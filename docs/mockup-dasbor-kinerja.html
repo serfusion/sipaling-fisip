@@ -1,0 +1,1043 @@
+<title>Dasbor Kinerja SiPaling</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+  /* ============================================================
+     TOKEN — navy + emas FISIP UMT. Tiga warna seri sudah lolos
+     validator (kontras, chroma, dan pemisahan buta warna
+     protan/deutan/tritan) pada tema terang maupun gelap.
+     ============================================================ */
+  :root {
+    --navy:#0a2a5e; --ground:#f1f5fb; --surface:#fff; --surface-2:#f7fafd;
+    --line:#dee7f3; --line-strong:#c2d2e8; --ink:#152238; --ink-2:#3a4a63; --muted:#55647c;
+    --gold:#f5c542; --gold-ink:#6b4e00;
+    --s1:#1565d8; --s2:#c9790d; --s3:#d9466f; --s-other:#94a3b8;
+    --s1-soft:#dcebff; --s2-soft:#fdeed5; --s3-soft:#fde4ec;
+    --good:#157f52; --good-bg:#e2f6eb; --warn:#9a6205; --warn-bg:#fdf1d8;
+    --crit:#b3261e; --crit-bg:#fdeceb;
+    --hm0:#eef3fa; --hm1:#cfe1fb; --hm2:#9dc2f6; --hm3:#4f8ceb; --hm4:#1552b4;
+    --shadow:0 1px 2px rgba(10,42,94,.05),0 10px 28px rgba(10,42,94,.07);
+    --radius:16px;
+  }
+  :root:not([data-theme="light"]) { color-scheme: light dark; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --navy:#cddffb; --ground:#0a0f1e; --surface:#12182a; --surface-2:#182036;
+      --line:#26304a; --line-strong:#3a4767; --ink:#e8eef9; --ink-2:#b5c2d8; --muted:#8797b0;
+      --gold:#f5c542; --gold-ink:#f5d888;
+      --s1:#3b82f6; --s2:#c9790d; --s3:#d9466f; --s-other:#64748b;
+      --s1-soft:#16294b; --s2-soft:#33260c; --s3-soft:#3a1622;
+      --good:#4ec78d; --good-bg:#0f2f1e; --warn:#e2ab4a; --warn-bg:#33260c;
+      --crit:#f28b84; --crit-bg:#3a1614;
+      --hm0:#161d31; --hm1:#1d3155; --hm2:#24518f; --hm3:#3272cd; --hm4:#5b9bff;
+      --shadow:0 1px 2px rgba(0,0,0,.45),0 10px 28px rgba(0,0,0,.3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --navy:#cddffb; --ground:#0a0f1e; --surface:#12182a; --surface-2:#182036;
+    --line:#26304a; --line-strong:#3a4767; --ink:#e8eef9; --ink-2:#b5c2d8; --muted:#8797b0;
+    --gold:#f5c542; --gold-ink:#f5d888;
+    --s1:#3b82f6; --s2:#c9790d; --s3:#d9466f; --s-other:#64748b;
+    --s1-soft:#16294b; --s2-soft:#33260c; --s3-soft:#3a1622;
+    --good:#4ec78d; --good-bg:#0f2f1e; --warn:#e2ab4a; --warn-bg:#33260c;
+    --crit:#f28b84; --crit-bg:#3a1614;
+    --hm0:#161d31; --hm1:#1d3155; --hm2:#24518f; --hm3:#3272cd; --hm4:#5b9bff;
+    --shadow:0 1px 2px rgba(0,0,0,.45),0 10px 28px rgba(0,0,0,.3);
+  }
+
+  * { box-sizing: border-box; }
+  html { font-size: 17px; }
+  html[data-size="besar"] { font-size: 20px; }
+  body {
+    margin:0; background:var(--ground); color:var(--ink); font-size:1rem; line-height:1.6;
+    font-family:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:1200px; margin:0 auto; padding:22px 18px 64px; }
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); }
+  :where(a,button,input,select,[tabindex]):focus-visible { outline:3px solid var(--s1); outline-offset:2px; border-radius:8px; }
+
+  /* Kepala */
+  .top { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:14px; padding-bottom:16px; border-bottom:3px solid var(--navy); }
+  .top h1 { margin:0; font-size:clamp(1.5rem,3.6vw,2.05rem); font-weight:800; letter-spacing:-.03em; color:var(--navy); text-wrap:balance; }
+  .top p { margin:5px 0 0; color:var(--muted); font-size:.92rem; max-width:60ch; }
+  .a11y { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .period { display:inline-flex; align-items:center; gap:8px; padding:9px 15px; background:var(--surface); border:1px solid var(--line); border-radius:999px; font-size:.88rem; font-weight:600; color:var(--ink-2); box-shadow:var(--shadow); }
+  .period b { color:var(--ink); font-weight:700; }
+  .a11y button { display:inline-flex; align-items:center; gap:7px; min-height:44px; padding:9px 16px; border:1px solid var(--line-strong); border-radius:999px; background:var(--surface); color:var(--ink-2); font:inherit; font-size:.88rem; font-weight:700; cursor:pointer; box-shadow:var(--shadow); }
+  .a11y button:hover { border-color:var(--s1); color:var(--s1); }
+  .a11y button[aria-pressed="true"] { background:var(--s1); border-color:var(--s1); color:#fff; }
+  .a11y button .aa { font-size:1.15em; font-weight:800; line-height:1; }
+  .mock-note { display:flex; gap:10px; margin:16px 0 0; padding:12px 15px; border-radius:12px; background:var(--warn-bg); color:var(--warn); font-size:.92rem; line-height:1.55; }
+
+  /* Bagian */
+  section { margin-top:40px; }
+  .eyebrow { margin:0 0 3px; font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:.74rem; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+  section > h2 { margin:0 0 5px; font-size:clamp(1.2rem,2.4vw,1.5rem); font-weight:800; letter-spacing:-.02em; color:var(--navy); text-wrap:balance; }
+  .lede { margin:0 0 18px; color:var(--ink-2); font-size:.96rem; max-width:70ch; }
+
+  /* Cincin */
+  .rings { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; }
+  .ring-card { padding:18px 14px 16px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:3px; }
+  .ring { position:relative; width:9.4rem; height:9.4rem; }
+  .ring svg { width:100%; height:100%; transform:rotate(-90deg); }
+  .ring-bg { fill:none; stroke:var(--surface-2); stroke-width:13; }
+  .ring-fg { fill:none; stroke-width:13; stroke-linecap:round; }
+  /* Baris, bukan grid: dengan place-items:center tanda persen tadi jadi
+     item grid tersendiri dan turun ke bawah angkanya. */
+  .ring-val { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:2px;
+    font-size:2.1rem; font-weight:800; letter-spacing:-.04em; font-variant-numeric:tabular-nums; }
+  .ring-val i { font-style:normal; font-size:.46em; font-weight:800; align-self:center; }
+  .ring-label { margin-top:8px; font-size:1rem; font-weight:800; color:var(--ink); line-height:1.25; }
+  .ring-sub { font-size:.85rem; color:var(--muted); }
+
+  /* Kartu angka */
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px; margin-top:14px; }
+  .kpi { padding:16px 18px 0; display:flex; flex-direction:column; overflow:hidden; }
+  .kpi .label { font-size:.86rem; font-weight:700; color:var(--muted); }
+  .kpi .num { font-size:2.3rem; font-weight:800; letter-spacing:-.04em; color:var(--ink); font-variant-numeric:tabular-nums; line-height:1.12; }
+  .kpi .num small { font-size:1rem; font-weight:700; color:var(--ink-2); }
+  .kpi .foot { display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; margin:6px 0 10px; }
+  .kpi.alert { border-color:var(--crit); }
+  .kpi.alert .num { color:var(--crit); }
+  .spark { width:calc(100% + 36px); height:2.5rem; margin:0 -18px -1px; display:block; }
+  .delta { font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:.82rem; font-weight:500; white-space:nowrap; }
+  .delta.up { color:var(--good); } .delta.down { color:var(--crit); }
+
+  /* Pil */
+  .pill { display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:999px; font-size:.8rem; font-weight:700; white-space:nowrap; }
+  .pill.ok,.pill.good { background:var(--good-bg); color:var(--good); }
+  .pill.warn { background:var(--warn-bg); color:var(--warn); }
+  .pill.crit { background:var(--crit-bg); color:var(--crit); }
+  .pill.calm { background:var(--surface-2); color:var(--muted); border:1px solid var(--line); }
+  .pill .dot { width:7px; height:7px; border-radius:50%; background:currentColor; flex:0 0 7px; }
+
+  /* Kunci baca */
+  .key { padding:18px 20px; margin-top:14px; }
+  .key h3 { margin:0 0 12px; font-size:1rem; font-weight:800; color:var(--ink); }
+  .key-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:12px 22px; }
+  .key-item { display:flex; gap:11px; align-items:flex-start; }
+  .key-item p { margin:0; font-size:.92rem; color:var(--ink-2); line-height:1.55; }
+  .key-item b { color:var(--ink); }
+
+  /* Tabel */
+  .table-scroll { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; min-width:820px; }
+  thead th { text-align:left; padding:13px 15px; font-size:.78rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); border-bottom:1px solid var(--line); white-space:nowrap; }
+  tbody td { padding:14px 15px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  tbody tr:last-child td { border-bottom:0; }
+  tbody tr:hover td { background:var(--surface-2); }
+  th.right, td.right { text-align:right; }
+  .num-cell { font-variant-numeric:tabular-nums; font-weight:700; color:var(--ink); white-space:nowrap; }
+  .num-cell.dim { color:var(--muted); font-weight:500; }
+  td.stripe { position:relative; padding-left:19px; }
+  td.stripe::before { content:""; position:absolute; left:0; top:8px; bottom:8px; width:4px; border-radius:0 4px 4px 0; }
+  tr.sev-ok td.stripe::before { background:var(--good); }
+  tr.sev-warn td.stripe::before { background:var(--warn); }
+  tr.sev-crit td.stripe::before { background:var(--crit); }
+  tr.sev-calm td.stripe::before { background:var(--line-strong); }
+  .unit-line { display:flex; align-items:center; gap:9px; }
+  .unit-ico { width:1.6rem; height:1.6rem; flex:0 0 auto; color:var(--s1); background:var(--s1-soft); border-radius:8px; padding:3px; }
+  tr.sev-warn .unit-ico { color:var(--warn); background:var(--warn-bg); }
+  tr.sev-crit .unit-ico { color:var(--crit); background:var(--crit-bg); }
+  tr.sev-calm .unit-ico { color:var(--muted); background:var(--surface-2); }
+  .unit-name { font-weight:800; color:var(--ink); font-size:1rem; }
+  .unit-sub { display:block; margin-left:2.25rem; font-size:.84rem; color:var(--muted); font-weight:500; }
+  .cellbar { width:5.5rem; height:9px; background:var(--surface-2); border-radius:999px; overflow:hidden; display:inline-block; vertical-align:middle; }
+  .cellbar i { display:block; height:100%; background:var(--s1); border-radius:999px; }
+  tr.sev-crit .cellbar i { background:var(--s3); }
+  tr.sev-warn .cellbar i { background:var(--s2); }
+  .cellbar-n { margin-left:8px; font-size:.88rem; font-weight:700; font-variant-numeric:tabular-nums; color:var(--ink); }
+  .sparkline { width:96px; height:28px; display:block; overflow:visible; }
+  .series-line { fill:none; stroke-width:2.6; stroke-linecap:round; stroke-linejoin:round; }
+
+  /* Callout */
+  .callout { display:flex; gap:12px; padding:15px 17px; margin-top:14px; border:1px solid var(--line); border-left:4px solid var(--gold); border-radius:12px; background:var(--surface-2); }
+  .callout p { margin:0; font-size:.95rem; color:var(--ink-2); line-height:1.65; }
+  .callout strong { color:var(--ink); }
+  .callout .mark { font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:.78rem; color:var(--gold-ink); background:rgba(245,197,66,.22); padding:2px 7px; border-radius:5px; white-space:nowrap; align-self:flex-start; }
+
+  /* Panel */
+  .duo { display:grid; grid-template-columns:1fr; gap:14px; }
+  @media (min-width:920px){ .duo{grid-template-columns:1.05fr .95fr;} .duo-wide{grid-template-columns:1.45fr 1fr;} }
+  .panel { padding:19px 20px; }
+  .panel h3 { margin:0 0 3px; font-size:1.1rem; font-weight:800; color:var(--ink); }
+  .panel .sub { margin:0 0 16px; font-size:.9rem; color:var(--muted); }
+
+  /* Alur bergambar */
+  .vflow { display:flex; align-items:flex-start; justify-content:center; gap:4px; padding:6px 2px 10px; }
+  .vnode { flex:1 1 0; min-width:126px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:7px; }
+  .vdisc { width:5.6rem; height:5.6rem; border-radius:50%; display:grid; place-items:center; position:relative; flex:0 0 auto; background:var(--s1-soft); color:var(--s1); border:3px solid var(--s1); }
+  .vdisc svg { width:2.7rem; height:2.7rem; }
+  .vdisc .vstep { position:absolute; top:-6px; right:-6px; width:1.75rem; height:1.75rem; border-radius:50%; background:var(--s1); color:#fff; display:grid; place-items:center; font-size:.88rem; font-weight:800; border:2.5px solid var(--surface); font-variant-numeric:tabular-nums; }
+  .vwho { font-size:.7rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
+  .vtitle { font-size:1rem; font-weight:800; color:var(--ink); line-height:1.28; }
+  .vsub { font-size:.83rem; color:var(--muted); line-height:1.45; max-width:15rem; }
+  .vlink { flex:0 0 auto; align-self:flex-start; margin-top:2.5rem; color:var(--line-strong); }
+  .vlink svg { width:1.8rem; height:1.8rem; }
+  .vnode.done .vdisc { background:var(--good-bg); color:var(--good); border-color:var(--good); }
+  .vnode.done .vdisc .vstep { background:var(--good); }
+  .vnode.done .vtitle { color:var(--good); }
+  .vleak { margin-top:2px; display:inline-flex; align-items:center; gap:6px; background:var(--crit-bg); color:var(--crit); border-radius:999px; padding:5px 13px 5px 9px; font-size:.8rem; font-weight:800; white-space:nowrap; }
+  .vleak svg { width:1.05rem; height:1.05rem; flex:0 0 auto; }
+  @media (max-width:820px){
+    .vflow { flex-direction:column; align-items:stretch; gap:2px; }
+    .vnode { display:grid; grid-template-columns:5.6rem 1fr; column-gap:14px; text-align:left; padding:6px 0; }
+    .vdisc { grid-row:1 / -1; align-self:center; }
+    .vwho,.vtitle,.vsub,.vleak { grid-column:2; }
+    .vsub { max-width:none; }
+    .vleak { justify-self:start; }
+    .vlink { align-self:flex-start; margin:0 0 0 2.8rem; transform:translateX(-50%) rotate(90deg); }
+  }
+
+  /* Corong */
+  /* Bentuk trapesium dipotong pada lapisan latarnya sendiri; teks berada
+     di lapisan terpisah supaya tidak ikut terpotong seperti sebelumnya. */
+  .fnl-band { position:relative; min-height:5.8rem; display:grid; place-items:center; color:#fff; text-align:center; }
+  .fnl-shape { position:absolute; inset:0; }
+  .fnl-a .fnl-shape { background:linear-gradient(180deg,#6fa4f4,#4f8ceb); clip-path:polygon(0 0,100% 0,91.2% 100%,8.8% 100%); }
+  .fnl-b .fnl-shape { background:linear-gradient(180deg,#2e78e0,#1565d8); clip-path:polygon(8.8% 0,91.2% 0,85.15% 100%,14.85% 100%); }
+  .fnl-c .fnl-shape { background:linear-gradient(180deg,#1b9463,#157f52); clip-path:polygon(14.85% 0,85.15% 0,85.15% 100%,14.85% 100%); }
+  .fnl-txt { position:relative; z-index:1; width:64%; padding:10px 0; }
+  .fnl-band b { display:block; font-size:2.1rem; font-weight:800; line-height:1.05; font-variant-numeric:tabular-nums; text-shadow:0 1px 3px rgba(0,0,0,.25); }
+  .fnl-band span { display:block; font-size:.84rem; font-weight:700; opacity:.97; line-height:1.35; }
+  .fnl-leak { display:flex; align-items:center; justify-content:flex-end; gap:7px; padding:8px 4px; color:var(--crit); font-size:.88rem; font-weight:800; }
+  .fnl-leak svg { width:1.15rem; height:1.15rem; }
+
+  /* Piktogram */
+  .picto { display:flex; flex-wrap:wrap; gap:5px; margin:2px 0 12px; }
+  .picto svg { width:1.5rem; height:1.5rem; display:block; }
+  .picto .on { color:var(--s1); } .picto .off { color:var(--s-other); opacity:.42; }
+  .picto-key { display:flex; flex-wrap:wrap; gap:8px 18px; margin-bottom:6px; }
+  .picto-key span { display:inline-flex; align-items:center; gap:7px; font-size:.9rem; font-weight:700; color:var(--ink-2); }
+  .picto-key svg { width:1.15rem; height:1.15rem; }
+  .picto-key .on { color:var(--s1); } .picto-key .off { color:var(--s-other); }
+
+  /* Bar dosen */
+  .bars { display:flex; flex-direction:column; gap:10px; }
+  .bar-row { display:grid; grid-template-columns:8.5rem 1fr 2rem; gap:12px; align-items:center; }
+  .bar-row .who { font-size:.94rem; font-weight:700; color:var(--ink-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .bar-row .track { height:20px; background:var(--surface-2); border-radius:6px; overflow:hidden; }
+  .bar-row .fill { height:100%; background:linear-gradient(90deg,#3f86ea,var(--s1)); border-radius:6px; }
+  .bar-row .fill.over { background:linear-gradient(90deg,#e09a2e,var(--s2)); }
+  .bar-row .n { font-variant-numeric:tabular-nums; font-size:1rem; font-weight:800; text-align:right; color:var(--ink); }
+  .spread { margin-top:14px; padding-top:13px; border-top:1px solid var(--line); display:flex; flex-wrap:wrap; gap:8px 18px; }
+  .spread div { font-size:.94rem; color:var(--ink-2); }
+  .spread b { color:var(--ink); font-variant-numeric:tabular-nums; }
+
+  /* Perbandingan dua prodi — batang tolak belakang */
+  .cmp-head { display:grid; grid-template-columns:1fr auto 1fr; gap:12px; align-items:center; margin-bottom:14px; }
+  .cmp-head .cmp-side { display:flex; align-items:center; gap:9px; font-size:.95rem; font-weight:800; }
+  .cmp-head .cmp-side.a { justify-content:flex-end; color:var(--s1); }
+  .cmp-head .cmp-side.b { color:var(--s2); }
+  .cmp-head i { width:14px; height:14px; border-radius:4px; flex:0 0 14px; }
+  .cmp-head .cmp-vs { font-size:.78rem; font-weight:800; color:var(--muted); letter-spacing:.08em; }
+  .cmp-row { display:grid; grid-template-columns:1fr auto 1fr; gap:10px 12px; align-items:center; padding:9px 0; border-top:1px solid var(--line); }
+  .cmp-label { grid-column:1 / -1; text-align:center; font-size:.88rem; font-weight:700; color:var(--muted); order:-1; }
+  /* Kolom ditetapkan eksplisit; tanpa ini .cmp-b tersedot ke kolom tengah
+     yang lebarnya "auto" sehingga batangnya menciut jadi nol. Batang juga
+     diberi track tersendiri supaya angka di tepi tidak terdorong keluar. */
+  .cmp-a { grid-column:1; grid-template-columns:auto 1fr; }
+  .cmp-b { grid-column:3; grid-template-columns:1fr auto; }
+  .cmp-a, .cmp-b { display:grid; align-items:center; gap:10px; min-width:0; }
+  .cmp-track { height:22px; display:flex; min-width:0; }
+  .cmp-a .cmp-track { justify-content:flex-end; }
+  .cmp-a i, .cmp-b i { height:22px; border-radius:5px; display:block; }
+  .cmp-a i { background:linear-gradient(90deg,var(--s1),#4f8ceb); }
+  .cmp-b i { background:linear-gradient(90deg,var(--s2),#e0a13d); }
+  .cmp-a b, .cmp-b b { font-size:1.05rem; font-weight:800; font-variant-numeric:tabular-nums; color:var(--ink); min-width:2.4rem; }
+  .cmp-a b { text-align:right; } .cmp-b b { text-align:left; }
+  .cmp-key { background:var(--s1-soft); border-radius:10px; padding:11px 12px; margin:4px 0; border-top-color:transparent; }
+  .cmp-key .cmp-label { color:var(--s1); font-weight:800; }
+
+  /* Peta panas */
+  .hm { display:grid; grid-template-columns:4.6rem repeat(9,1fr); gap:4px; }
+  .hm-corner { }
+  .hm-top { text-align:center; font-size:.76rem; font-weight:700; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .hm-lbl { display:flex; align-items:center; font-size:.86rem; font-weight:700; color:var(--ink-2); }
+  .hm-cell { aspect-ratio:1/1; border-radius:7px; display:grid; place-items:center; font-size:.8rem; font-weight:800; font-variant-numeric:tabular-nums; cursor:default; }
+  .hm-cell.l0 { background:var(--hm0); color:var(--muted); }
+  .hm-cell.l1 { background:var(--hm1); color:var(--navy); }
+  .hm-cell.l2 { background:var(--hm2); color:#0b2d63; }
+  .hm-cell.l3 { background:var(--hm3); color:#fff; }
+  .hm-cell.l4 { background:var(--hm4); color:#fff; }
+  .hm-scale { display:flex; align-items:center; gap:7px; margin-top:14px; font-size:.85rem; color:var(--muted); font-weight:600; }
+  .hm-scale i { width:26px; height:14px; border-radius:4px; }
+  @media (max-width:620px){ .hm { grid-template-columns:3.4rem repeat(9,1fr); gap:3px; } .hm-cell { font-size:.7rem; border-radius:5px; } .hm-lbl { font-size:.76rem; } .hm-top { font-size:.66rem; } }
+
+  /* Donat */
+  .don-wrap { display:flex; flex-wrap:wrap; align-items:center; gap:20px; }
+  .don { width:12.5rem; height:12.5rem; flex:0 0 auto; position:relative; }
+  .don svg { width:100%; height:100%; transform:rotate(-90deg); }
+  .don-seg { fill:none; stroke-width:22; }
+  .don-mid { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; line-height:1.15; }
+  .don-mid b { display:block; font-size:1.9rem; font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums; letter-spacing:-.03em; }
+  .don-mid span { font-size:.8rem; color:var(--muted); font-weight:700; }
+  .don-leg { list-style:none; margin:0; padding:0; flex:1 1 12rem; display:flex; flex-direction:column; gap:9px; }
+  .don-leg li { display:grid; grid-template-columns:14px 1fr auto auto; gap:10px; align-items:center; font-size:.92rem; }
+  .don-leg .swatch { width:14px; height:14px; border-radius:4px; }
+  .don-name { color:var(--ink-2); font-weight:600; }
+  .don-leg b { font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums; }
+  .don-leg small { color:var(--muted); font-weight:700; min-width:2.4rem; text-align:right; font-variant-numeric:tabular-nums; }
+
+  /* Grafik garis */
+  .chart { width:100%; height:auto; display:block; overflow:visible; }
+  .grid-line { stroke:var(--line); stroke-width:1; }
+  .axis-text { font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:13px; fill:var(--muted); }
+  .series-dot { r:5.5; stroke:var(--surface); stroke-width:2.5; }
+  .end-label { font-size:15px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .hit { fill:transparent; cursor:pointer; }
+  .legend { display:flex; flex-wrap:wrap; gap:8px 18px; margin:0 0 12px; padding:0; list-style:none; }
+  .legend li { display:inline-flex; align-items:center; gap:8px; font-size:.94rem; color:var(--ink-2); font-weight:700; }
+  .legend .swatch { width:14px; height:14px; border-radius:4px; }
+
+  /* Penjelasan yang bisa dibuka-tutup. Memakai <details> bawaan HTML
+     sehingga tetap berfungsi tanpa JavaScript dan ramah pembaca layar. */
+  .why { margin-top:10px; }
+  .why > summary {
+    cursor:pointer; list-style:none; display:inline-flex; align-items:center; gap:7px;
+    font-size:.84rem; font-weight:700; color:var(--s1); padding:7px 0; min-height:36px;
+  }
+  .why > summary::-webkit-details-marker { display:none; }
+  .why > summary::before { content:"\25B8"; display:inline-block; transition:transform .15s ease; }
+  .why[open] > summary::before { transform:rotate(90deg); }
+  .why > summary:hover { text-decoration:underline; }
+  .why-body {
+    margin-top:4px; padding:12px 14px; background:var(--surface-2);
+    border:1px solid var(--line); border-left:3px solid var(--s1); border-radius:10px;
+    font-size:.88rem; color:var(--ink-2); line-height:1.62; text-align:left;
+  }
+  .why-body p { margin:0 0 7px; }
+  .why-body p:last-child { margin:0; }
+  .why-body b { color:var(--ink); }
+  .why-body code { font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:.82em; background:var(--surface); border:1px solid var(--line); border-radius:5px; padding:1px 5px; }
+  .ring-card .why { width:100%; }
+  .ring-card .why > summary { justify-content:center; }
+
+  .toggle { margin-top:12px; background:none; border:1px solid var(--line); border-radius:9px; padding:10px 16px; font:inherit; font-size:.92rem; font-weight:700; color:var(--ink-2); cursor:pointer; min-height:44px; }
+  .toggle:hover { background:var(--surface-2); color:var(--ink); }
+  .data-table[hidden] { display:none; }
+  .data-table table { min-width:420px; }
+
+  #tip { position:fixed; z-index:50; pointer-events:none; opacity:0; transform:translate(-50%,-118%); background:var(--navy); color:var(--ground); padding:8px 12px; border-radius:9px; font-size:.88rem; font-weight:600; white-space:nowrap; box-shadow:0 6px 20px rgba(0,0,0,.3); transition:opacity .12s ease; }
+  #tip.on { opacity:1; }
+
+  .source { margin-top:42px; padding-top:18px; border-top:1px solid var(--line); font-size:.92rem; color:var(--muted); line-height:1.8; }
+  .source h3 { margin:0 0 10px; font-size:.82rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-2); }
+  .source ul { margin:0; padding-left:20px; }
+  .source code { font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:.82rem; background:var(--surface-2); border:1px solid var(--line); border-radius:5px; padding:1px 6px; color:var(--ink-2); }
+
+  @media (prefers-reduced-motion: reduce){ *,*::before,*::after{ transition-duration:.001ms !important; animation-duration:.001ms !important; } }
+
+</style>
+
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <h1>Dasbor Kinerja SiPaling</h1>
+      <p>Mengukur mutu layanan, bukan ramai atau sepinya.</p>
+    </div>
+    <div class="a11y">
+      <div class="period">Periode <b>Semester Ganjil 2025/2026</b></div>
+      <button type="button" id="btn-size" aria-pressed="false"><span class="aa">A</span> Perbesar teks</button>
+    </div>
+  </header>
+
+  <div class="mock-note"><span>&#9670;</span><div><b>Mockup.</b> Angka masih contoh.</div></div>
+
+  <section>
+    <p class="eyebrow">Pertanyaan 1</p>
+    <h2>Apakah layanan berjalan cepat dan tuntas?</h2>
+
+    <div class="rings">
+      <div class="card ring-card">
+        <div class="ring">
+          <svg viewBox="0 0 120 120" role="img" aria-label="Layanan tuntas: 94 persen">
+            <circle class="ring-bg" cx="60" cy="60" r="46"></circle>
+            <circle class="ring-fg" cx="60" cy="60" r="46" stroke="var(--good)"
+              stroke-dasharray="271.7 289.0"></circle>
+          </svg>
+          <span class="ring-val" style="color:var(--good)">94<i>%</i></span>
+        </div>
+        <b class="ring-label">Layanan tuntas</b>
+        <span class="ring-sub">Target 90% &middot; tercapai</span>
+        <details class="why">
+          <summary>Dari mana angkanya?</summary>
+          <div class="why-body">
+            <p><b>Hitungan:</b> tiket berstatus <b>Selesai</b> &divide; seluruh tiket bulan ini &times; 100 &rarr; <b>321 &divide; 342</b></p>
+            <p><b>Sumber:</b> <code>service_requests.status</code></p>
+            <p>Target fakultas 90%. Angka di atas itu berarti tercapai.</p>
+          </div>
+        </details>
+      </div>
+      <div class="card ring-card">
+        <div class="ring">
+          <svg viewBox="0 0 120 120" role="img" aria-label="Judul lolos berkas: 82 persen">
+            <circle class="ring-bg" cx="60" cy="60" r="46"></circle>
+            <circle class="ring-fg" cx="60" cy="60" r="46" stroke="var(--s1)"
+              stroke-dasharray="237.0 289.0"></circle>
+          </svg>
+          <span class="ring-val" style="color:var(--s1)">82<i>%</i></span>
+        </div>
+        <b class="ring-label">Judul lolos berkas</b>
+        <span class="ring-sub">61 dari 74 pengajuan</span>
+        <details class="why">
+          <summary>Dari mana angkanya?</summary>
+          <div class="why-body">
+            <p><b>Hitungan:</b> pengajuan yang lolos <b>dua ceklis</b> &divide; seluruh pengajuan &times; 100 &rarr; <b>61 &divide; 74</b></p>
+            <p><b>Sumber:</b> <code>title_proposals.finance_verified</code> dan <code>eligibility_verified</code></p>
+          </div>
+        </details>
+      </div>
+      <div class="card ring-card">
+        <div class="ring">
+          <svg viewBox="0 0 120 120" role="img" aria-label="Dosen aktif membimbing: 43 persen">
+            <circle class="ring-bg" cx="60" cy="60" r="46"></circle>
+            <circle class="ring-fg" cx="60" cy="60" r="46" stroke="var(--s2)"
+              stroke-dasharray="124.3 289.0"></circle>
+          </svg>
+          <span class="ring-val" style="color:var(--s2)">43<i>%</i></span>
+        </div>
+        <b class="ring-label">Dosen aktif membimbing</b>
+        <span class="ring-sub">15 dari 35 dosen</span>
+        <details class="why">
+          <summary>Dari mana angkanya?</summary>
+          <div class="why-body">
+            <p><b>Hitungan:</b> dosen dengan minimal 1 mahasiswa disetujui &divide; dosen aktif &times; 100 &rarr; <b>15 &divide; 35</b></p>
+            <p><b>Sumber:</b> <code>title_proposals.approved_lecturer_id</code> berstatus <code>Disetujui Dosen</code></p>
+            <p>Rendah berarti beban bimbingan menumpuk di sedikit orang.</p>
+          </div>
+        </details>
+      </div>
+      <div class="card ring-card">
+        <div class="ring">
+          <svg viewBox="0 0 120 120" role="img" aria-label="Dosen punya luaran: 56 persen">
+            <circle class="ring-bg" cx="60" cy="60" r="46"></circle>
+            <circle class="ring-fg" cx="60" cy="60" r="46" stroke="var(--s1)"
+              stroke-dasharray="161.9 289.0"></circle>
+          </svg>
+          <span class="ring-val" style="color:var(--s1)">56<i>%</i></span>
+        </div>
+        <b class="ring-label">Dosen punya luaran</b>
+        <span class="ring-sub">23 dari 41 dosen</span>
+        <details class="why">
+          <summary>Dari mana angkanya?</summary>
+          <div class="why-body">
+            <p><b>Hitungan:</b> dosen yang tercatat pada minimal 1 dokumen &divide; dosen aktif &times; 100 &rarr; <b>23 &divide; 41</b></p>
+            <p><b>Sumber:</b> <code>document_contributors</code></p>
+            <p>Bukan jumlah dokumen, melainkan berapa dosen yang terlibat.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+    <details class="why">
+      <summary>Dari mana angkanya?</summary>
+      <div class="why-body">
+        <p><b>Hitungan:</b> tiket bulan berjalan; median dari selisih masuk &rarr; selesai; menggantung = belum selesai lewat 7 hari; mahasiswa unik = <code>count(distinct nim)</code></p>
+        <p><b>Sumber:</b> <code>service_requests</code></p>
+        <p>Pembanding 1.240 adalah jumlah mahasiswa aktif FISIP semester ini.</p>
+      </div>
+    </details>
+
+    <div class="kpis">
+      <div class="card kpi">
+        <span class="label">Tiket bulan ini</span>
+        <span class="num">342</span>
+        <div class="foot"><span class="delta up">&#9650; 12% dari bulan lalu</span></div>
+        <svg class="spark" viewBox="0 0 96 32" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--s1)" stop-opacity=".42"/><stop offset="100%" stop-color="var(--s1)" stop-opacity="0"/></linearGradient></defs><polygon points="3,30 3,26 21,22 39,23 57,15 75,11 93,6 93,30" fill="url(#g1)"></polygon><polyline points="3,26 21,22 39,23 57,15 75,11 93,6" fill="none" stroke="var(--s1)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>
+      </div>
+      <div class="card kpi">
+        <span class="label">Median penyelesaian</span>
+        <span class="num">1,8 <small>hari</small></span>
+        <div class="foot"><span class="pill good"><i class="dot"></i> Di bawah target 2 hari</span></div>
+        <svg class="spark" viewBox="0 0 96 32" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--good)" stop-opacity=".42"/><stop offset="100%" stop-color="var(--good)" stop-opacity="0"/></linearGradient></defs><polygon points="3,30 3,8 21,11 39,10 57,17 75,21 93,25 93,30" fill="url(#g2)"></polygon><polyline points="3,8 21,11 39,10 57,17 75,21 93,25" fill="none" stroke="var(--good)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>
+      </div>
+      <div class="card kpi alert">
+        <span class="label">Menggantung &gt; 7 hari</span>
+        <span class="num">6</span>
+        <div class="foot"><span class="pill crit"><i class="dot"></i> Perlu ditindak</span><span class="delta down">&#9650; 2 minggu ini</span></div>
+      </div>
+      <div class="card kpi">
+        <span class="label">Mahasiswa unik terlayani</span>
+        <span class="num">218</span>
+        <div class="foot"><span class="delta up">&#9650; 18% dari 1.240 mahasiswa aktif</span></div>
+        <svg class="spark" viewBox="0 0 96 32" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="g3" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--s1)" stop-opacity=".42"/><stop offset="100%" stop-color="var(--s1)" stop-opacity="0"/></linearGradient></defs><polygon points="3,30 3,24 21,20 39,17 57,15 75,11 93,7 93,30" fill="url(#g3)"></polygon><polyline points="3,24 21,20 39,17 57,15 75,11 93,7" fill="none" stroke="var(--s1)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>
+      </div>
+    </div>
+
+    <div class="card key">
+      <h3>Cara membaca dasbor ini</h3>
+      <div class="key-grid">
+        <div class="key-item"><span class="pill good"><i class="dot"></i> Sehat</span><p>Cepat dan tuntas. <b>Tidak perlu ditindak.</b></p></div>
+        <div class="key-item"><span class="pill warn"><i class="dot"></i> Melambat</span><p>Masih jalan, tetapi lebih lambat. <b>Perlu diperhatikan.</b></p></div>
+        <div class="key-item"><span class="pill crit"><i class="dot"></i> Tertahan</span><p>Ada yang mandek. <b>Perlu ditindak minggu ini.</b></p></div>
+        <div class="key-item"><span class="pill calm"><i class="dot"></i> Wajar sepi</span><p>Memang jarang dipakai. <b>Sepi di sini bukan kegagalan.</b></p></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Pertanyaan 2</p>
+    <h2>Unit mana yang perlu dibantu?</h2>
+    <p class="lede">Tiap unit dibanding dirinya sendiri bulan lalu, bukan dengan unit lain.</p>
+    <div class="card table-scroll">
+      <table>
+        <thead><tr><th>Unit layanan</th><th class="right">Tiket</th><th class="right">Median</th><th>Tuntas</th><th class="right">&gt;7 hari</th><th>Tren sendiri</th><th>Keadaan</th></tr></thead>
+        <tbody>
+            <tr class="sev-ok">
+              <td class="stripe"><span class="unit-line"><svg class="unit-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 3h7.2L19 8.3V21H6.5z"/><path d="M13.5 3v5.4H19"/><path d="M9.5 13h6M9.5 17h6"/></svg><span class="unit-name">Akademik</span></span><span class="unit-sub">Nilai, transkrip, data akademik</span></td>
+              <td class="right num-cell">118</td>
+              <td class="right num-cell">1,4 hari</td>
+              <td><div class="cellbar"><i style="width:94%"></i></div><span class="cellbar-n">94%</span></td>
+              <td class="right num-cell">1</td>
+              <td><svg class="sparkline" viewBox="0 0 96 28" role="img" aria-label="Tren Akademik"><polyline class="series-line" points="3,15 20,13 37,16 54,12 71,13 88,11" stroke="var(--s1)"></polyline><circle cx="88" cy="11" r="3.5" fill="var(--s1)"></circle></svg></td>
+              <td><span class="pill ok"><i class="dot"></i> Sehat</span></td>
+            </tr>
+            <tr class="sev-ok">
+              <td class="stripe"><span class="unit-line"><svg class="unit-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="m4 7.5 8 6 8-6"/></svg><span class="unit-name">Umum</span></span><span class="unit-sub">Surat aktif, penelitian, PKL</span></td>
+              <td class="right num-cell">96</td>
+              <td class="right num-cell">1,1 hari</td>
+              <td><div class="cellbar"><i style="width:97%"></i></div><span class="cellbar-n">97%</span></td>
+              <td class="right num-cell dim">0</td>
+              <td><svg class="sparkline" viewBox="0 0 96 28" role="img" aria-label="Tren Umum"><polyline class="series-line" points="3,17 20,15 37,14 54,12 71,10 88,9" stroke="var(--s1)"></polyline><circle cx="88" cy="9" r="3.5" fill="var(--s1)"></circle></svg></td>
+              <td><span class="pill ok"><i class="dot"></i> Sehat</span></td>
+            </tr>
+            <tr class="sev-warn">
+              <td class="stripe"><span class="unit-line"><svg class="unit-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V9.5L12 4l8 5.5V21"/><path d="M9.5 21v-6h5v6"/></svg><span class="unit-name">Prodi</span></span><span class="unit-sub">Judul, pembimbing, seminar</span></td>
+              <td class="right num-cell">74</td>
+              <td class="right num-cell">2,6 hari</td>
+              <td><div class="cellbar"><i style="width:88%"></i></div><span class="cellbar-n">88%</span></td>
+              <td class="right num-cell">3</td>
+              <td><svg class="sparkline" viewBox="0 0 96 28" role="img" aria-label="Tren Prodi"><polyline class="series-line" points="3,11 20,12 37,11 54,15 71,16 88,18" stroke="var(--s2)"></polyline><circle cx="88" cy="18" r="3.5" fill="var(--s2)"></circle></svg></td>
+              <td><span class="pill warn"><i class="dot"></i> Melambat</span></td>
+            </tr>
+            <tr class="sev-ok">
+              <td class="stripe"><span class="unit-line"><svg class="unit-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h5v17H6a2 2 0 0 0-2 2z"/><path d="M20 5a2 2 0 0 0-2-2h-5v17h5a2 2 0 0 1 2 2z"/></svg><span class="unit-name">Perpustakaan</span></span><span class="unit-sub">Absensi, bebas pustaka</span></td>
+              <td class="right num-cell">38</td>
+              <td class="right num-cell">0,6 hari</td>
+              <td><div class="cellbar"><i style="width:99%"></i></div><span class="cellbar-n">99%</span></td>
+              <td class="right num-cell dim">0</td>
+              <td><svg class="sparkline" viewBox="0 0 96 28" role="img" aria-label="Tren Perpustakaan"><polyline class="series-line" points="3,13 20,14 37,12 54,13 71,12 88,12" stroke="var(--s1)"></polyline><circle cx="88" cy="12" r="3.5" fill="var(--s1)"></circle></svg></td>
+              <td><span class="pill ok"><i class="dot"></i> Sehat</span></td>
+            </tr>
+            <tr class="sev-crit">
+              <td class="stripe"><span class="unit-line"><svg class="unit-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8.5 12 4l10 4.5-10 4.5z"/><path d="M6.5 11.2V15c0 1.9 2.9 3.3 5.5 3.3S17.5 16.9 17.5 15v-3.8"/></svg><span class="unit-name">Tugas Akhir</span></span><span class="unit-sub">Draft skripsi, artikel, revisi</span></td>
+              <td class="right num-cell">22</td>
+              <td class="right num-cell">4,2 hari</td>
+              <td><div class="cellbar"><i style="width:71%"></i></div><span class="cellbar-n">71%</span></td>
+              <td class="right num-cell">2</td>
+              <td><svg class="sparkline" viewBox="0 0 96 28" role="img" aria-label="Tren Tugas Akhir"><polyline class="series-line" points="3,9 20,11 37,13 54,14 71,18 88,21" stroke="var(--s3)"></polyline><circle cx="88" cy="21" r="3.5" fill="var(--s3)"></circle></svg></td>
+              <td><span class="pill crit"><i class="dot"></i> Tertahan</span></td>
+            </tr>
+            <tr class="sev-calm">
+              <td class="stripe"><span class="unit-line"><svg class="unit-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg><span class="unit-name">PDDIKTI</span></span><span class="unit-sub">Sepi itu wajar — lihat di bawah</span></td>
+              <td class="right num-cell">9</td>
+              <td class="right num-cell">3,1 hari</td>
+              <td><div class="cellbar"><i style="width:89%"></i></div><span class="cellbar-n">89%</span></td>
+              <td class="right num-cell dim">0</td>
+              <td><svg class="sparkline" viewBox="0 0 96 28" role="img" aria-label="Tren PDDIKTI"><polyline class="series-line" points="3,7 20,10 37,12 54,15 71,18 88,20" stroke="var(--s-other)"></polyline><circle cx="88" cy="20" r="3.5" fill="var(--s-other)"></circle></svg></td>
+              <td><span class="pill calm"><i class="dot"></i> Wajar sepi</span></td>
+            </tr>
+            <tr class="sev-calm">
+              <td class="stripe"><span class="unit-line"><svg class="unit-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 3v6.5L4.8 18a2 2 0 0 0 1.8 3h10.8a2 2 0 0 0 1.8-3l-4.7-8.5V3"/><path d="M8 3h8M7.5 15h9"/></svg><span class="unit-name">Laboratorium</span></span><span class="unit-sub">Peminjaman dan praktikum</span></td>
+              <td class="right num-cell">7</td>
+              <td class="right num-cell">1,9 hari</td>
+              <td><div class="cellbar"><i style="width:100%"></i></div><span class="cellbar-n">100%</span></td>
+              <td class="right num-cell dim">0</td>
+              <td><svg class="sparkline" viewBox="0 0 96 28" role="img" aria-label="Tren Laboratorium"><polyline class="series-line" points="3,14 20,15 37,13 54,14 71,14 88,13" stroke="var(--s-other)"></polyline><circle cx="88" cy="13" r="3.5" fill="var(--s-other)"></circle></svg></td>
+              <td><span class="pill calm"><i class="dot"></i> Wajar sepi</span></td>
+            </tr>
+        </tbody>
+      </table>
+    </div>
+      <details class="why">
+        <summary>Dari mana angkanya?</summary>
+        <div class="why-body">
+          <p><b>Hitungan:</b> median selisih <code>created_at</code> &rarr; <code>updated_at</code> pada tiket berstatus Selesai; kolom Tuntas = persentase Selesai; &gt;7 hari = tiket belum selesai lewat tujuh hari kerja</p>
+          <p><b>Sumber:</b> <code>service_requests</code>, dikelompokkan per <code>service_type</code></p>
+          <p>Sparkline memakai enam bulan terakhir unit yang sama.</p>
+        </div>
+      </details>
+    <details class="why">
+        <summary>Kenapa tabel, bukan diagram pie?</summary>
+        <div class="why-body"><p><strong>Di sinilah diagram pie akan menyesatkan.</strong> Pie &ldquo;tiket per unit&rdquo; membuat PDDIKTI 2% terbaca sebagai kegagalan, padahal sepi justru berarti data mahasiswa sehat. Tabel ini memisahkan <em>volume</em> dari <em>mutu</em>: Tugas Akhir cuma 22 tiket tetapi paling merah.</p></div>
+      </details>
+  </section>
+
+  <section>
+    <p class="eyebrow">Pertanyaan 3</p>
+    <h2>Di mana pengajuan judul tersendat?</h2>
+    <p class="lede">Empat langkah, dua tempat bisa gugur.</p>
+
+    <figure class="card panel" style="margin:0 0 14px">
+      <h3>Alur yang sedang diukur</h3>
+      <p class="sub">Dari mahasiswa mengirim sampai Surat Tugas terbit</p>
+      <div class="vflow">
+        <div class="vnode">
+          <span class="vdisc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8.5 12 4l10 4.5-10 4.5z"/><path d="M6.5 11.2V15c0 1.9 2.9 3.3 5.5 3.3S17.5 16.9 17.5 15v-3.8"/><path d="M22 8.5v5.2"/></svg><b class="vstep">1</b></span>
+          <span class="vwho">Mahasiswa</span>
+          <span class="vtitle">Kirim template</span>
+          <span class="vsub">Bukti keuangan + tiga usulan dosen</span>
+        </div>
+        <span class="vlink" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></span>
+        <div class="vnode">
+          <span class="vdisc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 3h7.2L19 8.3V21H6.5z"/><path d="M13.5 3v5.4H19"/><path d="M9.3 14.6l2.1 2.1 4.3-4.3"/></svg><b class="vstep">2</b></span>
+          <span class="vwho">Program Studi</span>
+          <span class="vtitle">Cek berkas</span>
+          <span class="vsub">Dua ceklis wajib terpenuhi</span>
+          <span class="vleak"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v13"/><path d="m6.5 11.5 5.5 5.5 5.5-5.5"/></svg> 13 gugur</span>
+        </div>
+        <span class="vlink" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></span>
+        <div class="vnode">
+          <span class="vdisc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="7.3" r="3.4"/><path d="M4.8 20.4c0-4 3.2-7.2 7.2-7.2 1.5 0 2.9.5 4.1 1.2"/><path d="M15.4 18.6l2.2 2.2 4.2-4.2"/></svg><b class="vstep">3</b></span>
+          <span class="vwho">Program Studi</span>
+          <span class="vtitle">Pilih 1 dari 3 dosen</span>
+          <span class="vsub">Yang paling sesuai judulnya</span>
+        </div>
+        <span class="vlink" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></span>
+        <div class="vnode">
+          <span class="vdisc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.2l2.7 2.7L16.2 9.4"/></svg><b class="vstep">4</b></span>
+          <span class="vwho">Dosen</span>
+          <span class="vtitle">Terima atau Tolak</span>
+          <span class="vsub">Menolak wajib memberi alasan</span>
+          <span class="vleak"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v13"/><path d="m6.5 11.5 5.5 5.5 5.5-5.5"/></svg> 9 balik</span>
+        </div>
+        <span class="vlink" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></span>
+        <div class="vnode done">
+          <span class="vdisc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9.2" r="5.6"/><path d="m8.6 13.8-1.8 6.5 5.2-2.6 5.2 2.6-1.8-6.5"/></svg><b class="vstep">5</b></span>
+          <span class="vwho">Selesai</span>
+          <span class="vtitle">Surat Tugas terbit</span>
+          <span class="vsub">Otomatis, ikut bertambah sendiri</span>
+        </div>
+      </div>
+        <details class="why">
+          <summary>Dari mana angkanya?</summary>
+          <div class="why-body">
+            <p><b>Hitungan:</b> jumlah entri per tahun, dipisah menurut jenis dokumen</p>
+            <p><b>Sumber:</b> <code>document_records</code> dikelompokkan per <code>document_date</code> dan <code>category</code></p>
+            <p>Tahun berjalan dihitung sampai hari ini, jadi angkanya masih akan bertambah.</p>
+          </div>
+        </details>
+      <figcaption class="sub" style="margin:16px 0 0">Dua label merah menandai tempat pengajuan tersendat.</figcaption>
+    </figure>
+
+    <div class="duo">
+      <div class="card panel">
+        <h3>Corong pengajuan judul</h3>
+        <p class="sub">Semester ganjil 2025/2026</p>
+        <div role="img" aria-label="Corong: 74 diajukan, 61 lolos berkas, 52 diterima dosen">
+          <div class="fnl-band fnl-a"><span class="fnl-shape"></span><div class="fnl-txt"><b>74</b><span>Diajukan mahasiswa</span></div></div>
+          <div class="fnl-leak"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v13"/><path d="m6.5 11.5 5.5 5.5 5.5-5.5"/></svg> 13 gugur &mdash; berkas belum sesuai</div>
+          <div class="fnl-band fnl-b"><span class="fnl-shape"></span><div class="fnl-txt"><b>61</b><span>Lolos verifikasi berkas</span></div></div>
+          <div class="fnl-leak"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v13"/><path d="m6.5 11.5 5.5 5.5 5.5-5.5"/></svg> 9 ditolak dosen &mdash; cari pengganti</div>
+          <div class="fnl-band fnl-c"><span class="fnl-shape"></span><div class="fnl-txt"><b>52</b><span>Diterima dosen</span></div></div>
+        </div>
+        <div class="spread">
+          <div>Dari setiap <b>100</b> pengajuan, <b>70</b> berakhir dengan Surat Tugas.</div>
+          <div>Kebocoran terbesar ada di <b>verifikasi berkas</b>, bukan di dosen.</div>
+        </div>
+        <details class="why">
+          <summary>Dari mana angkanya?</summary>
+          <div class="why-body">
+            <p><b>Hitungan:</b> jumlah pengajuan di tiap tahap; selisih antar tahap dihitung sebagai kebocoran</p>
+            <p><b>Sumber:</b> <code>title_proposals</code> dan <code>title_proposal_choices</code></p>
+            <p>Lebar tiap pita sebanding dengan jumlahnya, jadi bentuk menyempit itu memang mencerminkan angkanya.</p>
+          </div>
+        </details>
+      </div>
+
+      <div class="card panel">
+        <h3>Beban bimbingan per dosen</h3>
+        <p class="sub">Satu orang = satu dosen. Total 35 dosen aktif.</p>
+        <div class="picto-key">
+          <span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg> Sedang membimbing (15)</span>
+          <span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg> Belum memegang (20)</span>
+        </div>
+        <div class="picto" role="img" aria-label="Dari 35 dosen, 15 membimbing dan 20 belum"><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span></div>
+        <p class="sub" style="margin:0 0 10px">Delapan dosen dengan bimbingan terbanyak:</p>
+        <div class="bars">
+          <div class="bar-row"><span class="who">Mirza Shahreza</span><div class="track"><div class="fill over" style="width:100%"></div></div><span class="n">12</span></div>
+          <div class="bar-row"><span class="who">Ahmad Fauzi</span><div class="track"><div class="fill over" style="width:83%"></div></div><span class="n">10</span></div>
+          <div class="bar-row"><span class="who">Siti Rahmawati</span><div class="track"><div class="fill" style="width:67%"></div></div><span class="n">8</span></div>
+          <div class="bar-row"><span class="who">Budi Santoso</span><div class="track"><div class="fill" style="width:50%"></div></div><span class="n">6</span></div>
+          <div class="bar-row"><span class="who">Nurhakim</span><div class="track"><div class="fill" style="width:42%"></div></div><span class="n">5</span></div>
+          <div class="bar-row"><span class="who">Dewi Lestari</span><div class="track"><div class="fill" style="width:25%"></div></div><span class="n">3</span></div>
+          <div class="bar-row"><span class="who">Rina Marlina</span><div class="track"><div class="fill" style="width:17%"></div></div><span class="n">2</span></div>
+          <div class="bar-row"><span class="who">Agus Salim</span><div class="track"><div class="fill" style="width:8%"></div></div><span class="n">1</span></div>
+        </div>
+        <div class="spread">
+          <div>Batas wajar <b>10</b> mahasiswa &mdash; <span class="pill warn"><i class="dot"></i> 2 dosen melewati</span></div>
+        </div>
+        <details class="why">
+          <summary>Dari mana angkanya?</summary>
+          <div class="why-body">
+            <p><b>Hitungan:</b> satu ikon = satu dosen aktif; berwarna bila memegang minimal satu mahasiswa yang sudah disetujui</p>
+            <p><b>Sumber:</b> <code>title_proposals.approved_lecturer_id</code> dan <code>lecturers.active</code></p>
+            <p>Batas 10 mahasiswa adalah ambang wajar yang dapat diatur Super Admin.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Pertanyaan 4</p>
+    <h2>Apakah salah satu program studi tertinggal?</h2>
+    <p class="lede">Ilkom 780 mahasiswa, Ilpem 460. Karena itu dibandingkan juga per 100 mahasiswa.</p>
+
+    <div class="card panel">
+      <div class="cmp-head">
+        <span class="cmp-side a"><i style="background:var(--s1)"></i> Ilmu Komunikasi <b style="font-weight:700;color:var(--muted)">&middot; 780 mhs</b></span>
+        <span class="cmp-vs">BANDING</span>
+        <span class="cmp-side b"><i style="background:var(--s2)"></i> Ilmu Pemerintahan <b style="font-weight:700;color:var(--muted)">&middot; 460 mhs</b></span>
+      </div>
+          <div class="cmp-row">
+            <span class="cmp-label">Tiket bulan ini</span>
+            <span class="cmp-a"><b>214</b><span class="cmp-track"><i style="width:100%"></i></span></span>
+            <span class="cmp-b"><span class="cmp-track"><i style="width:60%"></i></span><b>128</b></span>
+          </div>
+          <div class="cmp-row cmp-key">
+            <span class="cmp-label">Tiket per 100 mahasiswa</span>
+            <span class="cmp-a"><b>27</b><span class="cmp-track"><i style="width:96%"></i></span></span>
+            <span class="cmp-b"><span class="cmp-track"><i style="width:100%"></i></span><b>28</b></span>
+          </div>
+          <div class="cmp-row">
+            <span class="cmp-label">Pengajuan judul</span>
+            <span class="cmp-a"><b>48</b><span class="cmp-track"><i style="width:100%"></i></span></span>
+            <span class="cmp-b"><span class="cmp-track"><i style="width:54%"></i></span><b>26</b></span>
+          </div>
+          <div class="cmp-row">
+            <span class="cmp-label">Diterima dosen</span>
+            <span class="cmp-a"><b>35</b><span class="cmp-track"><i style="width:100%"></i></span></span>
+            <span class="cmp-b"><span class="cmp-track"><i style="width:49%"></i></span><b>17</b></span>
+          </div>
+      <details class="why">
+        <summary>Dari mana angkanya?</summary>
+        <div class="why-body">
+          <p><b>Hitungan:</b> angka mentah tiap prodi, lalu dibagi jumlah mahasiswa aktifnya &times; 100 untuk baris "per 100 mahasiswa"</p>
+          <p><b>Sumber:</b> kolom <code>study_program</code> pada <code>service_requests</code> dan <code>title_proposals</code></p>
+          <p>Jumlah mahasiswa aktif diambil dari data prodi, bukan dari jumlah pengirim tiket.</p>
+        </div>
+      </details>
+      <details class="why">
+        <summary>Apa temuannya?</summary>
+        <div class="why-body"><p><strong>Ternyata keduanya setara.</strong> Ilmu Komunikasi mengirim 214 tiket dan Ilmu Pemerintahan 128 &mdash; selisihnya besar. Tetapi <strong>per 100 mahasiswa angkanya 27 lawan 28</strong>. Tidak ada prodi yang tertinggal; yang berbeda hanya jumlah mahasiswanya.</p></div>
+      </details>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Pertanyaan 5</p>
+    <h2>Kapan loket paling sibuk?</h2>
+    <p class="lede">Makin pekat, makin ramai.</p>
+
+    <div class="card panel">
+      <h3>Tiket masuk menurut hari dan jam</h3>
+      <p class="sub">Rata-rata sebulan terakhir</p>
+      <div class="hm">
+          <span class="hm-corner"></span>
+          <span class="hm-top">08</span>
+          <span class="hm-top">09</span>
+          <span class="hm-top">10</span>
+          <span class="hm-top">11</span>
+          <span class="hm-top">12</span>
+          <span class="hm-top">13</span>
+          <span class="hm-top">14</span>
+          <span class="hm-top">15</span>
+          <span class="hm-top">16</span>
+          <span class="hm-lbl">Senin</span>
+          <span class="hm-cell l1" data-tip="Senin pukul 08.00 &mdash; <b>4 tiket</b>">4</span>
+          <span class="hm-cell l2" data-tip="Senin pukul 09.00 &mdash; <b>9 tiket</b>">9</span>
+          <span class="hm-cell l4" data-tip="Senin pukul 10.00 &mdash; <b>14 tiket</b>">14</span>
+          <span class="hm-cell l3" data-tip="Senin pukul 11.00 &mdash; <b>11 tiket</b>">11</span>
+          <span class="hm-cell l1" data-tip="Senin pukul 12.00 &mdash; <b>3 tiket</b>">3</span>
+          <span class="hm-cell l2" data-tip="Senin pukul 13.00 &mdash; <b>8 tiket</b>">8</span>
+          <span class="hm-cell l3" data-tip="Senin pukul 14.00 &mdash; <b>12 tiket</b>">12</span>
+          <span class="hm-cell l2" data-tip="Senin pukul 15.00 &mdash; <b>7 tiket</b>">7</span>
+          <span class="hm-cell l1" data-tip="Senin pukul 16.00 &mdash; <b>3 tiket</b>">3</span>
+          <span class="hm-lbl">Selasa</span>
+          <span class="hm-cell l1" data-tip="Selasa pukul 08.00 &mdash; <b>3 tiket</b>">3</span>
+          <span class="hm-cell l2" data-tip="Selasa pukul 09.00 &mdash; <b>7 tiket</b>">7</span>
+          <span class="hm-cell l3" data-tip="Selasa pukul 10.00 &mdash; <b>12 tiket</b>">12</span>
+          <span class="hm-cell l3" data-tip="Selasa pukul 11.00 &mdash; <b>10 tiket</b>">10</span>
+          <span class="hm-cell l1" data-tip="Selasa pukul 12.00 &mdash; <b>2 tiket</b>">2</span>
+          <span class="hm-cell l2" data-tip="Selasa pukul 13.00 &mdash; <b>7 tiket</b>">7</span>
+          <span class="hm-cell l3" data-tip="Selasa pukul 14.00 &mdash; <b>10 tiket</b>">10</span>
+          <span class="hm-cell l2" data-tip="Selasa pukul 15.00 &mdash; <b>6 tiket</b>">6</span>
+          <span class="hm-cell l1" data-tip="Selasa pukul 16.00 &mdash; <b>2 tiket</b>">2</span>
+          <span class="hm-lbl">Rabu</span>
+          <span class="hm-cell l2" data-tip="Rabu pukul 08.00 &mdash; <b>5 tiket</b>">5</span>
+          <span class="hm-cell l3" data-tip="Rabu pukul 09.00 &mdash; <b>11 tiket</b>">11</span>
+          <span class="hm-cell l4" data-tip="Rabu pukul 10.00 &mdash; <b>16 tiket</b>">16</span>
+          <span class="hm-cell l3" data-tip="Rabu pukul 11.00 &mdash; <b>13 tiket</b>">13</span>
+          <span class="hm-cell l1" data-tip="Rabu pukul 12.00 &mdash; <b>4 tiket</b>">4</span>
+          <span class="hm-cell l2" data-tip="Rabu pukul 13.00 &mdash; <b>9 tiket</b>">9</span>
+          <span class="hm-cell l3" data-tip="Rabu pukul 14.00 &mdash; <b>13 tiket</b>">13</span>
+          <span class="hm-cell l2" data-tip="Rabu pukul 15.00 &mdash; <b>8 tiket</b>">8</span>
+          <span class="hm-cell l1" data-tip="Rabu pukul 16.00 &mdash; <b>3 tiket</b>">3</span>
+          <span class="hm-lbl">Kamis</span>
+          <span class="hm-cell l1" data-tip="Kamis pukul 08.00 &mdash; <b>3 tiket</b>">3</span>
+          <span class="hm-cell l2" data-tip="Kamis pukul 09.00 &mdash; <b>8 tiket</b>">8</span>
+          <span class="hm-cell l3" data-tip="Kamis pukul 10.00 &mdash; <b>11 tiket</b>">11</span>
+          <span class="hm-cell l2" data-tip="Kamis pukul 11.00 &mdash; <b>9 tiket</b>">9</span>
+          <span class="hm-cell l1" data-tip="Kamis pukul 12.00 &mdash; <b>2 tiket</b>">2</span>
+          <span class="hm-cell l2" data-tip="Kamis pukul 13.00 &mdash; <b>6 tiket</b>">6</span>
+          <span class="hm-cell l2" data-tip="Kamis pukul 14.00 &mdash; <b>9 tiket</b>">9</span>
+          <span class="hm-cell l2" data-tip="Kamis pukul 15.00 &mdash; <b>5 tiket</b>">5</span>
+          <span class="hm-cell l1" data-tip="Kamis pukul 16.00 &mdash; <b>2 tiket</b>">2</span>
+          <span class="hm-lbl">Jumat</span>
+          <span class="hm-cell l2" data-tip="Jumat pukul 08.00 &mdash; <b>6 tiket</b>">6</span>
+          <span class="hm-cell l3" data-tip="Jumat pukul 09.00 &mdash; <b>12 tiket</b>">12</span>
+          <span class="hm-cell l4" data-tip="Jumat pukul 10.00 &mdash; <b>18 tiket</b>">18</span>
+          <span class="hm-cell l2" data-tip="Jumat pukul 11.00 &mdash; <b>9 tiket</b>">9</span>
+          <span class="hm-cell l1" data-tip="Jumat pukul 12.00 &mdash; <b>1 tiket</b>">1</span>
+          <span class="hm-cell l1" data-tip="Jumat pukul 13.00 &mdash; <b>4 tiket</b>">4</span>
+          <span class="hm-cell l2" data-tip="Jumat pukul 14.00 &mdash; <b>7 tiket</b>">7</span>
+          <span class="hm-cell l1" data-tip="Jumat pukul 15.00 &mdash; <b>4 tiket</b>">4</span>
+          <span class="hm-cell l1" data-tip="Jumat pukul 16.00 &mdash; <b>1 tiket</b>">1</span>
+      </div>
+      <div class="hm-scale">
+        <span>Sedikit</span>
+        <i style="background:var(--hm0)"></i><i style="background:var(--hm1)"></i><i style="background:var(--hm2)"></i><i style="background:var(--hm3)"></i><i style="background:var(--hm4)"></i>
+        <span>Banyak</span>
+      </div>
+      <details class="why">
+        <summary>Dari mana angkanya?</summary>
+        <div class="why-body">
+          <p><b>Hitungan:</b> jumlah tiket masuk dikelompokkan menurut hari dan jam, lalu dirata-rata sebulan</p>
+          <p><b>Sumber:</b> <code>EXTRACT(dow FROM created_at)</code> dan <code>EXTRACT(hour FROM created_at)</code></p>
+          <p>Lima tingkat warna dibagi rata dari nol sampai nilai tertinggi (18 tiket).</p>
+        </div>
+      </details>
+      <details class="why">
+        <summary>Apa temuannya?</summary>
+        <div class="why-body"><p><strong>Dua puncak setiap hari: pukul 10 dan pukul 14.</strong> Pukul 12 hampir kosong. Puncak tertinggi seminggu jatuh pada <strong>Jumat pukul 10</strong> &mdash; tepat sebelum jeda salat Jumat. Jaga loket paling dibutuhkan di dua jam itu, bukan sepanjang hari.</p></div>
+      </details>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Pertanyaan 6</p>
+    <h2>Apakah data PDDIKTI makin bersih?</h2>
+    <p class="lede">Satu-satunya grafik di sini yang <strong>turun berarti berhasil</strong>.</p>
+
+    <div class="card panel">
+      <h3>Permintaan perbaikan data per bulan</h3>
+      <p class="sub">Makin sedikit permintaan, makin sehat data mahasiswa</p>
+      <svg class="chart" viewBox="0 0 540 170" role="img" aria-label="Permintaan perbaikan PDDIKTI turun dari 14 pada Maret menjadi 4 pada Agustus">
+        <defs><linearGradient id="gp" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--good)" stop-opacity=".34"/>
+          <stop offset="100%" stop-color="var(--good)" stop-opacity="0"/></linearGradient></defs>
+        <line class="grid-line" x1="34" y1="25" x2="512" y2="25"></line>
+        <line class="grid-line" x1="34" y1="60" x2="512" y2="60"></line>
+        <line class="grid-line" x1="34" y1="95" x2="512" y2="95"></line>
+        <line class="grid-line" x1="34" y1="130" x2="512" y2="130"></line>
+        <text class="axis-text" x="28" y="29" text-anchor="end">15</text>
+        <text class="axis-text" x="28" y="99" text-anchor="end">5</text>
+        <text class="axis-text" x="28" y="134" text-anchor="end">0</text>
+        <polygon points="40,130 40,32 130,53 220,67 310,81 400,95 490,102 490,130" fill="url(#gp)"></polygon>
+        <polyline class="series-line" stroke="var(--good)" points="40,32 130,53 220,67 310,81 400,95 490,102"></polyline>
+        <circle class="series-dot" cx="40" cy="32" fill="var(--good)"></circle>
+        <circle class="series-dot" cx="130" cy="53" fill="var(--good)"></circle>
+        <circle class="series-dot" cx="220" cy="67" fill="var(--good)"></circle>
+        <circle class="series-dot" cx="310" cy="81" fill="var(--good)"></circle>
+        <circle class="series-dot" cx="400" cy="95" fill="var(--good)"></circle>
+        <circle class="series-dot" cx="490" cy="102" fill="var(--good)" r="7"></circle>
+        <text class="end-label" x="40" y="21" fill="var(--ink)" text-anchor="middle">14</text>
+        <text class="end-label" x="490" y="90" fill="var(--good)" text-anchor="middle">4</text>
+        <text class="axis-text" x="40" y="152" text-anchor="middle">Mar</text>
+        <text class="axis-text" x="130" y="152" text-anchor="middle">Apr</text>
+        <text class="axis-text" x="220" y="152" text-anchor="middle">Mei</text>
+        <text class="axis-text" x="310" y="152" text-anchor="middle">Jun</text>
+        <text class="axis-text" x="400" y="152" text-anchor="middle">Jul</text>
+        <text class="axis-text" x="490" y="152" text-anchor="middle">Agu</text>
+        <g>
+          <rect class="hit" x="10" y="10" width="90" height="130" data-tip="Maret &mdash; <b>14</b> perbaikan"></rect>
+          <rect class="hit" x="100" y="10" width="90" height="130" data-tip="April &mdash; <b>11</b> perbaikan"></rect>
+          <rect class="hit" x="190" y="10" width="90" height="130" data-tip="Mei &mdash; <b>9</b> perbaikan"></rect>
+          <rect class="hit" x="280" y="10" width="90" height="130" data-tip="Juni &mdash; <b>7</b> perbaikan"></rect>
+          <rect class="hit" x="370" y="10" width="90" height="130" data-tip="Juli &mdash; <b>5</b> perbaikan"></rect>
+          <rect class="hit" x="460" y="10" width="80" height="130" data-tip="Agustus &mdash; <b>4</b> perbaikan"></rect>
+        </g>
+      </svg>
+      <div class="spread"><div>Turun <b>71%</b> dalam enam bulan &mdash; di dasbor ini itu dibaca sebagai <b>keberhasilan</b>.</div></div>
+      <details class="why">
+        <summary>Dari mana angkanya?</summary>
+        <div class="why-body">
+          <p><b>Hitungan:</b> jumlah tiket PDDIKTI per bulan &mdash; makin sedikit makin baik</p>
+          <p><b>Sumber:</b> <code>service_requests</code> dengan <code>service_type = 'Layanan PDDIKTI'</code></p>
+          <p>Satu-satunya grafik yang arah turunnya positif, karena tiap tiket di sini berarti ada data yang salah.</p>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Pertanyaan 7</p>
+    <h2>Apakah luaran akademik tumbuh dan merata?</h2>
+    <p class="lede">Bukan mutu layanan, melainkan produktivitas &mdash; yang ditanya asesor akreditasi.</p>
+
+    <div class="duo duo-wide">
+      <div class="card panel">
+        <h3>Luaran per tahun</h3>
+        <p class="sub">Dari Database Dokumen &mdash; tiap entri sudah punya jenis dan tahun</p>
+        <ul class="legend">
+          <li><span class="swatch" style="background:var(--s1)"></span> Publikasi Jurnal</li>
+          <li><span class="swatch" style="background:var(--s2)"></span> Sertifikasi</li>
+          <li><span class="swatch" style="background:var(--s3)"></span> Artikel Ilmiah</li>
+        </ul>
+        <svg class="chart" viewBox="0 0 620 230" role="img" aria-label="Tren luaran 2022 sampai 2026: publikasi jurnal 12 ke 38, sertifikasi 8 ke 22, artikel ilmiah 5 ke 26">
+          <line class="grid-line" x1="34" y1="20" x2="600" y2="20"></line>
+          <line class="grid-line" x1="34" y1="105" x2="600" y2="105"></line>
+          <line class="grid-line" x1="34" y1="190" x2="600" y2="190"></line>
+          <text class="axis-text" x="28" y="24" text-anchor="end">40</text>
+          <text class="axis-text" x="28" y="109" text-anchor="end">20</text>
+          <text class="axis-text" x="28" y="194" text-anchor="end">0</text>
+          <polyline class="series-line" stroke="var(--s1)" points="48,139 178,113.5 308,88 438,58.25 568,28.5"></polyline>
+          <polyline class="series-line" stroke="var(--s2)" points="48,156 178,151.75 308,130.5 438,109.25 568,96.5"></polyline>
+          <polyline class="series-line" stroke="var(--s3)" points="48,168.75 178,143.25 308,134.75 438,117.75 568,79.5"></polyline>
+          <circle class="series-dot" cx="568" cy="28.5" fill="var(--s1)" r="6.5"></circle>
+          <circle class="series-dot" cx="568" cy="96.5" fill="var(--s2)" r="6.5"></circle>
+          <circle class="series-dot" cx="568" cy="79.5" fill="var(--s3)" r="6.5"></circle>
+          <text class="end-label" x="586" y="33" fill="var(--s1)">38</text>
+          <text class="end-label" x="586" y="103" fill="var(--s2)">22</text>
+          <text class="end-label" x="586" y="80" fill="var(--s3)">26</text>
+          <text class="axis-text" x="48" y="212" text-anchor="middle">2022</text>
+          <text class="axis-text" x="178" y="212" text-anchor="middle">2023</text>
+          <text class="axis-text" x="308" y="212" text-anchor="middle">2024</text>
+          <text class="axis-text" x="438" y="212" text-anchor="middle">2025</text>
+          <text class="axis-text" x="568" y="212" text-anchor="middle">2026</text>
+          <g>
+            <rect class="hit" x="10" y="8" width="120" height="185" data-tip="2022 &mdash; Jurnal <b>12</b> &middot; Sertifikasi <b>8</b> &middot; Artikel <b>5</b>"></rect>
+            <rect class="hit" x="130" y="8" width="120" height="185" data-tip="2023 &mdash; Jurnal <b>18</b> &middot; Sertifikasi <b>9</b> &middot; Artikel <b>11</b>"></rect>
+            <rect class="hit" x="250" y="8" width="120" height="185" data-tip="2024 &mdash; Jurnal <b>24</b> &middot; Sertifikasi <b>14</b> &middot; Artikel <b>13</b>"></rect>
+            <rect class="hit" x="370" y="8" width="120" height="185" data-tip="2025 &mdash; Jurnal <b>31</b> &middot; Sertifikasi <b>19</b> &middot; Artikel <b>17</b>"></rect>
+            <rect class="hit" x="490" y="8" width="120" height="185" data-tip="2026 &mdash; Jurnal <b>38</b> &middot; Sertifikasi <b>22</b> &middot; Artikel <b>26</b>"></rect>
+          </g>
+        </svg>
+        <button class="toggle" type="button" aria-expanded="false" aria-controls="tabel-luaran">Tampilkan sebagai tabel</button>
+        <div class="data-table table-scroll" id="tabel-luaran" hidden>
+          <table>
+            <thead><tr><th>Tahun</th><th class="right">Jurnal</th><th class="right">Sertifikasi</th><th class="right">Artikel</th></tr></thead>
+            <tbody>
+              <tr><td class="num-cell">2022</td><td class="right num-cell">12</td><td class="right num-cell">8</td><td class="right num-cell">5</td></tr>
+              <tr><td class="num-cell">2023</td><td class="right num-cell">18</td><td class="right num-cell">9</td><td class="right num-cell">11</td></tr>
+              <tr><td class="num-cell">2024</td><td class="right num-cell">24</td><td class="right num-cell">14</td><td class="right num-cell">13</td></tr>
+              <tr><td class="num-cell">2025</td><td class="right num-cell">31</td><td class="right num-cell">19</td><td class="right num-cell">17</td></tr>
+              <tr><td class="num-cell">2026</td><td class="right num-cell">38</td><td class="right num-cell">22</td><td class="right num-cell">26</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card panel">
+        <h3>Isi Database Dokumen</h3>
+        <p class="sub">247 entri terkumpul sampai hari ini</p>
+        <div class="don-wrap">
+          <div class="don">
+            <svg viewBox="0 0 120 120" role="img" aria-label="Komposisi database: surat tugas 96, publikasi jurnal 62, sertifikat 48, artikel dan lainnya 41">
+            <circle class="don-seg" cx="60" cy="60" r="45" stroke="var(--s1)" stroke-dasharray="108.3 174.5" stroke-dashoffset="-0.0" data-tip="Surat Tugas &mdash; <b>96</b> (39%)"></circle>
+            <circle class="don-seg" cx="60" cy="60" r="45" stroke="var(--s2)" stroke-dasharray="69.4 213.4" stroke-dashoffset="-109.9" data-tip="Publikasi Jurnal &mdash; <b>62</b> (25%)"></circle>
+            <circle class="don-seg" cx="60" cy="60" r="45" stroke="var(--s3)" stroke-dasharray="53.3 229.4" stroke-dashoffset="-180.9" data-tip="Sertifikat & Sertifikasi &mdash; <b>48</b> (19%)"></circle>
+            <circle class="don-seg" cx="60" cy="60" r="45" stroke="var(--s-other)" stroke-dasharray="45.3 237.4" stroke-dashoffset="-235.8" data-tip="Artikel & lainnya &mdash; <b>41</b> (17%)"></circle>
+            </svg>
+            <span class="don-mid"><b>247</b><span>entri</span></span>
+          </div>
+          <ul class="don-leg">
+          <li><span class="swatch" style="background:var(--s1)"></span><span class="don-name">Surat Tugas</span><b>96</b><small>39%</small></li>
+          <li><span class="swatch" style="background:var(--s2)"></span><span class="don-name">Publikasi Jurnal</span><b>62</b><small>25%</small></li>
+          <li><span class="swatch" style="background:var(--s3)"></span><span class="don-name">Sertifikat & Sertifikasi</span><b>48</b><small>19%</small></li>
+          <li><span class="swatch" style="background:var(--s-other)"></span><span class="don-name">Artikel & lainnya</span><b>41</b><small>17%</small></li>
+          </ul>
+        </div>
+        <details class="why">
+          <summary>Dari mana angkanya?</summary>
+          <div class="why-body">
+            <p><b>Hitungan:</b> jumlah entri per jenis dibagi total 247 entri</p>
+            <p><b>Sumber:</b> <code>document_records.category</code></p>
+            <p>&ldquo;Artikel &amp; lainnya&rdquo; menggabungkan artikel ilmiah, HKI, penelitian, dan pengabdian.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="card panel" style="margin-top:14px">
+      <h3>Cakupan dosen &mdash; berapa yang punya minimal satu luaran</h3>
+      <p class="sub">Satu orang = satu dosen. Total 41 dosen.</p>
+      <div class="picto-key">
+        <span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg> Punya luaran (23)</span>
+        <span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg> Belum ada (18)</span>
+      </div>
+      <div class="picto" role="img" aria-label="Dari 41 dosen, 23 punya luaran dan 18 belum"><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="on"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span><span class="off"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.6" r="4.1"/><path d="M12 12.4c-4.5 0-8.2 3-8.2 6.9V22h16.4v-2.7c0-3.9-3.7-6.9-8.2-6.9z"/></svg></span></div>
+      <details class="why">
+        <summary>Dari mana angkanya?</summary>
+        <div class="why-body">
+          <p><b>Hitungan:</b> dosen yang namanya muncul pada minimal satu dokumen &divide; seluruh dosen aktif</p>
+          <p><b>Sumber:</b> <code>document_contributors</code> di-<code>distinct</code> per <code>lecturer_id</code></p>
+          <p>Yang dihitung orangnya, bukan dokumennya &mdash; supaya ketimpangan terlihat.</p>
+        </div>
+      </details>
+      <details class="why">
+        <summary>Kenapa cakupan, bukan jumlah total?</summary>
+        <div class="why-body"><p><strong>Angka total menipu.</strong> &ldquo;86 luaran&rdquo; terdengar hebat sampai ketahuan datangnya dari 5 orang saja. Cakupan menangkap ketimpangan itu &mdash; dan itulah yang ditanya asesor.</p></div>
+      </details>
+    </div>
+  </section>
+
+  <div class="source">
+    <details class="why">
+      <summary>Ringkasan seluruh sumber data</summary>
+      <div class="why-body">
+        <p>Tiap grafik sudah menyebutkan sumbernya sendiri. Ringkasnya, semuanya berasal dari lima tabel yang <b>sudah ada di skema v4</b> &mdash; tidak perlu tabel baru, cukup query agregat:</p>
+        <p><code>service_requests</code> &middot; <code>title_proposals</code> &middot; <code>title_proposal_choices</code> &middot; <code>document_records</code> &middot; <code>document_contributors</code></p>
+      </div>
+    </details>
+  </div>
+</div>
+
+<div id="tip" role="status" aria-live="polite"></div>
+
+<script>
+  (function () {
+    var tip = document.getElementById("tip");
+    function show(el) {
+      var b = el.getBoundingClientRect();
+      tip.innerHTML = el.getAttribute("data-tip");
+      tip.style.left = (b.left + b.width / 2) + "px";
+      tip.style.top = (b.top + b.height / 2) + "px";
+      tip.classList.add("on");
+    }
+    function hide() { tip.classList.remove("on"); }
+    document.querySelectorAll("[data-tip]").forEach(function (el) {
+      el.addEventListener("mouseenter", function () { show(el); });
+      el.addEventListener("mouseleave", hide);
+    });
+    window.addEventListener("scroll", hide, { passive: true });
+  })();
+
+  (function () {
+    var btn = document.getElementById("btn-size");
+    btn.addEventListener("click", function () {
+      var besar = document.documentElement.getAttribute("data-size") === "besar";
+      if (besar) document.documentElement.removeAttribute("data-size");
+      else document.documentElement.setAttribute("data-size", "besar");
+      btn.setAttribute("aria-pressed", String(!besar));
+      btn.lastChild.textContent = besar ? " Perbesar teks" : " Kembalikan ukuran";
+    });
+  })();
+
+  (function () {
+    var btn = document.querySelector(".toggle");
+    if (!btn) return;
+    var panel = document.getElementById(btn.getAttribute("aria-controls"));
+    btn.addEventListener("click", function () {
+      var open = panel.hasAttribute("hidden");
+      if (open) panel.removeAttribute("hidden"); else panel.setAttribute("hidden", "");
+      btn.setAttribute("aria-expanded", String(open));
+      btn.textContent = open ? "Sembunyikan tabel" : "Tampilkan sebagai tabel";
+    });
+  })();
+</script>
