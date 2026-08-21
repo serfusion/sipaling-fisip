@@ -2,7 +2,7 @@
 
 ## Temuan penting: situs live-mu menjalankan versi LAMA
 
-Saya cek langsung https://sipalingfisip.web.id —  halaman yang tampil masih versi lama
+Saya cek langsung https://sipalingfisip.web.id —  halaman yang tampil masih versi lama 
 (teks "maksimal 20 MB", padahal kode terbaru "maksimal 10 MB"). Artinya:
 **deploy terakhirmu kemungkinan besar GAGAL BUILD**, dan hosting terus menyajikan
 versi lama yang tidak cocok dengan database baru → muncul "Pengajuan belum tersimpan."
