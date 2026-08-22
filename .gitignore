@@ -1,0 +1,45 @@
+# Dependensi
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/releases
+!.yarn/plugins
+!.yarn/versions
+
+# Hasil build
+/.next/
+/out/
+/build
+/dist
+*.tsbuildinfo
+next-env.d.ts.timestamp
+
+# Rahasia — jangan pernah ikut ter-commit.
+# Berkas ini memuat kunci Supabase; sekali masuk ke riwayat git,
+# kuncinya harus dianggap bocor dan wajib diputar ulang.
+.env
+.env.*
+!.env.example
+
+# Berkas uji sementara
+/uji-*.ts
+/uji-*.mjs
+/uji-mobile/
+
+# Sistem operasi & editor
+.DS_Store
+Thumbs.db
+*.pem
+.vercel
+.idea/
+.vscode/
+*.swp
+
+# Log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+tsconfig.tsbuildinfo

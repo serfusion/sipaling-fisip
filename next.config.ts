@@ -26,7 +26,13 @@ const supabase = supabaseOrigins();
 // dikunci sehingga data tidak dapat dikirim ke domain asing.
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  // React mode pengembangan memakai eval() untuk penyusunan ulang callstack.
+  // Produksi tidak memerlukannya, jadi 'unsafe-eval' hanya diberikan saat
+  // `next dev`. Tanpa ini, hidrasi gagal dan seluruh halaman mati saat
+  // dikembangkan lokal — sementara CSP produksi tetap ketat.
+  process.env.NODE_ENV === "production"
+    ? "script-src 'self' 'unsafe-inline'"
+    : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: blob:",

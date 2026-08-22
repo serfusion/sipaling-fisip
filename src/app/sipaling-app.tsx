@@ -893,6 +893,9 @@ export default function SipalingApp() {
               <button type="button" className="hero-button" onClick={() => selectTab("revisi")}>
                 Upload Revisi
               </button>
+              <a className="hero-button" href="/alat">
+                <span>⚗</span> Alat Bantu
+              </a>
               <a className={sessionRole ? "hero-button hero-button-logged" : "hero-button"} href="/dashboard">
                 {sessionRole ? `● Dashboard ${DASH_ROLE_LABEL[sessionRole] || "Admin"}` : "Login Dosen/Admin"}
               </a>
