@@ -13,7 +13,7 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// VERIFIKASI SITASI — pencarian ke pangkalan data sitasi publik.
+// VERIFIKASI SITASI: pencarian ke pangkalan data sitasi publik.
 //
 //   Crossref https://api.crossref.org/works/{doi}
 //            https://api.crossref.org/works?query.bibliographic=...
@@ -89,7 +89,7 @@ function jadikanTemuan(item: Json, judulRujukan: string | null): Temuan {
   };
 }
 
-/** Cari lewat DOI — jalur paling meyakinkan bila DOI tersedia. */
+/** Cari lewat DOI: jalur paling meyakinkan bila DOI tersedia. */
 async function lewatDoi(rujukan: Rujukan): Promise<Temuan | null> {
   if (!rujukan.doi) return null;
   const data = await ambil(berkontak(`https://api.crossref.org/works/${encodeURIComponent(rujukan.doi)}`));
@@ -156,7 +156,7 @@ async function lewatOpenAlex(rujukan: Rujukan): Promise<Temuan | null> {
 
 async function periksaSatu(rujukan: Rujukan): Promise<HasilRujukan> {
   // Jenis yang memang tidak ada di pangkalan data sitasi tidak dicari sama
-  // sekali — supaya tidak membuang kuota dan tidak salah menuduh.
+  // sekali, supaya tidak membuang kuota dan tidak salah menuduh.
   if (!dapatDiperiksa(rujukan.jenis)) return simpulkan(rujukan, null);
 
   try {
@@ -193,13 +193,13 @@ export async function POST(request: Request) {
   try {
     muatan = (await request.json()) as typeof muatan;
   } catch {
-    return Response.json({ success: false, message: "Permintaan tidak dapat dibaca." }, { status: 400 });
+    return Response.json({ success: false, message: "Permintaan tidak terbaca." }, { status: 400 });
   }
 
   const teksDaftar = typeof muatan.daftar === "string" ? muatan.daftar : "";
   if (teksDaftar.trim().length < 20) {
     return Response.json(
-      { success: false, message: "Tempelkan daftar pustaka Anda terlebih dahulu." },
+      { success: false, message: "Tempelkan dulu daftar pustaka Anda." },
       { status: 400 },
     );
   }
@@ -209,7 +209,7 @@ export async function POST(request: Request) {
     return Response.json(
       {
         success: false,
-        message: "Tidak ada rujukan yang dapat diurai. Pastikan tiap rujukan berada pada barisnya sendiri.",
+        message: "Tidak ada rujukan yang bisa diurai. Pastikan tiap rujukan berdiri di barisnya sendiri.",
       },
       { status: 400 },
     );
@@ -228,7 +228,7 @@ export async function POST(request: Request) {
   } catch (error: unknown) {
     console.error("verify-citations", error);
     return Response.json(
-      { success: false, message: "Pemeriksaan tidak dapat diselesaikan. Coba lagi sebentar lagi." },
+      { success: false, message: "Pemeriksaan gagal diselesaikan. Coba lagi sebentar lagi." },
       { status: 500 },
     );
   }

@@ -10,7 +10,7 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// RADAR JURNAL — pengumpul bukti.
+// RADAR JURNAL: pengumpul bukti.
 //
 // Seluruh sumber di sini gratis, publik, dan tidak menuntut kunci API:
 //   DOAJ     https://doaj.org/api/search/journals/issn:XXXX-XXXX
@@ -42,7 +42,7 @@ async function ambil(url: string): Promise<Json | null> {
     if (!balasan.ok) return null;
     return (await balasan.json()) as Json;
   } catch {
-    // Satu sumber yang gagal tidak boleh menggagalkan seluruh pemeriksaan —
+    // Satu sumber yang gagal tidak boleh menggagalkan seluruh pemeriksaan.
     // pemeriksaan yang tidak terjadi dilaporkan apa adanya kepada pengguna.
     return null;
   } finally {
@@ -111,7 +111,7 @@ async function periksaDoaj(issn: string, bukti: Bukti) {
 }
 
 // ---------------------------------------------------------------------------
-// Crossref — pendaftaran DOI dan kecepatan telaah
+// Crossref: pendaftaran DOI dan kecepatan telaah
 // ---------------------------------------------------------------------------
 async function periksaCrossref(issn: string, bukti: Bukti) {
   const jurnal = await ambil(berkontak(`https://api.crossref.org/journals/${encodeURIComponent(issn)}`));
@@ -124,7 +124,7 @@ async function periksaCrossref(issn: string, bukti: Bukti) {
   if (!bukti.nama && typeof pesan.title === "string") bukti.nama = pesan.title;
 
   // Kecepatan telaah hanya dapat dihitung bila penerbit menyetorkan riwayat
-  // tanggalnya. Banyak yang tidak — itu dilaporkan sebagai tak terperiksa.
+  // tanggalnya. Banyak yang tidak, dan itu dilaporkan sebagai tak terperiksa.
   const karya = await ambil(
     berkontak(
       `https://api.crossref.org/journals/${encodeURIComponent(issn)}/works` +
@@ -140,7 +140,7 @@ async function periksaCrossref(issn: string, bukti: Bukti) {
     const terbit = bagianTanggal(item["published-online"]) ?? bagianTanggal(item["published-print"]) ?? bagianTanggal(item.issued);
     if (dibuat === null || terbit === null) continue;
     const hari = Math.round((terbit - dibuat) / 86_400_000);
-    // Nilai negatif berarti terbit mendahului pendaftaran DOI — abaikan.
+    // Nilai negatif berarti terbit mendahului pendaftaran DOI, jadi abaikan.
     if (hari >= 0 && hari < 1500) selisih.push(hari);
   }
 
@@ -160,7 +160,7 @@ function bagianTanggal(nilai: unknown): number | null {
 }
 
 // ---------------------------------------------------------------------------
-// OpenAlex — perilaku penerbitan
+// OpenAlex: perilaku penerbitan
 // ---------------------------------------------------------------------------
 async function periksaOpenAlex(issn: string, bukti: Bukti) {
   const sumber = await ambil(berkontak(`https://api.openalex.org/sources/issn:${encodeURIComponent(issn)}`));
@@ -242,7 +242,7 @@ export async function POST(request: Request) {
   try {
     muatan = (await request.json()) as typeof muatan;
   } catch {
-    return Response.json({ success: false, message: "Permintaan tidak dapat dibaca." }, { status: 400 });
+    return Response.json({ success: false, message: "Permintaan tidak terbaca." }, { status: 400 });
   }
 
   const issn = typeof muatan.issn === "string" ? bakukanIssn(muatan.issn) : null;
@@ -250,7 +250,7 @@ export async function POST(request: Request) {
     return Response.json(
       {
         success: false,
-        message: "Masukkan ISSN yang sah, misalnya 2089-3477. ISSN tercantum pada halaman depan jurnal.",
+        message: "Masukkan ISSN yang sah, misalnya 2089-3477. ISSN ada di halaman depan jurnal.",
       },
       { status: 400 },
     );
@@ -274,7 +274,7 @@ export async function POST(request: Request) {
   } catch (error: unknown) {
     console.error("journal-radar", error);
     return Response.json(
-      { success: false, message: "Pemeriksaan tidak dapat diselesaikan. Coba lagi sebentar lagi." },
+      { success: false, message: "Pemeriksaan gagal diselesaikan. Coba lagi sebentar lagi." },
       { status: 500 },
     );
   }

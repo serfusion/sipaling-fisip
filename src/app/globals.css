@@ -1889,7 +1889,7 @@ a.mt-i-dot:hover { background: var(--yellow); box-shadow: 0 0 0 .045em rgba(245,
 .mtp-hint code { background: white; border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; font-size: 10.5px; }
 
 /* ============================================================
-   ALAT BANTU AKADEMIK — Radar Jurnal & Periksa Bahasa
+   CAKRAWALA: Verifikasi Sitasi, Radar Jurnal, Naskah Inggris, Periksa Bahasa
    ============================================================ */
 .at-shell { min-height: 100vh; background: var(--canvas); padding-bottom: 48px; }
 .at-head { background: linear-gradient(160deg, #071e44 0%, var(--navy) 100%); color: #e8effc; padding: 22px 18px 26px; }

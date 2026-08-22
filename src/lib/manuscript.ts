@@ -1,4 +1,4 @@
-// NASKAH INGGRIS — pemeriksa ragam akademik Inggris dan pemeta BAB → IMRaD.
+// NASKAH INGGRIS: pemeriksa ragam akademik Inggris dan pemeta BAB ke IMRaD.
 //
 // Dua hal yang membuat naskah penulis Indonesia ditolak sebelum isinya dibaca:
 //
@@ -9,7 +9,7 @@
 //    peninjau dibaca sebagai laporan, bukan artikel.
 //
 // 2. Ragam. Bukan tata bahasa yang salah, melainkan pola retorika Indonesia
-//    yang diterjemahkan harfiah — "in this modern era", "as we know",
+//    yang diterjemahkan harfiah: "in this modern era", "as we know",
 //    "from the explanation above". Peninjau internasional menandainya
 //    seketika sebagai "language needs improvement" walaupun ilmunya bagus.
 //
@@ -28,80 +28,80 @@ export type TemuanInggris = {
 };
 
 export const BERAT_INGGRIS_LABEL: Record<BeratInggris, string> = {
-  ganti: "Ditandai peninjau",
+  ganti: "Biasa ditandai peninjau",
   rapikan: "Sebaiknya dirapikan",
   pertimbangkan: "Pertimbangkan",
 };
 
 // ---------------------------------------------------------------------------
-// 1. Kalke — pola retorika Indonesia yang diterjemahkan harfiah
+// 1. Kalke: pola retorika Indonesia yang diterjemahkan harfiah
 // ---------------------------------------------------------------------------
 type Aturan = { pola: RegExp; pesan: string; saran: string | null; berat: BeratInggris };
 
 const KALKE: Aturan[] = [
   {
     pola: /\bin (?:this|the) (?:modern|globalization|digital|current) (?:era|age)\b/gi,
-    pesan: 'Terjemahan harfiah "di era modern ini". Pembuka semacam ini tidak dipakai jurnal internasional.',
+    pesan: 'Terjemahan harfiah "di era modern ini". Jurnal internasional tidak memakai pembuka semacam ini.',
     saran: "Buka dengan temuan atau masalah yang konkret",
     berat: "ganti",
   },
   {
     pola: /\bas we (?:all )?know\b/gi,
-    pesan: 'Terjemahan "seperti yang kita ketahui". Klaim tanpa rujukan.',
+    pesan: 'Terjemahan "seperti yang kita ketahui". Ini klaim tanpa rujukan.',
     saran: "Sebutkan sumbernya, atau hapus",
     berat: "ganti",
   },
   {
     pola: /\b(?:based on|from) the (?:explanation|description|background|elaboration) above\b/gi,
-    pesan: 'Terjemahan "berdasarkan penjelasan di atas". Jurnal tidak merujuk letak dalam teks.',
+    pesan: 'Terjemahan "berdasarkan penjelasan di atas". Artikel jurnal tidak menunjuk letak dalam teks.',
     saran: "Nyatakan langsung simpulannya",
     berat: "ganti",
   },
   {
     pola: /\bcannot be separated from\b/gi,
-    pesan: 'Terjemahan "tidak dapat dipisahkan dari". Tidak lazim dalam bahasa Inggris akademik.',
+    pesan: 'Terjemahan "tidak dapat dipisahkan dari". Janggal dalam Inggris akademik.',
     saran: "is closely linked to / depends on",
     berat: "ganti",
   },
   {
     pola: /\bthe (?:writer|author)s?\s+(?:want|would like|will|tries|try|attempts?)\b/gi,
-    pesan: 'Terjemahan "penulis ingin/berusaha". Jurnal memakai kalimat pasif atau "this study".',
+    pesan: 'Terjemahan "penulis ingin" atau "penulis berusaha". Jurnal memakai kalimat pasif atau "this study".',
     saran: "This study examines…",
     berat: "ganti",
   },
   {
     pola: /\bin this (?:research|study),? the (?:researcher|writer|author)s?\b/gi,
-    pesan: 'Terjemahan "dalam penelitian ini, peneliti…". Mubazir dan menonjolkan orangnya.',
+    pesan: 'Terjemahan "dalam penelitian ini, peneliti…". Mubazir, dan menonjolkan orangnya alih-alih penelitiannya.',
     saran: "This study…",
     berat: "ganti",
   },
   {
     pola: /\bvery (?:influential|important|significant|crucial|useful|interesting)\b/gi,
-    pesan: '"very" + kata sifat adalah pola Indonesia. Bahasa Inggris akademik memakai kata yang lebih tepat.',
+    pesan: 'Pola "very" + kata sifat khas Indonesia. Inggris akademik memilih satu kata yang lebih tepat.',
     saran: "substantial / central / considerable",
     berat: "rapikan",
   },
   {
     pola: /\b(?:beside|besides) that\b/gi,
-    pesan: 'Terjemahan "di samping itu". Bentuk yang lazim adalah "In addition" atau "Moreover".',
+    pesan: 'Terjemahan "di samping itu". Yang lazim "In addition" atau "Moreover".',
     saran: "In addition",
     berat: "rapikan",
   },
   {
     pola: /\bnowadays\b/gi,
-    pesan: '"Nowadays" jarang dipakai dalam jurnal; ia menandai tulisan sebagai non-akademik.',
+    pesan: '"Nowadays" jarang muncul di jurnal dan langsung menandai tulisan sebagai non-akademik.',
     saran: "Recently / Over the past decade",
     berat: "rapikan",
   },
   {
     pola: /\bmany (?:experts|scholars|researchers) (?:say|said|state|argue)\b(?![^.]{0,80}\()/gi,
-    pesan: "Klaim banyak ahli tanpa rujukan. Peninjau akan meminta sitasinya.",
+    pesan: "Menyebut banyak ahli tanpa satu pun rujukan. Peninjau pasti meminta sitasinya.",
     saran: "Sebutkan penulis dan tahunnya",
     berat: "ganti",
   },
   {
     pola: /\b(?:do|does|did|make|made|conducting a|doing a) (?:a )?research\b/gi,
-    pesan: 'Kolokasi keliru. Bahasa Inggris memakai "conduct research" atau "carry out research".',
+    pesan: 'Kolokasi keliru. Yang benar "conduct research" atau "carry out research".',
     saran: "conduct research",
     berat: "ganti",
   },
@@ -113,37 +113,37 @@ const KALKE: Aturan[] = [
   },
   {
     pola: /\bhas (?:an? )?(?:influence|impact|effect) (?:to|for)\b/gi,
-    pesan: 'Kata depan keliru — yang benar "on".',
+    pesan: 'Kata depan keliru. Yang benar "on".',
     saran: "has an effect on",
     berat: "ganti",
   },
   {
     pola: /\baccording to .{0,40}\b(?:said|says)\b/gi,
-    pesan: '"According to X, X said" mubazir.',
+    pesan: 'Bentuk "According to X, X said" mubazir.',
     saran: "According to X, …",
     berat: "rapikan",
   },
   {
     pola: /\bit can be concluded that\b/gi,
-    pesan: "Frasa ini sangat sering muncul pada naskah Indonesia dan terbaca sebagai pengisi.",
+    pesan: "Frasa ini terlalu sering muncul pada naskah Indonesia dan terbaca sebagai pengisi.",
     saran: "These results indicate that…",
     berat: "rapikan",
   },
   {
     pola: /\bin line with (?:the )?(?:theory|opinion|statement)\b/gi,
-    pesan: 'Terjemahan "sejalan dengan teori/pendapat".',
+    pesan: 'Terjemahan "sejalan dengan teori" atau "sejalan dengan pendapat".',
     saran: "consistent with",
     berat: "rapikan",
   },
   {
     pola: /\band so on\b|\betc\.\s/gi,
-    pesan: '"and so on" serta "etc." dihindari dalam jurnal karena tidak menyebutkan apa pun.',
+    pesan: 'Jurnal menghindari "and so on" dan "etc." karena keduanya tidak menyebut apa pun.',
     saran: "Sebutkan seluruh butirnya, atau tulis 'among others'",
     berat: "rapikan",
   },
   {
     pola: /\bhuman being(?!s?\b['’]?s?\s+(?:right|dignity))\b/gi,
-    pesan: '"human being" kerap dipakai berlebihan sebagai terjemahan "manusia".',
+    pesan: 'Terjemahan "manusia" yang berlebihan. Cukup "people" atau "humans".',
     saran: "people / individuals",
     berat: "pertimbangkan",
   },
@@ -155,13 +155,13 @@ const KALKE: Aturan[] = [
 const KLAIM_MUTLAK: Aturan[] = [
   {
     pola: /\b(?:this )?(?:research|study|result|data|finding)s?\s+(?:prove|proves|proved)\b/gi,
-    pesan: 'Penelitian sosial tidak "membuktikan". Klaim mutlak adalah alasan penolakan yang lazim.',
+    pesan: 'Penelitian sosial tidak "membuktikan". Klaim mutlak termasuk alasan penolakan yang paling lazim.',
     saran: "suggests / indicates / provides evidence that",
     berat: "ganti",
   },
   {
     pola: /\b(?:clearly|obviously|certainly|definitely|undoubtedly) (?:shows?|proves?|indicates?)\b/gi,
-    pesan: "Penegasan semacam ini melemahkan naskah, bukan menguatkannya.",
+    pesan: "Penegasan semacam ini melemahkan naskah, bukan menguatkan.",
     saran: "Hapus keterangannya",
     berat: "ganti",
   },
@@ -173,14 +173,14 @@ const KLAIM_MUTLAK: Aturan[] = [
   },
   {
     pola: /\bit is (?:certain|sure) that\b/gi,
-    pesan: "Kepastian mutlak jarang dapat dipertahankan.",
+    pesan: "Kepastian mutlak sulit dipertahankan di hadapan peninjau.",
     saran: "It appears that / The evidence suggests",
     berat: "rapikan",
   },
 ];
 
 // ---------------------------------------------------------------------------
-// 3. Ketaksederhanaan — frasa panjang yang punya padanan pendek
+// 3. Ketaksederhanaan: frasa panjang yang punya padanan pendek
 // ---------------------------------------------------------------------------
 const BERTELE: Array<[RegExp, string]> = [
   [/\bin order to\b/gi, "to"],
@@ -250,7 +250,7 @@ export function periksaInggris(teks: string): {
     }
   }
 
-  // Kalimat kepanjangan — batas Inggris lebih longgar daripada Indonesia.
+  // Kalimat kepanjangan. Batas Inggris lebih longgar daripada Indonesia.
   const kalimat = teks.split(/(?<=[.!?])\s+/).filter((k) => k.trim());
   let jalan = 0;
   for (const k of kalimat) {
@@ -263,13 +263,13 @@ export function periksaInggris(teks: string): {
         berat: "pertimbangkan",
         kutipan: k.trim().slice(0, 90) + (k.length > 90 ? "…" : ""),
         posisi: Math.max(0, posisi),
-        pesan: `${jumlah} kata. Di atas ${AMBANG_KALIMAT_PANJANG} kata, peninjau kehilangan alur argumennya.`,
+        pesan: `${jumlah} kata. Lewat ${AMBANG_KALIMAT_PANJANG} kata, peninjau kehilangan alur argumennya.`,
         saran: "Pecah menjadi dua kalimat",
       });
     }
   }
 
-  // Kadar kalimat pasif — bukan kesalahan, tetapi kadar yang terlalu tinggi
+  // Kadar kalimat pasif. Bukan kesalahan, tetapi kadar yang terlalu tinggi
   // membuat naskah sulit dibaca. Ditampilkan sebagai angka, bukan temuan.
   const pasif = kalimat.filter((k) =>
     /\b(?:is|are|was|were|been|being|be)\s+\w+(?:ed|en)\b/i.test(k),
@@ -337,28 +337,28 @@ type PolaBagian = { pola: RegExp; bagian: BagianJurnal; catatan: string };
 
 // Diperiksa berurutan; yang lebih khusus didahulukan.
 const PETA_JUDUL: PolaBagian[] = [
-  { pola: /sistematika\s+penulisan/i, bagian: "dibuang", catatan: "Sistematika penulisan tidak ada pada artikel jurnal." },
-  { pola: /manfaat\s+(?:penelitian|teoritis|praktis)/i, bagian: "dibuang", catatan: "Manfaat penelitian dilebur ke bagian akhir Introduction, biasanya satu kalimat." },
-  { pola: /batasan\s+masalah|ruang\s+lingkup/i, bagian: "methods", catatan: "Batasan masalah menjadi bagian dari cakupan pada Methods." },
-  { pola: /latar\s+belakang/i, bagian: "introduction", catatan: "Menjadi gerakan pertama CARS: menegakkan bidang penelitian." },
-  { pola: /(?:rumusan|identifikasi)\s+masalah/i, bagian: "introduction", catatan: "Menjadi gerakan kedua CARS: menunjukkan celah. Ditulis sebagai pernyataan, bukan daftar pertanyaan." },
-  { pola: /tujuan\s+penelitian/i, bagian: "introduction", catatan: "Menjadi gerakan ketiga CARS: mengisi celah, ditempatkan di akhir Introduction." },
-  { pola: /penelitian\s+(?:terdahulu|relevan|sebelumnya)/i, bagian: "literature", catatan: "Inti Literature review — inilah yang paling dipertahankan dari BAB II." },
-  { pola: /kerangka\s+(?:pemikiran|teori|konsep|berpikir)/i, bagian: "literature", catatan: "Diringkas menjadi beberapa paragraf yang memosisikan penelitian Anda." },
-  { pola: /hipotesis/i, bagian: "literature", catatan: "Hipotesis ditempatkan di akhir Literature review." },
-  { pola: /(?:landasan|kajian|tinjauan)\s+(?:teori|pustaka)/i, bagian: "literature", catatan: "Uraian teori dipangkas paling banyak — jurnal tidak memuat penjelasan buku teks." },
-  { pola: /(?:metode|metodologi)\s+penelitian/i, bagian: "methods", catatan: "Ditulis dalam kala lampau." },
-  { pola: /(?:populasi|sampel|teknik\s+pengambilan)/i, bagian: "methods", catatan: "Sertakan jumlah, cara pengambilan, dan alasannya." },
-  { pola: /(?:teknik|instrumen)\s+(?:pengumpulan|analisis)\s+data/i, bagian: "methods", catatan: "Cukup ringkas; rincian panjang dipindahkan ke lampiran." },
+  { pola: /sistematika\s+penulisan/i, bagian: "dibuang", catatan: "Artikel jurnal tidak punya bagian ini." },
+  { pola: /manfaat\s+(?:penelitian|teoritis|praktis)/i, bagian: "dibuang", catatan: "Lebur ke akhir Introduction, cukup satu kalimat." },
+  { pola: /batasan\s+masalah|ruang\s+lingkup/i, bagian: "methods", catatan: "Jadikan bagian cakupan di Methods." },
+  { pola: /latar\s+belakang/i, bagian: "introduction", catatan: "Gerakan pertama CARS: tegakkan bidang penelitiannya." },
+  { pola: /(?:rumusan|identifikasi)\s+masalah/i, bagian: "introduction", catatan: "Gerakan kedua CARS: tunjukkan celahnya. Tulis sebagai pernyataan, bukan daftar pertanyaan." },
+  { pola: /tujuan\s+penelitian/i, bagian: "introduction", catatan: "Gerakan ketiga CARS: isi celah itu. Tempatnya di akhir Introduction." },
+  { pola: /penelitian\s+(?:terdahulu|relevan|sebelumnya)/i, bagian: "literature", catatan: "Inti Literature review. Justru bagian ini yang paling banyak dipertahankan dari BAB II." },
+  { pola: /kerangka\s+(?:pemikiran|teori|konsep|berpikir)/i, bagian: "literature", catatan: "Ringkas jadi beberapa paragraf yang memosisikan penelitian Anda." },
+  { pola: /hipotesis/i, bagian: "literature", catatan: "Tempatkan di akhir Literature review." },
+  { pola: /(?:landasan|kajian|tinjauan)\s+(?:teori|pustaka)/i, bagian: "literature", catatan: "Uraian teori dipangkas paling dalam. Jurnal tidak memuat penjelasan gaya buku teks." },
+  { pola: /(?:metode|metodologi)\s+penelitian/i, bagian: "methods", catatan: "Tulis dalam kala lampau." },
+  { pola: /(?:populasi|sampel|teknik\s+pengambilan)/i, bagian: "methods", catatan: "Sebutkan jumlah, cara pengambilan, dan alasannya." },
+  { pola: /(?:teknik|instrumen)\s+(?:pengumpulan|analisis)\s+data/i, bagian: "methods", catatan: "Cukup ringkas. Rincian panjang pindahkan ke lampiran." },
   { pola: /(?:uji\s+validitas|uji\s+reliabilitas)/i, bagian: "methods", catatan: "Cukup satu paragraf berisi angkanya." },
-  { pola: /(?:hasil\s+penelitian|hasil\s+dan\s+pembahasan|deskripsi\s+data|gambaran\s+umum)/i, bagian: "results", catatan: "Hanya temuan, tanpa penafsiran. Kala lampau." },
-  { pola: /pembahasan|interpretasi/i, bagian: "discussion", catatan: "Hubungkan dengan penelitian terdahulu di Literature review, lalu sebutkan keterbatasan." },
-  { pola: /(?:kesimpulan|simpulan|penutup)/i, bagian: "conclusion", catatan: "Tanpa mengulang angka; nyatakan sumbangan dan arah penelitian berikutnya." },
-  { pola: /saran/i, bagian: "conclusion", catatan: "Dilebur ke Conclusion, bukan bagian tersendiri." },
-  { pola: /(?:daftar\s+pustaka|referensi)/i, bagian: "dibuang", catatan: "Ditulis ulang mengikuti gaya sitasi jurnal tujuan." },
-  { pola: /lampiran/i, bagian: "dibuang", catatan: "Lampiran umumnya tidak ikut, kecuali instrumen yang diminta." },
-  { pola: /(?:kata\s+pengantar|halaman\s+pengesahan|motto|persembahan|riwayat\s+hidup|ucapan\s+terima\s+kasih)/i, bagian: "dibuang", catatan: "Bagian administratif skripsi, tidak ada pada artikel." },
-  { pola: /abstrak/i, bagian: "abstract", catatan: "Ditulis ulang: latar, tujuan, metode, temuan utama berikut angkanya, dan implikasi." },
+  { pola: /(?:hasil\s+penelitian|hasil\s+dan\s+pembahasan|deskripsi\s+data|gambaran\s+umum)/i, bagian: "results", catatan: "Temuan saja, tanpa tafsiran. Kala lampau." },
+  { pola: /pembahasan|interpretasi/i, bagian: "discussion", catatan: "Hubungkan dengan penelitian terdahulu di Literature review, lalu akui keterbatasannya." },
+  { pola: /(?:kesimpulan|simpulan|penutup)/i, bagian: "conclusion", catatan: "Jangan ulang angka. Nyatakan sumbangan dan arah penelitian berikutnya." },
+  { pola: /saran/i, bagian: "conclusion", catatan: "Lebur ke Conclusion, bukan bagian tersendiri." },
+  { pola: /(?:daftar\s+pustaka|referensi)/i, bagian: "dibuang", catatan: "Tulis ulang mengikuti gaya sitasi jurnal tujuan." },
+  { pola: /lampiran/i, bagian: "dibuang", catatan: "Tidak ikut, kecuali instrumen yang memang diminta." },
+  { pola: /(?:kata\s+pengantar|halaman\s+pengesahan|motto|persembahan|riwayat\s+hidup|ucapan\s+terima\s+kasih)/i, bagian: "dibuang", catatan: "Bagian administratif skripsi, tidak ada di artikel." },
+  { pola: /abstrak/i, bagian: "abstract", catatan: "Tulis ulang: latar, tujuan, metode, temuan utama berikut angkanya, lalu implikasi." },
 ];
 
 export type BagianSkripsi = {
@@ -386,7 +386,7 @@ const POLA_JUDUL_BAB =
  * Petakan naskah skripsi ke struktur artikel jurnal.
  *
  * Judul dikenali dari pola penomoran BAB dan subbab. Yang tidak cocok dengan
- * satu pun pola dilaporkan apa adanya supaya penulis memutuskan sendiri —
+ * satu pun pola dilaporkan apa adanya supaya penulis memutuskan sendiri;
  * menebak akan lebih berbahaya daripada mengaku tidak tahu.
  */
 export function petakanNaskah(teks: string, targetTotal = 7000): PetaNaskah {

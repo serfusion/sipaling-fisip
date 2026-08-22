@@ -1,17 +1,17 @@
-// VERIFIKASI SITASI — pengurai daftar pustaka dan pencocok hasil pencarian.
+// VERIFIKASI SITASI: pengurai daftar pustaka dan pencocok hasil pencarian.
 //
 // Latar: referensi fiktif buatan AI naik dua belas kali lipat dalam tiga
-// tahun, dan dua pertiganya karangan utuh — nama penulis nyata, jurnal nyata,
+// tahun, dan dua pertiganya karangan utuh: nama penulis nyata, jurnal nyata,
 // tahun masuk akal, tetapi karyanya tidak pernah ada. Yang membuatnya
 // berbahaya justru karena tidak terlihat cacat.
 //
 // PRINSIP TERPENTING DI BERKAS INI:
 // Banyak referensi Indonesia yang sepenuhnya sah tidak ada di Crossref atau
-// OpenAlex — buku terbitan lokal, skripsi, tesis, peraturan perundangan,
+// OpenAlex. Contohnya buku terbitan lokal, skripsi, tesis, peraturan perundangan,
 // laporan lembaga, jurnal kampus yang belum ber-DOI. Alat yang menyamakan
 // "tidak ditemukan" dengan "palsu" akan menuduh mahasiswa yang benar.
 // Karena itu jenis referensi dikenali lebih dulu, dan yang memang tidak dapat
-// diperiksa otomatis dinyatakan begitu apa adanya — bukan dituduh.
+// diperiksa otomatis dinyatakan begitu apa adanya, bukan dituduh.
 //
 // Semua fungsi di sini murni supaya dapat diuji tanpa jaringan.
 
@@ -62,9 +62,9 @@ export type HasilRujukan = {
 
 export const PUTUSAN_LABEL: Record<Putusan, string> = {
   terverifikasi: "Terverifikasi",
-  "beda-rincian": "Ada rincian yang berbeda",
+  "beda-rincian": "Rinciannya berbeda",
   "tidak-ditemukan": "Tidak ditemukan",
-  "tak-dapat-diperiksa": "Tidak dapat diperiksa otomatis",
+  "tak-dapat-diperiksa": "Tidak bisa diperiksa otomatis",
 };
 
 // ---------------------------------------------------------------------------
@@ -248,7 +248,7 @@ const AMBANG = {
  * Simpulkan satu rujukan dari kandidat terbaik hasil pencarian.
  *
  * `kandidat` null berarti pencarian berjalan tetapi tidak menemukan apa pun.
- * `jaringanGagal` true berarti pencarian tidak dapat dilakukan — ini tidak
+ * `jaringanGagal` true berarti pencarian tidak dapat dilakukan. Ini tidak
  * boleh dibaca sebagai bukti apa pun tentang rujukannya.
  */
 export function simpulkan(
@@ -262,7 +262,7 @@ export function simpulkan(
     return {
       rujukan,
       putusan: "tak-dapat-diperiksa",
-      pesan: "Pemeriksaan tidak dapat dijalankan. Coba lagi — ini bukan tanda apa pun tentang rujukannya.",
+      pesan: "Pemeriksaan gagal berjalan. Coba lagi. Ini bukan tanda apa pun tentang rujukannya.",
       temuan: null,
       selisih,
     };
@@ -270,15 +270,15 @@ export function simpulkan(
 
   if (!dapatDiperiksa(rujukan.jenis)) {
     const alasan: Record<string, string> = {
-      buku: "Buku umumnya tidak terdaftar di Crossref maupun OpenAlex. Periksa langsung ke katalog perpustakaan atau penerbitnya.",
-      "skripsi-tesis": "Skripsi, tesis, dan disertasi tidak terdaftar di Crossref. Periksa ke repositori kampus penerbitnya.",
-      peraturan: "Peraturan perundangan tidak terdaftar di pangkalan data sitasi. Periksa ke JDIH instansi terkait.",
-      "laman-web": "Laman web tidak terdaftar di pangkalan data sitasi. Buka tautannya dan pastikan masih hidup.",
+      buku: "Buku memang jarang terdaftar di Crossref maupun OpenAlex. Cek langsung ke katalog perpustakaan atau ke penerbitnya.",
+      "skripsi-tesis": "Skripsi, tesis, dan disertasi tidak terdaftar di Crossref. Cek ke repositori kampus asalnya.",
+      peraturan: "Peraturan perundangan tidak ada di pangkalan data sitasi. Cek ke JDIH instansi terkait.",
+      "laman-web": "Laman web tidak ada di pangkalan data sitasi. Buka tautannya, pastikan masih hidup.",
     };
     return {
       rujukan,
       putusan: "tak-dapat-diperiksa",
-      pesan: alasan[rujukan.jenis] ?? "Jenis rujukan ini tidak dapat diperiksa otomatis.",
+      pesan: alasan[rujukan.jenis] ?? "Jenis rujukan ini tidak bisa diperiksa otomatis.",
       temuan: null,
       selisih,
     };
@@ -289,8 +289,8 @@ export function simpulkan(
       rujukan,
       putusan: "tidak-ditemukan",
       pesan:
-        "Tidak ditemukan di Crossref maupun OpenAlex. Ini rujukan yang paling perlu Anda buka sendiri — " +
-        "referensi karangan AI biasanya terlihat wajar tetapi karyanya tidak pernah ada.",
+        "Tidak ada di Crossref maupun OpenAlex. Inilah rujukan yang paling perlu Anda buka sendiri. " +
+        "Referensi karangan AI biasanya terlihat wajar, padahal karyanya tidak pernah terbit.",
       temuan: null,
       selisih,
     };
@@ -299,23 +299,23 @@ export function simpulkan(
   const mirip = kandidat.kemiripanJudul;
 
   if (rujukan.tahun !== null && kandidat.tahun !== null && rujukan.tahun !== kandidat.tahun) {
-    selisih.push(`Tahun pada daftar pustaka ${rujukan.tahun}, pada catatan resmi ${kandidat.tahun}.`);
+    selisih.push(`Tahun di daftar pustaka Anda ${rujukan.tahun}, di catatan resmi ${kandidat.tahun}.`);
   }
   const penulisCocok = namaKeluargaSama(rujukan.penulisPertama, kandidat.penulisPertama);
   if (penulisCocok === false) {
     selisih.push(
-      `Penulis pertama pada daftar pustaka "${rujukan.penulisPertama}", pada catatan resmi "${kandidat.penulisPertama}".`,
+      `Penulis pertama di daftar pustaka Anda "${rujukan.penulisPertama}", di catatan resmi "${kandidat.penulisPertama}".`,
     );
   }
   if (mirip < 0.95 && rujukan.judul && kandidat.judul) {
-    selisih.push(`Judul mirip tetapi tidak persis sama (kemiripan ${Math.round(mirip * 100)}%).`);
+    selisih.push(`Judulnya mirip, tetapi tidak sama persis (kemiripan ${Math.round(mirip * 100)}%).`);
   }
 
   if (mirip >= AMBANG.cocokKuat && selisih.length === 0) {
     return {
       rujukan,
       putusan: "terverifikasi",
-      pesan: `Ditemukan di ${kandidat.sumber} dengan judul, tahun, dan penulis yang cocok.`,
+      pesan: `Ada di ${kandidat.sumber}. Judul, tahun, dan penulisnya cocok.`,
       temuan: kandidat,
       selisih,
     };
@@ -326,8 +326,8 @@ export function simpulkan(
       rujukan,
       putusan: "beda-rincian",
       pesan:
-        "Ada karya nyata yang mirip, tetapi rinciannya berbeda. Perbaiki agar sesuai catatan resmi, " +
-        "atau pastikan Anda memang merujuk karya yang lain.",
+        "Ada karya nyata yang mirip, tetapi rinciannya berbeda. Samakan dengan catatan resmi, " +
+        "atau pastikan yang Anda maksud memang karya lain.",
       temuan: kandidat,
       selisih,
     };
@@ -337,7 +337,7 @@ export function simpulkan(
     rujukan,
     putusan: "tidak-ditemukan",
     pesan:
-      "Tidak ada karya dengan judul yang cukup mirip. Buka sendiri rujukan ini dan pastikan benar-benar ada.",
+      "Tidak ada karya berjudul cukup mirip. Buka sendiri rujukan ini, pastikan memang ada.",
     temuan: kandidat,
     selisih,
   };
@@ -349,7 +349,7 @@ export type RingkasanSitasi = {
   bedaRincian: number;
   tidakDitemukan: number;
   takDapatDiperiksa: number;
-  /** Kalimat ringkas yang tidak menuduh. */
+  /** Kalimat ringkas, tanpa menuduh. */
   pesan: string;
 };
 
@@ -362,11 +362,11 @@ export function ringkas(hasil: HasilRujukan[]): RingkasanSitasi {
 
   let pesan: string;
   if (hasil.length === 0) {
-    pesan = "Belum ada rujukan yang dapat diurai.";
+    pesan = "Belum ada rujukan yang bisa diurai.";
   } else if (tidakDitemukan === 0 && bedaRincian === 0) {
-    pesan = "Tidak ada rujukan yang mencurigakan pada pemeriksaan otomatis.";
+    pesan = "Tidak ada rujukan yang mencurigakan dari pemeriksaan otomatis.";
   } else if (tidakDitemukan > 0) {
-    pesan = `${tidakDitemukan} rujukan tidak ditemukan dan perlu Anda buka sendiri.`;
+    pesan = `${tidakDitemukan} rujukan tidak ditemukan. Buka sendiri satu per satu.`;
   } else {
     pesan = `${bedaRincian} rujukan perlu dirapikan rinciannya.`;
   }
