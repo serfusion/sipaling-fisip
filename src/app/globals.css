@@ -2013,3 +2013,27 @@ a.mt-i-dot:hover { background: var(--yellow); box-shadow: 0 0 0 .045em rgba(245,
   .at-shell, .at-panel { background: white; box-shadow: none; border: 0; padding: 0; }
   .at-lapor { border-color: #cbd5e1; }
 }
+
+/* --- Verifikasi Sitasi & Naskah Inggris --- */
+.at-temuan li.at-abu { border-left-color: #94a3b8; }
+.at-temuan li.at-positif { border-left-color: var(--green); }
+.at-angka-bahaya { background: #fef2f2; border-color: #fca5a5; }
+.at-angka-bahaya b { color: #991b1b; }
+.at-nomor { margin-left: auto; color: var(--muted); font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.at-ringkas { margin: 0 0 14px; color: var(--navy); font-size: 13.5px; font-weight: 700; }
+.at-mentah { margin: 0 0 6px !important; color: var(--ink) !important; font-size: 12.5px; line-height: 1.55; overflow-wrap: anywhere; }
+.at-selisih { margin: 6px 0 0; padding-left: 18px; color: #475569; font-size: 12px; line-height: 1.55; }
+.at-selisih li { margin-bottom: 2px; }
+.at-field-kecil { max-width: 15rem; margin-top: 12px; }
+.at-subjudul { margin: 20px 0 8px; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.at-peta { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.at-peta li { border: 1px solid var(--line); border-left: 4px solid var(--primary); border-radius: 10px; padding: 11px 13px; background: #fcfdfe; }
+.at-peta li.at-buang { border-left-color: #cbd5e1; background: #f8fafc; }
+.at-peta-atas { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.at-peta-atas b { font-size: 13.5px; color: var(--ink); }
+.at-panah { color: var(--muted); font-size: 13px; }
+.at-tujuan { color: var(--primary); font-size: 11.5px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; }
+.at-buang .at-tujuan { color: var(--muted); }
+.at-peta-kata { margin: 0 0 4px !important; color: var(--muted) !important; font-size: 12px; font-variant-numeric: tabular-nums; }
+.at-peta-kata b { color: var(--green); }
+.at-peta p { margin: 0; color: #475569; font-size: 12.5px; line-height: 1.6; }
