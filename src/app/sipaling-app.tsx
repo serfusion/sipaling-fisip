@@ -302,7 +302,7 @@ function copyTicketToClipboard(ticket: string, onDone: () => void) {
 
 function StatusTimeline({ status }: { status: string }) {
   if (status === "Ditolak") {
-    return <div className="tl-reject">Pengajuan ditolak — silakan baca catatan admin di bawah, lalu ajukan kembali bila diperlukan.</div>;
+    return <div className="tl-reject">Pengajuan ditolak. Baca catatan admin di bawah, lalu ajukan kembali bila perlu.</div>;
   }
   const steps = ["Masuk", "Dicek", "Revisi", "Diproses", "Selesai"];
   const current = steps.indexOf(status);
@@ -354,7 +354,7 @@ function ProposalReport({ proposal, onCopy }: { proposal: ProposalRecord; onCopy
         <div className="tl-reject">
           {proposal.status === PROPOSAL_STATUS.rejectedProdi
             ? "Program Studi belum dapat meneruskan pengajuan ini. Silakan baca catatan di bawah, perbaiki, lalu ajukan ulang."
-            : "Dosen yang ditunjuk menolak pengajuan ini. Program Studi sedang mencarikan dosen pengganti — pantau halaman ini secara berkala."}
+            : "Dosen yang ditunjuk menolak pengajuan ini. Program Studi sedang mencarikan dosen pengganti. Pantau halaman ini secara berkala."}
         </div>
       ) : (
         <div className="tline">
@@ -545,7 +545,7 @@ export default function SipalingApp() {
 
   const currentService = serviceCatalog[serviceType];
   const currentNeeds = needsFor(serviceType, finalTaskType);
-  // Kebutuhan "Pengajuan Judul" TIDAK boleh memakai form layanan biasa —
+  // Kebutuhan "Pengajuan Judul" TIDAK boleh memakai form layanan biasa,
   // form itu hanya punya satu Dosen Tujuan, sedangkan pengajuan judul wajib
   // tiga usulan dosen. Semua jalur masuk diarahkan ke templatenya.
   const isProposalNeed = isTitleProposalNeed(selectedNeed);
@@ -894,7 +894,7 @@ export default function SipalingApp() {
                 Upload Revisi
               </button>
               <a className="hero-button" href="/alat">
-                <span>⚗</span> Alat Bantu
+                Cakrawala
               </a>
               <a className={sessionRole ? "hero-button hero-button-logged" : "hero-button"} href="/dashboard">
                 {sessionRole ? `● Dashboard ${DASH_ROLE_LABEL[sessionRole] || "Admin"}` : "Login Dosen/Admin"}
@@ -1141,7 +1141,7 @@ export default function SipalingApp() {
                       onChange={setSelectedLecturerId}
                       name="lecturerId"
                       required
-                      placeholder={lecturers.length ? "Ketik nama dosen — daftar langsung tersaring" : "Memuat daftar dosen…"}
+                      placeholder={lecturers.length ? "Ketik nama dosen, daftar langsung tersaring" : "Memuat daftar dosen…"}
                       helper={`${lecturers.length} dosen aktif, urut A–Z tanpa gelar.`}
                     />
                     {lecturerError && <p className="helper helper-error">{lecturerError}</p>}
@@ -1255,7 +1255,7 @@ export default function SipalingApp() {
                     <div><small>Pengajuan</small><strong>{formatDate(statusData.createdAt)}</strong></div>
                   </div>
                   <div className="report-notes"><div><small>Catatan Dosen</small><p>{statusData.lecturerNote || "Belum ada catatan dosen."}</p></div><div><small>Catatan Admin</small><p>{statusData.adminNote || "Belum ada catatan admin."}</p></div></div>
-                  {statusData.status === "Revisi" && <button type="button" className="text-action" onClick={() => selectTab("revisi")}>Status revisi — unggah berkas terbaru →</button>}
+                  {statusData.status === "Revisi" && <button type="button" className="text-action" onClick={() => selectTab("revisi")}>Status revisi: unggah berkas terbaru →</button>}
                 </div>
               )}
             </article>

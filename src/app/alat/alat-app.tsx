@@ -55,11 +55,12 @@ export default function AlatApp() {
         <div className="at-head-in">
           <Link href="/" className="at-back">← Portal Mahasiswa</Link>
           <div>
-            <p className="at-eyebrow">ALAT MAHASISWA</p>
-            <h1>Alat Bantu Akademik</h1>
+            <p className="at-eyebrow">UNTUK MAHASISWA FISIP</p>
+            <h1>Cakrawala</h1>
           </div>
           <p className="at-sub">
-            Gratis, tanpa akun, dan naskah Anda tidak dikirim ke mana pun kecuali Anda menekan tombol periksa jurnal.
+            Empat pemeriksa untuk skripsi dan naskah jurnal Anda. Gratis, tanpa akun, tanpa AI.
+            Tulisan Anda baru keluar dari perangkat ini kalau Anda sendiri yang menekan tombol periksa.
           </p>
         </div>
       </header>
@@ -127,10 +128,10 @@ function RadarJurnal() {
   return (
     <section className="at-panel">
       <div className="at-intro">
-        <h2>Periksa jurnal sebelum Anda mengirim naskah</h2>
+        <h2>Periksa jurnalnya dulu, baru kirim naskah</h2>
         <p>
-          Setelah naskah masuk, penarikan sering ditolak — dan Anda tidak boleh mengirimkannya ke jurnal lain
-          sampai penarikan itu dikonfirmasi. Karena itu pemeriksaan dilakukan sekarang, bukan nanti.
+          Begitu naskah masuk, permintaan penarikan sering ditolak. Selama penarikan belum dikonfirmasi, naskah
+          itu tidak boleh Anda kirim ke jurnal lain. Jadi periksa sekarang, bukan nanti.
         </p>
       </div>
 
@@ -145,7 +146,7 @@ function RadarJurnal() {
             autoComplete="off"
             required
           />
-          <small>Tercantum di halaman depan jurnal atau di bagian &ldquo;About&rdquo;.</small>
+          <small>Ada di halaman depan jurnal atau di bagian &ldquo;About&rdquo;.</small>
         </label>
 
         <fieldset className="at-fieldset">
@@ -155,13 +156,13 @@ function RadarJurnal() {
             <input type="checkbox" checked={sinta} onChange={(e) => setSinta(e.target.checked)} />
             <span>
               <b>Terakreditasi SINTA</b>
-              <small>SINTA tidak menyediakan API publik. Periksa sendiri lalu centang bila benar.</small>
+              <small>SINTA tidak punya API publik. Cek sendiri, lalu centang bila benar.</small>
             </span>
           </label>
 
           <p className="at-legend-note">
-            Buka situs jurnalnya, lalu centang metrik yang Anda lihat dipajang di sana. Tidak satu pun dari ini
-            diterbitkan lembaga pengindeks yang diakui — memajangnya adalah tanda bahaya.
+            Buka situs jurnalnya, lalu centang metrik yang dipajang di sana. Tidak satu pun metrik ini
+            diterbitkan lembaga pengindeks yang diakui. Memajangnya adalah tanda bahaya.
           </p>
           <div className="at-chips">
             {METRIK_TIDAK_DIAKUI.slice(0, 8).map((m) => {
@@ -209,9 +210,9 @@ function LaporanRadar({ hasil }: { hasil: Hasil }) {
       </header>
 
       <div className="at-lapor-isi">
-        {berat.length > 0 && <Kelompok judul="Temuan berbobot berat" sinyal={berat} />}
+        {berat.length > 0 && <Kelompok judul="Tanda bahaya" sinyal={berat} />}
         {lain.length > 0 && <Kelompok judul="Temuan pendukung" sinyal={lain} />}
-        {positif.length > 0 && <Kelompok judul="Yang justru wajar" sinyal={positif} />}
+        {positif.length > 0 && <Kelompok judul="Yang sudah wajar" sinyal={positif} />}
 
         {hasil.takTerperiksa.length > 0 && (
           <>
@@ -222,8 +223,8 @@ function LaporanRadar({ hasil }: { hasil: Hasil }) {
               ))}
             </ul>
             <p className="at-catatan">
-              Pemeriksaan yang tidak terjadi tidak dihitung sebagai aman maupun sebagai bahaya. Semakin banyak
-              yang tidak terperiksa, semakin sedikit yang dapat disimpulkan.
+              Pemeriksaan yang gagal berjalan tidak dihitung aman, tidak pula dihitung bahaya. Makin banyak yang
+              tidak terperiksa, makin sedikit yang bisa disimpulkan.
             </p>
           </>
         )}
@@ -236,12 +237,12 @@ function LaporanRadar({ hasil }: { hasil: Hasil }) {
         </ol>
 
         <p className="at-sangkalan">
-          Ini penilaian risiko dari sinyal publik yang dapat diperiksa ulang, bukan putusan tentang jurnal ini.
-          Tunjukkan kepada dosen pembimbing Anda dan putuskan bersama.
+          Ini penilaian risiko dari sinyal publik yang bisa Anda telusuri ulang, bukan vonis atas jurnalnya.
+          Bawa ke dosen pembimbing, lalu putuskan bersama.
         </p>
 
         <button type="button" className="at-cetak" onClick={() => window.print()}>
-          Cetak / simpan sebagai PDF
+          Cetak atau simpan sebagai PDF
         </button>
       </div>
     </article>
@@ -282,7 +283,7 @@ function PeriksaBahasa() {
   const [teks, setTeks] = useState("");
   const [saring, setSaring] = useState<Berat | "semua">("semua");
 
-  // Seluruhnya dihitung di peramban — naskah tidak pernah dikirim ke server.
+  // Seluruhnya dihitung di peramban. Naskah tidak pernah dikirim ke server.
   const hasil: Ringkasan | null = useMemo(() => (teks.trim() ? periksaBahasa(teks) : null), [teks]);
 
   const tampil = useMemo(() => {
@@ -295,9 +296,9 @@ function PeriksaBahasa() {
       <div className="at-intro">
         <h2>Periksa ragam ilmiah tulisan Anda</h2>
         <p>
-          Penelitian atas karya tulis mahasiswa Indonesia menemukan sebagian besar kesalahan justru ada di
-          tataran ejaan — kata depan, huruf kapital, tanda baca, dan kata tidak baku. Semuanya diperiksa di sini
-          tanpa AI, <b>dan tanpa naskah Anda meninggalkan perangkat ini.</b>
+          Kesalahan terbanyak pada karya tulis mahasiswa bukan soal isi, melainkan ejaan: kata depan, huruf
+          kapital, tanda baca, dan kata tidak baku. Semuanya diperiksa di sini tanpa AI,
+          <b> dan tanpa naskah Anda meninggalkan perangkat ini.</b>
         </p>
       </div>
 
@@ -308,7 +309,7 @@ function PeriksaBahasa() {
             value={teks}
             onChange={(e) => setTeks(e.target.value)}
             rows={10}
-            placeholder="Tempelkan satu bab, satu paragraf, atau seluruh draf…"
+            placeholder="Tempelkan satu paragraf, satu bab, atau seluruh draf…"
           />
         </label>
         <div className="at-editor-aksi">
@@ -352,7 +353,10 @@ function PeriksaBahasa() {
           )}
 
           {hasil.temuan.length === 0 ? (
-            <p className="at-bersih">Tidak ada temuan pada aturan yang diperiksa. Ini bukan jaminan bebas kesalahan — pemeriksa ini hanya menangkap pola yang paling sering muncul.</p>
+            <p className="at-bersih">
+              Bersih untuk aturan yang diperiksa. Ini bukan jaminan bebas kesalahan: yang ditangkap di sini hanya
+              pola yang paling sering keliru.
+            </p>
           ) : (
             <ul className="at-temuan">
               {tampil.map((t, i) => (
@@ -373,8 +377,8 @@ function PeriksaBahasa() {
           )}
 
           <p className="at-sangkalan">
-            Pemeriksa ini mengikuti PUEBI dan KBBI untuk pola yang paling sering keliru. Ia tidak menggantikan
-            pembacaan dosen pembimbing, dan kutipan langsung sengaja dilewati agar tidak salah menandai.
+            Aturannya mengikuti PUEBI dan KBBI. Ini tidak menggantikan pembacaan dosen pembimbing, dan kutipan
+            langsung sengaja dilewati supaya tidak salah tandai.
           </p>
         </>
       )}
@@ -432,9 +436,10 @@ function VerifikasiSitasi() {
       <div className="at-intro">
         <h2>Pastikan tiap referensi Anda benar-benar ada</h2>
         <p>
-          Referensi fiktif buatan AI naik dua belas kali lipat dalam tiga tahun, dan dua pertiganya karangan utuh —
-          nama penulis nyata, jurnal nyata, tahun masuk akal, tetapi karyanya tidak pernah ada. Yang berbahaya justru
-          karena <b>tidak terlihat cacat.</b> Tiap entri di sini diadu ke Crossref dan OpenAlex.
+          Referensi fiktif buatan AI naik dua belas kali lipat dalam tiga tahun. Dua pertiganya karangan utuh:
+          nama penulis nyata, jurnal nyata, tahun masuk akal, tapi karyanya tidak pernah terbit. Justru karena
+          <b> tidak terlihat cacat</b>, referensi seperti ini lolos sampai sidang. Di sini tiap entri diadu ke
+          Crossref dan OpenAlex.
         </p>
       </div>
 
@@ -445,7 +450,7 @@ function VerifikasiSitasi() {
             value={daftar}
             onChange={(e) => setDaftar(e.target.value)}
             rows={9}
-            placeholder="Satu rujukan per baris — dari daftar pustaka Anda, atau dari jawaban AI mana pun…"
+            placeholder="Satu rujukan per baris. Dari daftar pustaka Anda, atau dari jawaban AI mana pun…"
           />
         </label>
         <div className="at-editor-aksi">
@@ -511,10 +516,10 @@ function VerifikasiSitasi() {
 
           <p className="at-sangkalan">
             <b>Tidak ditemukan bukan berarti palsu.</b>{" "}
-            Buku, skripsi, peraturan, dan terbitan lokal memang tidak
-            terdaftar di Crossref maupun OpenAlex — semuanya ditandai &ldquo;tidak dapat diperiksa&rdquo;, bukan
-            dituduh. Yang berstatus <b>tidak ditemukan</b> adalah artikel jurnal yang seharusnya ada di sana tetapi
-            tidak ada. Buka sendiri rujukan itu sebelum menyerahkan naskah.
+            Buku, skripsi, peraturan, dan terbitan lokal memang tidak terdaftar di Crossref maupun OpenAlex.
+            Semuanya ditandai &ldquo;tidak dapat diperiksa&rdquo;, bukan dituduh. Yang berstatus{" "}
+            <b>tidak ditemukan</b> adalah artikel jurnal yang seharusnya ada di sana, tapi tidak ada. Buka sendiri
+            rujukan itu sebelum naskah Anda diserahkan.
           </p>
         </>
       )}
@@ -544,17 +549,18 @@ function NaskahInggris() {
   return (
     <section className="at-panel">
       <div className="at-intro">
-        <h2>Ubah skripsi Anda menjadi naskah jurnal berbahasa Inggris</h2>
+        <h2>Ubah skripsi Anda menjadi artikel jurnal berbahasa Inggris</h2>
         <p>
-          Bukan mengarang jurnal baru — mengubah skripsi yang <b>sudah Anda pertahankan sendiri</b> menjadi artikel.
-          Dua hal yang membuat naskah penulis Indonesia ditolak sebelum isinya dibaca: strukturnya masih BAB I–V,
-          dan ragam bahasanya terjemahan harfiah. Keduanya diperiksa di sini, di peramban, tanpa AI.
+          Bukan mengarang penelitian baru. Anda mengubah skripsi yang <b>sudah Anda pertahankan sendiri</b>
+          {" "}menjadi artikel. Dua hal membuat naskah penulis Indonesia ditolak sebelum isinya dibaca: strukturnya
+          masih BAB I sampai V, dan bahasanya terjemahan harfiah. Dua-duanya diperiksa di sini, di perangkat Anda,
+          tanpa AI.
         </p>
       </div>
 
       <div className="at-saring" role="group" aria-label="Pilih pemeriksaan">
         <button type="button" className={mode === "struktur" ? "on" : ""} onClick={() => setMode("struktur")}>
-          1 · Struktur BAB → IMRaD
+          1 · Struktur BAB ke IMRaD
         </button>
         <button type="button" className={mode === "bahasa" ? "on" : ""} onClick={() => setMode("bahasa")}>
           2 · Ragam akademik Inggris
@@ -582,7 +588,7 @@ function NaskahInggris() {
               step={500}
               onChange={(e) => setTarget(Math.max(3000, Math.min(12000, Number(e.target.value) || 7000)))}
             />
-            <small>Artikel ilmu sosial umumnya 6.000–8.000 kata.</small>
+            <small>Artikel ilmu sosial umumnya 6.000 sampai 8.000 kata.</small>
           </label>
 
           {peta && peta.bagian.length > 0 && (
@@ -621,8 +627,8 @@ function NaskahInggris() {
                     {peta.takTerpetakan.map((j) => <li key={j}>{j}</li>)}
                   </ul>
                   <p className="at-catatan">
-                    Judul ini tidak cocok dengan pola mana pun. Anda yang paling tahu isinya — menebak akan lebih
-                    berbahaya daripada mengaku tidak tahu.
+                    Judul ini tidak cocok dengan pola mana pun. Anda yang paling tahu isinya, dan menebak jauh
+                    lebih berbahaya daripada mengaku tidak tahu.
                   </p>
                 </>
               )}
@@ -630,7 +636,7 @@ function NaskahInggris() {
           )}
           {skripsi.trim() && peta && peta.bagian.length === 0 && (
             <p className="at-galat">
-              Tidak ada judul bab yang dikenali. Pastikan tiap judul berada pada barisnya sendiri, misalnya
+              Tidak ada judul bab yang dikenali. Pastikan tiap judul berdiri di barisnya sendiri, misalnya
               &ldquo;1.1 Latar Belakang&rdquo;.
             </p>
           )}
@@ -668,8 +674,8 @@ function NaskahInggris() {
 
               {cek.temuan.length === 0 ? (
                 <p className="at-bersih">
-                  Tidak ada pola yang biasa ditandai peninjau. Ini bukan jaminan bebas kesalahan — pemeriksa ini
-                  hanya menangkap pola yang paling sering muncul pada naskah penulis Indonesia.
+                  Bersih dari pola yang biasa ditandai peninjau. Ini bukan jaminan bebas kesalahan: yang ditangkap
+                  di sini hanya pola yang paling sering muncul pada naskah penulis Indonesia.
                 </p>
               ) : (
                 <ul className="at-temuan">
@@ -687,8 +693,8 @@ function NaskahInggris() {
               )}
 
               <p className="at-sangkalan">
-                Kadar kalimat pasif bukan kesalahan — ia hanya ditampilkan sebagai angka. Di atas sekitar 40%,
-                naskah biasanya mulai sulit diikuti peninjau.
+                Kadar kalimat pasif bukan kesalahan, hanya angka. Di atas sekitar 40%, naskah biasanya mulai
+                sulit diikuti peninjau.
               </p>
             </>
           )}
