@@ -11,6 +11,8 @@
 // setelah tujuh hari tanpa situs ini dibuka. Karena itu tersedia ekspor
 // cadangan, dan navigator.storage.persist() diminta sejak awal.
 
+import type { Masukan } from "./metodologi";
+
 export type JenisProject = "skripsi" | "jurnal" | "makalah";
 
 export type Bab = {
@@ -34,6 +36,12 @@ export type Project = {
   issnTujuan: string;
   /** Naskah Inggris yang sedang dikerjakan. */
   naskahInggris: string;
+  /** Topik atau pertanyaan penelitian, dipakai Cari Referensi. */
+  topik: string;
+  /** Masukan Perumus Judul, disimpan agar tidak perlu diisi ulang. */
+  rancangan: Masukan | null;
+  /** Sumber yang ditempel mahasiswa untuk pembanding kemiripan. */
+  sumberBanding: Array<{ nama: string; teks: string }>;
   dibuat: number;
   diubah: number;
 };
@@ -127,6 +135,9 @@ export function projectBaru(nama: string, jenis: JenisProject, prodi = ""): Proj
     daftarPustaka: "",
     issnTujuan: "",
     naskahInggris: "",
+    topik: "",
+    rancangan: null,
+    sumberBanding: [],
     dibuat: kini,
     diubah: kini,
   };
@@ -137,9 +148,29 @@ export async function simpanProject(project: Project): Promise<void> {
   await jalankan("readwrite", (toko) => toko.put(disimpan) as IDBRequest<IDBValidKey>);
 }
 
+/**
+ * Isi bidang yang belum ada pada project lama.
+ *
+ * Project disimpan di perangkat pengguna dan tidak ikut termigrasi ketika
+ * aplikasi diperbarui. Tanpa pelengkapan ini, project yang dibuat sebelum
+ * suatu bidang ditambahkan akan membuat alat yang membacanya gagal.
+ */
+function lengkapi(p: Project): Project {
+  return {
+    ...p,
+    daftarPustaka: p.daftarPustaka ?? "",
+    issnTujuan: p.issnTujuan ?? "",
+    naskahInggris: p.naskahInggris ?? "",
+    topik: p.topik ?? "",
+    rancangan: p.rancangan ?? null,
+    sumberBanding: Array.isArray(p.sumberBanding) ? p.sumberBanding : [],
+    bab: Array.isArray(p.bab) ? p.bab : [],
+  };
+}
+
 export async function ambilProject(id: string): Promise<Project | null> {
   const hasil = await jalankan("readonly", (toko) => toko.get(id) as IDBRequest<Project | undefined>);
-  return hasil ?? null;
+  return hasil ? lengkapi(hasil) : null;
 }
 
 export async function daftarProject(): Promise<RingkasProject[]> {
@@ -244,7 +275,7 @@ export async function pulihkanCadangan(isi: string): Promise<number> {
     if (!p || typeof p.id !== "string" || !Array.isArray(p.bab)) continue;
     // Id dibuat ulang agar cadangan yang dipulihkan di perangkat yang sudah
     // punya project tidak menimpa pekerjaan yang ada di sana.
-    await simpanProject({ ...p, id: idBaru() });
+    await simpanProject(lengkapi({ ...(p as Project), id: idBaru() }));
     jumlah += 1;
   }
   return jumlah;

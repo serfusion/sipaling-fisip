@@ -30,6 +30,9 @@ export const IKON = {
   unggah: "M12 20V9M8 13l4-4 4 4M4 4h16",
   hapus: "M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13",
   dokumen: "M14 3v4a1 1 0 0 0 1 1h4M6 3h9l5 5v12a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z",
+  judul: "M4 6h9M4 11h6M12.5 20l6.5-6.5a2.1 2.1 0 0 0-3-3L9.5 17 9 20z",
+  referensi: "M11 19a8 8 0 1 1 8-8 8 8 0 0 1-8 8zM21 21l-4.3-4.3",
+  kemiripan: "M9 7H6a5 5 0 0 0 0 10h3M15 7h3a5 5 0 0 1 0 10h-3M8 12h8",
 };
 
 /** Kepala kartu: ikon berbingkai lembut, judul, satu baris penjelas. */

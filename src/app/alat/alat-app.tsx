@@ -6,11 +6,17 @@ import { Ic, IKON } from "./ikon";
 import { useProject } from "./use-project";
 import { PanelBeranda, type Tab } from "./panel-beranda";
 import { PanelStruktur, PanelInggris } from "./panel-naskah";
+import { PanelJudul } from "./panel-judul";
+import { PanelReferensi } from "./panel-referensi";
+import { PanelKemiripan } from "./panel-kemiripan";
 import { PanelSitasi, PanelRadar, PanelBahasa } from "./panel-periksa";
 import { JENIS_LABEL } from "@/lib/project";
 
 const MENU: Array<{ id: Tab; label: string; sub: string; ikon: string }> = [
   { id: "beranda", label: "Beranda", sub: "Project dan naskah", ikon: IKON.beranda },
+  { id: "judul", label: "Judul dan Metode", sub: "Sebelum judul ditetapkan", ikon: IKON.judul },
+  { id: "referensi", label: "Cari Referensi", sub: "Jurnal ilmiah yang sahih", ikon: IKON.referensi },
+  { id: "kemiripan", label: "Cek Kemiripan", sub: "Sitasi dan parafrase", ikon: IKON.kemiripan },
   { id: "struktur", label: "Struktur Naskah", sub: "Bab skripsi ke IMRaD", ikon: IKON.struktur },
   { id: "inggris", label: "Naskah Inggris", sub: "Padanan ragam jurnal", ikon: IKON.inggris },
   { id: "sitasi", label: "Verifikasi Sitasi", sub: "Cek referensi fiktif", ikon: IKON.sitasi },
@@ -31,8 +37,8 @@ export default function AlatApp() {
           <p className="al-eyebrow">UNTUK MAHASISWA FISIP</p>
           <h1>Cakrawala</h1>
           <p>
-            Ruang kerja untuk skripsi dan naskah jurnal Anda. Satu project menampung naskah, daftar pustaka, dan
-            jurnal tujuan; lima alat memakainya bersama. Gratis, tanpa akun, tanpa AI.
+            Ruang kerja untuk skripsi dan naskah jurnal Anda, dari merumuskan judul sampai naskah siap kirim.
+            Satu project menampung semuanya, dan delapan alat memakainya bersama. Gratis, tanpa akun, tanpa AI.
           </p>
 
           {aktif && (
@@ -86,6 +92,9 @@ export default function AlatApp() {
               keAlat={setTab}
             />
           )}
+          {tab === "judul" && <PanelJudul project={p.aktif} ubah={p.ubah} keAlat={setTab} />}
+          {tab === "referensi" && <PanelReferensi project={p.aktif} ubah={p.ubah} />}
+          {tab === "kemiripan" && <PanelKemiripan project={p.aktif} ubah={p.ubah} />}
           {tab === "struktur" && <PanelStruktur project={p.aktif} />}
           {tab === "inggris" && <PanelInggris project={p.aktif} ubah={p.ubah} />}
           {tab === "sitasi" && <PanelSitasi project={p.aktif} ubah={p.ubah} />}

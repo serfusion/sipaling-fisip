@@ -2163,6 +2163,33 @@ a.mt-i-dot:hover { background: var(--yellow); box-shadow: 0 0 0 .045em rgba(245,
 .al-kosong h3 { margin: 0 0 6px; font-size: 15.5px; font-weight: 800; color: var(--al-ink); }
 .al-kosong p { margin: 0 auto; max-width: 30rem; color: var(--al-muted); font-size: 13px; line-height: 1.65; }
 
+/* --- Isian berdampingan di dalam kartu --- */
+.al-duo-isi { display: grid; gap: 0 14px; grid-template-columns: 1fr; }
+@media (min-width: 620px) { .al-duo-isi { grid-template-columns: 1fr 1fr; } }
+
+/* --- Lencana hasil pencarian referensi --- */
+.al-lencana { font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+  border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
+.al-lencana.unduh { background: var(--al-ok-bg); color: var(--al-ok); }
+.al-lencana.doaj { background: var(--al-soft); color: var(--al-accent-dark); }
+.al-sumber-baris { color: var(--al-muted) !important; font-size: 12px !important; margin-top: 5px !important; }
+.al-inti { margin-top: 9px; padding: 11px 13px; background: var(--al-line-soft); border-radius: 10px; }
+.al-inti p { margin: 0; color: #4b5568; font-size: 12.5px; line-height: 1.6; }
+.al-inti p + p { margin-top: 6px; }
+.al-inti b { color: var(--al-accent-dark); }
+.al-apa { margin-top: 10px !important; padding-top: 10px; border-top: 1px dashed var(--al-line);
+  color: var(--al-muted) !important; font-size: 11.5px !important; line-height: 1.6 !important;
+  overflow-wrap: anywhere; }
+
+/* Tautan yang tampil sebagai tombol kecil. */
+a.al-mini { text-decoration: none; color: var(--al-muted); }
+a.al-mini:hover { color: var(--al-ink); }
+.al-mini.sudah { border-color: #bde3d6; background: var(--al-ok-bg); color: var(--al-ok); }
+
+/* Baris bab dan sumber memuat tombol hapus di ujungnya. */
+.al-bab-baris .al-proj-hapus { width: 30px; height: 30px; margin: -6px -6px -6px 0; }
+.al-bab-baris .al-proj-hapus svg { width: 14px; height: 14px; }
+
 @media (max-width: 560px) {
   .al-card { padding: 16px 14px; border-radius: 14px; }
   .al-body { padding: 14px 12px 44px; }

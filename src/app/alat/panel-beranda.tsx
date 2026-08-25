@@ -13,7 +13,9 @@ import {
   type RingkasProject,
 } from "@/lib/project";
 
-export type Tab = "beranda" | "struktur" | "inggris" | "sitasi" | "radar" | "bahasa";
+export type Tab =
+  | "beranda" | "judul" | "referensi" | "struktur" | "inggris"
+  | "kemiripan" | "sitasi" | "radar" | "bahasa";
 
 const JENIS: JenisProject[] = ["skripsi", "jurnal", "makalah"];
 
@@ -307,6 +309,23 @@ function Langkah({ project, keAlat }: { project: Project; keAlat: (t: Tab) => vo
   const rujukan = project.daftarPustaka.split(/\n\s*\n|\n/).filter((b) => b.trim().length > 20).length;
 
   const langkah: Array<{ tab: Tab; ikon: string; judul: string; ket: string; siap: boolean }> = [
+    {
+      tab: "judul", ikon: IKON.judul, judul: "Judul dan Metode",
+      ket: project.rancangan ? "Rancangan tersimpan" : "Mulai dari sini bila judul belum pasti",
+      siap: Boolean(project.rancangan),
+    },
+    {
+      tab: "referensi", ikon: IKON.referensi, judul: "Cari Referensi",
+      ket: project.topik ? "Topik tersimpan" : "Cari jurnal ilmiah yang sahih",
+      siap: Boolean(project.topik),
+    },
+    {
+      tab: "kemiripan", ikon: IKON.kemiripan, judul: "Cek Kemiripan",
+      ket: project.sumberBanding.length > 0
+        ? `${project.sumberBanding.length} sumber pembanding`
+        : kata > 0 ? "Periksa sitasi dan parafrase" : "Menunggu naskah",
+      siap: kata > 0,
+    },
     {
       tab: "struktur", ikon: IKON.struktur, judul: "Struktur Naskah",
       ket: project.bab.length > 0 ? `${project.bab.length} bab siap dipetakan ke IMRaD` : "Menunggu naskah",

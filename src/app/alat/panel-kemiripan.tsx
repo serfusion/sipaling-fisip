@@ -1,0 +1,323 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { Ic, IKON, Kepala } from "./ikon";
+import { PerluProject } from "./panel-naskah";
+import {
+  PARAFRASE_LABEL, TEMUAN_LABEL,
+  bandingkanSumber, periksaSitasi, ujiParafrase,
+  type PutusanParafrase,
+} from "@/lib/kemiripan";
+import type { Project } from "@/lib/project";
+
+const KELAS_PUTUSAN: Record<PutusanParafrase, string> = {
+  salin: "bad", "tukar-sinonim": "bad", "parafrase-lemah": "warn", "parafrase-baik": "ok",
+};
+const KELAS_BERAT: Record<string, string> = { salah: "bad", sebaiknya: "warn", periksa: "warn" };
+
+export function PanelKemiripan({
+  project, ubah,
+}: { project: Project | null; ubah: (p: Partial<Project>) => void }) {
+  const [sisi, setSisi] = useState<"naskah" | "sumber" | "parafrase">("naskah");
+
+  if (!project) return <PerluProject pesan="Buat atau pilih project dulu, lalu unggah naskah Anda di Beranda." />;
+
+  return (
+    <>
+      <section className="al-card">
+        <Kepala ikon={IKON.kemiripan} judul="Cek Kemiripan dan Parafrase"
+          sub="Bereskan yang bisa Anda bereskan sendiri, sebelum jatah unggah Turnitin terpakai" />
+        <p className="al-note">
+          <b>Alat ini bukan Turnitin dan tidak berpura-pura menjadi Turnitin.</b> Kekuatan Turnitin ada pada
+          korpusnya: jutaan skripsi mahasiswa dan jurnal berlangganan yang tidak dapat diakses siapa pun dari luar.
+          Angka di sini tidak akan sama dengan angka Turnitin, dan siapa pun yang menjanjikan sebaliknya sedang
+          menyesatkan Anda.
+        </p>
+        <p className="al-note">
+          Yang dikerjakan di sini justru pekerjaan yang bisa Anda selesaikan sendiri lebih dulu: memeriksa naskah
+          terhadap sumber yang Anda pakai sendiri, membereskan sitasi yang pincang, dan menguji apakah parafrase Anda
+          benar-benar parafrase. Semuanya berjalan di perangkat ini; naskah Anda tidak dikirim ke mana pun.
+        </p>
+
+        <div className="al-filter">
+          <button type="button" className={sisi === "naskah" ? "on" : ""} onClick={() => setSisi("naskah")}>
+            1 · Periksa sitasi naskah
+          </button>
+          <button type="button" className={sisi === "sumber" ? "on" : ""} onClick={() => setSisi("sumber")}>
+            2 · Bandingkan dengan sumber
+          </button>
+          <button type="button" className={sisi === "parafrase" ? "on" : ""} onClick={() => setSisi("parafrase")}>
+            3 · Uji satu parafrase
+          </button>
+        </div>
+      </section>
+
+      {sisi === "naskah" && <SisiNaskah project={project} />}
+      {sisi === "sumber" && <SisiSumber project={project} ubah={ubah} />}
+      {sisi === "parafrase" && <SisiParafrase />}
+    </>
+  );
+}
+
+/* -------------------------------------------------- 1. Pemeriksaan sitasi */
+
+function SisiNaskah({ project }: { project: Project }) {
+  const naskah = useMemo(
+    () => project.bab.map((b) => `${b.judul}\n${b.isi}`).join("\n\n"),
+    [project.bab],
+  );
+  const temuan = useMemo(
+    () => (naskah.trim() ? periksaSitasi(naskah, project.daftarPustaka) : []),
+    [naskah, project.daftarPustaka],
+  );
+
+  if (!naskah.trim()) {
+    return (
+      <section className="al-card">
+        <p className="al-galat">Naskah project ini masih kosong. Buka Beranda dan tempelkan naskah Anda dulu.</p>
+      </section>
+    );
+  }
+
+  const perJenis = (j: string) => temuan.filter((t) => t.jenis === j);
+
+  return (
+    <section className="al-card">
+      <div className="al-stats">
+        <div className={`al-stat ${perJenis("kutipan-tanpa-halaman").length ? "bad" : "ok"}`}>
+          <b>{perJenis("kutipan-tanpa-halaman").length}</b><span>kutipan tanpa halaman</span>
+        </div>
+        <div className={`al-stat ${perJenis("sitasi-tanpa-rujukan").length ? "bad" : "ok"}`}>
+          <b>{perJenis("sitasi-tanpa-rujukan").length}</b><span>sitasi tanpa entri</span>
+        </div>
+        <div className={`al-stat ${perJenis("rujukan-tak-disitasi").length ? "warn" : "ok"}`}>
+          <b>{perJenis("rujukan-tak-disitasi").length}</b><span>rujukan menganggur</span>
+        </div>
+      </div>
+
+      {!project.daftarPustaka.trim() && (
+        <p className="al-note">
+          Daftar pustaka project ini masih kosong, jadi kecocokan sitasi belum dapat diperiksa. Isi lewat menu
+          Verifikasi Sitasi, atau tambahkan langsung dari menu Cari Referensi.
+        </p>
+      )}
+
+      {temuan.length === 0 ? (
+        <p className="al-good">
+          Tidak ada temuan pada aturan yang diperiksa. Ini bukan jaminan naskah Anda bersih: yang diperiksa di sini
+          hanya kelengkapan sitasi dan porsi kutipan, bukan kemiripan dengan karya orang lain.
+        </p>
+      ) : (
+        <ul className="al-list">
+          {temuan.map((t, i) => (
+            <li key={`${t.jenis}-${i}`} className={`al-item ${KELAS_BERAT[t.berat] ?? "abu"}`}>
+              <div className="al-item-atas"><span className="al-tag">{TEMUAN_LABEL[t.jenis]}</span></div>
+              <p className="al-kutip">{t.kutipan}</p>
+              <p>{t.pesan}</p>
+              {t.saran && <p className="al-fix">{t.saran}</p>}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <p className="al-tail">
+        Sitasi yang pincang adalah temuan yang paling sering dikembalikan penguji, dan paling mudah dibereskan
+        sendiri. Bereskan ini dulu sebelum memikirkan angka kemiripan.
+      </p>
+      <button type="button" className="al-print" onClick={() => window.print()}>Cetak atau simpan sebagai PDF</button>
+    </section>
+  );
+}
+
+/* ------------------------------------------------ 2. Pembandingan sumber */
+
+function SisiSumber({
+  project, ubah,
+}: { project: Project; ubah: (p: Partial<Project>) => void }) {
+  const [nama, setNama] = useState("");
+  const [teks, setTeks] = useState("");
+
+  const naskah = useMemo(
+    () => project.bab.map((b) => `${b.judul}\n${b.isi}`).join("\n\n"),
+    [project.bab],
+  );
+  const hasil = useMemo(
+    () => (naskah.trim() ? bandingkanSumber(naskah, project.sumberBanding) : null),
+    [naskah, project.sumberBanding],
+  );
+
+  function tambah() {
+    if (!teks.trim()) return;
+    ubah({
+      sumberBanding: [...project.sumberBanding, { nama: nama.trim() || `Sumber ${project.sumberBanding.length + 1}`, teks }],
+    });
+    setNama(""); setTeks("");
+  }
+
+  return (
+    <>
+      <section className="al-card">
+        <h3 className="al-h4">Sumber pembanding</h3>
+        <p className="al-note">
+          Tempelkan teks sumber yang benar-benar Anda pakai: bab dari buku, artikel jurnal, atau halaman web yang
+          Anda parafrasekan. Naskah Anda akan diadu dengan sumber itu, dan bagian yang sama persis sepanjang delapan
+          kata atau lebih akan ditandai. Itu panjang yang juga dipakai pemeriksa kemiripan pada umumnya.
+        </p>
+
+        {project.sumberBanding.length > 0 && (
+          <ul className="al-chaps al-chaps-rapat">
+            {project.sumberBanding.map((s, i) => (
+              <li key={`${s.nama}-${i}`} className="al-bab-baris">
+                <b>{s.nama}</b>
+                <span>{s.teks.trim().split(/\s+/).length.toLocaleString("id-ID")} kata</span>
+                <button type="button" className="al-proj-hapus" aria-label={`Hapus ${s.nama}`}
+                  onClick={() => ubah({ sumberBanding: project.sumberBanding.filter((_, j) => j !== i) })}>
+                  <Ic d={IKON.hapus} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <label className="al-field">
+          <span>Nama sumber</span>
+          <input value={nama} onChange={(e) => setNama(e.target.value)}
+            placeholder="Sugiyono (2019), Bab 3" autoComplete="off" />
+        </label>
+        <label className="al-field">
+          <span>Teks sumber</span>
+          <textarea value={teks} onChange={(e) => setTeks(e.target.value)} rows={7}
+            placeholder="Tempelkan teks aslinya di sini." />
+        </label>
+        <button type="button" className="al-btn al-btn-lembut" onClick={tambah} disabled={!teks.trim()}>
+          <Ic d={IKON.tambah} /> Tambahkan sumber ini
+        </button>
+      </section>
+
+      {hasil && project.sumberBanding.length > 0 && (
+        <section className="al-card">
+          <div className="al-stats">
+            <div className={`al-stat ${hasil.persenTanpaKutipan > 15 ? "bad" : hasil.persenTanpaKutipan > 5 ? "warn" : "ok"}`}>
+              <b>{hasil.persenTanpaKutipan}%</b><span>sama, tanpa tanda kutip</span>
+            </div>
+            <div className="al-stat"><b>{hasil.persenGabungan}%</b><span>sama, termasuk kutipan</span></div>
+            <div className="al-stat"><b>{hasil.persenKutipan}%</b><span>berada dalam tanda kutip</span></div>
+            <div className="al-stat"><b>{hasil.jumlahKataNaskah.toLocaleString("id-ID")}</b><span>kata naskah</span></div>
+          </div>
+
+          <p className="al-note">
+            Angka pertama yang paling penting: bagian yang sama persis dengan sumber <b>tanpa</b> ditandai kutipan.
+            Itulah yang akan dibaca sebagai salinan. Yang berada di dalam tanda kutip dihitung terpisah karena
+            kutipan langsung memang sah, asalkan bernomor halaman.
+          </p>
+
+          {hasil.perSumber.map((s) => (
+            <div key={s.nama}>
+              <h3 className="al-h4">{s.nama} — {s.persen}% naskah Anda cocok</h3>
+              {s.rentang.length === 0 ? (
+                <p className="al-good">Tidak ada deret delapan kata atau lebih yang sama dengan sumber ini.</p>
+              ) : (
+                <ul className="al-list">
+                  {s.rentang.slice(0, 12).map((r) => (
+                    <li key={r.mulaiKata} className={`al-item ${r.dalamKutip ? "warn" : "bad"}`}>
+                      <div className="al-item-atas">
+                        <span className="al-tag">{r.dalamKutip ? "Di dalam tanda kutip" : "Tanpa tanda kutip"}</span>
+                        <span className="al-num">{r.jumlahKata} kata</span>
+                      </div>
+                      <p className="al-kutip">{r.kutipan}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+
+          {hasil.pengulanganInternal.length > 0 && (
+            <>
+              <h3 className="al-h4">Bagian yang Anda ulang sendiri</h3>
+              <p className="al-note">
+                Potongan ini muncul dua kali di naskah Anda pada jarak berjauhan, biasanya karena satu bab disalin
+                ke bab lain. Penguji membacanya sebagai pengisi halaman.
+              </p>
+              <ul className="al-list">
+                {hasil.pengulanganInternal.slice(0, 6).map((r) => (
+                  <li key={r.mulaiKata} className="al-item warn">
+                    <div className="al-item-atas"><span className="al-num">{r.jumlahKata} kata</span></div>
+                    <p className="al-kutip">{r.kutipan}</p>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          <p className="al-tail">
+            Lingkup pemeriksaan ini <b>hanya sebatas sumber yang Anda tempel sendiri</b>. Kemiripan dengan karya yang
+            tidak Anda tempel di sini tidak akan terdeteksi, dan itu memang di luar jangkauan alat mana pun yang tidak
+            memiliki korpus berlangganan.
+          </p>
+        </section>
+      )}
+    </>
+  );
+}
+
+/* ------------------------------------------------------ 3. Uji parafrase */
+
+function SisiParafrase() {
+  const [asli, setAsli] = useState("");
+  const [baru, setBaru] = useState("");
+  const hasil = useMemo(() => ujiParafrase(asli, baru), [asli, baru]);
+
+  return (
+    <>
+      <section className="al-card">
+        <p className="al-note">
+          Tempelkan satu kalimat asli dari sumber, lalu parafrase Anda sendiri. Yang paling sering keliru dipahami
+          mahasiswa: mengganti kata dengan sinonim sambil mempertahankan susunan kalimat <b>bukan</b> parafrase.
+          Dalam pedoman akademik itu disebut patchwriting, dan tetap terbaca sebagai salinan.
+        </p>
+        <label className="al-field">
+          <span>Kalimat asli dari sumber</span>
+          <textarea value={asli} onChange={(e) => setAsli(e.target.value)} rows={4}
+            placeholder="Literasi digital merupakan kemampuan individu untuk…" />
+        </label>
+        <label className="al-field">
+          <span>Parafrase Anda</span>
+          <textarea value={baru} onChange={(e) => setBaru(e.target.value)} rows={4}
+            placeholder="Tulis ulang dengan susunan Anda sendiri." />
+        </label>
+      </section>
+
+      {hasil && (
+        <section className="al-card">
+          <div className={`al-verdict ${hasil.putusan === "parafrase-baik" ? "wajar" : hasil.putusan === "parafrase-lemah" ? "periksa" : "sangat"}`}>
+            <h3>{PARAFRASE_LABEL[hasil.putusan]}</h3>
+            <p>{hasil.pesan}</p>
+          </div>
+
+          <div className="al-stats">
+            <div className={`al-stat ${KELAS_PUTUSAN[hasil.putusan]}`}>
+              <b>{hasil.persenKataSama}%</b><span>kata masih sama</span>
+            </div>
+            <div className={`al-stat ${hasil.runTerpanjang >= 8 ? "bad" : ""}`}>
+              <b>{hasil.runTerpanjang}</b><span>kata berurutan sama</span>
+            </div>
+            <div className="al-stat"><b>{hasil.urutanTerjaga}%</b><span>urutan dipertahankan</span></div>
+          </div>
+
+          {hasil.runTerpanjang >= 5 && hasil.kutipanRun && (
+            <p className="al-fix">Deret terpanjang yang sama: <b>&ldquo;{hasil.kutipanRun}&rdquo;</b></p>
+          )}
+
+          <h3 className="al-h4">Yang bisa Anda lakukan</h3>
+          <ul className="al-plain">{hasil.saran.map((s) => <li key={s}>{s}</li>)}</ul>
+
+          <p className="al-tail">
+            Parafrase yang baik pun tetap gagasan orang lain: sitasinya tetap wajib. Yang hilang dengan parafrase
+            hanyalah tanda kutipnya, bukan kewajiban menyebut sumbernya.
+          </p>
+        </section>
+      )}
+    </>
+  );
+}
