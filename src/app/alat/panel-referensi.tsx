@@ -5,7 +5,10 @@ import { Ic, IKON, Kepala } from "./ikon";
 import { INTI_LABEL, SARINGAN_BAWAAN, type Karya, type Saringan } from "@/lib/referensi";
 import type { Project } from "@/lib/project";
 
-type Ringkasan = { total: number; bisaDiunduh: number; diDoaj: number; adaAbstrak: number; kunci: string[] };
+type Ringkasan = {
+  total: number; bisaDiunduh: number; diDoaj: number; adaAbstrak: number;
+  kunci: string[]; saringanDilepas?: boolean;
+};
 
 const TAHUN_KINI = new Date().getFullYear();
 
@@ -121,6 +124,13 @@ export function PanelReferensi({
             <div className="al-stat"><b>{ringkasan.diDoaj}</b><span>terdaftar DOAJ</span></div>
             <div className="al-stat"><b>{ringkasan.adaAbstrak}</b><span>ada abstrak</span></div>
           </div>
+
+          {ringkasan.saringanDilepas && (
+            <p className="al-note">
+              Katalog menolak sebagian saringan lanjutan yang Anda pilih, jadi hasil ini ditampilkan tanpa saringan
+              itu. Periksa sendiri lencana &ldquo;bisa diunduh&rdquo; dan &ldquo;DOAJ&rdquo; pada tiap artikel.
+            </p>
+          )}
 
           {hasil.length === 0 ? (
             <p className="al-galat">

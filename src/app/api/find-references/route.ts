@@ -22,6 +22,8 @@ export const dynamic = "force-dynamic";
 // yang lebih stabil. Diisi lewat RADAR_CONTACT_EMAIL, sama seperti Radar Jurnal.
 
 const KONTAK = process.env.RADAR_CONTACT_EMAIL || "";
+// Dapat diarahkan ke tiruan saat pengujian; bawaannya katalog sesungguhnya.
+const DASAR = process.env.OPENALEX_BASE_URL || "https://api.openalex.org";
 const BATAS_WAKTU_MS = 10_000;
 const UA = "SiPalingFISIP-CariReferensi/1.0 (https://www.sipalingfisip.web.id)";
 const MAKS_HASIL = 25;
@@ -55,29 +57,47 @@ export async function POST(request: Request) {
       : tahunKini - 10;
   const bahasa = s.bahasa === "en" || s.bahasa === "id" ? s.bahasa : "semua";
 
-  const saring = [
-    `from_publication_date:${tahunMinimal}-01-01`,
-    "type:article",
+  // Saringan inti selalu dipakai; saringan lanjutan dipisahkan karena bila
+  // salah satu namanya tidak dikenali katalog, OpenAlex menolak seluruh
+  // permintaan. Lebih baik mahasiswa menerima hasil tanpa satu saringan
+  // daripada menerima layar galat.
+  const saringInti = [`from_publication_date:${tahunMinimal}-01-01`, "type:article"];
+  const saringLanjut = [
     ...(s.hanyaBisaDiunduh ? ["is_oa:true"] : []),
     ...(s.hanyaDoaj ? ["primary_location.source.is_in_doaj:true"] : []),
     ...(bahasa !== "semua" ? [`language:${bahasa}`] : []),
-  ].join(",");
+  ];
 
-  const alamat = new URL("https://api.openalex.org/works");
-  alamat.searchParams.set("search", pertanyaan);
-  alamat.searchParams.set("filter", saring);
-  alamat.searchParams.set("per_page", String(MAKS_HASIL));
-  alamat.searchParams.set("sort", "relevance_score:desc");
-  if (KONTAK) alamat.searchParams.set("mailto", KONTAK);
+  function alamatUntuk(saring: string[]) {
+    const alamat = new URL(`${DASAR}/works`);
+    alamat.searchParams.set("search", pertanyaan);
+    alamat.searchParams.set("filter", saring.join(","));
+    alamat.searchParams.set("per_page", String(MAKS_HASIL));
+    alamat.searchParams.set("sort", "relevance_score:desc");
+    if (KONTAK) alamat.searchParams.set("mailto", KONTAK);
+    return alamat.toString();
+  }
 
   const kendali = new AbortController();
   const jam = setTimeout(() => kendali.abort(), BATAS_WAKTU_MS);
-  try {
-    const balasan = await fetch(alamat.toString(), {
+  const ambil = (url: string) =>
+    fetch(url, {
       signal: kendali.signal,
       headers: { "User-Agent": UA, Accept: "application/json" },
       cache: "no-store",
     });
+
+  try {
+    let balasan = await ambil(alamatUntuk([...saringInti, ...saringLanjut]));
+    let saringanDilepas = false;
+
+    // 400 dan 403 dari OpenAlex menandakan saringan yang ditolak, bukan
+    // gangguan jaringan. Coba sekali lagi tanpa saringan lanjutan.
+    if (!balasan.ok && saringLanjut.length > 0 && (balasan.status === 400 || balasan.status === 403)) {
+      balasan = await ambil(alamatUntuk(saringInti));
+      saringanDilepas = balasan.ok;
+    }
+
     if (!balasan.ok) {
       return gagal(
         balasan.status === 429
@@ -103,6 +123,7 @@ export async function POST(request: Request) {
         diDoaj: hasil.filter((k) => k.diDoaj).length,
         adaAbstrak: hasil.filter((k) => k.abstrak.length > 0).length,
         kunci,
+        saringanDilepas,
       },
     });
   } catch (alasan: unknown) {
