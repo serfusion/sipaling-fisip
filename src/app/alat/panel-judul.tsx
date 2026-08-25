@@ -10,6 +10,7 @@ import {
 } from "@/lib/metodologi";
 import type { Project } from "@/lib/project";
 import type { Tab } from "./panel-beranda";
+import { Bagian, Butir, Catatan, LaporanCetak, TombolCetak } from "./laporan";
 
 const KOSONG: Masukan = {
   variabelX: "", variabelY: "", objek: "", lokasi: "",
@@ -255,7 +256,89 @@ export function PanelJudul({
             <p className="al-tail">
               Disusun dari kaidah metodologi baku, bukan tebakan mesin. Keputusan akhir tetap milik dosen pembimbing.
             </p>
-            <button type="button" className="al-print" onClick={() => window.print()}>Cetak atau simpan sebagai PDF</button>
+            <TombolCetak apa="Laporan memuat rancangan metode lengkap. Bawa cetakannya ke bimbingan berikutnya." />
+
+            <LaporanCetak
+              judul="Rancangan Penelitian"
+              project={project}
+              angka={[
+                { nilai: kuan ? "Kuantitatif" : "Kualitatif", label: "Pendekatan" },
+                { nilai: String(hasil.analisis.length), label: "Tahap analisis" },
+                { nilai: String(hambat.length), label: "Perlu dibereskan",
+                  nada: hambat.length > 0 ? "bad" : "ok" },
+                { nilai: String(periksa.length), label: "Perlu diperhatikan",
+                  nada: periksa.length > 0 ? "warn" : undefined },
+              ]}
+            >
+              <div className="lap-meta">
+                <b>{JENIS_LABEL[hasil.jenis]}</b>
+                <span>{hasil.paradigma}</span>
+              </div>
+
+              {hambat.length > 0 && (
+                <>
+                  <Bagian>Perlu dibereskan sebelum maju ke pembimbing</Bagian>
+                  {hambat.map((pr) => (
+                    <Butir key={pr.judul} nada="bad" tanda="Tidak sejalan" kutipan={pr.judul}>
+                      <p>{pr.pesan}</p>
+                      <p className="lap-fix">Jalan keluar: {pr.jalanKeluar}</p>
+                    </Butir>
+                  ))}
+                </>
+              )}
+
+              <Bagian>Usulan judul</Bagian>
+              <ol>{hasil.judul.map((j) => <li key={j}>{j}</li>)}</ol>
+
+              <Bagian>Rumusan masalah</Bagian>
+              <ol>{hasil.rumusan.map((r) => <li key={r}>{r}</li>)}</ol>
+
+              <Bagian>Tujuan penelitian</Bagian>
+              <ol>{hasil.tujuanTulis.map((t) => <li key={t}>{t}</li>)}</ol>
+
+              <Bagian>Populasi dan sampel</Bagian>
+              <p style={{ fontSize: "9pt", lineHeight: 1.55, color: "#3f4a5c" }}>{hasil.populasi}</p>
+              {hasil.sampling.map((sm) => (
+                <Butir key={sm.nama} nada="abu" kutipan={sm.nama}><p>{sm.alasan}</p></Butir>
+              ))}
+
+              <Bagian>Teknik pengumpulan data</Bagian>
+              <ul>{hasil.pengumpulan.map((pg) => <li key={pg}>{pg}</li>)}</ul>
+
+              <Bagian>Teknik analisis data</Bagian>
+              {hasil.analisis.map((an) => (
+                <Butir key={an.nama} nada="ok" kutipan={an.nama}><p>{an.syarat}</p></Butir>
+              ))}
+
+              <Bagian>Uji keabsahan data</Bagian>
+              <ul>{hasil.keabsahan.map((kb) => <li key={kb}>{kb}</li>)}</ul>
+
+              <Bagian>Teori yang lazim dipakai</Bagian>
+              <ul>{hasil.teori.map((th) => <li key={th}>{th}</li>)}</ul>
+
+              {periksa.length > 0 && (
+                <>
+                  <Bagian>Yang perlu diperhatikan</Bagian>
+                  {periksa.map((pr) => (
+                    <Butir key={pr.judul} nada="warn" kutipan={pr.judul}>
+                      <p>{pr.pesan}</p>
+                      <p className="lap-fix">{pr.jalanKeluar}</p>
+                    </Butir>
+                  ))}
+                </>
+              )}
+
+              <Catatan>
+                <p>
+                  <b>Ini kerangka, bukan rancangan jadi.</b> Seluruh isinya disusun dari kaidah metodologi yang baku
+                  berdasarkan pilihan yang Anda tetapkan sendiri, bukan dari tebakan mesin.
+                </p>
+                <p>
+                  Dosen pembimbing Anda yang paling memahami keadaan lapangan dan kekhasan prodi. Bawa dua atau tiga
+                  usulan judul ke bimbingan, jangan satu, dan keputusan akhir tetap ada pada beliau.
+                </p>
+              </Catatan>
+            </LaporanCetak>
           </section>
         </>
       )}

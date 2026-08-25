@@ -9,6 +9,7 @@ import {
   type PutusanParafrase,
 } from "@/lib/kemiripan";
 import type { Project } from "@/lib/project";
+import { Bagian, Butir, Catatan, LaporanCetak, TombolCetak } from "./laporan";
 
 const KELAS_PUTUSAN: Record<PutusanParafrase, string> = {
   salin: "bad", "tukar-sinonim": "bad", "parafrase-lemah": "warn", "parafrase-baik": "ok",
@@ -125,7 +126,63 @@ function SisiNaskah({ project }: { project: Project }) {
       )}
 
       <p className="al-tail">Bereskan sitasi dulu sebelum memikirkan angka kemiripan.</p>
-      <button type="button" className="al-print" onClick={() => window.print()}>Cetak atau simpan sebagai PDF</button>
+      <TombolCetak apa="Laporan memuat tiap sitasi yang pincang beserta cara membetulkannya." />
+
+      <LaporanCetak
+        judul="Laporan Pemeriksaan Sitasi"
+        project={project}
+        angka={[
+          { nilai: String(perJenis("kutipan-tanpa-halaman").length), label: "Kutipan tanpa halaman",
+            nada: perJenis("kutipan-tanpa-halaman").length > 0 ? "bad" : "ok" },
+          { nilai: String(perJenis("sitasi-tanpa-rujukan").length), label: "Sitasi tanpa entri",
+            nada: perJenis("sitasi-tanpa-rujukan").length > 0 ? "bad" : "ok" },
+          { nilai: String(perJenis("rujukan-tak-disitasi").length), label: "Rujukan menganggur",
+            nada: perJenis("rujukan-tak-disitasi").length > 0 ? "warn" : "ok" },
+          { nilai: String(perJenis("kutipan-berlebih").length), label: "Porsi kutipan",
+            nada: perJenis("kutipan-berlebih").length > 0 ? "warn" : "ok" },
+        ]}
+      >
+        {temuan.length === 0 ? (
+          <>
+            <Bagian>Hasil</Bagian>
+            <Butir nada="ok" kutipan="Tidak ada temuan pada aturan yang diperiksa.">
+              <p>
+                Yang diperiksa di sini hanya kelengkapan sitasi dan porsi kutipan, bukan kemiripan dengan karya orang
+                lain.
+              </p>
+            </Butir>
+          </>
+        ) : (
+          (["kutipan-tanpa-halaman", "sitasi-tanpa-rujukan", "rujukan-tak-disitasi", "kutipan-berlebih"] as const)
+            .map((jn) => {
+              const isi = perJenis(jn);
+              if (isi.length === 0) return null;
+              return (
+                <div key={jn}>
+                  <Bagian>{TEMUAN_LABEL[jn]} ({isi.length})</Bagian>
+                  {isi.map((tm, i) => (
+                    <Butir key={`${jn}-${i}`} nada={(KELAS_BERAT[tm.berat] ?? "abu") as "ok" | "warn" | "bad" | "abu"}
+                      tanda={TEMUAN_LABEL[tm.jenis]} kutipan={tm.kutipan}>
+                      <p>{tm.pesan}</p>
+                      {tm.saran && <p className="lap-fix">{tm.saran}</p>}
+                    </Butir>
+                  ))}
+                </div>
+              );
+            })
+        )}
+
+        <Catatan>
+          <p>
+            <b>Laporan ini bukan hasil pemeriksaan Turnitin dan angkanya tidak sebanding.</b> Yang diperiksa di sini
+            adalah kelengkapan sitasi dan porsi kutipan langsung, bukan kemiripan dengan karya orang lain.
+          </p>
+          <p>
+            Sitasi yang pincang adalah temuan yang paling sering dikembalikan penguji, dan paling mudah dibereskan
+            sendiri sebelum jatah unggah Turnitin terpakai.
+          </p>
+        </Catatan>
+      </LaporanCetak>
     </section>
   );
 }

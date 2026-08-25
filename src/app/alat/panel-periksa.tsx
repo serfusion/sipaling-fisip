@@ -6,6 +6,7 @@ import { periksaBahasa, BERAT_LABEL, type Berat } from "@/lib/bahasa-check";
 import { METRIK_TIDAK_DIAKUI, PITA_LABEL, type Hasil, type Tingkat } from "@/lib/journal-radar";
 import { PUTUSAN_LABEL, type HasilRujukan, type Putusan, type RingkasanSitasi } from "@/lib/citation-check";
 import type { Project } from "@/lib/project";
+import { Bagian, Butir, Catatan, LaporanCetak, TombolCetak } from "./laporan";
 
 const KELAS_PUTUSAN: Record<Putusan, string> = {
   terverifikasi: "ok", "beda-rincian": "warn", "tidak-ditemukan": "bad", "tak-dapat-diperiksa": "abu",
@@ -121,7 +122,54 @@ export function PanelSitasi({
             <b>Tidak ditemukan bukan berarti palsu.</b> Buku, skripsi, dan peraturan memang tidak terdaftar di
             Crossref maupun OpenAlex, jadi ditandai tidak dapat diperiksa.
           </p>
-          <button type="button" className="al-print" onClick={() => window.print()}>Cetak atau simpan sebagai PDF</button>
+          <TombolCetak apa="Laporan memuat seluruh rujukan beserta putusannya, siap dilampirkan ke bimbingan." />
+
+          <LaporanCetak
+            judul="Laporan Verifikasi Sitasi"
+            project={project}
+            angka={[
+              { nilai: String(ringkasan.total), label: "Rujukan diperiksa" },
+              { nilai: String(ringkasan.terverifikasi), label: "Terverifikasi", nada: "ok" },
+              { nilai: String(ringkasan.bedaRincian), label: "Beda rincian", nada: ringkasan.bedaRincian > 0 ? "warn" : undefined },
+              { nilai: String(ringkasan.tidakDitemukan), label: "Tidak ditemukan", nada: ringkasan.tidakDitemukan > 0 ? "bad" : undefined },
+              { nilai: String(ringkasan.takDapatDiperiksa), label: "Tak dapat diperiksa" },
+            ]}
+          >
+            {urutan.map((pt) => {
+              const isi = hasil.filter((h) => h.putusan === pt);
+              if (isi.length === 0) return null;
+              return (
+                <div key={pt}>
+                  <Bagian>{PUTUSAN_LABEL[pt]} ({isi.length})</Bagian>
+                  {isi.map((h) => (
+                    <Butir key={`${h.rujukan.urut}-${pt}`} nada={KELAS_PUTUSAN[pt] as "ok" | "warn" | "bad" | "abu"}
+                      tanda={PUTUSAN_LABEL[pt]} kanan={`Rujukan #${h.rujukan.urut}`} kutipan={h.rujukan.mentah}>
+                      <p>{h.pesan}</p>
+                      {h.selisih.length > 0 && <ul>{h.selisih.map((d) => <li key={d}>{d}</li>)}</ul>}
+                      {h.temuan?.judul && (
+                        <p className="lap-fix">
+                          Catatan {h.temuan.sumber}: {h.temuan.judul}
+                          {h.temuan.tahun ? ` (${h.temuan.tahun})` : ""}{h.temuan.doi ? ` · ${h.temuan.doi}` : ""}
+                        </p>
+                      )}
+                    </Butir>
+                  ))}
+                </div>
+              );
+            })}
+
+            <Catatan>
+              <p>
+                <b>Tidak ditemukan bukan berarti palsu.</b> Buku, skripsi, peraturan, dan terbitan lokal memang tidak
+                terdaftar di Crossref maupun OpenAlex, sehingga ditandai tidak dapat diperiksa, bukan dituduh. Yang
+                berstatus tidak ditemukan adalah artikel jurnal yang seharusnya ada di sana tetapi tidak ada.
+              </p>
+              <p>
+                Pemeriksaan dilakukan terhadap pangkalan data Crossref dan OpenAlex pada tanggal yang tertera di kepala
+                laporan. Hasilnya dapat berubah bila penerbit memperbarui datanya.
+              </p>
+            </Catatan>
+          </LaporanCetak>
         </section>
       )}
     </>
@@ -274,7 +322,57 @@ function LaporanRadar({ hasil }: { hasil: Hasil }) {
       <p className="al-tail">
         Ini penilaian risiko dari sinyal publik yang dapat diperiksa ulang, <b>bukan putusan</b> tentang jurnal ini.
       </p>
-      <button type="button" className="al-print" onClick={() => window.print()}>Cetak atau simpan sebagai PDF</button>
+      <TombolCetak apa="Laporan memuat tiap sinyal beserta bobot dan buktinya, untuk didiskusikan dengan pembimbing." />
+
+      <LaporanCetak
+        judul="Laporan Radar Jurnal"
+        project={null}
+        angka={[
+          { nilai: PITA_LABEL[hasil.pita], label: "Pita risiko",
+            nada: hasil.pita === "wajar" ? "ok" : hasil.pita === "periksa" ? "warn" : "bad" },
+          { nilai: String(berat.length), label: "Temuan berat", nada: berat.length > 0 ? "bad" : undefined },
+          { nilai: String(lain.length), label: "Temuan pendukung" },
+          { nilai: String(positif.length), label: "Sinyal wajar", nada: "ok" },
+        ]}
+      >
+        <div className="lap-meta">
+          <b>{hasil.nama}</b>
+          <span>ISSN {hasil.issn.join(", ")} · {hasil.putusan}</span>
+        </div>
+
+        {[["Temuan berbobot berat", berat], ["Temuan pendukung", lain], ["Yang justru wajar", positif]]
+          .filter(([, d]) => (d as Hasil["sinyal"]).length > 0)
+          .map(([judulBagian, daftar]) => (
+            <div key={judulBagian as string}>
+              <Bagian>{judulBagian as string}</Bagian>
+              {(daftar as Hasil["sinyal"]).map((sn) => (
+                <Butir key={sn.id} nada={KELAS_TINGKAT[sn.tingkat] as "ok" | "warn" | "bad" | "abu"}
+                  tanda={sn.sumber} kanan={sn.bobot > 0 ? `+${sn.bobot}` : String(sn.bobot)} kutipan={sn.judul}>
+                  <p>{sn.bukti}</p>
+                </Butir>
+              ))}
+            </div>
+          ))}
+
+        {hasil.takTerperiksa.length > 0 && (
+          <>
+            <Bagian>Tidak dapat diperiksa</Bagian>
+            <ul>{hasil.takTerperiksa.map((t) => <li key={t}>{t}</li>)}</ul>
+          </>
+        )}
+
+        <Bagian>Langkah yang disarankan</Bagian>
+        <ol>{hasil.langkah.map((l) => <li key={l}>{l}</li>)}</ol>
+
+        <Catatan>
+          <p>
+            <b>Ini penilaian risiko, bukan putusan tentang jurnal ini.</b> Seluruh sinyal berasal dari sumber publik
+            yang dapat Anda periksa ulang sendiri: DOAJ, Crossref, dan OpenAlex. Bobot tiap sinyal ditampilkan terbuka
+            agar dapat diperdebatkan.
+          </p>
+          <p>Tunjukkan laporan ini kepada dosen pembimbing, lalu putuskan bersama.</p>
+        </Catatan>
+      </LaporanCetak>
     </section>
   );
 }
@@ -385,6 +483,55 @@ export function PanelBahasa({ project }: { project: Project | null }) {
           <p className="al-tail">
             Mengikuti PUEBI dan KBBI. Kutipan langsung dilewati agar tidak salah ditandai.
           </p>
+          <TombolCetak apa="Laporan memuat tiap temuan beserta saran perbaikannya, urut sesuai naskah." />
+
+          <LaporanCetak
+            judul="Laporan Periksa Bahasa"
+            project={project}
+            angka={[
+              { nilai: hasil.jumlahKata.toLocaleString("id-ID"), label: "Kata" },
+              { nilai: String(hasil.jumlahKalimat), label: "Kalimat" },
+              { nilai: String(hasil.rataKataPerKalimat), label: "Kata per kalimat" },
+              { nilai: String(hasil.temuan.length), label: "Temuan",
+                nada: hasil.temuan.length > 0 ? "warn" : "ok" },
+            ]}
+          >
+            {(["salah", "sebaiknya", "gaya"] as Berat[]).map((bt) => {
+              const isi = hasil.temuan.filter((t) => t.berat === bt);
+              if (isi.length === 0) return null;
+              return (
+                <div key={bt}>
+                  <Bagian>{BERAT_LABEL[bt]} ({isi.length})</Bagian>
+                  {isi.map((t, i) => (
+                    <Butir key={`${t.posisi}-${t.aturan}-${i}`} nada={KELAS_BERAT[t.berat] as "ok" | "warn" | "bad" | "abu"}
+                      tanda={t.aturan} kutipan={t.kutipan}>
+                      <p>{t.pesan}</p>
+                      {t.saran && <p className="lap-fix">Ganti menjadi: {t.saran}</p>}
+                    </Butir>
+                  ))}
+                </div>
+              );
+            })}
+            {hasil.temuan.length === 0 && (
+              <>
+                <Bagian>Hasil</Bagian>
+                <Butir nada="ok" kutipan="Tidak ada temuan pada aturan yang diperiksa.">
+                  <p>
+                    Ini bukan jaminan bebas kesalahan: pemeriksa hanya menangkap pola yang paling sering muncul pada
+                    karya tulis mahasiswa.
+                  </p>
+                </Butir>
+              </>
+            )}
+
+            <Catatan>
+              <p>
+                Pemeriksaan mengikuti <b>PUEBI dan KBBI</b> untuk pola yang paling sering keliru. Kutipan langsung
+                sengaja dilewati agar tidak salah ditandai.
+              </p>
+              <p>Laporan ini tidak menggantikan pembacaan dosen pembimbing.</p>
+            </Catatan>
+          </LaporanCetak>
         </section>
       )}
     </>
