@@ -2070,11 +2070,105 @@ a.mt-i-dot:hover { background: var(--yellow); box-shadow: 0 0 0 .045em rgba(245,
   border-radius: 999px; padding: 8px 15px; font-size: 12px; font-weight: 700; min-height: 38px; cursor: pointer; }
 .al-filter button.on { background: var(--al-accent); border-color: var(--al-accent); color: #fff; }
 
+/* --- Project aktif di kepala halaman --- */
+.al-aktif { display: flex; align-items: center; gap: 11px; margin-top: 12px; padding: 11px 14px;
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); border-radius: 13px; flex-wrap: wrap; }
+.al-aktif-ic { width: 32px; height: 32px; flex: 0 0 32px; border-radius: 9px; background: rgba(255,255,255,.12);
+  color: #cfe0ff; display: grid; place-items: center; }
+.al-aktif-ic svg { width: 16px; height: 16px; }
+.al-aktif-teks { min-width: 0; flex: 1 1 12rem; }
+.al-aktif-teks b { display: block; color: #fff; font-size: 13.5px; font-weight: 800; letter-spacing: -.01em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.al-aktif-teks span { display: block; margin-top: 2px; color: #a9bde2; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.al-aktif-ganti { flex: 0 0 auto; border: 1px solid rgba(255,255,255,.24); background: transparent; color: #dbe6fb;
+  border-radius: 9px; min-height: 36px; padding: 0 14px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.al-aktif-ganti:hover { background: rgba(255,255,255,.12); color: #fff; }
+
+/* --- Daftar project --- */
+.al-projs { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.al-proj { display: flex; align-items: center; gap: 6px; border: 1.5px solid var(--al-line); border-radius: 13px;
+  background: #fcfdff; padding: 4px 8px 4px 4px; transition: .14s ease; flex-wrap: wrap; }
+.al-proj:hover { border-color: var(--al-soft-line); }
+.al-proj.on { border-color: var(--al-accent); background: var(--al-soft); }
+.al-proj-buka { display: flex; align-items: center; gap: 12px; flex: 1 1 14rem; min-width: 0; text-align: left;
+  border: 0; background: none; padding: 10px; cursor: pointer; }
+.al-proj-ic { width: 34px; height: 34px; flex: 0 0 34px; border-radius: 10px; background: var(--al-soft);
+  color: var(--al-accent); display: grid; place-items: center; }
+.al-proj.on .al-proj-ic { background: #fff; }
+.al-proj-ic svg { width: 17px; height: 17px; }
+.al-proj-nama { display: block; font-size: 13.5px; font-weight: 800; color: var(--al-ink); line-height: 1.35;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.al-proj-meta { display: block; margin-top: 3px; color: var(--al-muted); font-size: 11.5px; line-height: 1.5;
+  font-variant-numeric: tabular-nums; }
+.al-proj-hapus { flex: 0 0 auto; width: 38px; height: 38px; border: 0; background: none; color: #a3adc0;
+  border-radius: 10px; display: grid; place-items: center; cursor: pointer; }
+.al-proj-hapus:hover { background: var(--al-bad-bg); color: var(--al-bad); }
+.al-proj-hapus svg { width: 16px; height: 16px; }
+.al-proj-pasti { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; padding: 6px 4px 6px 0; }
+.al-proj-pasti > span { color: var(--al-bad); font-size: 12px; font-weight: 700; }
+.al-mini.bahaya { border-color: #f0c2be; background: var(--al-bad-bg); color: var(--al-bad); }
+.al-mini.bahaya:hover { background: #fadedc; color: var(--al-bad); }
+.al-mini:disabled { opacity: .5; cursor: default; }
+.al-mini { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.al-mini svg { width: 15px; height: 15px; flex: 0 0 15px; }
+
+/* --- Form project baru --- */
+.al-form-baru { border-top: 1px dashed var(--al-line); padding-top: 18px; }
+.al-btn-lembut { background: var(--al-soft); color: var(--al-accent-dark); }
+.al-btn-lembut:hover:not(:disabled) { background: #e4e6fa; }
+.al-btn svg { width: 17px; height: 17px; }
+.al-aksi { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-top: 14px; }
+.al-aksi .al-btn { width: auto; flex: 0 0 auto; }
+
+/* --- Kotak naskah --- */
+.al-simpan { float: right; font-style: normal; font-size: 11px; font-weight: 700; color: var(--al-muted); }
+.al-simpan.tersimpan { color: var(--al-ok); }
+.al-bab-baris { display: flex; align-items: baseline; gap: 12px; padding: 9px 13px; border: 1px solid var(--al-line);
+  border-radius: 10px; background: #fcfdff; }
+.al-bab-baris b { flex: 1 1 auto; min-width: 0; font-size: 12.5px; font-weight: 700; color: var(--al-ink); line-height: 1.45; }
+.al-bab-baris span { flex: 0 0 auto; color: var(--al-muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+
+/* --- Langkah lanjutan --- */
+.al-langkah { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.al-tile-langkah { display: block; }
+.al-langkah-ic { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px;
+  background: var(--al-line-soft); color: var(--al-muted); margin-bottom: 9px; }
+.al-langkah-ic svg { width: 16px; height: 16px; }
+.al-tile-langkah.siap .al-langkah-ic { background: var(--al-soft); color: var(--al-accent); }
+.al-tile-langkah.siap small { color: var(--al-ok); }
+
+/* --- Dua kolom di dalam isi --- */
+.al-duo { display: grid; gap: 16px; grid-template-columns: 1fr; align-items: start; }
+@media (min-width: 1080px) { .al-duo { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); } }
+.al-duo > * > .al-card:first-child { margin-top: 0; }
+.al-tiles-1 { grid-template-columns: 1fr; }
+.al-stats-1 { grid-template-columns: 1fr; }
+.al-chaps-rapat { margin-bottom: 16px; }
+
+/* --- Penanda nilai yang berasal dari project --- */
+.al-dari { display: inline-block; margin-left: 8px; font-style: normal; font-size: 10px; font-weight: 800;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--al-accent-dark);
+  background: var(--al-soft); border-radius: 999px; padding: 3px 9px; }
+
+/* --- Padanan frasa --- */
+.al-padanan { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px !important; }
+.al-pad { border: 1px solid var(--al-line); background: #fff; border-radius: 999px; padding: 5px 12px;
+  font-size: 12.5px; color: #4b5568; }
+.al-pad.utama { border-color: #bde3d6; background: var(--al-ok-bg); color: var(--al-ok); font-weight: 700; }
+.al-catatan-frasa { margin-top: 8px !important; color: var(--al-muted) !important; font-size: 12px !important; }
+
+/* --- Keadaan kosong --- */
+.al-kosong { text-align: center; padding: 26px 10px; }
+.al-kosong .al-head-ic { margin: 0 auto 14px; }
+.al-kosong h3 { margin: 0 0 6px; font-size: 15.5px; font-weight: 800; color: var(--al-ink); }
+.al-kosong p { margin: 0 auto; max-width: 30rem; color: var(--al-muted); font-size: 13px; line-height: 1.65; }
+
 @media (max-width: 560px) {
   .al-card { padding: 16px 14px; border-radius: 14px; }
   .al-body { padding: 14px 12px 44px; }
 }
 @media print {
-  .al-top, .al-side, .al-print, .al-btn, .al-linkrow, .al-field { display: none !important; }
+  .al-top, .al-side, .al-print, .al-btn, .al-linkrow, .al-field,
+  .al-aksi, .al-projs, .al-langkah, .al-filter { display: none !important; }
   .al, .al-card { background: #fff; box-shadow: none; border: 0; padding: 0; }
 }
