@@ -1,4 +1,4 @@
-// RADAR JURNAL — mesin penilaian risiko jurnal predator.
+// RADAR JURNAL: mesin penilaian risiko jurnal predator.
 //
 // Berkas ini sengaja hanya berisi fungsi murni: ia menerima bukti yang sudah
 // dinormalkan lalu mengembalikan skor beserta rinciannya. Pengambilan data
@@ -6,14 +6,14 @@
 // dapat diuji tanpa jaringan.
 //
 // Rujukan kriteria: Principles of Transparency and Best Practice in Scholarly
-// Publishing — dipakai bersama oleh COPE, DOAJ, OASPA, dan WAME — serta daftar
+// Publishing, yang dipakai bersama oleh COPE, DOAJ, OASPA, dan WAME, serta daftar
 // periksa Think. Check. Submit. Sinyal di bawah adalah penerjemahan prinsip
 // tersebut menjadi hal-hal yang dapat dihitung dari data publik.
 //
 // PENTING: keluaran alat ini adalah PENILAIAN RISIKO, bukan putusan. Menyebut
 // sebuah penerbit "predator" adalah tuduhan serius dan pernah berujung pada
 // tekanan hukum terhadap pihak yang menerbitkan daftar semacam itu. Karena
-// itu tidak ada satu pun label "predator" di sini — yang ada adalah pita
+// itu tidak ada satu pun label "predator" di sini. Yang ada adalah pita
 // risiko, jumlah sinyal, dan bukti yang dapat ditelusuri kembali.
 
 export type Bukti = {
@@ -35,7 +35,7 @@ export type Bukti = {
   crossrefJumlahKarya: number | null;
   /** Ada pada daftar sumber yang dihentikan Scopus. */
   scopusDihentikan: boolean | null;
-  /** Terakreditasi SINTA — dikonfirmasi manual oleh pengguna. */
+  /** Terakreditasi SINTA, dikonfirmasi manual oleh pengguna. */
   sintaTerakreditasi: boolean | null;
 
   // --- Lapisan 2: forensik situs (diisi pengguna atau pengambil halaman) ---
@@ -87,7 +87,7 @@ export type Hasil = {
   issn: string[];
   skor: number;
   pita: Pita;
-  /** Kalimat putusan — tidak pernah memakai kata "predator". */
+  /** Kalimat putusan. Tidak pernah memakai kata "predator". */
   putusan: string;
   menyala: number;
   diperiksa: number;
@@ -97,10 +97,10 @@ export type Hasil = {
 };
 
 export const PITA_LABEL: Record<Pita, string> = {
-  wajar: "Wajar — tidak ada tanda bahaya berarti",
-  periksa: "Perlu diperiksa — ada hal yang sebaiknya Anda tanyakan",
-  berisiko: "Berisiko — jangan kirim sebelum berkonsultasi",
-  sangat: "Sangat berisiko — sangat disarankan mencari jurnal lain",
+  wajar: "Wajar, tidak ada tanda bahaya berarti",
+  periksa: "Perlu diperiksa, ada yang sebaiknya Anda tanyakan",
+  berisiko: "Berisiko, jangan kirim sebelum berkonsultasi",
+  sangat: "Sangat berisiko, cari jurnal lain",
 };
 
 // Metrik yang dijual sebagai "impact factor" tetapi tidak diterbitkan lembaga
@@ -143,7 +143,7 @@ function pitaDari(skor: number): Pita {
  * Hitung penilaian risiko dari bukti yang sudah dinormalkan.
  *
  * Setiap sinyal membawa bobot yang terlihat oleh pengguna. Skor tertutup
- * tidak dapat dipertahankan di hadapan dosen — dan tidak seharusnya.
+ * tidak dapat dipertahankan di hadapan dosen, dan memang tidak seharusnya.
  */
 export function nilaiJurnal(bukti: Bukti): Hasil {
   const sinyal: Sinyal[] = [];
@@ -157,7 +157,7 @@ export function nilaiJurnal(bukti: Bukti): Hasil {
     tambah({
       id: "scopus-dihentikan",
       judul: "Tercantum pada daftar sumber yang dihentikan Scopus",
-      bukti: "Elsevier mengeluarkan judul ini dari Scopus. Penghentian umumnya menyangkut kekhawatiran atas mutu penerbitan.",
+      bukti: "Elsevier mengeluarkan judul ini dari Scopus. Alasan penghentian biasanya menyangkut mutu penerbitan.",
       sumber: "Daftar sumber dihentikan Scopus",
       bobot: 25,
       tingkat: "berat",
@@ -170,7 +170,7 @@ export function nilaiJurnal(bukti: Bukti): Hasil {
     tambah({
       id: "doaj-terdaftar",
       judul: "Terdaftar di DOAJ",
-      bukti: "DOAJ menilai jurnal terhadap prinsip transparansi yang sama dengan COPE, OASPA, dan WAME sebelum menerimanya.",
+      bukti: "Sebelum menerima sebuah jurnal, DOAJ menilainya dengan prinsip transparansi yang sama seperti COPE, OASPA, dan WAME.",
       sumber: "DOAJ",
       bobot: -15,
       tingkat: "positif",
@@ -188,8 +188,8 @@ export function nilaiJurnal(bukti: Bukti): Hasil {
     if (bukti.doajBiayaDiungkap === false) {
       tambah({
         id: "biaya-tertutup",
-        judul: "Biaya publikasi tidak diungkap sebelum penyerahan naskah",
-        bukti: "Jurnal yang sah menyebutkan seluruh biaya di muka beserta apa yang dicakupnya.",
+        judul: "Biaya publikasi tidak diungkap di muka",
+        bukti: "Jurnal yang benar menyebut seluruh biaya di muka, lengkap dengan apa saja yang dicakup.",
         sumber: "DOAJ",
         bobot: 10,
         tingkat: "sedang",
@@ -199,7 +199,7 @@ export function nilaiJurnal(bukti: Bukti): Hasil {
     tambah({
       id: "doaj-tidak",
       judul: "Tidak terdaftar di DOAJ",
-      bukti: "Bukan tanda bahaya bila jurnal bukan akses terbuka. Menjadi berarti bila jurnal mengklaim dirinya akses terbuka.",
+      bukti: "Ini wajar bila jurnalnya memang bukan akses terbuka. Baru jadi masalah kalau jurnal mengaku akses terbuka.",
       sumber: "DOAJ",
       bobot: 5,
       tingkat: "ringan",
@@ -212,7 +212,7 @@ export function nilaiJurnal(bukti: Bukti): Hasil {
     tambah({
       id: "sinta",
       judul: "Terakreditasi SINTA",
-      bukti: "Dikonfirmasi manual. SINTA tidak menyediakan API publik, jadi status ini tidak diambil otomatis.",
+      bukti: "Dikonfirmasi manual oleh Anda. SINTA tidak punya API publik, jadi status ini tidak bisa diambil otomatis.",
       sumber: "Konfirmasi pengguna",
       bobot: -15,
       tingkat: "positif",
@@ -222,8 +222,8 @@ export function nilaiJurnal(bukti: Bukti): Hasil {
   if (bukti.crossrefMenyetorDoi === false) {
     tambah({
       id: "doi-tidak-disetor",
-      judul: "Tidak ditemukan penyetoran DOI ke Crossref",
-      bukti: "Menjadi tanda bahaya bila jurnal mencantumkan DOI pada artikelnya.",
+      judul: "Tidak ada penyetoran DOI ke Crossref",
+      bukti: "Ini jadi tanda bahaya kalau jurnalnya tetap mencantumkan DOI pada artikel.",
       sumber: "Crossref",
       bobot: 8,
       tingkat: "ringan",
@@ -231,7 +231,7 @@ export function nilaiJurnal(bukti: Bukti): Hasil {
   } else if (bukti.crossrefMenyetorDoi === true) {
     tambah({
       id: "doi-disetor",
-      judul: "DOI benar-benar disetorkan ke Crossref",
+      judul: "DOI benar disetorkan ke Crossref",
       bukti:
         bukti.crossrefJumlahKarya !== null
           ? `${bukti.crossrefJumlahKarya.toLocaleString("id-ID")} karya tercatat.`
@@ -250,7 +250,7 @@ export function nilaiJurnal(bukti: Bukti): Hasil {
     tambah({
       id: "metrik-palsu",
       judul: "Memajang metrik dampak yang tidak diakui",
-      bukti: `Ditemukan: ${bukti.metrikPalsu.join(", ")}. Metrik ini tidak diterbitkan lembaga pengindeks mana pun — menjualnya adalah modelnya.`,
+      bukti: `Ditemukan: ${bukti.metrikPalsu.join(", ")}. Tidak satu pun metrik ini diterbitkan lembaga pengindeks. Menjualnya justru itulah modelnya.`,
       sumber: "Situs jurnal",
       bobot: 20,
       tingkat: "berat",
@@ -258,13 +258,13 @@ export function nilaiJurnal(bukti: Bukti): Hasil {
   }
 
   // Memajang lencana Scopus/WoS padahal tidak terdaftar di keduanya bukan
-  // kelalaian — itu keterangan yang menyesatkan calon penulis.
+  // kelalaian, melainkan keterangan yang menyesatkan calon penulis.
   const tidakDiIndeksBesar = bukti.scopusDihentikan === true || bukti.doajTerdaftar === false;
   if (bukti.klaimLencanaIndeks === true && tidakDiIndeksBesar) {
     tambah({
       id: "lencana-tanpa-dasar",
-      judul: "Menampilkan lencana pengindeks tanpa dasar yang ditemukan",
-      bukti: "Situs memajang logo Scopus atau Web of Science, tetapi pemeriksaan tidak menemukan pendaftaran yang sesuai.",
+      judul: "Memajang lencana pengindeks tanpa dasar",
+      bukti: "Situs memajang logo Scopus atau Web of Science, tetapi pendaftarannya tidak ditemukan.",
       sumber: "Situs jurnal + daftar sumber",
       bobot: 20,
       tingkat: "berat",
@@ -275,7 +275,7 @@ export function nilaiJurnal(bukti: Bukti): Hasil {
     tambah({
       id: "surel-gratis",
       judul: "Kontak resmi memakai surel gratis",
-      bukti: "Redaksi jurnal yang mapan memakai domain lembaganya sendiri.",
+      bukti: "Redaksi jurnal yang mapan memakai domain lembaganya sendiri, bukan Gmail atau Yahoo.",
       sumber: "Situs jurnal",
       bobot: 8,
       tingkat: "ringan",
@@ -289,7 +289,7 @@ export function nilaiJurnal(bukti: Bukti): Hasil {
       tambah({
         id: "telaah-terlalu-cepat",
         judul: `Median telaah ${bukti.medianHariTelaah} hari`,
-        bukti: `Dihitung dari ${bukti.sampelHariTelaah} artikel yang menyetorkan tanggal diterima dan disetujui. Telaah sejawat ilmu sosial yang sungguhan jarang selesai di bawah dua minggu.`,
+        bukti: `Dihitung dari ${bukti.sampelHariTelaah} artikel yang menyetorkan tanggal diterima dan disetujui. Telaah sejawat ilmu sosial yang sungguhan jarang rampung di bawah dua minggu.`,
         sumber: "Crossref",
         bobot: 20,
         tingkat: "berat",
@@ -298,7 +298,7 @@ export function nilaiJurnal(bukti: Bukti): Hasil {
       tambah({
         id: "telaah-wajar",
         judul: `Median telaah ${bukti.medianHariTelaah} hari`,
-        bukti: `Dihitung dari ${bukti.sampelHariTelaah} artikel. Rentang ini konsisten dengan telaah sejawat yang benar-benar berjalan.`,
+        bukti: `Dihitung dari ${bukti.sampelHariTelaah} artikel. Rentang ini wajar untuk telaah sejawat yang benar-benar berjalan.`,
         sumber: "Crossref",
         bobot: -8,
         tingkat: "positif",
@@ -312,8 +312,8 @@ export function nilaiJurnal(bukti: Bukti): Hasil {
     if (bukti.entropiCakupan > AMBANG.entropiTinggi) {
       tambah({
         id: "cakupan-kacau",
-        judul: "Cakupan topik terlalu tersebar untuk sebuah jurnal berfokus",
-        bukti: `Keberagaman topik terukur ${(bukti.entropiCakupan * 100).toFixed(0)} dari 100. Jurnal yang sah punya fokus; yang menerbitkan segala bidang sekaligus biasanya tidak menyeleksi.`,
+        judul: "Cakupan topiknya terlalu melebar",
+        bukti: `Keberagaman topik terukur ${(bukti.entropiCakupan * 100).toFixed(0)} dari 100. Jurnal yang benar punya fokus. Yang menerbitkan segala bidang sekaligus biasanya tidak menyeleksi apa pun.`,
         sumber: "Konsep OpenAlex",
         bobot: 15,
         tingkat: "sedang",
@@ -340,7 +340,7 @@ export function nilaiJurnal(bukti: Bukti): Hasil {
     tambah({
       id: "sitasi-diri",
       judul: "Porsi sitasi diri tinggi",
-      bukti: `${(bukti.rasioSitasiDiri * 100).toFixed(0)}% sitasi berasal dari jurnal ini sendiri. Lembaga pengindeks memakai ukuran serupa untuk menangguhkan jurnal.`,
+      bukti: `${(bukti.rasioSitasiDiri * 100).toFixed(0)}% sitasi berasal dari jurnal ini sendiri. Lembaga pengindeks memakai ukuran serupa saat menangguhkan sebuah jurnal.`,
       sumber: "OpenAlex",
       bobot: 12,
       tingkat: "sedang",
@@ -352,8 +352,8 @@ export function nilaiJurnal(bukti: Bukti): Hasil {
     tambah({
       id: "pemusatan-negara",
       judul: internasional
-        ? "Menyebut diri internasional, tetapi penulisnya terpusat di satu negara"
-        : "Penulis sangat terpusat di satu negara",
+        ? "Mengaku internasional, tetapi penulisnya menumpuk di satu negara"
+        : "Penulis menumpuk di satu negara",
       bukti: `${(bukti.pemusatanNegara * 100).toFixed(0)}% penulis berasal dari satu negara yang sama.`,
       sumber: "OpenAlex",
       bobot: internasional ? 10 : 6,
@@ -368,7 +368,7 @@ export function nilaiJurnal(bukti: Bukti): Hasil {
       tambah({
         id: "riwayat-panjang",
         judul: `Terbit sejak ${bukti.tahunTerbitAwal} tanpa anomali yang terdeteksi`,
-        bukti: "Riwayat terbitan yang panjang dan stabil sulit dipalsukan.",
+        bukti: "Riwayat terbit yang panjang dan stabil sulit dipalsukan.",
         sumber: "OpenAlex",
         bobot: -10,
         tingkat: "positif",
@@ -385,7 +385,7 @@ export function nilaiJurnal(bukti: Bukti): Hasil {
       tambah({
         id: "dewan-tak-terverifikasi",
         judul: `${takTerverifikasi} dari ${bukti.dewanTotal} anggota dewan redaksi tidak dapat diverifikasi`,
-        bukti: "Nama dan afiliasi yang diklaim tidak ditemukan pada rekam jejak publikasi. Penerbit yang tidak menjalankan telaah sungguhan kerap mencantumkan akademisi tanpa izin, atau mengarang nama.",
+        bukti: "Nama dan afiliasi yang diklaim tidak punya rekam jejak publikasi. Penerbit yang tidak menjalankan telaah sungguhan kerap mencatut nama akademisi tanpa izin, atau mengarangnya.",
         sumber: "OpenAlex",
         bobot: 18,
         tingkat: "berat",
@@ -416,7 +416,7 @@ export function nilaiJurnal(bukti: Bukti): Hasil {
 
   let putusan: string;
   if (menyala === 0) {
-    putusan = "Tidak ada tanda bahaya yang terdeteksi dari sumber publik yang diperiksa.";
+    putusan = "Tidak ada tanda bahaya dari sumber publik yang diperiksa.";
   } else {
     const bagianBerat = berat > 0 ? `, ${berat} di antaranya berbobot berat` : "";
     putusan = `${menyala} dari ${diperiksa} pemeriksaan menyalakan tanda bahaya${bagianBerat}.`;
@@ -443,24 +443,24 @@ export function nilaiJurnal(bukti: Bukti): Hasil {
 function langkahUntuk(pita: Pita, sinyal: Sinyal[]): string[] {
   if (pita === "wajar") {
     return [
-      "Tetap periksa cakupan jurnal terhadap topik Anda sebelum mengirim.",
-      "Pastikan besaran biaya publikasi tertulis sebelum Anda menyerahkan naskah.",
+      "Cocokkan cakupan jurnal dengan topik Anda sebelum mengirim.",
+      "Pastikan besaran biaya publikasi tertulis sebelum naskah diserahkan.",
     ];
   }
 
   const langkah = [
-    "Tunjukkan laporan ini kepada dosen pembimbing sebelum mengambil keputusan.",
+    "Bawa laporan ini ke dosen pembimbing sebelum memutuskan apa pun.",
     "Bandingkan dengan jurnal terakreditasi SINTA yang cakupannya cocok dengan topik Anda.",
   ];
 
   if (sinyal.some((s) => s.id === "biaya-tertutup")) {
-    langkah.push("Minta pernyataan tertulis besaran biaya sebelum mengirim apa pun.");
+    langkah.push("Minta rincian biaya secara tertulis sebelum mengirim apa pun.");
   }
   if (sinyal.some((s) => s.id === "telaah-terlalu-cepat")) {
-    langkah.push("Tanyakan prosedur telaah sejawat secara tertulis: berapa penelaah, berapa lama, dan bagaimana hasilnya disampaikan.");
+    langkah.push("Tanyakan prosedur telaahnya secara tertulis: berapa penelaah, berapa lama, dan bagaimana hasilnya disampaikan.");
   }
   if (pita === "sangat") {
-    langkah.push("Jangan mengirim naskah ke jurnal ini. Setelah naskah masuk, Anda tidak boleh mengirimkannya ke jurnal lain sampai penarikan dikonfirmasi.");
+    langkah.push("Jangan kirim naskah ke jurnal ini. Begitu naskah masuk, Anda tidak boleh mengirimkannya ke jurnal lain sampai penarikan dikonfirmasi.");
   }
 
   return langkah;
@@ -497,7 +497,7 @@ export function median(nilai: number[]): number | null {
   return urut.length % 2 ? urut[tengah] : (urut[tengah - 1] + urut[tengah]) / 2;
 }
 
-/** Bukti kosong — seluruh pemeriksaan berstatus belum dilakukan. */
+/** Bukti kosong: seluruh pemeriksaan berstatus belum dilakukan. */
 export function buktiKosong(nama: string, issn: string[]): Bukti {
   return {
     nama,

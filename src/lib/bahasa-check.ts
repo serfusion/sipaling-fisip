@@ -1,4 +1,4 @@
-// PERIKSA BAHASA — pemeriksa ragam ilmiah Bahasa Indonesia.
+// PERIKSA BAHASA: pemeriksa ragam ilmiah Bahasa Indonesia.
 //
 // Penelitian atas karya tulis mahasiswa Indonesia berulang kali menemukan
 // bahwa 40–45% kesalahan terjadi di tataran ejaan: huruf kapital, penulisan
@@ -6,7 +6,7 @@
 // diperiksa tanpa AI sama sekali.
 //
 // Seluruh pemeriksaan berjalan di peramban. Naskah tidak pernah dikirim ke
-// mana pun — ini penting karena draf skripsi kerap memuat data responden.
+// mana pun. Ini penting karena draf skripsi kerap memuat data responden.
 //
 // Rujukan: Pedoman Umum Ejaan Bahasa Indonesia (PUEBI/EYD) dan KBBI.
 
@@ -241,7 +241,7 @@ export function periksaBahasa(teksAsli: string): Ringkasan {
       berat: "salah",
       kutipan: cocok[0],
       posisi: cocok.index ?? 0,
-      pesan: `"${depan}" di sini adalah awalan, bukan kata depan, jadi harus dirangkai.`,
+      pesan: `"${depan}" di sini awalan, bukan kata depan, jadi ditulis serangkai.`,
       saran: `${depan}${berikut}`,
     });
   }
@@ -270,7 +270,7 @@ export function periksaBahasa(teksAsli: string): Ringkasan {
         berat: "salah",
         kutipan: cocok[0],
         posisi,
-        pesan: `Akar "${akar}" tidak baku menurut KBBI; bentuk bakunya "${benar}".`,
+        pesan: `Akar kata "${akar}" tidak baku. Bentuk baku KBBI-nya "${benar}".`,
         saran: `${awalan}${benar}${akhiran}`,
       });
     }
@@ -302,7 +302,7 @@ export function periksaBahasa(teksAsli: string): Ringkasan {
         berat: "sebaiknya",
         kutipan: cocok[0],
         posisi: cocok.index ?? 0,
-        pesan: `"${cocok[0]}" adalah ragam percakapan, tidak dipakai dalam karya ilmiah.`,
+        pesan: `"${cocok[0]}" ragam percakapan, tidak dipakai dalam karya ilmiah.`,
         saran: ganti || "hapus",
       });
     }
@@ -324,7 +324,7 @@ export function periksaBahasa(teksAsli: string): Ringkasan {
       berat: "sebaiknya",
       kutipan: cocok[0],
       posisi,
-      pesan: `"${cocok[0]}" sebagai kata penghubung adalah serapan dari "where". Dalam ragam ilmiah Indonesia gunakan "yang", "tempat", atau pecah kalimatnya.`,
+      pesan: `Sebagai penghubung, "${cocok[0]}" adalah serapan dari "where". Pakai "yang", "tempat", atau pecah kalimatnya.`,
       saran: "yang / tempat",
     });
   }
@@ -337,7 +337,7 @@ export function periksaBahasa(teksAsli: string): Ringkasan {
         berat: "sebaiknya",
         kutipan: cocok[0].trim(),
         posisi: cocok.index ?? 0,
-        pesan: `"${nama}" mubazir — dua kata dengan makna sama dipakai bersamaan.`,
+        pesan: `"${nama}" mubazir. Dua kata bermakna sama dipakai bersamaan.`,
         saran: ganti,
       });
     }
@@ -365,7 +365,7 @@ export function periksaBahasa(teksAsli: string): Ringkasan {
       berat: "salah",
       kutipan: cocok[0].replace(/\s+/g, "␣"),
       posisi: cocok.index ?? 0,
-      pesan: `Tidak ada spasi sebelum tanda "${cocok[1]}".`,
+      pesan: `Tanda "${cocok[1]}" tidak didahului spasi.`,
       saran: cocok[1],
     });
   }
@@ -375,7 +375,7 @@ export function periksaBahasa(teksAsli: string): Ringkasan {
       berat: "salah",
       kutipan: teks.slice(cocok.index ?? 0, (cocok.index ?? 0) + 12),
       posisi: cocok.index ?? 0,
-      pesan: `Perlu satu spasi sesudah tanda "${cocok[1]}".`,
+      pesan: `Tanda "${cocok[1]}" perlu satu spasi sesudahnya.`,
       saran: `${cocok[1]} `,
     });
   }
@@ -401,7 +401,7 @@ export function periksaBahasa(teksAsli: string): Ringkasan {
         berat: "sebaiknya",
         kutipan: cocok[1],
         posisi,
-        pesan: `"${cocok[1]}" menghubungkan bagian dalam satu kalimat, jadi tidak lazim mengawali kalimat baru.`,
+        pesan: `"${cocok[1]}" menghubungkan bagian di dalam satu kalimat, jadi janggal bila mengawali kalimat baru.`,
         saran: kata === "sehingga" ? "Oleh karena itu" : kata === "sedangkan" ? "Sementara itu" : null,
       });
     }
@@ -420,7 +420,7 @@ export function periksaBahasa(teksAsli: string): Ringkasan {
         berat: "gaya",
         kutipan: k.trim().slice(0, 90) + (k.length > 90 ? "…" : ""),
         posisi: Math.max(0, posisi),
-        pesan: `Kalimat ini ${kata} kata. Di atas ${AMBANG_KALIMAT_PANJANG} kata, pembaca mudah kehilangan subjeknya.`,
+        pesan: `Kalimat ini ${kata} kata. Lewat ${AMBANG_KALIMAT_PANJANG} kata, pembaca mudah kehilangan subjeknya.`,
         saran: "Pecah menjadi dua kalimat.",
       });
     }
@@ -451,7 +451,7 @@ export function periksaBahasa(teksAsli: string): Ringkasan {
 }
 
 export const BERAT_LABEL: Record<Berat, string> = {
-  salah: "Salah menurut PUEBI/KBBI",
+  salah: "Salah menurut PUEBI dan KBBI",
   sebaiknya: "Sebaiknya diperbaiki",
   gaya: "Pertimbangkan",
 };

@@ -62,8 +62,12 @@ export default function AlatApp() {
       <header className="al-top">
         <div className="al-top-in">
           <Link href="/" className="al-back">← Portal Mahasiswa</Link>
-          <h1>Alat Bantu Akademik</h1>
-          <p>Gratis, tanpa akun, tanpa pasang aplikasi. Tulisan Anda tidak dikirim ke mana pun kecuali Anda menekan tombol periksa.</p>
+          <p className="al-eyebrow">UNTUK MAHASISWA FISIP</p>
+          <h1>Cakrawala</h1>
+          <p>
+            Empat pemeriksa untuk skripsi dan naskah jurnal Anda. Gratis, tanpa akun, tanpa AI.
+            Tulisan Anda baru keluar dari perangkat ini kalau Anda sendiri yang menekan tombol periksa.
+          </p>
         </div>
       </header>
 
@@ -150,13 +154,14 @@ function VerifikasiSitasi() {
       <section className="al-card">
         <Kepala
           ikon={IKON.sitasi}
-          judul="Verifikasi Sitasi"
+          judul="Pastikan tiap referensi Anda benar-benar ada"
           sub="Tempel daftar pustaka → diadu ke Crossref & OpenAlex → lihat mana yang benar-benar ada"
         />
         <p className="al-note">
-          Referensi fiktif buatan AI naik dua belas kali lipat dalam tiga tahun, dan dua pertiganya karangan utuh —
-          nama penulis nyata, jurnal nyata, tahun masuk akal, tetapi karyanya tidak pernah ada. Yang berbahaya justru
-          karena <b>tidak terlihat cacat.</b>
+          Referensi fiktif buatan AI naik dua belas kali lipat dalam tiga tahun. Dua pertiganya karangan utuh:
+          nama penulis nyata, jurnal nyata, tahun masuk akal, tapi karyanya tidak pernah terbit. Justru karena
+          <b> tidak terlihat cacat</b>, referensi seperti ini lolos sampai sidang. Di sini tiap entri diadu ke
+          Crossref dan OpenAlex.
         </p>
 
         <form onSubmit={periksa}>
@@ -166,7 +171,7 @@ function VerifikasiSitasi() {
               value={daftar}
               onChange={(e) => setDaftar(e.target.value)}
               rows={9}
-              placeholder="Satu rujukan per baris — dari skripsi Anda, atau dari jawaban AI mana pun…"
+              placeholder="Satu rujukan per baris: dari skripsi Anda, atau dari jawaban AI mana pun…"
             />
           </label>
           <div className="al-linkrow">
@@ -216,7 +221,7 @@ function VerifikasiSitasi() {
 
           <p className="al-tail">
             <b>Tidak ditemukan bukan berarti palsu.</b>{" "}
-            Buku, skripsi, peraturan, dan terbitan lokal memang tidak terdaftar di Crossref maupun OpenAlex — semuanya
+            Buku, skripsi, peraturan, dan terbitan lokal memang tidak terdaftar di Crossref maupun OpenAlex: semuanya
             ditandai &ldquo;tidak dapat diperiksa&rdquo;, bukan dituduh. Yang berstatus <b>tidak ditemukan</b> adalah
             artikel jurnal yang seharusnya ada di sana tetapi tidak ada.
           </p>
@@ -259,12 +264,12 @@ function RadarJurnal() {
       <section className="al-card">
         <Kepala
           ikon={IKON.radar}
-          judul="Radar Jurnal"
+          judul="Periksa jurnalnya dulu, baru kirim naskah"
           sub="Masukkan ISSN → periksa DOAJ, Crossref, OpenAlex → lihat tanda bahayanya beserta bukti"
         />
         <p className="al-note">
-          Periksa <b>sebelum</b> mengirim naskah. Setelah naskah masuk, penarikan sering ditolak — dan Anda tidak boleh
-          mengirimkannya ke jurnal lain sampai penarikan itu dikonfirmasi.
+          Begitu naskah masuk, permintaan penarikan sering ditolak. Selama penarikan belum dikonfirmasi, naskah
+          itu tidak boleh Anda kirim ke jurnal lain. Jadi periksa sekarang, bukan nanti.
         </p>
 
         <form onSubmit={periksa}>
@@ -289,7 +294,7 @@ function RadarJurnal() {
 
           <p className="al-note" style={{ marginBottom: 10 }}>
             Buka situs jurnalnya, lalu pilih metrik yang Anda lihat dipajang di sana. Tidak satu pun dari ini diterbitkan
-            lembaga pengindeks yang diakui — memajangnya adalah tanda bahaya.
+            lembaga pengindeks yang diakui: memajangnya adalah tanda bahaya.
           </p>
           <div className="al-tiles" style={{ marginBottom: 18 }}>
             {METRIK_TIDAK_DIAKUI.slice(0, 8).map((m) => {
@@ -448,13 +453,14 @@ function NaskahInggris() {
       <section className="al-card">
         <Kepala
           ikon={IKON.naskah}
-          judul="Naskah Inggris"
+          judul="Ubah skripsi Anda menjadi artikel jurnal berbahasa Inggris"
           sub="Pilih bab → petakan ke bagian jurnal → periksa ragam bahasanya"
         />
         <p className="al-note">
-          Bukan mengarang jurnal baru — mengubah skripsi yang <b>sudah Anda pertahankan sendiri</b> menjadi artikel.
-          Dua hal yang membuat naskah penulis Indonesia ditolak sebelum isinya dibaca: strukturnya masih BAB I–V, dan
-          ragam bahasanya terjemahan harfiah. Keduanya diperiksa di peramban, tanpa AI.
+          Bukan mengarang penelitian baru. Anda mengubah skripsi yang <b>sudah Anda pertahankan sendiri</b>
+          {" "}menjadi artikel. Dua hal membuat naskah penulis Indonesia ditolak sebelum isinya dibaca: strukturnya
+          masih BAB I sampai V, dan bahasanya terjemahan harfiah. Dua-duanya diperiksa di sini, di perangkat Anda,
+          tanpa AI.
         </p>
 
         <div className="al-filter">
@@ -561,7 +567,7 @@ function NaskahInggris() {
               <h4 className="al-h4">Belum dapat dipetakan</h4>
               <ul className="al-plain">{peta.takTerpetakan.map((j) => <li key={j}>{j}</li>)}</ul>
               <p className="al-tail">
-                Judul ini tidak cocok dengan pola mana pun. Anda yang paling tahu isinya — menebak akan lebih berbahaya
+                Judul ini tidak cocok dengan pola mana pun. Anda yang paling tahu isinya: menebak akan lebih berbahaya
                 daripada mengaku tidak tahu.
               </p>
             </>
@@ -589,7 +595,7 @@ function NaskahInggris() {
 
           {cek.temuan.length === 0 ? (
             <p className="al-good">
-              Tidak ada pola yang biasa ditandai peninjau. Ini bukan jaminan bebas kesalahan — pemeriksa ini hanya
+              Tidak ada pola yang biasa ditandai peninjau. Ini bukan jaminan bebas kesalahan: pemeriksa ini hanya
               menangkap pola yang paling sering muncul pada naskah penulis Indonesia.
             </p>
           ) : (
@@ -608,7 +614,7 @@ function NaskahInggris() {
           )}
 
           <p className="al-tail">
-            Kadar kalimat pasif bukan kesalahan — ia hanya ditampilkan sebagai angka. Di atas sekitar 40%, naskah
+            Kadar kalimat pasif bukan kesalahan: ia hanya ditampilkan sebagai angka. Di atas sekitar 40%, naskah
             biasanya mulai sulit diikuti peninjau.
           </p>
         </section>
@@ -642,13 +648,13 @@ function PeriksaBahasa() {
       <section className="al-card">
         <Kepala
           ikon={IKON.bahasa}
-          judul="Periksa Bahasa"
+          judul="Periksa ragam ilmiah tulisan Anda"
           sub="Tempel naskah → periksa ejaan, kata baku, dan kalimat efektif menurut PUEBI"
         />
         <p className="al-note">
-          Penelitian atas karya tulis mahasiswa Indonesia menemukan sebagian besar kesalahan justru ada di tataran
-          ejaan — kata depan, huruf kapital, tanda baca, dan kata tidak baku. Diperiksa di sini tanpa AI,{" "}
-          <b>dan tanpa naskah Anda meninggalkan perangkat ini.</b>
+          Kesalahan terbanyak pada karya tulis mahasiswa bukan soal isi, melainkan ejaan: kata depan, huruf
+          kapital, tanda baca, dan kata tidak baku. Semuanya diperiksa di sini tanpa AI,
+          <b> dan tanpa naskah Anda meninggalkan perangkat ini.</b>
         </p>
 
         <label className="al-field">
@@ -690,7 +696,7 @@ function PeriksaBahasa() {
 
           {hasil.temuan.length === 0 ? (
             <p className="al-good">
-              Tidak ada temuan pada aturan yang diperiksa. Ini bukan jaminan bebas kesalahan — pemeriksa ini hanya
+              Tidak ada temuan pada aturan yang diperiksa. Ini bukan jaminan bebas kesalahan: pemeriksa ini hanya
               menangkap pola yang paling sering muncul.
             </p>
           ) : (

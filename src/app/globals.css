@@ -1887,9 +1887,8 @@ a.mt-i-dot:hover { background: var(--yellow); box-shadow: 0 0 0 .045em rgba(245,
   border: 1px dashed var(--line); border-radius: 10px; padding: 11px 13px; }
 .mtp-hint b { color: var(--navy); }
 .mtp-hint code { background: white; border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; font-size: 10.5px; }
-
 /* ============================================================
-   ALAT BANTU AKADEMIK
+   CAKRAWALA
    Bahasa visual mengikuti rujukan yang diberikan: sisi kiri berikon,
    kartu bersudut lembut, baris bab yang dapat dipilih, dan pilihan
    berbentuk ubin. Warna aksen indigo lembut agar terasa tenang tanpa
@@ -1919,6 +1918,7 @@ a.mt-i-dot:hover { background: var(--yellow); box-shadow: 0 0 0 .045em rgba(245,
 .al-top-in { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
 .al-back { align-self: flex-start; color: #a9bde2; text-decoration: none; font-size: 12.5px; font-weight: 700; padding: 4px 0; }
 .al-back:hover { color: #fff; }
+.al-eyebrow { margin: 0; color: #f5c542; font-size: 10px; font-weight: 800; letter-spacing: .14em; }
 .al-top h1 { margin: 2px 0 0; font-size: clamp(21px, 4.2vw, 27px); font-weight: 800; letter-spacing: -.02em; }
 .al-top p { margin: 0; color: #b6c6e4; font-size: 13px; line-height: 1.6; max-width: 46rem; }
 
