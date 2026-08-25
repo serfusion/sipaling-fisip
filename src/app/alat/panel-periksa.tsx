@@ -60,7 +60,7 @@ export function PanelSitasi({
     <>
       <section className="al-card">
         <Kepala ikon={IKON.sitasi} judul="Pastikan tiap referensi Anda benar-benar ada"
-          sub="Tempel daftar pustaka → diadu ke Crossref dan OpenAlex → lihat mana yang nyata" />
+          sub="Tempel daftar pustaka → mencari data ke Crossref dan OpenAlex → lihat mana yang nyata" />
         <Rinci>
           <p>
             Rujukan karangan AI biasanya terlihat wajar: nama penulis nyata, jurnal nyata, tahun masuk akal, tetapi
@@ -79,7 +79,7 @@ export function PanelSitasi({
             {daftar && <button type="button" className="al-link" onClick={() => { setDaftar(""); setHasil(null); }}>Kosongkan</button>}
           </div>
           <button type="submit" className="al-btn" disabled={memuat || !daftar.trim()}>
-            {memuat ? "Mengadu ke Crossref dan OpenAlex…" : "Periksa daftar pustaka"}
+            {memuat ? "Mencari data ke Crossref dan OpenAlex…" : "Periksa daftar pustaka"}
           </button>
         </form>
         {galat && <p className="al-galat" role="alert">{galat}</p>}
@@ -308,7 +308,7 @@ export function PanelBahasa({ project }: { project: Project | null }) {
     <>
       <section className="al-card">
         <Kepala ikon={IKON.bahasa} judul="Periksa ragam ilmiah tulisan Anda"
-          sub="Ejaan, kata baku, tanda baca, dan kalimat efektif menurut PUEBI" />
+          sub="Ejaan, kata baku, tanda baca, dan kalimat efektif menurut PUEBI dan KBBI" />
         <p className="al-note">
           Ejaan, kata depan, huruf kapital, tanda baca, dan kata tidak baku. <b>Naskah tidak dikirim ke mana pun.</b>
         </p>

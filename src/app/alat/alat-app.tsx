@@ -34,11 +34,10 @@ export default function AlatApp() {
       <header className="al-top">
         <div className="al-top-in">
           <Link href="/" className="al-back">← Portal Mahasiswa</Link>
-          <p className="al-eyebrow">UNTUK MAHASISWA FISIP</p>
+          <p className="al-eyebrow">ONE FOR ALL &middot; SIPALING FISIP</p>
           <h1>Cakrawala</h1>
           <p>
-            Delapan alat untuk skripsi dan naskah jurnal, dari merumuskan judul sampai naskah siap kirim.
-            Gratis, tanpa akun, tanpa AI.
+Be Your Self, Kamu adalah Pencipta Masa Depanmu Sendiri
           </p>
 
           {aktif && (

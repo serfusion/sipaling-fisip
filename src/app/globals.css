@@ -1926,7 +1926,13 @@ a.mt-i-dot:hover { background: var(--yellow); box-shadow: 0 0 0 .045em rgba(245,
 .al-body { max-width: 1120px; margin: 0 auto; padding: 18px 16px 56px; display: grid; gap: 18px; grid-template-columns: 1fr; }
 @media (min-width: 920px) { .al-body { grid-template-columns: 232px minmax(0, 1fr); align-items: start; } }
 
-.al-side { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+/* Item grid dan flex bawaannya tidak mau menyusut di bawah lebar isinya.
+   Satu judul project yang panjang karena itu dapat melebarkan seluruh
+   halaman: nama bernilai white-space nowrap menetapkan lebar minimum yang
+   merambat naik sampai ke kolom grid. min-width nol memutus rambatan itu
+   sehingga judulnya yang dipotong, bukan halamannya yang melar. */
+.al-body > * { min-width: 0; }
+.al-side { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; min-width: 0; }
 .al-side::-webkit-scrollbar { display: none; }
 @media (min-width: 920px) {
   .al-side { flex-direction: column; overflow: visible; position: sticky; top: 18px;
@@ -2096,6 +2102,7 @@ a.mt-i-dot:hover { background: var(--yellow); box-shadow: 0 0 0 .045em rgba(245,
   color: var(--al-accent); display: grid; place-items: center; }
 .al-proj.on .al-proj-ic { background: #fff; }
 .al-proj-ic svg { width: 17px; height: 17px; }
+.al-proj-buka > span { min-width: 0; }
 .al-proj-nama { display: block; font-size: 13.5px; font-weight: 800; color: var(--al-ink); line-height: 1.35;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .al-proj-meta { display: block; margin-top: 3px; color: var(--al-muted); font-size: 11.5px; line-height: 1.5;
