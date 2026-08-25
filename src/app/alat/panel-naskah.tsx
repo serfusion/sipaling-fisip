@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Ic, IKON, Kepala } from "./ikon";
+import { Ic, IKON, Kepala, Rinci } from "./ikon";
 import {
   BAGIAN_LABEL,
   BERAT_INGGRIS_LABEL,
@@ -100,11 +100,12 @@ export function PanelStruktur({ project }: { project: Project | null }) {
       <section className="al-card">
         <Kepala ikon={IKON.struktur} judul="Struktur Naskah"
           sub="Pilih bab → petakan ke bagian jurnal → lihat berapa yang harus dipangkas" />
-        <p className="al-note">
-          BAB I sampai V bukan IMRaD. Pendahuluan skripsi memuat latar belakang, rumusan, tujuan, manfaat, dan
-          sistematika; Introduction jurnal menuntut tiga gerakan: tegakkan bidang, tunjukkan celah, isi celah.
-          Di sini pemetaannya ditampilkan beserta alasan tiap pemindahan.
-        </p>
+        <Rinci judul="Kenapa BAB I sampai V harus diubah?">
+          <p>
+            BAB I sampai V bukan IMRaD. Pendahuluan skripsi memuat latar belakang, rumusan, tujuan, manfaat, dan
+            sistematika. Introduction jurnal menuntut tiga gerakan: tegakkan bidang, tunjukkan celah, isi celah.
+          </p>
+        </Rinci>
       </section>
 
       <div className="al-duo">
@@ -231,13 +232,14 @@ export function PanelInggris({
       <section className="al-card">
         <Kepala ikon={IKON.inggris} judul="Naskah Inggris"
           sub="Rumusan baku skripsi Anda → padanan yang dipakai jurnal → periksa ragam hasilnya" />
-        <p className="al-note">
-          Yang membuat naskah penulis Indonesia terbaca janggal biasanya bukan tata bahasanya, melainkan pilihan kata
-          pada rumusan baku. <b>&ldquo;Penelitian ini bertujuan untuk menganalisis&rdquo;</b> diterjemahkan harfiah
-          menjadi <i>&ldquo;This research have a purpose to analyze&rdquo;</i>, padahal jurnal menulisnya{" "}
-          <b>&ldquo;This study examines&rdquo;</b>. Di sini rumusan itu dikenali dari naskah Indonesia Anda beserta
-          padanannya. Anda yang memutuskan, bukan mesin.
-        </p>
+        <Rinci judul="Contohnya seperti apa?">
+          <p>
+            &ldquo;Penelitian ini bertujuan untuk menganalisis&rdquo; sering diterjemahkan harfiah menjadi{" "}
+            <i>&ldquo;This research have a purpose to analyze&rdquo;</i>, padahal jurnal menulisnya{" "}
+            <b>&ldquo;This study examines&rdquo;</b>.
+          </p>
+          <p>Padanan yang ditawarkan hanya usulan. Anda yang menyusun kalimatnya.</p>
+        </Rinci>
 
         <div className="al-filter">
           <button type="button" className={sisi === "indonesia" ? "on" : ""} onClick={() => setSisi("indonesia")}>
@@ -286,10 +288,7 @@ export function PanelInggris({
                   </ul>
                 </div>
               ))}
-              <p className="al-tail">
-                Padanan pertama yang paling lazim. Ini bukan penerjemah otomatis: Anda tetap yang menyusun kalimatnya,
-                dan itulah yang membuat naskahnya tetap karya Anda.
-              </p>
+              <p className="al-tail">Padanan pertama yang paling lazim. Ini bukan penerjemah otomatis.</p>
             </>
           )}
         </section>

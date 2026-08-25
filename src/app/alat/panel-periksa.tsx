@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Ic, IKON, Kepala } from "./ikon";
+import { Ic, IKON, Kepala, Rinci } from "./ikon";
 import { periksaBahasa, BERAT_LABEL, type Berat } from "@/lib/bahasa-check";
 import { METRIK_TIDAK_DIAKUI, PITA_LABEL, type Hasil, type Tingkat } from "@/lib/journal-radar";
 import { PUTUSAN_LABEL, type HasilRujukan, type Putusan, type RingkasanSitasi } from "@/lib/citation-check";
@@ -61,11 +61,12 @@ export function PanelSitasi({
       <section className="al-card">
         <Kepala ikon={IKON.sitasi} judul="Pastikan tiap referensi Anda benar-benar ada"
           sub="Tempel daftar pustaka → diadu ke Crossref dan OpenAlex → lihat mana yang nyata" />
-        <p className="al-note">
-          Referensi fiktif buatan AI naik dua belas kali lipat dalam tiga tahun. Dua pertiganya karangan utuh:
-          nama penulis nyata, jurnal nyata, tahun masuk akal, tapi karyanya tidak pernah terbit. Justru karena
-          <b> tidak terlihat cacat</b>, referensi seperti ini lolos sampai sidang.
-        </p>
+        <Rinci>
+          <p>
+            Rujukan karangan AI biasanya terlihat wajar: nama penulis nyata, jurnal nyata, tahun masuk akal, tetapi
+            karyanya tidak pernah terbit. Karena tidak terlihat cacat, rujukan seperti itu sering lolos sampai sidang.
+          </p>
+        </Rinci>
 
         <form onSubmit={periksa}>
           <label className="al-field">
@@ -117,9 +118,8 @@ export function PanelSitasi({
           </ul>
 
           <p className="al-tail">
-            <b>Tidak ditemukan bukan berarti palsu.</b>{" "}
-            Buku, skripsi, peraturan, dan terbitan lokal memang tidak terdaftar di Crossref maupun OpenAlex. Semuanya
-            ditandai tidak dapat diperiksa, bukan dituduh.
+            <b>Tidak ditemukan bukan berarti palsu.</b> Buku, skripsi, dan peraturan memang tidak terdaftar di
+            Crossref maupun OpenAlex, jadi ditandai tidak dapat diperiksa.
           </p>
           <button type="button" className="al-print" onClick={() => window.print()}>Cetak atau simpan sebagai PDF</button>
         </section>
@@ -163,10 +163,13 @@ export function PanelRadar({
       <section className="al-card">
         <Kepala ikon={IKON.radar} judul="Periksa jurnalnya dulu, baru kirim naskah"
           sub="Masukkan ISSN → periksa DOAJ, Crossref, OpenAlex → lihat tanda bahayanya beserta bukti" />
-        <p className="al-note">
-          Begitu naskah masuk, permintaan penarikan sering ditolak. Selama penarikan belum dikonfirmasi, naskah itu
-          tidak boleh Anda kirim ke jurnal lain. Jadi periksa sekarang, bukan nanti.
-        </p>
+        <p className="al-note">Periksa jurnalnya sebelum naskah dikirim.</p>
+        <Rinci>
+          <p>
+            Setelah naskah masuk, permintaan penarikan sering ditolak. Selama penarikan belum dikonfirmasi, naskah itu
+            tidak boleh dikirim ke jurnal lain.
+          </p>
+        </Rinci>
 
         <form onSubmit={periksa}>
           <label className="al-field al-field-kecil">
@@ -190,10 +193,13 @@ export function PanelRadar({
             </li>
           </ul>
 
-          <p className="al-note">
-            Buka situs jurnalnya, lalu pilih metrik yang Anda lihat dipajang di sana. Tidak satu pun dari ini
-            diterbitkan lembaga pengindeks yang diakui.
-          </p>
+          <p className="al-note">Buka situs jurnalnya, lalu centang metrik yang dipajang di sana.</p>
+          <Rinci judul="Kenapa metrik ini jadi tanda bahaya?">
+            <p>
+              Tidak satu pun diterbitkan lembaga pengindeks yang diakui. Memajangnya biasanya untuk meyakinkan
+              penulis yang tidak sempat memeriksa.
+            </p>
+          </Rinci>
           <div className="al-tiles">
             {METRIK_TIDAK_DIAKUI.slice(0, 8).map((m) => {
               const aktif = metrik.includes(m);
@@ -304,9 +310,7 @@ export function PanelBahasa({ project }: { project: Project | null }) {
         <Kepala ikon={IKON.bahasa} judul="Periksa ragam ilmiah tulisan Anda"
           sub="Ejaan, kata baku, tanda baca, dan kalimat efektif menurut PUEBI" />
         <p className="al-note">
-          Kesalahan terbanyak pada karya tulis mahasiswa bukan soal isi, melainkan ejaan: kata depan, huruf kapital,
-          tanda baca, dan kata tidak baku. Semuanya diperiksa di sini tanpa AI,
-          <b> dan tanpa naskah Anda meninggalkan perangkat ini.</b>
+          Ejaan, kata depan, huruf kapital, tanda baca, dan kata tidak baku. <b>Naskah tidak dikirim ke mana pun.</b>
         </p>
 
         {project && dariProject.trim() && (
@@ -379,8 +383,7 @@ export function PanelBahasa({ project }: { project: Project | null }) {
           )}
 
           <p className="al-tail">
-            Pemeriksa ini mengikuti PUEBI dan KBBI untuk pola yang paling sering keliru. Kutipan langsung sengaja
-            dilewati agar tidak salah menandai.
+            Mengikuti PUEBI dan KBBI. Kutipan langsung dilewati agar tidak salah ditandai.
           </p>
         </section>
       )}

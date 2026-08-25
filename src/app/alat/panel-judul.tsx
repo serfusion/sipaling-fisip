@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Ic, IKON, Kepala } from "./ikon";
+import { Ic, IKON, Kepala, Rinci } from "./ikon";
 import { PerluProject } from "./panel-naskah";
 import {
   DATA_PILIHAN, JENIS_LABEL, TUJUAN_PILIHAN, UNIT_PILIHAN,
@@ -53,11 +53,15 @@ export function PanelJudul({
         <Kepala ikon={IKON.judul} judul="Perumus Judul dan Metode"
           sub="Katakan apa yang ingin Anda teliti, lalu lihat metode mana yang benar-benar dapat menjawabnya" />
         <p className="al-note">
-          Yang paling sering memulangkan mahasiswa dari meja pembimbing bukan kurang membaca, melainkan{" "}
-          <b>judul yang tidak sejalan dengan metodenya</b>. &ldquo;Pengaruh A terhadap B&rdquo; yang hendak dikerjakan
-          dengan wawancara mendalam tidak akan pernah bisa menjawab pertanyaannya sendiri, dan itu baru ketahuan
-          setelah berbulan-bulan. Di sini ketidakcocokan itu muncul sekarang, bukan nanti.
+          Jawab pertanyaan di bawah, lalu rancangan penelitiannya disusun beserta peringatan bila judul dan metode
+          tidak sejalan.
         </p>
+        <Rinci>
+          <p>
+            &ldquo;Pengaruh A terhadap B&rdquo; yang hendak dikerjakan dengan wawancara mendalam tidak akan bisa
+            menjawab pertanyaannya sendiri. Ketidakcocokan seperti ini biasanya baru ketahuan setelah berbulan-bulan.
+          </p>
+        </Rinci>
 
         <h3 className="al-h4">1 · Apa yang ingin Anda ketahui?</h3>
         <div className="al-tiles">
@@ -188,8 +192,7 @@ export function PanelJudul({
               ))}
             </ul>
             <p className="al-tail">
-              Ini kerangka, bukan judul jadi. Dosen pembimbing Anda yang paling tahu keadaan lapangan dan kekhasan
-              prodi; bawa dua-tiga pilihan ini kepadanya, jangan satu.
+              Ini kerangka, bukan judul jadi. Bawa dua atau tiga pilihan ke dosen pembimbing, jangan satu.
             </p>
           </section>
 
@@ -250,9 +253,7 @@ export function PanelJudul({
             )}
 
             <p className="al-tail">
-              Seluruh isi halaman ini disusun dari kaidah metodologi yang baku, bukan dari tebakan mesin. Tiap
-              keluaran dapat ditelusuri ke pilihan yang Anda buat sendiri di atas. Keputusan akhir tetap milik dosen
-              pembimbing Anda.
+              Disusun dari kaidah metodologi baku, bukan tebakan mesin. Keputusan akhir tetap milik dosen pembimbing.
             </p>
             <button type="button" className="al-print" onClick={() => window.print()}>Cetak atau simpan sebagai PDF</button>
           </section>

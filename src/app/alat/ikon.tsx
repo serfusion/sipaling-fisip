@@ -47,3 +47,21 @@ export function Kepala({ ikon, judul, sub }: { ikon: string; judul: string; sub:
     </div>
   );
 }
+
+/**
+ * Penjelasan yang dapat dibuka-tutup.
+ *
+ * Keterangan panjang menutupi alatnya dan membuat halaman melelahkan dibaca.
+ * Yang tampak hanyalah satu baris inti; alasan dan latar belakangnya
+ * disembunyikan di sini sampai pengguna memang menginginkannya.
+ */
+export function Rinci({
+  judul = "Kenapa ini penting?", children,
+}: { judul?: string; children: React.ReactNode }) {
+  return (
+    <details className="al-rinci">
+      <summary>{judul}</summary>
+      <div className="al-rinci-isi">{children}</div>
+    </details>
+  );
+}

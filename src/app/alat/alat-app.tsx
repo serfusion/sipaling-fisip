@@ -37,8 +37,8 @@ export default function AlatApp() {
           <p className="al-eyebrow">UNTUK MAHASISWA FISIP</p>
           <h1>Cakrawala</h1>
           <p>
-            Ruang kerja untuk skripsi dan naskah jurnal Anda, dari merumuskan judul sampai naskah siap kirim.
-            Satu project menampung semuanya, dan delapan alat memakainya bersama. Gratis, tanpa akun, tanpa AI.
+            Delapan alat untuk skripsi dan naskah jurnal, dari merumuskan judul sampai naskah siap kirim.
+            Gratis, tanpa akun, tanpa AI.
           </p>
 
           {aktif && (

@@ -2190,6 +2190,24 @@ a.al-mini:hover { color: var(--al-ink); }
 .al-bab-baris .al-proj-hapus { width: 30px; height: 30px; margin: -6px -6px -6px 0; }
 .al-bab-baris .al-proj-hapus svg { width: 14px; height: 14px; }
 
+/* --- Penjelasan buka-tutup --- */
+.al-rinci { margin: 0 0 14px; }
+.al-rinci > summary { display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  color: var(--al-accent); font-size: 12.5px; font-weight: 700; padding: 5px 0; list-style: none;
+  min-height: 32px; }
+.al-rinci > summary::-webkit-details-marker { display: none; }
+.al-rinci > summary::before { content: ""; width: 0; height: 0; border-left: 5px solid currentColor;
+  border-top: 4px solid transparent; border-bottom: 4px solid transparent; transition: transform .15s ease; }
+.al-rinci[open] > summary::before { transform: rotate(90deg); }
+.al-rinci > summary:hover { color: var(--al-accent-dark); text-decoration: underline; }
+.al-rinci-isi { margin-top: 8px; padding: 13px 15px; background: var(--al-line-soft);
+  border-radius: 11px; color: #4b5568; font-size: 12.5px; line-height: 1.7; }
+.al-rinci-isi p { margin: 0; }
+.al-rinci-isi p + p { margin-top: 9px; }
+.al-rinci-isi b { color: var(--al-ink); }
+.al-rinci-isi ul { margin: 8px 0 0; padding-left: 18px; }
+.al-rinci-isi li + li { margin-top: 5px; }
+
 @media (max-width: 560px) {
   .al-card { padding: 16px 14px; border-radius: 14px; }
   .al-body { padding: 14px 12px 44px; }
@@ -2198,4 +2216,6 @@ a.al-mini:hover { color: var(--al-ink); }
   .al-top, .al-side, .al-print, .al-btn, .al-linkrow, .al-field,
   .al-aksi, .al-projs, .al-langkah, .al-filter { display: none !important; }
   .al, .al-card { background: #fff; box-shadow: none; border: 0; padding: 0; }
+  .al-rinci > summary { display: none; }
+  .al-rinci-isi { display: block !important; background: none; padding: 0; }
 }

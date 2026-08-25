@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Ic, IKON, Kepala } from "./ikon";
+import { Ic, IKON, Kepala, Rinci } from "./ikon";
 import { INTI_LABEL, SARINGAN_BAWAAN, type Karya, type Saringan } from "@/lib/referensi";
 import type { Project } from "@/lib/project";
 
@@ -59,12 +59,16 @@ export function PanelReferensi({
         <Kepala ikon={IKON.referensi} judul="Cari Referensi"
           sub="Tuliskan topik Anda → cari ke katalog OpenAlex → lihat inti tiap penelitian tanpa membaca utuh" />
         <p className="al-note">
-          Dua tembok menghadang mahasiswa Indonesia sekaligus: jurnal bermutu terkunci di balik langganan yang
-          kampusnya tidak beli, dan mesin pencari biasa mencampur artikel ilmiah dengan blog serta jurnal yang tidak
-          jelas penerbitnya. Di sini pencarian menuju <b>OpenAlex</b>, katalog terbuka berisi lebih dari dua ratus juta
-          karya ilmiah. Yang naskah lengkapnya <b>dapat diunduh gratis</b> ditandai, begitu pula yang terbit di jurnal
-          terdaftar DOAJ.
+          Mencari ke <b>OpenAlex</b>, katalog terbuka berisi lebih dari 200 juta artikel ilmiah. Yang bisa diunduh
+          gratis dan yang terdaftar DOAJ ditandai.
         </p>
+        <Rinci judul="Kenapa tidak pakai Google saja?">
+          <p>
+            Mesin pencari biasa mencampur artikel ilmiah dengan blog dan jurnal yang tidak jelas penerbitnya,
+            sedangkan jurnal bermutu sering terkunci di balik langganan yang kampus tidak beli. OpenAlex hanya memuat
+            karya ilmiah, dan menandai mana yang naskah lengkapnya terbuka.
+          </p>
+        </Rinci>
 
         <form onSubmit={cari}>
           <label className="al-field">
@@ -192,9 +196,8 @@ export function PanelReferensi({
           )}
 
           <p className="al-tail">
-            <b>Kalimat inti di atas diambil apa adanya dari abstrak</b>, bukan ringkasan buatan mesin. Itu disengaja:
-            ringkasan yang disusun ulang mesin dapat menyatakan hal yang tidak ada di sumbernya, dan Anda yang akan
-            menanggungnya di ruang sidang. Tetap baca naskah aslinya sebelum menyitasi.
+            <b>Kalimat inti diambil apa adanya dari abstrak</b>, bukan ringkasan buatan mesin. Tetap baca naskah
+            aslinya sebelum menyitasi.
           </p>
         </section>
       )}

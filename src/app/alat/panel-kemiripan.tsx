@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Ic, IKON, Kepala } from "./ikon";
+import { Ic, IKON, Kepala, Rinci } from "./ikon";
 import { PerluProject } from "./panel-naskah";
 import {
   PARAFRASE_LABEL, TEMUAN_LABEL,
@@ -28,16 +28,20 @@ export function PanelKemiripan({
         <Kepala ikon={IKON.kemiripan} judul="Cek Kemiripan dan Parafrase"
           sub="Bereskan yang bisa Anda bereskan sendiri, sebelum jatah unggah Turnitin terpakai" />
         <p className="al-note">
-          <b>Alat ini bukan Turnitin dan tidak berpura-pura menjadi Turnitin.</b> Kekuatan Turnitin ada pada
-          korpusnya: jutaan skripsi mahasiswa dan jurnal berlangganan yang tidak dapat diakses siapa pun dari luar.
-          Angka di sini tidak akan sama dengan angka Turnitin, dan siapa pun yang menjanjikan sebaliknya sedang
-          menyesatkan Anda.
+          <b>Bukan Turnitin, dan angkanya tidak akan sama.</b> Yang diperiksa di sini: sumber yang Anda tempel
+          sendiri, kelengkapan sitasi, dan mutu parafrase. Semua berjalan di perangkat ini.
         </p>
-        <p className="al-note">
-          Yang dikerjakan di sini justru pekerjaan yang bisa Anda selesaikan sendiri lebih dulu: memeriksa naskah
-          terhadap sumber yang Anda pakai sendiri, membereskan sitasi yang pincang, dan menguji apakah parafrase Anda
-          benar-benar parafrase. Semuanya berjalan di perangkat ini; naskah Anda tidak dikirim ke mana pun.
-        </p>
+        <Rinci judul="Kenapa tidak bisa sama dengan Turnitin?">
+          <p>
+            Kekuatan Turnitin ada pada korpusnya: jutaan skripsi mahasiswa dan jurnal berlangganan yang tidak dapat
+            diakses dari luar. Alat mana pun tanpa korpus itu tidak bisa menghasilkan angka yang sama, dan yang
+            menjanjikan sebaliknya sedang menyesatkan Anda.
+          </p>
+          <p>
+            Yang bisa dikerjakan di sini adalah pekerjaan yang memang bisa Anda selesaikan sendiri lebih dulu,
+            sebelum jatah unggah Turnitin terpakai.
+          </p>
+        </Rinci>
 
         <div className="al-filter">
           <button type="button" className={sisi === "naskah" ? "on" : ""} onClick={() => setSisi("naskah")}>
@@ -120,10 +124,7 @@ function SisiNaskah({ project }: { project: Project }) {
         </ul>
       )}
 
-      <p className="al-tail">
-        Sitasi yang pincang adalah temuan yang paling sering dikembalikan penguji, dan paling mudah dibereskan
-        sendiri. Bereskan ini dulu sebelum memikirkan angka kemiripan.
-      </p>
+      <p className="al-tail">Bereskan sitasi dulu sebelum memikirkan angka kemiripan.</p>
       <button type="button" className="al-print" onClick={() => window.print()}>Cetak atau simpan sebagai PDF</button>
     </section>
   );
@@ -159,9 +160,8 @@ function SisiSumber({
       <section className="al-card">
         <h3 className="al-h4">Sumber pembanding</h3>
         <p className="al-note">
-          Tempelkan teks sumber yang benar-benar Anda pakai: bab dari buku, artikel jurnal, atau halaman web yang
-          Anda parafrasekan. Naskah Anda akan diadu dengan sumber itu, dan bagian yang sama persis sepanjang delapan
-          kata atau lebih akan ditandai. Itu panjang yang juga dipakai pemeriksa kemiripan pada umumnya.
+          Tempelkan teks sumber yang Anda pakai. Bagian yang sama persis sepanjang delapan kata atau lebih akan
+          ditandai.
         </p>
 
         {project.sumberBanding.length > 0 && (
@@ -206,9 +206,8 @@ function SisiSumber({
           </div>
 
           <p className="al-note">
-            Angka pertama yang paling penting: bagian yang sama persis dengan sumber <b>tanpa</b> ditandai kutipan.
-            Itulah yang akan dibaca sebagai salinan. Yang berada di dalam tanda kutip dihitung terpisah karena
-            kutipan langsung memang sah, asalkan bernomor halaman.
+            Perhatikan angka pertama: bagian yang sama dengan sumber <b>tanpa</b> tanda kutip. Itulah yang terbaca
+            sebagai salinan.
           </p>
 
           {hasil.perSumber.map((s) => (
@@ -236,8 +235,7 @@ function SisiSumber({
             <>
               <h3 className="al-h4">Bagian yang Anda ulang sendiri</h3>
               <p className="al-note">
-                Potongan ini muncul dua kali di naskah Anda pada jarak berjauhan, biasanya karena satu bab disalin
-                ke bab lain. Penguji membacanya sebagai pengisi halaman.
+                Potongan ini muncul dua kali di naskah Anda, biasanya karena satu bab disalin ke bab lain.
               </p>
               <ul className="al-list">
                 {hasil.pengulanganInternal.slice(0, 6).map((r) => (
@@ -251,9 +249,7 @@ function SisiSumber({
           )}
 
           <p className="al-tail">
-            Lingkup pemeriksaan ini <b>hanya sebatas sumber yang Anda tempel sendiri</b>. Kemiripan dengan karya yang
-            tidak Anda tempel di sini tidak akan terdeteksi, dan itu memang di luar jangkauan alat mana pun yang tidak
-            memiliki korpus berlangganan.
+            Hanya sebatas sumber yang Anda tempel sendiri. Kemiripan dengan karya lain tidak akan terdeteksi.
           </p>
         </section>
       )}
@@ -271,11 +267,13 @@ function SisiParafrase() {
   return (
     <>
       <section className="al-card">
-        <p className="al-note">
-          Tempelkan satu kalimat asli dari sumber, lalu parafrase Anda sendiri. Yang paling sering keliru dipahami
-          mahasiswa: mengganti kata dengan sinonim sambil mempertahankan susunan kalimat <b>bukan</b> parafrase.
-          Dalam pedoman akademik itu disebut patchwriting, dan tetap terbaca sebagai salinan.
-        </p>
+        <p className="al-note">Tempelkan kalimat asli dari sumber, lalu parafrase Anda sendiri.</p>
+        <Rinci judul="Apa bedanya parafrase dan tukar sinonim?">
+          <p>
+            Mengganti kata dengan sinonim sambil mempertahankan susunan kalimat bukan parafrase. Dalam pedoman
+            akademik itu disebut <b>patchwriting</b>, dan tetap terbaca sebagai salinan.
+          </p>
+        </Rinci>
         <label className="al-field">
           <span>Kalimat asli dari sumber</span>
           <textarea value={asli} onChange={(e) => setAsli(e.target.value)} rows={4}
@@ -312,10 +310,7 @@ function SisiParafrase() {
           <h3 className="al-h4">Yang bisa Anda lakukan</h3>
           <ul className="al-plain">{hasil.saran.map((s) => <li key={s}>{s}</li>)}</ul>
 
-          <p className="al-tail">
-            Parafrase yang baik pun tetap gagasan orang lain: sitasinya tetap wajib. Yang hilang dengan parafrase
-            hanyalah tanda kutipnya, bukan kewajiban menyebut sumbernya.
-          </p>
+          <p className="al-tail">Parafrase tetap wajib disitasi. Yang hilang hanya tanda kutipnya.</p>
         </section>
       )}
     </>

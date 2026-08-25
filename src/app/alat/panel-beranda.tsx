@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Ic, IKON, Kepala } from "./ikon";
+import { Ic, IKON, Kepala, Rinci } from "./ikon";
 import {
   JENIS_LABEL,
   buatCadangan,
@@ -63,10 +63,8 @@ export function PanelBeranda(props: Props) {
           }
         />
         <p className="al-note">
-          Sebelumnya tiap alat berdiri sendiri dan Anda harus menempelkan naskah yang sama berulang kali. Sekarang
-          naskah, daftar pustaka, dan jurnal tujuan tersimpan dalam satu project.{" "}
-          <b>Semuanya disimpan di perangkat ini saja</b>, tidak dikirim ke server mana pun, karena naskah skripsi
-          kerap memuat data responden.
+          Naskah, daftar pustaka, dan jurnal tujuan tersimpan dalam satu project, lalu dipakai semua alat.{" "}
+          <b>Semuanya di perangkat ini saja</b>, tidak dikirim ke server mana pun.
         </p>
 
         {daftar.length > 0 && (
@@ -281,8 +279,7 @@ function KotakNaskah({
       {galat && <p className="al-galat" role="alert">{galat}</p>}
 
       <p className="al-tail">
-        Berkas .docx dan .pdf belum dapat dibaca di sini. Buka naskah Anda di Word, pilih seluruhnya, salin, lalu
-        tempel di kotak ini. Isi naskah tetap tidak meninggalkan perangkat Anda.
+        Berkas .docx dan .pdf belum dapat dibaca. Salin isinya dari Word, lalu tempel di kotak ini.
       </p>
 
       {project.bab.length > 0 && (
@@ -415,10 +412,15 @@ function KartuCadangan({
       <Kepala ikon={IKON.unduh} judul="Cadangan"
         sub="Simpan salinan project Anda sebelum peramban membersihkan penyimpanannya" />
       <p className="al-note">
-        Penyimpanan lokal bukan brankas. Safari membuang data situs yang tidak dibuka selama tujuh hari, dan
-        membersihkan riwayat peramban dapat menghapusnya kapan saja. <b>Unduh cadangan secara berkala</b>, terutama
-        menjelang sidang. Berkasnya dapat dipulihkan di perangkat mana pun.
+        <b>Unduh cadangan secara berkala</b>, terutama menjelang sidang. Berkasnya dapat dipulihkan di perangkat
+        mana pun.
       </p>
+      <Rinci judul="Kenapa perlu dicadangkan?">
+        <p>
+          Penyimpanan peramban bukan brankas. Safari membuang data situs yang tidak dibuka selama tujuh hari, dan
+          membersihkan riwayat peramban dapat menghapusnya kapan saja.
+        </p>
+      </Rinci>
       <div className="al-aksi">
         <button type="button" className="al-mini" onClick={() => void unduh()} disabled={!adaProject}>
           <Ic d={IKON.unduh} /> Unduh cadangan
