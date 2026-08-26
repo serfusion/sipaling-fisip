@@ -101,11 +101,14 @@ export const ACUAN: Record<string, Kelompok> = {
     alat: "Naskah Inggris",
     catatan:
       "Bank frasa memuat rumusan baku yang paling sering muncul pada skripsi Indonesia beserta padanan yang " +
-      "lazim dipakai jurnal berbahasa Inggris. Ini bukan penerjemah otomatis.",
+      "lazim dipakai jurnal berbahasa Inggris. Alih bahasanya deterministik dan berjalan di peramban: kata yang " +
+      "tidak ada padanannya ditandai, bukan ditebak. Hasilnya draf yang wajib disunting, bukan penerjemah otomatis.",
     acuan: [
       { sumber: "Swales, J. M., & Feak, C. B. (2012). Academic Writing for Graduate Students (3rd ed.). University of Michigan Press.", untuk: "Rumusan baku tiap bagian artikel" },
       { sumber: "Hyland, K. (2005). Metadiscourse: Exploring Interaction in Writing. Continuum.", untuk: "Kadar hedging dan klaim yang wajar di jurnal" },
       { sumber: "American Psychological Association. (2020). Publication Manual of the APA (7th ed.), bab 4.", untuk: "Ragam bahasa, kala, dan kalimat pasif" },
+      { sumber: "IEEE. (2024). IEEE Reference Guide. IEEE Publishing.", untuk: "Susunan rujukan bernomor pada prosiding dan jurnal teknik" },
+      { sumber: "Basit, A., Nurlukman, A. D., Wahyono, E., & Fadli, Y. (2019). Social Media in The Public Sphere, Network Society, and Political Branding. Universitas Muhammadiyah Tangerang.", untuk: "Contoh susunan artikel prosiding berbahasa Inggris yang dipakai sebagai acuan bentuk" },
     ],
   },
 };

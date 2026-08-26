@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Ic, IKON, Kepala, Rinci, SumberAcuan } from "./ikon";
 import { PerluProject } from "./panel-naskah";
 import {
@@ -34,6 +34,29 @@ export function PanelJudul({
   const m: Masukan = project?.rancangan ?? { ...KOSONG, prodi: prodiDari(project?.prodi ?? "") };
   const [draf, setDraf] = useState<Masukan>(m);
   const [lihatHasil, setLihatHasil] = useState(Boolean(project?.rancangan));
+  // Penyusunan rancangan berjalan seketika di peramban. Tanpa jeda yang
+  // terlihat, tombolnya terasa tidak menghasilkan apa-apa ketika hasilnya
+  // sudah terbuka: layarnya sama persis sebelum dan sesudah ditekan.
+  const [menyusun, setMenyusun] = useState(false);
+  const jamRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasilRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => () => { if (jamRef.current) clearTimeout(jamRef.current); }, []);
+
+  function susun() {
+    if (menyusun) return;
+    if (jamRef.current) clearTimeout(jamRef.current);
+    // Hasil lama disembunyikan dulu, supaya yang muncul sesudahnya benar-benar
+    // terbaca sebagai hasil baru.
+    setLihatHasil(false);
+    setMenyusun(true);
+    jamRef.current = setTimeout(() => {
+      setMenyusun(false);
+      setLihatHasil(true);
+      // Digulirkan ke hasilnya setelah React sempat memasangnya.
+      requestAnimationFrame(() => hasilRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    }, 650);
+  }
 
   const atur = (bagian: Partial<Masukan>) => {
     const baru = { ...draf, ...bagian };
@@ -187,13 +210,29 @@ export function PanelJudul({
           </>
         )}
 
-        <button type="button" className="al-btn" onClick={() => setLihatHasil(true)}>
-          <Ic d={IKON.centang} /> Susun rancangan penelitian
+        <button type="button" className="al-btn" onClick={susun} disabled={menyusun}>
+          {menyusun ? (
+            <><span className="al-putar" aria-hidden="true" /> Menyusun rancangan…</>
+          ) : (
+            <><Ic d={IKON.centang} /> {lihatHasil ? "Susun ulang rancangan penelitian" : "Susun rancangan penelitian"}</>
+          )}
         </button>
       </section>
 
+      {menyusun && (
+        <section className="al-card" aria-live="polite">
+          <div className="al-memuat">
+            <span className="al-putar besar" aria-hidden="true" />
+            <div>
+              <b>Menyusun rancangan penelitian…</b>
+              <p>Mencocokkan tujuan, unit analisis, dan data yang Anda pilih dengan kaidah metodologi.</p>
+            </div>
+          </div>
+        </section>
+      )}
+
       {lihatHasil && (
-        <>
+        <div ref={hasilRef}>
           {hambat.length > 0 && (
             <section className="al-card">
               <h3 className="al-h4">Perlu dibereskan sebelum maju ke pembimbing</h3>
@@ -435,7 +474,7 @@ export function PanelJudul({
               </Catatan>
             </LaporanCetak>
           </section>
-        </>
+        </div>
       )}
 
       <SumberAcuan kunci="judul" />
