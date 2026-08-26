@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Ic, IKON, Kepala, Rinci } from "./ikon";
+import { Ic, IKON, Kepala, Rinci, SumberAcuan } from "./ikon";
 import { periksaBahasa, BERAT_LABEL, type Berat } from "@/lib/bahasa-check";
 import { METRIK_TIDAK_DIAKUI, PITA_LABEL, type Hasil, type Tingkat } from "@/lib/journal-radar";
 import { PUTUSAN_LABEL, type HasilRujukan, type Putusan, type RingkasanSitasi } from "@/lib/citation-check";
@@ -172,6 +172,8 @@ export function PanelSitasi({
           </LaporanCetak>
         </section>
       )}
+
+      <SumberAcuan kunci="sitasi" />
     </>
   );
 }
@@ -268,6 +270,8 @@ export function PanelRadar({
       </section>
 
       {hasil && <LaporanRadar hasil={hasil} />}
+
+      <SumberAcuan kunci="radar" />
     </>
   );
 }
@@ -534,6 +538,8 @@ export function PanelBahasa({ project }: { project: Project | null }) {
           </LaporanCetak>
         </section>
       )}
+
+      <SumberAcuan kunci="bahasa" />
     </>
   );
 }

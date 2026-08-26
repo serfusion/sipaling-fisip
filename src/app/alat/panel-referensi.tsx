@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Ic, IKON, Kepala, Rinci } from "./ikon";
+import { Ic, IKON, Kepala, Rinci, SumberAcuan } from "./ikon";
 import { INTI_LABEL, SARINGAN_BAWAAN, type Karya, type Saringan } from "@/lib/referensi";
 import type { Project } from "@/lib/project";
 
@@ -201,6 +201,8 @@ export function PanelReferensi({
           </p>
         </section>
       )}
+
+      <SumberAcuan kunci="referensi" />
     </>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Ic, IKON, Kepala, Rinci } from "./ikon";
+import { Ic, IKON, Kepala, Rinci, SumberAcuan } from "./ikon";
 import {
   BAGIAN_LABEL,
   BERAT_INGGRIS_LABEL,
@@ -76,10 +76,18 @@ export function PanelStruktur({ project }: { project: Project | null }) {
     [peta, dipilih, target],
   );
 
-  if (!project) return <PerluProject pesan="Buat atau pilih project dulu, lalu unggah naskah skripsi Anda." />;
+  if (!project) {
+    return (
+      <>
+        <PerluProject pesan="Buat atau pilih project dulu, lalu unggah naskah skripsi Anda." />
+        <SumberAcuan kunci="struktur" />
+      </>
+    );
+  }
 
   if (!peta || peta.bagian.length === 0) {
     return (
+      <>
       <section className="al-card">
         <Kepala ikon={IKON.struktur} judul="Struktur Naskah"
           sub="Petakan bab skripsi ke bagian artikel jurnal, lengkap dengan target jumlah kata" />
@@ -88,6 +96,8 @@ export function PanelStruktur({ project }: { project: Project | null }) {
           judul bab berada pada barisnya sendiri.
         </p>
       </section>
+      <SumberAcuan kunci="struktur" />
+      </>
     );
   }
 
@@ -200,6 +210,8 @@ export function PanelStruktur({ project }: { project: Project | null }) {
           </section>
         </div>
       </div>
+
+      <SumberAcuan kunci="struktur" />
     </>
   );
 }
@@ -223,7 +235,14 @@ export function PanelInggris({
   const inggris = project?.naskahInggris ?? "";
   const cek = useMemo(() => (inggris.trim() ? periksaInggris(inggris) : null), [inggris]);
 
-  if (!project) return <PerluProject pesan="Buat atau pilih project dulu, lalu unggah naskah Indonesia Anda." />;
+  if (!project) {
+    return (
+      <>
+        <PerluProject pesan="Buat atau pilih project dulu, lalu unggah naskah Indonesia Anda." />
+        <SumberAcuan kunci="inggris" />
+      </>
+    );
+  }
 
   const jumlahFrasa = frasa.reduce((n, k) => n + k.isi.length, 0);
 
@@ -340,6 +359,8 @@ export function PanelInggris({
           )}
         </>
       )}
+
+      <SumberAcuan kunci="inggris" />
     </>
   );
 }

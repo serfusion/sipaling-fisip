@@ -1,6 +1,8 @@
 // Ikon garis untuk seluruh halaman Cakrawala. Satu komponen, satu jalur path,
 // supaya tidak ada berkas SVG terpisah yang harus ikut dimuat.
 
+import { ACUAN } from "@/lib/acuan";
+
 export function Ic({ d }: { d: string }) {
   return (
     <svg
@@ -63,5 +65,32 @@ export function Rinci({
       <summary>{judul}</summary>
       <div className="al-rinci-isi">{children}</div>
     </details>
+  );
+}
+
+/** Daftar acuan sebuah alat, dapat dibuka-tutup. */
+export function SumberAcuan({ kunci }: { kunci: string }) {
+  const k = ACUAN[kunci];
+  if (!k) return null;
+  return (
+    <section className="al-card al-acuan">
+      <details>
+        <summary>
+          <span>Sumber dan acuan</span>
+          <em>{k.acuan.length} rujukan</em>
+        </summary>
+        <div className="al-acuan-isi">
+          <p className="al-acuan-catatan">{k.catatan}</p>
+          <ol>
+            {k.acuan.map((a) => (
+              <li key={a.sumber}>
+                <b>{a.sumber}</b>
+                <span>Dipakai untuk: {a.untuk}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </details>
+    </section>
   );
 }

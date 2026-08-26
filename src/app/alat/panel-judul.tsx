@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Ic, IKON, Kepala, Rinci } from "./ikon";
+import { Ic, IKON, Kepala, Rinci, SumberAcuan } from "./ikon";
 import { PerluProject } from "./panel-naskah";
 import {
   DATA_PILIHAN, JENIS_LABEL, TUJUAN_PILIHAN, UNIT_PILIHAN,
@@ -11,9 +11,12 @@ import {
 import type { Project } from "@/lib/project";
 import type { Tab } from "./panel-beranda";
 import { Bagian, Butir, Catatan, LaporanCetak, TombolCetak } from "./laporan";
+import { BaganKerangka, ContohGrafik } from "./grafik";
+import { susunKerangka } from "@/lib/kerangka";
+import { GRAFIK_NAMA, usulkanVisual } from "@/lib/visual";
 
 const KOSONG: Masukan = {
-  variabelX: "", variabelY: "", objek: "", lokasi: "",
+  variabelX: "", variabelX2: "", variabelZ: "", variabelY: "", objek: "", lokasi: "",
   tujuan: "pengaruh", unit: "individu", data: ["kuesioner"],
   jumlahPopulasi: 0, perkiraanSampel: 0, prodi: "komunikasi",
 };
@@ -39,12 +42,26 @@ export function PanelJudul({
   };
 
   const hasil = useMemo(() => rancang(draf), [draf]);
+  const visual = useMemo(() => usulkanVisual(hasil.jenis), [hasil.jenis]);
+  // Kerangka berpikir hanya bermakna pada rancangan yang menguji hubungan
+  // antarvariabel. Rancangan deskriptif dan kualitatif tidak memakainya.
+  const kerangka = useMemo(
+    () => (draf.tujuan === "pengaruh" || draf.tujuan === "hubungan" ? susunKerangka(draf) : null),
+    [draf],
+  );
   const anjuran = slovin(draf.jumlahPopulasi);
   const kuan = kuantitatif(hasil.jenis);
   const hambat = hasil.peringatan.filter((p) => p.berat === "hambat");
   const periksa = hasil.peringatan.filter((p) => p.berat === "periksa");
 
-  if (!project) return <PerluProject pesan="Buat atau pilih project dulu, agar rancangan penelitian Anda tersimpan." />;
+  if (!project) {
+    return (
+      <>
+        <PerluProject pesan="Buat atau pilih project dulu, agar rancangan penelitian Anda tersimpan." />
+        <SumberAcuan kunci="judul" />
+      </>
+    );
+  }
 
   const tanya = TUJUAN_PILIHAN.find((t) => t.id === draf.tujuan)?.tanya ?? "";
 
@@ -126,6 +143,28 @@ export function PanelJudul({
               placeholder="Kota Tangerang" autoComplete="off" />
           </label>
         </div>
+
+        {kuan && (
+          <>
+            <h3 className="al-h4">Variabel tambahan, bila ada</h3>
+            <p className="al-note">
+              Kosongkan bila penelitian Anda hanya memakai satu variabel bebas tanpa variabel antara.
+            </p>
+            <div className="al-duo-isi">
+              <label className="al-field">
+                <span>Variabel bebas kedua (X2)</span>
+                <input value={draf.variabelX2 ?? ""} onChange={(e) => atur({ variabelX2: e.target.value })}
+                  placeholder="kompensasi" autoComplete="off" />
+              </label>
+              <label className="al-field">
+                <span>Variabel antara atau mediasi (Z)</span>
+                <input value={draf.variabelZ ?? ""} onChange={(e) => atur({ variabelZ: e.target.value })}
+                  placeholder="komitmen organisasional" autoComplete="off" />
+                <small>Variabel yang dilewati pengaruh X sebelum sampai ke Y.</small>
+              </label>
+            </div>
+          </>
+        )}
 
         {kuan && (
           <>
@@ -223,6 +262,62 @@ export function PanelJudul({
               <ul className="al-plain">{hasil.pengumpulan.map((p) => <li key={p}>{p}</li>)}</ul>
             </section>
           </div>
+
+          {kerangka && (
+            <section className="al-card">
+              <h3 className="al-h4">Kerangka berpikir</h3>
+              <p className="al-note">
+                Bagan ini disusun dari variabel yang Anda isi, jadi panah dan nomor hipotesisnya tidak mungkin
+                berselisih dengan rumusan masalahnya.
+              </p>
+              <BaganKerangka kerangka={kerangka} />
+
+              <h3 className="al-h4">Hipotesis</h3>
+              <ul className="al-list">
+                {kerangka.jalur.map((j) => (
+                  <li key={j.kode} className={`al-item ${j.jenis === "tak-langsung" ? "warn" : "ok"}`}>
+                    <div className="al-item-atas">
+                      <span className="al-tag">{j.kode}</span>
+                      <span className="al-num">
+                        {j.jenis === "tak-langsung" ? "tidak langsung" : j.jenis === "serentak" ? "serentak" : "langsung"}
+                      </span>
+                    </div>
+                    <p className="al-kutip">{j.bunyi}</p>
+                  </li>
+                ))}
+              </ul>
+              <p className="al-tail">
+                Uji pengaruh tidak langsung menuntut uji mediasi, misalnya uji Sobel atau bootstrapping, bukan
+                sekadar regresi berganda biasa.
+              </p>
+            </section>
+          )}
+
+          <section className="al-card">
+            <h3 className="al-h4">Visualisasi yang sesuai</h3>
+            <p className="al-note">
+              Grafik yang keliru dipilih merusak temuan yang sebenarnya benar. Ini bentuk yang cocok untuk rancangan
+              Anda, beserta apa yang diletakkan di tiap sumbunya.
+            </p>
+            <div className="al-visual">
+              {visual.map((v) => (
+                <div key={v.nama} className={`al-visual-kartu ${v.utama ? "utama" : ""}`}>
+                  <ContohGrafik jenis={v.grafik} />
+                  <div className="al-visual-teks">
+                    <b>{v.nama}</b>
+                    {v.utama && <span className="al-badge">Utama</span>}
+                    <p>{v.untuk}</p>
+                    {v.sumbu && <p className="al-visual-sumbu">{v.sumbu}</p>}
+                    {v.hati && <p className="al-visual-hati">{v.hati}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="al-tail">
+              Bentuk yang tidak tercantum di sini bukan berarti terlarang, tetapi Anda perlu punya alasan untuk
+              memakainya, dan penguji biasanya menanyakannya.
+            </p>
+          </section>
 
           <section className="al-card">
             <h3 className="al-h4">Teknik analisis data</h3>
@@ -342,6 +437,8 @@ export function PanelJudul({
           </section>
         </>
       )}
+
+      <SumberAcuan kunci="judul" />
     </>
   );
 }

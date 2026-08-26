@@ -65,6 +65,10 @@ export const JENIS_LABEL: Record<Jenis, string> = {
 
 export type Masukan = {
   variabelX: string;
+  /** Variabel bebas kedua, bila ada. Kosong berarti hanya satu X. */
+  variabelX2?: string;
+  /** Variabel antara atau mediasi, bila ada. */
+  variabelZ?: string;
   variabelY: string;
   objek: string;
   lokasi: string;

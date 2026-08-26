@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Ic, IKON, Kepala, Rinci } from "./ikon";
+import { Ic, IKON, Kepala, Rinci, SumberAcuan } from "./ikon";
 import { PerluProject } from "./panel-naskah";
 import {
   MAKS_KATA_PARAFRASE, PARAFRASE_LABEL, TEMUAN_LABEL,
@@ -21,7 +21,14 @@ export function PanelKemiripan({
 }: { project: Project | null; ubah: (p: Partial<Project>) => void }) {
   const [sisi, setSisi] = useState<"naskah" | "sumber" | "parafrase">("naskah");
 
-  if (!project) return <PerluProject pesan="Buat atau pilih project dulu, lalu unggah naskah Anda di Beranda." />;
+  if (!project) {
+    return (
+      <>
+        <PerluProject pesan="Buat atau pilih project dulu, lalu unggah naskah Anda di Beranda." />
+        <SumberAcuan kunci="kemiripan" />
+      </>
+    );
+  }
 
   return (
     <>
@@ -60,6 +67,8 @@ export function PanelKemiripan({
       {sisi === "naskah" && <SisiNaskah project={project} />}
       {sisi === "sumber" && <SisiSumber project={project} ubah={ubah} />}
       {sisi === "parafrase" && <SisiParafrase />}
+
+      <SumberAcuan kunci="kemiripan" />
     </>
   );
 }
