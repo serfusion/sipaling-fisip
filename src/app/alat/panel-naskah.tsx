@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Ic, IKON, Kepala, Rinci, SumberAcuan } from "./ikon";
 import {
   BAGIAN_LABEL,
@@ -13,6 +13,7 @@ import {
   type BeratInggris,
 } from "@/lib/manuscript";
 import { cariFrasa, kelompokkan } from "@/lib/frasa-akademik";
+import { alihBahasa, apaKeIeee, BAGIAN_EN_LABEL, type HasilAlih } from "@/lib/alih-bahasa";
 import type { Project } from "@/lib/project";
 
 const KELAS_ING: Record<BeratInggris, string> = { ganti: "bad", rapikan: "warn", pertimbangkan: "abu" };
@@ -222,10 +223,12 @@ export function PanelStruktur({ project }: { project: Project | null }) {
    beserta padanan yang dipakai jurnal, lalu pemeriksaan ragam pada hasilnya.
    ========================================================================== */
 
+type Sisi = "indonesia" | "alih" | "inggris";
+
 export function PanelInggris({
   project, ubah,
 }: { project: Project | null; ubah: (p: Partial<Project>) => void }) {
-  const [sisi, setSisi] = useState<"indonesia" | "inggris">("indonesia");
+  const [sisi, setSisi] = useState<Sisi>("indonesia");
 
   const indonesia = useMemo(
     () => (project ? project.bab.map((b) => `${b.judul}\n${b.isi}`).join("\n\n") : ""),
@@ -264,13 +267,18 @@ export function PanelInggris({
           <button type="button" className={sisi === "indonesia" ? "on" : ""} onClick={() => setSisi("indonesia")}>
             1 · Padanan dari naskah Indonesia {jumlahFrasa > 0 && `(${jumlahFrasa})`}
           </button>
+          <button type="button" className={sisi === "alih" ? "on" : ""} onClick={() => setSisi("alih")}>
+            2 · Alihbahasakan naskah
+          </button>
           <button type="button" className={sisi === "inggris" ? "on" : ""} onClick={() => setSisi("inggris")}>
-            2 · Periksa naskah Inggris {cek && cek.temuan.length > 0 && `(${cek.temuan.length})`}
+            3 · Periksa naskah Inggris {cek && cek.temuan.length > 0 && `(${cek.temuan.length})`}
           </button>
         </div>
       </section>
 
-      {sisi === "indonesia" ? (
+      {sisi === "alih" ? (
+        <PanelAlihBahasa project={project} ubah={ubah} keSisi={setSisi} />
+      ) : sisi === "indonesia" ? (
         <section className="al-card">
           {indonesia.trim() === "" ? (
             <p className="al-galat">
@@ -361,6 +369,245 @@ export function PanelInggris({
       )}
 
       <SumberAcuan kunci="inggris" />
+    </>
+  );
+}
+
+/* ==========================================================================
+   ALIH BAHASA NASKAH INDONESIA KE INGGRIS
+   Bukan penerjemah otomatis: yang disusun adalah draf naskah bergaya jurnal
+   beserta daftar kata yang belum punya padanan, supaya penulisnya tahu persis
+   mana yang masih harus dikerjakan sendiri.
+   ========================================================================== */
+
+function PanelAlihBahasa({
+  project, ubah, keSisi,
+}: {
+  project: Project;
+  ubah: (p: Partial<Project>) => void;
+  keSisi: (s: Sisi) => void;
+}) {
+  const [memuat, setMemuat] = useState(false);
+  const [hasil, setHasil] = useState<HasilAlih | null>(null);
+  const [tersalin, setTersalin] = useState("");
+  const [ieee, setIeee] = useState<ReturnType<typeof apaKeIeee> | null>(null);
+  const jamRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (jamRef.current) clearTimeout(jamRef.current); }, []);
+
+  const naskah = useMemo(
+    () => project.bab.map((b) => `${b.judul}\n${b.isi}`).join("\n\n"),
+    [project],
+  );
+
+  function kerjakan() {
+    if (memuat) return;
+    setMemuat(true);
+    setHasil(null);
+    setTersalin("");
+    // Alih bahasa berjalan di utas yang sama dengan antarmuka. Jeda sesaat
+    // memberi peramban kesempatan menggambar keadaan "sedang bekerja" lebih
+    // dulu, sehingga tombolnya tidak terasa mati pada naskah panjang.
+    jamRef.current = setTimeout(() => {
+      setHasil(alihBahasa(naskah));
+      setMemuat(false);
+    }, 60);
+  }
+
+  async function salin(teks: string, tanda: string) {
+    try {
+      await navigator.clipboard.writeText(teks);
+      setTersalin(tanda);
+      setTimeout(() => setTersalin(""), 2000);
+    } catch {
+      setTersalin("gagal");
+    }
+  }
+
+  if (naskah.trim() === "") {
+    return (
+      <section className="al-card">
+        <p className="al-galat">
+          Naskah Indonesia project ini masih kosong. Buka Beranda, tempelkan naskah skripsi Anda, lalu kembali ke sini.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <>
+      <section className="al-card">
+        <h3 className="al-h4">Alihbahasakan naskah Indonesia Anda</h3>
+        <p className="al-note">
+          Naskah diolah di peramban Anda sendiri: tidak dikirim ke mana pun, dan tidak ada mesin penerjemah daring
+          yang dihubungi. Hasilnya <b>draf</b> yang mengikuti pedoman penulisan artikel — judul bagian bergaya
+          IMRaD bernomor Romawi, kala yang menyesuaikan bagian, dan rumusan baku yang lazim dipakai jurnal.
+        </p>
+        <Rinci judul="Sejauh mana ini bisa diandalkan?">
+          <p>
+            Alat ini mengenali rumusan baku skripsi beserta padanan jurnalnya, membalik urutan kata sifat, memasang
+            kata sandang, dan menyesuaikan kala tiap bagian. Yang tidak dapat dilakukannya: menebak istilah khas
+            bidang Anda. Kata yang tidak ada padanannya ditandai «begini» dan dihitung, bukan dikarang.
+          </p>
+          <p>
+            Karena itu bacalah hasilnya sebagai naskah yang sudah 80 persen jalan, bukan naskah siap kirim.
+            Peninjau internasional menilai isi dan ragam bahasa sekaligus.
+          </p>
+        </Rinci>
+
+        <button type="button" className="al-btn" onClick={kerjakan} disabled={memuat}>
+          {memuat ? (
+            <><span className="al-putar" aria-hidden="true" /> Mengalihbahasakan…</>
+          ) : (
+            <><Ic d={IKON.inggris} /> {hasil ? "Alihbahasakan ulang" : "Alihbahasakan ke Inggris"}</>
+          )}
+        </button>
+      </section>
+
+      {memuat && (
+        <section className="al-card" aria-live="polite">
+          <div className="al-memuat">
+            <span className="al-putar besar" aria-hidden="true" />
+            <div>
+              <b>Mengalihbahasakan naskah…</b>
+              <p>Mengenali judul bab, mencocokkan rumusan baku, lalu menyusun kalimatnya menurut kala tiap bagian.</p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {hasil && (
+        <>
+          <section className="al-card">
+            <div className="al-stats">
+              <div className="al-stat"><b>{hasil.jumlahKata.toLocaleString("id-ID")}</b><span>kata sumber</span></div>
+              <div className={`al-stat ${hasil.cakupan >= 90 ? "ok" : "warn"}`}>
+                <b>{hasil.cakupan}%</b><span>kata terpadankan</span>
+              </div>
+              <div className="al-stat"><b>{hasil.bagianAda.length}</b><span>bagian dikenali</span></div>
+              <div className={`al-stat ${hasil.belum.length > 0 ? "warn" : "ok"}`}>
+                <b>{hasil.belum.length}</b><span>istilah tertinggal</span>
+              </div>
+            </div>
+
+            <div className="al-aksi">
+              <button type="button" className="al-mini" onClick={() => salin(hasil.teks, "draf")}>
+                {tersalin === "draf" ? "Tersalin" : "Salin draf"}
+              </button>
+              <button type="button" className="al-mini"
+                onClick={() => { ubah({ naskahInggris: hasil.teks }); keSisi("inggris"); }}>
+                Simpan ke Naskah Inggris lalu periksa ragamnya
+              </button>
+            </div>
+            <p className="al-tail">
+              Menyimpan ke Naskah Inggris menimpa isi kotak naskah Inggris pada project ini.
+            </p>
+          </section>
+
+          <section className="al-card">
+            <h3 className="al-h4">Yang diterapkan mengikuti pedoman</h3>
+            <ul className="al-list">
+              {hasil.catatan.map((c) => (
+                <li key={c.judul} className="al-item abu">
+                  <div className="al-item-atas"><span className="al-tag">{c.judul}</span></div>
+                  <p>{c.pesan}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          {hasil.belum.length > 0 && (
+            <section className="al-card">
+              <h3 className="al-h4">Istilah yang belum ada padanannya</h3>
+              <p className="al-note">
+                Ditandai «begini» di dalam draf. Tentukan padanannya sendiri, lalu pakai konsisten di seluruh naskah —
+                peninjau menandai istilah yang berganti-ganti sebagai naskah yang tidak dirawat.
+              </p>
+              <p className="al-padanan">
+                {hasil.belum.slice(0, 40).map((b) => (
+                  <span key={b.kata} className="al-pad">{b.kata}{b.jumlah > 1 && ` ×${b.jumlah}`}</span>
+                ))}
+              </p>
+            </section>
+          )}
+
+          <section className="al-card">
+            <h3 className="al-h4">Draf naskah Inggris</h3>
+            <pre className="al-draf">{hasil.teks}</pre>
+          </section>
+
+          <section className="al-card">
+            <h3 className="al-h4">Bandingkan kalimat per kalimat</h3>
+            <p className="al-note">
+              Kolom kiri naskah Anda, kolom kanan drafnya. Bagian tiap baris disebut supaya terlihat kala mana yang
+              dipakai dan mengapa.
+            </p>
+            <ul className="al-list">
+              {hasil.baris.map((b, i) => (
+                <li key={`${b.sumber.slice(0, 24)}-${i}`}
+                  className={`al-item ${b.jenis === "paragraf" ? (b.belum.length > 0 ? "warn" : "ok") : "abu"}`}>
+                  <div className="al-item-atas">
+                    <span className="al-tag">{BAGIAN_EN_LABEL[b.bagian]}</span>
+                    {b.jenis !== "paragraf" && <code>judul</code>}
+                  </div>
+                  <div className="al-alih">
+                    <p className="al-alih-id">
+                      {b.sumber || <em>Disisipkan agar susunan IMRaD tetap utuh</em>}
+                    </p>
+                    <p className="al-alih-en">{b.hasil}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </>
+      )}
+
+      <section className="al-card">
+        <h3 className="al-h4">Daftar pustaka: APA menjadi IEEE</h3>
+        <p className="al-note">
+          Prosiding dan jurnal teknik menomori rujukan dalam kurung siku sesuai urutan penyebutan pertama, sedangkan
+          skripsi ilmu sosial hampir selalu APA. Daftar pustaka project ini diubah susunannya, bukan isinya.
+        </p>
+        {project.daftarPustaka.trim() === "" ? (
+          <p className="al-galat">
+            Daftar pustaka project ini masih kosong. Isi lewat Beranda atau tambahkan dari alat Cari Referensi.
+          </p>
+        ) : (
+          <>
+            <button type="button" className="al-btn al-btn-lembut"
+              onClick={() => setIeee(apaKeIeee(project.daftarPustaka))}>
+              <Ic d={IKON.dokumen} /> Ubah ke gaya IEEE
+            </button>
+            {ieee && (
+              <>
+                <div className="al-aksi">
+                  <button type="button" className="al-mini"
+                    onClick={() => salin(ieee.map((e) => e.hasil).join("\n"), "ieee")}>
+                    {tersalin === "ieee" ? "Tersalin" : "Salin daftar IEEE"}
+                  </button>
+                </div>
+                <ul className="al-list">
+                  {ieee.map((e) => (
+                    <li key={e.nomor} className={`al-item ${e.utuh ? "ok" : "warn"}`}>
+                      <div className="al-item-atas">
+                        <span className="al-tag">{e.utuh ? `Rujukan ${e.nomor}` : `Rujukan ${e.nomor} · belum utuh`}</span>
+                      </div>
+                      <p className="al-kutip">{e.hasil}</p>
+                      {!e.utuh && (
+                        <p className="al-fix">
+                          Pola entri ini tidak terbaca, jadi dikeluarkan apa adanya. Lengkapi nama, tahun dalam
+                          kurung, judul, dan sumbernya.
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </>
+        )}
+      </section>
     </>
   );
 }

@@ -2164,6 +2164,33 @@ a.mt-i-dot:hover { background: var(--yellow); box-shadow: 0 0 0 .045em rgba(245,
 .al-pad.utama { border-color: #bde3d6; background: var(--al-ok-bg); color: var(--al-ok); font-weight: 700; }
 .al-catatan-frasa { margin-top: 8px !important; color: var(--al-muted) !important; font-size: 12px !important; }
 
+/* --- Keadaan sedang bekerja ---
+   Sebagian alat menyelesaikan pekerjaannya dalam sepersekian detik. Tanpa
+   penanda yang terlihat, tombolnya terbaca sebagai tidak berfungsi. */
+.al-putar { display: inline-block; width: 15px; height: 15px; border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, .35); border-top-color: #fff; animation: al-putar .7s linear infinite; }
+.al-putar.besar { width: 26px; height: 26px; border-width: 2.5px;
+  border-color: var(--al-soft); border-top-color: var(--al-accent); }
+@keyframes al-putar { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .al-putar { animation-duration: 2.4s; } }
+
+.al-memuat { display: flex; align-items: center; gap: 14px; }
+.al-memuat b { display: block; font-size: 14px; color: var(--al-ink); }
+.al-memuat p { margin: 4px 0 0; color: var(--al-muted); font-size: 12.5px; line-height: 1.6; }
+
+/* --- Draf naskah Inggris dan pasangan kalimat --- */
+.al-draf { margin: 0; padding: 15px 17px; background: #fbfbff; border: 1px solid var(--al-line);
+  border-radius: 12px; max-height: 460px; overflow: auto; white-space: pre-wrap; word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; line-height: 1.75; color: #3f4a5c; }
+.al-alih { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 8px; }
+.al-alih p { margin: 0; font-size: 13px; line-height: 1.7; }
+.al-alih-id { color: var(--al-muted); }
+.al-alih-en { color: var(--al-ink); border-left: 2px solid var(--al-soft-line); padding-left: 12px; }
+@media (max-width: 700px) {
+  .al-alih { grid-template-columns: 1fr; gap: 8px; }
+  .al-alih-en { border-left: 0; border-top: 1px solid var(--al-line); padding: 8px 0 0; }
+}
+
 /* --- Keadaan kosong --- */
 .al-kosong { text-align: center; padding: 26px 10px; }
 .al-kosong .al-head-ic { margin: 0 auto 14px; }
