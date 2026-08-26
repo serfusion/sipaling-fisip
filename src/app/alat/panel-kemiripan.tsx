@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Ic, IKON, Kepala, Rinci } from "./ikon";
 import { PerluProject } from "./panel-naskah";
 import {
-  PARAFRASE_LABEL, TEMUAN_LABEL,
+  MAKS_KATA_PARAFRASE, PARAFRASE_LABEL, TEMUAN_LABEL,
   bandingkanSumber, periksaSitasi, ujiParafrase,
   type PutusanParafrase,
 } from "@/lib/kemiripan";
@@ -316,9 +316,16 @@ function SisiSumber({
 
 /* ------------------------------------------------------ 3. Uji parafrase */
 
+function hitungKata(t: string) {
+  const b = t.trim();
+  return b ? b.split(/\s+/).length : 0;
+}
+
 function SisiParafrase() {
   const [asli, setAsli] = useState("");
   const [baru, setBaru] = useState("");
+  const terlaluPanjang =
+    hitungKata(asli) > MAKS_KATA_PARAFRASE || hitungKata(baru) > MAKS_KATA_PARAFRASE;
   const hasil = useMemo(() => ujiParafrase(asli, baru), [asli, baru]);
 
   return (
@@ -342,6 +349,16 @@ function SisiParafrase() {
             placeholder="Tulis ulang dengan susunan Anda sendiri." />
         </label>
       </section>
+
+      {terlaluPanjang && (
+        <section className="al-card">
+          <p className="al-galat">
+            Uji ini untuk satu kalimat atau satu paragraf pendek, paling banyak {MAKS_KATA_PARAFRASE} kata di tiap
+            kotak. Perbandingan kata demi kata pada teks yang lebih panjang membuat peramban berhenti menanggapi.
+            Uji parafrase Anda satu kalimat pada satu waktu.
+          </p>
+        </section>
+      )}
 
       {hasil && (
         <section className="al-card">

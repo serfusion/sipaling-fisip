@@ -154,6 +154,28 @@ async function lewatOpenAlex(rujukan: Rujukan): Promise<Temuan | null> {
   return terbaik;
 }
 
+/**
+ * Pilih satu kandidat dari dua sumber, secara pasti.
+ *
+ * Selisih kemiripan yang sangat kecil bukan bukti bahwa satu sumber lebih
+ * benar; itu hanya riak pembulatan. Dalam rentang itu dipilih kandidat yang
+ * metadatanya lebih lengkap, lalu Crossref sebagai pemutus terakhir, supaya
+ * masukan yang sama selalu menghasilkan keluaran yang sama.
+ */
+function pilihTerbaik(a: Temuan | null, b: Temuan | null): Temuan | null {
+  if (!a) return b;
+  if (!b) return a;
+
+  const beda = a.kemiripanJudul - b.kemiripanJudul;
+  if (Math.abs(beda) > 0.03) return beda > 0 ? a : b;
+
+  const lengkap = (t: Temuan) => (t.tahun !== null ? 1 : 0) + (t.penulisPertama ? 1 : 0) + (t.doi ? 1 : 0);
+  const selisihLengkap = lengkap(a) - lengkap(b);
+  if (selisihLengkap !== 0) return selisihLengkap > 0 ? a : b;
+
+  return a.sumber === "Crossref" ? a : b;
+}
+
 async function periksaSatu(rujukan: Rujukan): Promise<HasilRujukan> {
   // Jenis yang memang tidak ada di pangkalan data sitasi tidak dicari sama
   // sekali, supaya tidak membuang kuota dan tidak salah menuduh.
@@ -163,14 +185,14 @@ async function periksaSatu(rujukan: Rujukan): Promise<HasilRujukan> {
     const lewatDoiHasil = await lewatDoi(rujukan);
     if (lewatDoiHasil) return simpulkan(rujukan, lewatDoiHasil);
 
-    const crossref = await lewatJudul(rujukan);
-    if (crossref && crossref.kemiripanJudul >= 0.82) return simpulkan(rujukan, crossref);
-
-    const openalex = await lewatOpenAlex(rujukan);
-    const terbaik =
-      openalex && (!crossref || openalex.kemiripanJudul > crossref.kemiripanJudul) ? openalex : crossref;
-
-    return simpulkan(rujukan, terbaik);
+    // Kedua sumber selalu ditanya, tidak berhenti pada yang pertama menjawab.
+    // Sebelumnya pencarian berhenti begitu Crossref melewati ambang, sehingga
+    // rujukan yang sama dapat diputus memakai Crossref pada satu pemeriksaan
+    // dan memakai OpenAlex pada pemeriksaan berikutnya, ketika peringkat hasil
+    // bergeser atau satu sumber lambat menjawab. Metadata kedua sumber tidak
+    // selalu sama, jadi putusannya ikut berubah-ubah.
+    const [crossref, openalex] = await Promise.all([lewatJudul(rujukan), lewatOpenAlex(rujukan)]);
+    return simpulkan(rujukan, pilihTerbaik(crossref, openalex));
   } catch {
     return simpulkan(rujukan, null, true);
   }

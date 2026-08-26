@@ -58,6 +58,8 @@ export type HasilRujukan = {
   temuan: Temuan | null;
   /** Perbedaan yang perlu diperiksa mahasiswa, mis. tahun tidak cocok. */
   selisih: string[];
+  /** Keterangan tambahan yang tidak memengaruhi putusan. */
+  catatan: string[];
 };
 
 export const PUTUSAN_LABEL: Record<Putusan, string> = {
@@ -257,6 +259,7 @@ export function simpulkan(
   jaringanGagal = false,
 ): HasilRujukan {
   const selisih: string[] = [];
+  const catatan: string[] = [];
 
   if (jaringanGagal) {
     return {
@@ -265,6 +268,7 @@ export function simpulkan(
       pesan: "Pemeriksaan gagal berjalan. Coba lagi. Ini bukan tanda apa pun tentang rujukannya.",
       temuan: null,
       selisih,
+      catatan,
     };
   }
 
@@ -281,6 +285,7 @@ export function simpulkan(
       pesan: alasan[rujukan.jenis] ?? "Jenis rujukan ini tidak bisa diperiksa otomatis.",
       temuan: null,
       selisih,
+      catatan,
     };
   }
 
@@ -293,11 +298,15 @@ export function simpulkan(
         "Referensi karangan AI biasanya terlihat wajar, padahal karyanya tidak pernah terbit.",
       temuan: null,
       selisih,
+      catatan,
     };
   }
 
   const mirip = kandidat.kemiripanJudul;
 
+  // Hanya dua hal yang dihitung sebagai selisih sungguhan: tahun dan penulis.
+  // Keduanya dapat dibandingkan tepat, dan perbedaannya berarti rujukan Anda
+  // memang menunjuk karya lain.
   if (rujukan.tahun !== null && kandidat.tahun !== null && rujukan.tahun !== kandidat.tahun) {
     selisih.push(`Tahun di daftar pustaka Anda ${rujukan.tahun}, di catatan resmi ${kandidat.tahun}.`);
   }
@@ -307,8 +316,16 @@ export function simpulkan(
       `Penulis pertama di daftar pustaka Anda "${rujukan.penulisPertama}", di catatan resmi "${kandidat.penulisPertama}".`,
     );
   }
+
+  // Kemiripan judul yang tidak seratus persen dulunya ikut dihitung sebagai
+  // selisih. Akibatnya tiap rujukan yang kemiripannya di antara ambang kuat
+  // dan 95% selalu berakhir "beda rincian", tidak pernah "terverifikasi",
+  // padahal tahun dan penulisnya cocok. Lebih buruk lagi, angka kemiripan
+  // bergeser sedikit tergantung sumber mana yang menjawab dan urutan hasil
+  // pencariannya, sehingga rujukan yang sama dapat berganti putusan pada
+  // pemeriksaan berikutnya. Kini ia menjadi catatan, bukan penentu putusan.
   if (mirip < 0.95 && rujukan.judul && kandidat.judul) {
-    selisih.push(`Judulnya mirip, tetapi tidak sama persis (kemiripan ${Math.round(mirip * 100)}%).`);
+    catatan.push(`Judul cocok ${Math.round(mirip * 100)}%, tidak sama persis huruf demi huruf.`);
   }
 
   if (mirip >= AMBANG.cocokKuat && selisih.length === 0) {
@@ -318,6 +335,7 @@ export function simpulkan(
       pesan: `Ada di ${kandidat.sumber}. Judul, tahun, dan penulisnya cocok.`,
       temuan: kandidat,
       selisih,
+      catatan,
     };
   }
 
@@ -330,6 +348,7 @@ export function simpulkan(
         "atau pastikan yang Anda maksud memang karya lain.",
       temuan: kandidat,
       selisih,
+      catatan,
     };
   }
 
@@ -340,6 +359,7 @@ export function simpulkan(
       "Tidak ada karya berjudul cukup mirip. Buka sendiri rujukan ini, pastikan memang ada.",
     temuan: kandidat,
     selisih,
+    catatan,
   };
 }
 

@@ -2219,6 +2219,12 @@ a.al-mini:hover { color: var(--al-ink); }
   .al-card { padding: 16px 14px; border-radius: 14px; }
   .al-body { padding: 14px 12px 44px; }
 }
+/* --- Sangkalan tetap --- */
+.al-sangkal { margin-top: 18px; padding: 14px 16px; background: #fbfbfe;
+  border: 1px solid var(--al-line); border-left: 4px solid #b6bed0; border-radius: 12px;
+  color: var(--al-muted); font-size: 12px; line-height: 1.65; }
+.al-sangkal b { color: var(--al-ink); }
+
 /* --- Baris tombol cetak --- */
 .al-cetak-baris { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--al-line);
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -2312,6 +2318,11 @@ a.al-mini:hover { color: var(--al-ink); }
     font-size: 8.2pt; line-height: 1.55; color: #5b6577; break-inside: avoid; }
   .lap-catatan b { color: #16202f; }
   .lap-catatan p + p { margin-top: 5pt; }
+
+  /* Sangkalan pada laporan cetak */
+  .lap-sangkal { margin-top: 14pt; padding: 8pt 10pt; border: 1.2pt solid #0a2a5e; border-radius: 4pt;
+    font-size: 8.4pt; line-height: 1.55; color: #3f4a5c; break-inside: avoid; }
+  .lap-sangkal b { color: #0a2a5e; }
 
   /* Kaki laporan.
      Sempat dicoba sebagai position fixed agar berulang di tiap lembar, tetapi

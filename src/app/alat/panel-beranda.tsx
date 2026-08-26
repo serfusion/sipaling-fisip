@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Ic, IKON, Kepala, Rinci } from "./ikon";
+import { MAKS_UKURAN_MB, bacaTeks } from "@/lib/berkas";
 import {
   JENIS_LABEL,
   buatCadangan,
@@ -230,11 +231,11 @@ function KotakNaskah({
     event.target.value = "";
     if (!f) return;
     setGalat("");
-    try {
-      const isi = await f.text();
-      setTeks(isi);
-    } catch {
-      setGalat("Berkas tidak dapat dibaca.");
+    const hasil = await bacaTeks(f);
+    if (!hasil.ok) { setGalat(hasil.pesan); return; }
+    setTeks(hasil.teks);
+    if (hasil.dipangkas) {
+      setGalat("Berkas sangat panjang, jadi hanya bagian awalnya yang dimuat. Sisanya dapat Anda tempel sendiri.");
     }
   }
 
@@ -398,8 +399,11 @@ function KartuCadangan({
     event.target.value = "";
     if (!f) return;
     setGalat(""); setPesan("");
+    const dibaca = await bacaTeks(f);
+    if (!dibaca.ok) { setGalat(dibaca.pesan); return; }
+    if (dibaca.dipangkas) { setGalat("Berkas cadangan terlalu besar untuk dibaca utuh."); return; }
     try {
-      const jumlah = await pulihkanCadangan(await f.text());
+      const jumlah = await pulihkanCadangan(dibaca.teks);
       await muatDaftar();
       setPesan(`${jumlah} project dipulihkan. Project yang sudah ada tidak ditimpa.`);
     } catch (alasan: unknown) {

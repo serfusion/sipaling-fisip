@@ -386,10 +386,21 @@ function subbarisan(a: string[], b: string[]) {
   return sebelum[b.length];
 }
 
+/**
+ * Batas kata untuk uji parafrase.
+ *
+ * Deret terpanjang dan subbarisan terpanjang keduanya berbiaya n kali m.
+ * Pada dua teks seribu kata itu berarti sejuta sel, dan peramban berhenti
+ * menanggapi. Alat ini memang untuk satu kalimat, bukan satu bab, jadi
+ * batasnya ditetapkan tegas dan dinyatakan kepada pengguna.
+ */
+export const MAKS_KATA_PARAFRASE = 400;
+
 export function ujiParafrase(asli: string, baru: string): HasilParafrase | null {
   const ta = tokenkan(asli).map((t) => t.kata);
   const tb = tokenkan(baru).map((t) => t.kata);
   if (ta.length < 5 || tb.length < 5) return null;
+  if (ta.length > MAKS_KATA_PARAFRASE || tb.length > MAKS_KATA_PARAFRASE) return null;
 
   // Kesamaan kata dihitung sebagai multihimpunan supaya pengulangan tidak
   // membesarkan angkanya secara palsu.

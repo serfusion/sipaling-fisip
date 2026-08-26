@@ -89,6 +89,12 @@ export function LaporanCetak({
 
       <div className="lap-isi">{children}</div>
 
+      <div className="lap-sangkal">
+        <b>Cakrawala alat bantu, bukan penentu.</b> Laporan ini gambaran awal untuk diperiksa sendiri, bukan patokan
+        yang dapat dijadikan pegangan, dan bukan penilaian atas mutu karya. Keputusan akademik tetap ada pada dosen
+        pembimbing dan penguji.
+      </div>
+
       <footer className="lap-kaki">
         <span>Cakrawala · sipalingfisip.web.id</span>
         <span className="lap-kaki-dev">Superfal Dev</span>

@@ -99,6 +99,13 @@ Be Your Self, Kamu adalah Pencipta Masa Depanmu Sendiri
           {tab === "sitasi" && <PanelSitasi project={p.aktif} ubah={p.ubah} />}
           {tab === "radar" && <PanelRadar project={p.aktif} ubah={p.ubah} />}
           {tab === "bahasa" && <PanelBahasa project={p.aktif} />}
+
+          <section className="al-sangkal">
+            <b>Cakrawala alat bantu, bukan penentu.</b> Semua yang keluar di sini adalah gambaran awal untuk Anda
+            periksa sendiri, bukan patokan yang bisa dijadikan pegangan. Alat ini tidak menilai, tidak meluluskan,
+            dan tidak menggantikan pembacaan dosen pembimbing maupun penguji. Keputusan akademik tetap ada pada
+            mereka.
+          </section>
         </main>
       </div>
     </div>
