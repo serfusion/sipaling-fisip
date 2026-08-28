@@ -691,6 +691,7 @@ export default function SipalingApp() {
     setServiceType(type);
     setSelectedNeed(nextNeed);
     setAttendanceInfo(null);
+    setBuktiInfo({});
     setActiveTab(isTitleProposalNeed(nextNeed) ? "judul" : "form");
     window.setTimeout(() => {
       document.getElementById("workspace")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -714,6 +715,7 @@ export default function SipalingApp() {
 
   function selectNeed(need: string) {
     setSelectedNeed(need);
+    setBuktiInfo({});
     if (isTitleProposalNeed(need)) {
       // Kebutuhan "Pengajuan Judul" memakai template resmi, bukan form biasa.
       if (need === "Pengajuan Judul Jurnal") setFinalTaskType("Jurnal");
@@ -1088,7 +1090,7 @@ export default function SipalingApp() {
                 </div>
                 <div className="field-group">
                   <label htmlFor="serviceType">Jenis Layanan <em>*</em></label>
-                  <select id="serviceType" name="serviceType" value={serviceType} onChange={(event) => { const t = event.target.value as ServiceType; const nextNeed = needsFor(t, finalTaskType)[0]; setServiceType(t); setSelectedNeed(nextNeed); setAttendanceInfo(null); if (isTitleProposalNeed(nextNeed)) selectTab("judul"); }} required>
+                  <select id="serviceType" name="serviceType" value={serviceType} onChange={(event) => { const t = event.target.value as ServiceType; const nextNeed = needsFor(t, finalTaskType)[0]; setServiceType(t); setSelectedNeed(nextNeed); setAttendanceInfo(null); setBuktiInfo({}); if (isTitleProposalNeed(nextNeed)) selectTab("judul"); }} required>
                     {serviceTypes.map((type) => <option value={type} key={type}>{type}</option>)}
                   </select>
                 </div>

@@ -288,6 +288,9 @@ export default function DashboardApp({ profile }: { profile: SessionProfile | nu
   const [selected, setSelected] = useState<RequestRow | null>(null);
   const [attachments, setAttachments] = useState<AttachmentRow[]>([]);
   const [attachmentsBusy, setAttachmentsBusy] = useState(false);
+  // Tiket yang sedang dibuka. Dipakai untuk membuang balasan yang telat
+  // datang dari tiket sebelumnya.
+  const attachmentsForRef = useRef<string>("");
   const [statusDraft, setStatusDraft] = useState("");
   const [adminStatusDraft, setAdminStatusDraft] = useState("");
   const [lecturerNoteDraft, setLecturerNoteDraft] = useState("");
@@ -497,16 +500,18 @@ export default function DashboardApp({ profile }: { profile: SessionProfile | nu
   // Lampiran bernama hanya dimuat ketika satu tiket dibuka, bukan untuk
   // seluruh antrean — daftar antrean bisa berisi ribuan baris.
   async function loadAttachments(ticket: string) {
+    attachmentsForRef.current = ticket;
     setAttachments([]);
     setAttachmentsBusy(true);
     try {
       const response = await fetch(`/api/requests/${encodeURIComponent(ticket)}/attachments`, { cache: "no-store" });
       const payload = (await response.json()) as { success?: boolean; attachments?: AttachmentRow[] };
+      if (attachmentsForRef.current !== ticket) return; // tiket lain sudah dibuka
       if (response.ok && payload.success && payload.attachments) setAttachments(payload.attachments);
     } catch {
-      setAttachments([]);
+      if (attachmentsForRef.current === ticket) setAttachments([]);
     } finally {
-      setAttachmentsBusy(false);
+      if (attachmentsForRef.current === ticket) setAttachmentsBusy(false);
     }
   }
 

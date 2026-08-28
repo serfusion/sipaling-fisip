@@ -60,7 +60,15 @@ const serviceCatalog: Record<string, string[]> = {
     "Pengajuan Seminar Proposal",
     "Pengajuan Sidang Skripsi",
   ],
+  // Empat nama pertama adalah yang tampil pada form mahasiswa sekarang.
+  // Empat berikutnya nama lama dari versi awal portal: tetap diterima supaya
+  // tautan dan halaman yang sudah tersebar sebelum penggantian nama tidak
+  // ikut ditolak.
   "Layanan Umum": [
+    "Surat Keterangan Aktif",
+    "Izin Penelitian",
+    "Permohonan Praktek Kerja Lapangan",
+    "Kebutuhan Lainnya",
     "Surat Pengantar",
     "Pengajuan Magang",
     "Surat Keterangan Aktif Kuliah",

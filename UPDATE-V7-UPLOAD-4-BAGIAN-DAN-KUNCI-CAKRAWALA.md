@@ -1,7 +1,8 @@
 # Pembaruan v7: unggah bukti penyerahan 4 bagian & kunci menu Cakrawala
 
-Dua perubahan besar. Keduanya membutuhkan **satu berkas SQL dijalankan sekali**
-di Supabase: `supabase-update-v7-upload-4-bagian.sql`.
+Dua perubahan besar dan satu perbaikan penting. Dua yang pertama membutuhkan
+**satu berkas SQL dijalankan sekali** di Supabase:
+`supabase-update-v7-upload-4-bagian.sql`.
 
 ---
 
@@ -143,3 +144,37 @@ Berkas: `src/lib/cakrawala.ts`, `src/lib/cakrawala-store.ts`,
 `src/app/api/cakrawala-access/route.ts`, `src/app/alat/page.tsx`,
 `src/app/alat/pratinjau.tsx`, `src/app/dashboard/dashboard-app.tsx`,
 `src/app/sipaling-app.tsx`, `src/app/globals.css`.
+
+---
+
+## 3. Perbaikan: Layanan Umum tidak lagi ditolak "Pilihan layanan tidak valid"
+
+**Masalahnya.** Keempat kebutuhan pada **Layanan Umum** di form mahasiswa
+(Surat Keterangan Aktif, Izin Penelitian, Permohonan Praktek Kerja Lapangan,
+Kebutuhan Lainnya) pernah berganti nama, tetapi daftar yang diperiksa server
+masih memakai nama lama (Surat Pengantar, Pengajuan Magang, Surat Keterangan
+Aktif Kuliah, Surat Lainnya). Akibatnya **seluruh pengajuan Layanan Umum
+ditolak** dengan pesan "Pilihan layanan tidak valid." — mahasiswa tidak punya
+cara untuk lolos, apa pun yang dipilihnya.
+
+**Yang berubah.** Daftar di server kini memuat empat nama yang dipakai form
+sekarang, **ditambah** empat nama lama yang tetap diterima (mengikuti cara yang
+sudah dipakai untuk "Layanan Skripsi / Jurnal" → "Layanan Tugas Akhir"),
+sehingga tautan atau halaman lama yang masih terbuka tidak ikut ditolak.
+
+**Cara memastikannya.** Seluruh 31 kombinasi Jenis Layanan × Kebutuhan dibaca
+langsung dari form yang berjalan, lalu dikirim satu per satu ke
+`POST /api/requests`: tidak ada lagi yang ditolak karena katalognya. Kombinasi
+yang belum lengkap berkasnya ditolak dengan pesan yang sesuai (mis. "File DOCX
+wajib dilampirkan…"), bukan karena namanya tidak dikenali.
+
+Berkas: `src/app/api/requests/route.ts`.
+
+### Dua perbaikan kecil lain
+
+- **Laci detail tiket.** Daftar lampiran dari tiket yang dibuka sebelumnya
+  tidak lagi dapat menimpa tiket yang sedang dibuka bila balasannya telat
+  datang.
+- **Form mahasiswa.** Nama berkas yang sudah dipilih ikut dibersihkan ketika
+  mahasiswa berpindah kebutuhan atau jenis layanan — sebelumnya labelnya
+  tertinggal padahal kotak unggahnya sudah kosong kembali.
