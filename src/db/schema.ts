@@ -51,6 +51,24 @@ export const serviceRequests = pgTable("service_requests", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Lampiran bernama untuk satu pengajuan. Dipakai oleh kebutuhan yang
+// mengunggah beberapa berkas sekaligus — saat ini "Upload Bukti Penyerahan
+// Jurnal/Skripsi" yang dibagi menjadi empat bagian, sehingga admin
+// perpustakaan menerima berkas yang sudah tersortir.
+export const requestAttachments = pgTable("request_attachments", {
+  id: serial("id").primaryKey(),
+  requestId: integer("request_id").notNull().references(() => serviceRequests.id, { onDelete: "cascade" }),
+  // Kode bagian, mis. "cover" | "isi" | "pustaka" | "full".
+  part: varchar("part", { length: 40 }).notNull(),
+  label: varchar("label", { length: 160 }).notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+  fileMime: varchar("file_mime", { length: 160 }).notNull(),
+  fileSize: integer("file_size").notNull(),
+  fileStoragePath: text("file_storage_path").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const revisionUploads = pgTable("revision_uploads", {
   id: serial("id").primaryKey(),
   requestId: integer("request_id").notNull().references(() => serviceRequests.id, { onDelete: "cascade" }),

@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { libraryAttendance, revisionUploads, serviceRequests } from "@/db/schema";
+import { libraryAttendance, requestAttachments, revisionUploads, serviceRequests } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { canAccessServiceRequest, getCurrentProfile } from "@/lib/supabase-server";
 import { removeDocument } from "@/lib/document-storage";
@@ -99,10 +99,25 @@ export async function DELETE(
       .select({ path: revisionUploads.fileStoragePath })
       .from(revisionUploads)
       .where(eq(revisionUploads.requestId, requestId));
+    // Lampiran bernama (bukti penyerahan 4 bagian) ikut dibersihkan; barisnya
+    // terhapus otomatis lewat ON DELETE CASCADE, tetapi berkas fisiknya di
+    // Storage tidak — jadi jalurnya dikumpulkan lebih dulu di sini.
+    const attachments = await db
+      .select({ path: requestAttachments.fileStoragePath })
+      .from(requestAttachments)
+      .where(eq(requestAttachments.requestId, requestId));
 
-    const paths = [found[0].fileStoragePath, ...revisions.map((r) => r.path)].filter(
-      (path): path is string => Boolean(path),
-    );
+    // Berkas skripsi full tercatat dua kali (lampiran utama tiket sekaligus
+    // salah satu dari empat bagian), jadi jalurnya disatukan lebih dulu.
+    const paths = [
+      ...new Set(
+        [
+          found[0].fileStoragePath,
+          ...revisions.map((r) => r.path),
+          ...attachments.map((a) => a.path),
+        ].filter((path): path is string => Boolean(path)),
+      ),
+    ];
     if (paths.length) {
       try {
         await Promise.all(paths.map((path) => removeDocument(path)));
@@ -111,6 +126,7 @@ export async function DELETE(
       }
     }
 
+    await db.delete(requestAttachments).where(eq(requestAttachments.requestId, requestId));
     await db.delete(libraryAttendance).where(eq(libraryAttendance.requestId, requestId));
     await db.delete(revisionUploads).where(eq(revisionUploads.requestId, requestId));
     await db.delete(serviceRequests).where(eq(serviceRequests.id, requestId));

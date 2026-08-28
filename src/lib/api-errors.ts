@@ -43,6 +43,9 @@ export function explainServerError(error: unknown, fallback: string): string {
   if (lower.includes("tenant or user not found")) {
     return "Koneksi pooler ditolak: format username DATABASE_URL salah. Gunakan connection string persis dari Supabase → Connect → Transaction pooler (username berformat postgres.xxxx).";
   }
+  if (lower.includes("request_attachments")) {
+    return "Tabel lampiran empat bagian belum dibuat. Jalankan supabase-update-v7-upload-4-bagian.sql di Supabase → SQL Editor.";
+  }
   if (/relation .* does not exist|42p01/.test(lower)) {
     return "Tabel database belum dibuat. Jalankan isi file supabase-setup.sql lalu supabase-update-v2.sql di Supabase → SQL Editor.";
   }

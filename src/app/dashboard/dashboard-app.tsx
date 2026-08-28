@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useAutoLogout } from "@/lib/use-auto-logout";
 import { DEFAULT_MAINTENANCE, type MaintenanceState } from "@/lib/maintenance";
+import { sisaPemakaian, type CakrawalaCode } from "@/lib/cakrawala";
 import type { LecturerOption } from "../lecturer-picker";
 import DatabasePanel from "./database-panel";
 import GuidancePanel from "./guidance-panel";
@@ -60,6 +61,18 @@ type RequestRow = {
   lecturerName: string | null;
 };
 
+// Lampiran bernama: empat bagian bukti penyerahan jurnal/skripsi yang
+// diunggah mahasiswa secara terpisah.
+type AttachmentRow = {
+  id: number;
+  part: string;
+  label: string;
+  fileName: string;
+  fileMime: string;
+  fileSize: number;
+  createdAt: string;
+};
+
 type ArchiveRow = {
   id: number;
   unitRole: string;
@@ -92,6 +105,7 @@ type ViewId =
   | "absensi"
   | "pengumuman"
   | "maintenance"
+  | "cakrawala"
   | "akun";
 
 const STATUSES = ["Masuk", "Dicek", "Revisi", "Diproses", "Selesai", "Ditolak"];
@@ -211,6 +225,7 @@ const MENU: Array<{ id: ViewId; icon: string; label: string; roles: Role[] | "al
   { id: "absensi", icon: "◔", label: "Absensi Perpustakaan", roles: ATTENDANCE_ROLES },
   { id: "pengumuman", icon: "✎", label: "Pengumuman & Status", roles: ["super_admin", "admin"] },
   { id: "maintenance", icon: "☾", label: "Mode Maintenance", roles: ["super_admin"] },
+  { id: "cakrawala", icon: "✧", label: "Kunci Cakrawala", roles: ["super_admin"] },
   { id: "akun", icon: "⚙", label: "Akun", roles: "all" },
 ];
 
@@ -226,6 +241,7 @@ const VIEW_TITLES: Record<ViewId, string> = {
   absensi: "Absensi Perpustakaan",
   pengumuman: "Pengumuman & Status",
   maintenance: "Mode Maintenance",
+  cakrawala: "Kunci Cakrawala",
   akun: "Akun",
 };
 
@@ -270,6 +286,11 @@ export default function DashboardApp({ profile }: { profile: SessionProfile | nu
   const [searchQ, setSearchQ] = useState("");
 
   const [selected, setSelected] = useState<RequestRow | null>(null);
+  const [attachments, setAttachments] = useState<AttachmentRow[]>([]);
+  const [attachmentsBusy, setAttachmentsBusy] = useState(false);
+  // Tiket yang sedang dibuka. Dipakai untuk membuang balasan yang telat
+  // datang dari tiket sebelumnya.
+  const attachmentsForRef = useRef<string>("");
   const [statusDraft, setStatusDraft] = useState("");
   const [adminStatusDraft, setAdminStatusDraft] = useState("");
   const [lecturerNoteDraft, setLecturerNoteDraft] = useState("");
@@ -300,6 +321,15 @@ export default function DashboardApp({ profile }: { profile: SessionProfile | nu
   const [mtBusy, setMtBusy] = useState(false);
   const [mtMessage, setMtMessage] = useState("");
   const [mtError, setMtError] = useState("");
+
+  // Kunci Cakrawala: status kunci, daftar kode, dan formulir pembuat kode.
+  const [cwLocked, setCwLocked] = useState(true);
+  const [cwCodes, setCwCodes] = useState<CakrawalaCode[]>([]);
+  const [cwBusy, setCwBusy] = useState(false);
+  const [cwMessage, setCwMessage] = useState("");
+  const [cwError, setCwError] = useState("");
+  const [cwDraft, setCwDraft] = useState({ label: "", maxUses: "" });
+  const [cwCopied, setCwCopied] = useState("");
 
   async function deleteRequest(ticket: string) {
     if (!window.confirm(`Hapus permanen tiket ${ticket}? Lampiran dan riwayat revisinya ikut terhapus dan tidak dapat dikembalikan.`)) return;
@@ -396,6 +426,15 @@ export default function DashboardApp({ profile }: { profile: SessionProfile | nu
         })
         .catch(() => {});
     }
+    if (view === "cakrawala" && profile.role === "super_admin") {
+      fetch("/api/cakrawala-access", { cache: "no-store" })
+        .then((response) => response.json())
+        .then((payload: { locked?: boolean; codes?: CakrawalaCode[] }) => {
+          setCwLocked(payload.locked !== false);
+          setCwCodes(payload.codes || []);
+        })
+        .catch(() => {});
+    }
     if (view === "maintenance" && profile.role === "super_admin") {
       fetch("/api/maintenance", { cache: "no-store" })
         .then((response) => response.json())
@@ -455,6 +494,25 @@ export default function DashboardApp({ profile }: { profile: SessionProfile | nu
     setAdminNoteDraft(row.adminNote || "");
     setSaveMessage("");
     setSaveError("");
+    void loadAttachments(row.ticket);
+  }
+
+  // Lampiran bernama hanya dimuat ketika satu tiket dibuka, bukan untuk
+  // seluruh antrean — daftar antrean bisa berisi ribuan baris.
+  async function loadAttachments(ticket: string) {
+    attachmentsForRef.current = ticket;
+    setAttachments([]);
+    setAttachmentsBusy(true);
+    try {
+      const response = await fetch(`/api/requests/${encodeURIComponent(ticket)}/attachments`, { cache: "no-store" });
+      const payload = (await response.json()) as { success?: boolean; attachments?: AttachmentRow[] };
+      if (attachmentsForRef.current !== ticket) return; // tiket lain sudah dibuka
+      if (response.ok && payload.success && payload.attachments) setAttachments(payload.attachments);
+    } catch {
+      if (attachmentsForRef.current === ticket) setAttachments([]);
+    } finally {
+      if (attachmentsForRef.current === ticket) setAttachmentsBusy(false);
+    }
   }
 
   async function saveSelected(event: FormEvent<HTMLFormElement>) {
@@ -597,6 +655,49 @@ export default function DashboardApp({ profile }: { profile: SessionProfile | nu
     } finally {
       setMtBusy(false);
     }
+  }
+
+  // Satu pintu untuk seluruh perubahan kunci Cakrawala: sakelar, pembuatan
+  // kode, penonaktifan, dan penghapusan. Server yang menentukan hasil
+  // akhirnya, jadi tampilan selalu memakai daftar yang dikembalikan.
+  async function ubahCakrawala(body: Record<string, unknown>, sukses: string) {
+    setCwBusy(true);
+    setCwMessage("");
+    setCwError("");
+    try {
+      const response = await fetch("/api/cakrawala-access", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = (await response.json()) as {
+        success?: boolean;
+        message?: string;
+        locked?: boolean;
+        codes?: CakrawalaCode[];
+        created?: string | null;
+      };
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.message || "Pengaturan Cakrawala belum tersimpan.");
+      }
+      setCwLocked(payload.locked !== false);
+      setCwCodes(payload.codes || []);
+      setCwMessage(payload.created ? `Kode baru dibuat: ${payload.created}` : sukses);
+    } catch (reason: unknown) {
+      setCwError(reason instanceof Error ? reason.message : "Pengaturan Cakrawala belum tersimpan.");
+    } finally {
+      setCwBusy(false);
+    }
+  }
+
+  function salinKode(code: string) {
+    navigator.clipboard
+      ?.writeText(code)
+      .then(() => {
+        setCwCopied(code);
+        window.setTimeout(() => setCwCopied(""), 2000);
+      })
+      .catch(() => setCwCopied(""));
   }
 
   async function logout() {
@@ -1123,6 +1224,152 @@ export default function DashboardApp({ profile }: { profile: SessionProfile | nu
             </section>
           )}
 
+          {view === "cakrawala" && profile.role === "super_admin" && (
+            <section>
+              <p className="section-eyebrow">SUPER ADMIN</p>
+              <h2 className="dsh-title">Kunci menu Cakrawala</h2>
+
+              <div className="panel">
+                <div className="mtp-hero" data-on={cwLocked ? "1" : undefined}>
+                  <div className="mtp-hero-copy">
+                    <b>{cwLocked ? "Cakrawala terkunci" : "Cakrawala terbuka untuk umum"}</b>
+                    <span>
+                      {cwLocked
+                        ? "Pengunjung melihat halaman pratinjau berisi keunggulan tiap menu, dan hanya masuk setelah memasukkan kode akses."
+                        : "Siapa pun yang membuka /alat langsung memakai seluruh alat tanpa kode."}
+                    </span>
+                  </div>
+                  <span className="mtp-state cwp-state" data-on={cwLocked ? "1" : undefined}>
+                    {cwLocked ? "TERKUNCI" : "TERBUKA"}
+                  </span>
+                  <label className="mtp-switch" title="Kunci / buka menu Cakrawala">
+                    <input
+                      type="checkbox"
+                      checked={cwLocked}
+                      disabled={cwBusy}
+                      onChange={(event) =>
+                        void ubahCakrawala(
+                          { action: "toggle", locked: event.target.checked },
+                          event.target.checked ? "Cakrawala dikunci kembali." : "Kunci Cakrawala dimatikan.",
+                        )
+                      }
+                    />
+                    <i aria-hidden="true" />
+                  </label>
+                </div>
+
+                <form
+                  className="annform"
+                  style={{ padding: "16px 0 0" }}
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    const jatah = Number(cwDraft.maxUses);
+                    void ubahCakrawala(
+                      {
+                        action: "generate",
+                        label: cwDraft.label,
+                        maxUses: Number.isFinite(jatah) && jatah > 0 ? Math.floor(jatah) : 0,
+                      },
+                      "Kode baru dibuat.",
+                    );
+                    setCwDraft({ label: "", maxUses: "" });
+                  }}
+                >
+                  <label>
+                    Catatan pemilik kode (opsional)
+                    <input
+                      value={cwDraft.label}
+                      maxLength={80}
+                      placeholder="Contoh: Rina — Ilkom 2021, atau Kelas Metopen A"
+                      onChange={(event) => setCwDraft({ ...cwDraft, label: event.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Batas pemakaian (kosongkan untuk tanpa batas)
+                    <input
+                      type="number"
+                      min={1}
+                      max={9999}
+                      value={cwDraft.maxUses}
+                      placeholder="Contoh: 1 untuk sekali pakai"
+                      onChange={(event) => setCwDraft({ ...cwDraft, maxUses: event.target.value })}
+                    />
+                  </label>
+                  <div className="mtp-actions">
+                    <button className="btn btn-primary" type="submit" disabled={cwBusy}>
+                      {cwBusy ? "Memproses…" : "✧ Buat kode baru"}
+                    </button>
+                    <a className="btn btn-light" href="/alat" target="_blank" rel="noreferrer">
+                      Lihat halaman pratinjau →
+                    </a>
+                  </div>
+                  {cwMessage && <div className="dsh-ok">{cwMessage}</div>}
+                  {cwError && <div className="dsh-error">{cwError}</div>}
+                </form>
+
+                <div className="cwp-list">
+                  <div className="cwp-list-h">
+                    <b>Kode yang sudah dibuat</b>
+                    <span>{cwCodes.length} kode</span>
+                  </div>
+                  {cwCodes.length === 0 ? (
+                    <div className="nofile">Belum ada kode. Buat satu di atas, lalu bagikan kepada yang berhak.</div>
+                  ) : (
+                    cwCodes.map((item) => (
+                      <div className={`cwp-item ${item.active ? "" : "cwp-item-off"}`} key={item.code}>
+                        <div className="cwp-main">
+                          <button type="button" className="cwp-code" onClick={() => salinKode(item.code)} title="Klik untuk menyalin">
+                            {item.code}
+                            <span>{cwCopied === item.code ? "tersalin ✓" : "⧉ salin"}</span>
+                          </button>
+                          <small>{item.label || "Tanpa catatan"}</small>
+                        </div>
+                        <div className="cwp-meta">
+                          <span>Dipakai {item.uses}×</span>
+                          <span>Sisa: {sisaPemakaian(item)}</span>
+                          <span>{item.lastUsedAt ? `Terakhir ${formatDate(item.lastUsedAt)}` : "Belum pernah dipakai"}</span>
+                        </div>
+                        <div className="cwp-aksi">
+                          <button
+                            type="button"
+                            className="btn btn-light"
+                            disabled={cwBusy}
+                            onClick={() =>
+                              void ubahCakrawala(
+                                { action: item.active ? "disable" : "enable", code: item.code },
+                                item.active ? "Kode dinonaktifkan." : "Kode diaktifkan kembali.",
+                              )
+                            }
+                          >
+                            {item.active ? "Nonaktifkan" : "Aktifkan"}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-danger"
+                            disabled={cwBusy}
+                            onClick={() => {
+                              if (!window.confirm(`Hapus kode ${item.code}? Pemakainya akan langsung tertutup.`)) return;
+                              void ubahCakrawala({ action: "remove", code: item.code }, "Kode dihapus.");
+                            }}
+                          >
+                            Hapus
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="mtp-hint">
+                  <b>Yang perlu diketahui.</b> Menu ini hanya tampil untuk Super Admin, dan server pun hanya menerima
+                  perubahan dari Super Admin. Kode yang dimasukkan mahasiswa disimpan pada cookie perangkatnya selama
+                  30 hari — menonaktifkan atau menghapus kode langsung menutup akses semua perangkat yang memakainya.
+                  Akun Super Admin sendiri selalu dapat membuka Cakrawala tanpa kode.
+                </div>
+              </div>
+            </section>
+          )}
+
           {view === "akun" && (
             <section>
               <p className="section-eyebrow">PENGATURAN</p>
@@ -1169,7 +1416,31 @@ export default function DashboardApp({ profile }: { profile: SessionProfile | nu
                 <div><dt>Dosen tujuan</dt><dd>{selected.lecturerName || "Admin unit layanan"}</dd></div>
                 <div><dt>Revisi ke</dt><dd>{selected.revisionCount}</dd></div>
               </dl>
-              {selected.fileName ? (
+              {attachments.length > 0 ? (
+                <div className="dbagian">
+                  <div className="dbagian-h">
+                    <b>Berkas per bagian</b>
+                    <span>{attachments.length} berkas · sudah tersortir</span>
+                  </div>
+                  {attachments.map((item) => (
+                    <a
+                      className="dbagian-item"
+                      key={item.id}
+                      href={`/api/attachments/${item.id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <span className="dbagian-ic">⇩</span>
+                      <span className="dbagian-teks">
+                        <b>{item.label}</b>
+                        <small>{item.fileName} · {(item.fileSize / 1024 / 1024).toFixed(2).replace(".", ",")} MB</small>
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              ) : attachmentsBusy ? (
+                <div className="nofile">Memuat lampiran…</div>
+              ) : selected.fileName ? (
                 <a className="dlink dlink-file" href={`/api/files/${selected.id}`} target="_blank" rel="noreferrer">⇩ Unduh {selected.fileName}</a>
               ) : (
                 <div className="nofile">Tidak ada lampiran pada pengajuan ini.</div>
