@@ -1,11 +1,19 @@
 import { db } from "@/db";
-import { lecturers, libraryAttendance, serviceRequests } from "@/db/schema";
+import { lecturers, libraryAttendance, requestAttachments, serviceRequests } from "@/db/schema";
 import { and, desc, eq, gte, ilike, lt, sql } from "drizzle-orm";
 import {
   MAX_DOCUMENT_BYTES,
   removeDocument,
   uploadDocument,
 } from "@/lib/document-storage";
+import {
+  BUKTI_PARTS,
+  BUKTI_PART_UTAMA,
+  buktiMime,
+  isBuktiPenyerahan,
+  periksaBuktiFile,
+  type BuktiPart,
+} from "@/lib/bukti-penyerahan";
 import { getCurrentProfile, serviceTypeForProfile } from "@/lib/supabase-server";
 import { explainServerError } from "@/lib/api-errors";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
@@ -155,20 +163,33 @@ export async function POST(request: Request) {
       }
     }
 
+    // Bukti penyerahan jurnal/skripsi memakai jalurnya sendiri: empat berkas
+    // terpisah, bukan satu lampiran gabungan.
+    const multiPart = isBuktiPenyerahan(serviceType, serviceNeed);
+    const buktiFiles: Array<{ part: BuktiPart; file: File }> = [];
+    if (multiPart) {
+      for (const part of BUKTI_PARTS) {
+        const entry = form.get(part.field);
+        const candidate = entry instanceof File && entry.name ? entry : null;
+        const check = periksaBuktiFile(part, candidate);
+        if (!check.ok) {
+          return Response.json({ success: false, message: check.pesan }, { status: 400 });
+        }
+        buktiFiles.push({ part, file: candidate as File });
+      }
+    }
+
     const fileEntry = form.get("file");
     const file = fileEntry instanceof File && fileEntry.name ? fileEntry : null;
     const requiresDocx = isTugasAkhir;
-    const requiresPdf = serviceType === "Layanan PDDIKTI" || (
-      serviceType === "Layanan Perpustakaan" &&
-      serviceNeed === "Upload Bukti Penyerahan Jurnal/Skripsi"
-    );
-    if ((requiresDocx || requiresPdf) && !file) {
+    const requiresPdf = serviceType === "Layanan PDDIKTI";
+    if (!multiPart && (requiresDocx || requiresPdf) && !file) {
       return Response.json(
         { success: false, message: requiresPdf ? "Satu file PDF wajib dilampirkan untuk layanan ini." : "File DOCX wajib dilampirkan untuk Layanan Tugas Akhir." },
         { status: 400 },
       );
     }
-    if (file) {
+    if (file && !multiPart) {
       const name = file.name.toLowerCase();
       const okExt = requiresPdf
         ? name.endsWith(".pdf")
@@ -190,15 +211,69 @@ export async function POST(request: Request) {
       }
     }
 
-    const fileName = file?.name || null;
-    const fileMime = file
-      ? (file.type || (file.name.toLowerCase().endsWith(".pdf") ? PDF_MIME : DOCX_MIME))
-      : null;
-    const fileSize = file?.size || null;
     const ticket = makeTicket(serviceType, nim);
-    const fileStoragePath = file
-      ? await uploadDocument({ folder: "requests", ticket, file, contentType: fileMime || "application/octet-stream" })
-      : null;
+
+    // Setiap berkas yang berhasil naik dicatat di sini. Bila langkah
+    // berikutnya gagal, semuanya dihapus kembali supaya tidak ada berkas
+    // yatim yang memakan kuota penyimpanan.
+    const uploadedPaths: string[] = [];
+    let fileName: string | null = null;
+    let fileMime: string | null = null;
+    let fileSize: number | null = null;
+    let fileStoragePath: string | null = null;
+    const attachmentRows: Array<{
+      part: string;
+      label: string;
+      sortOrder: number;
+      fileName: string;
+      fileMime: string;
+      fileSize: number;
+      fileStoragePath: string;
+    }> = [];
+
+    try {
+      if (multiPart) {
+        for (let index = 0; index < buktiFiles.length; index++) {
+          const { part, file: partFile } = buktiFiles[index];
+          const mime = buktiMime(partFile.name, partFile.type);
+          let path: string;
+          try {
+            path = await uploadDocument({ folder: "requests", ticket, file: partFile, contentType: mime });
+          } catch (reason) {
+            // Nama bagiannya ikut disebut, supaya mahasiswa tahu berkas mana
+            // dari keempatnya yang harus diperbaiki.
+            throw new Error(`${part.label}: ${(reason as Error).message}`);
+          }
+          uploadedPaths.push(path);
+          attachmentRows.push({
+            part: part.id,
+            label: part.label,
+            sortOrder: index,
+            fileName: partFile.name,
+            fileMime: mime,
+            fileSize: partFile.size,
+            fileStoragePath: path,
+          });
+          // Skripsi full sekaligus menjadi lampiran utama tiket, sehingga
+          // tombol unduh yang sudah ada tetap menunjuk berkas yang benar.
+          if (part.id === BUKTI_PART_UTAMA) {
+            fileName = partFile.name;
+            fileMime = mime;
+            fileSize = partFile.size;
+            fileStoragePath = path;
+          }
+        }
+      } else if (file) {
+        fileName = file.name;
+        fileMime = file.type || (file.name.toLowerCase().endsWith(".pdf") ? PDF_MIME : DOCX_MIME);
+        fileSize = file.size;
+        fileStoragePath = await uploadDocument({ folder: "requests", ticket, file, contentType: fileMime });
+        uploadedPaths.push(fileStoragePath);
+      }
+    } catch (error) {
+      await Promise.all(uploadedPaths.map((path) => removeDocument(path).catch(() => undefined)));
+      throw error;
+    }
 
     let finalTicket = ticket;
     let requestId: number | null = null;
@@ -238,8 +313,23 @@ export async function POST(request: Request) {
           throw error;
         }
       }
+
+      // Empat lampiran bernama disimpan setelah tiketnya ada. Bila langkah
+      // ini gagal, tiket yang baru saja dibuat ikut dihapus supaya tidak
+      // tersisa pengajuan yang berkasnya tidak lengkap.
+      const savedId = requestId;
+      if (attachmentRows.length && savedId) {
+        try {
+          await db.insert(requestAttachments).values(
+            attachmentRows.map((row) => ({ ...row, requestId: savedId })),
+          );
+        } catch (error) {
+          await db.delete(serviceRequests).where(eq(serviceRequests.id, savedId));
+          throw error;
+        }
+      }
     } catch (error) {
-      await removeDocument(fileStoragePath);
+      await Promise.all(uploadedPaths.map((path) => removeDocument(path).catch(() => undefined)));
       throw error;
     }
 

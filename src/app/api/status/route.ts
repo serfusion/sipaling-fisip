@@ -1,6 +1,6 @@
 import { db } from "@/db";
-import { lecturers, serviceRequests } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
+import { lecturers, requestAttachments, serviceRequests } from "@/db/schema";
+import { and, asc, eq } from "drizzle-orm";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +20,7 @@ export async function POST(request: Request) {
 
     const rows = await db
       .select({
+        id: serviceRequests.id,
         ticket: serviceRequests.ticket,
         nim: serviceRequests.nim,
         studentName: serviceRequests.studentName,
@@ -51,6 +52,28 @@ export async function POST(request: Request) {
       return Response.json({ success: false, message: "Data tidak ditemukan. Pastikan nomor tiket sudah benar." }, { status: 404 });
     }
 
+    // Nama berkas per bagian ditampilkan agar mahasiswa yakin keempat unggahan
+    // bukti penyerahan benar-benar diterima. Hanya nama dan ukurannya —
+    // berkasnya sendiri tetap tidak dapat diunduh tanpa login.
+    //
+    // SENGAJA GAGAL-LUNAK: bila tabelnya belum dibuat (migrasi v7 belum
+    // dijalankan), pelacakan status tetap berjalan tanpa daftar bagian.
+    let attachments: Array<{ part: string; label: string; fileName: string; fileSize: number }> = [];
+    try {
+      attachments = await db
+        .select({
+          part: requestAttachments.part,
+          label: requestAttachments.label,
+          fileName: requestAttachments.fileName,
+          fileSize: requestAttachments.fileSize,
+        })
+        .from(requestAttachments)
+        .where(eq(requestAttachments.requestId, row.id))
+        .orderBy(asc(requestAttachments.sortOrder), asc(requestAttachments.id));
+    } catch (error) {
+      console.error("baca lampiran bernama", error);
+    }
+
     return Response.json({
       success: true,
       data: {
@@ -70,6 +93,7 @@ export async function POST(request: Request) {
         lecturerNote: row.lecturerNote,
         adminNote: row.adminNote,
         fileName: row.fileName,
+        attachments,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
       },

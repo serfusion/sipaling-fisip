@@ -7,6 +7,12 @@ import {
   PROPOSAL_STATUS,
   type FinalTaskType,
 } from "@/lib/academic";
+import {
+  BUKTI_PARTS,
+  buktiAccept,
+  isBuktiPenyerahan,
+  periksaBuktiFile,
+} from "@/lib/bukti-penyerahan";
 import { LecturerPicker, type LecturerOption } from "./lecturer-picker";
 import TitleProposalForm from "./title-proposal-form";
 
@@ -67,6 +73,9 @@ type StatusRecord = {
   lecturerNote: string | null;
   adminNote: string | null;
   fileName: string | null;
+  // Bagian-bagian berkas untuk kebutuhan yang mengunggah lebih dari satu
+  // lampiran; kosong pada kebutuhan lain.
+  attachments?: Array<{ part: string; label: string; fileName: string; fileSize: number }>;
   createdAt: string;
   updatedAt: string;
 };
@@ -214,15 +223,12 @@ function firstFormNeed(type: ServiceType, finalTaskType: FinalTaskType) {
 
 type UploadMode = "required-docx" | "required-pdf" | "optional-document";
 
-function getUploadMode(serviceType: ServiceType, serviceNeed: string): UploadMode {
+// Kebutuhan "Upload Bukti Penyerahan Jurnal/Skripsi" tidak muncul di sini:
+// berkasnya empat buah, jadi kotak lampiran tunggal diganti seluruhnya oleh
+// blok unggah empat bagian dan mode ini tidak dipakai untuknya.
+function getUploadMode(serviceType: ServiceType): UploadMode {
   if (serviceType === "Layanan Tugas Akhir") return "required-docx";
   if (serviceType === "Layanan PDDIKTI") return "required-pdf";
-  if (
-    serviceType === "Layanan Perpustakaan" &&
-    serviceNeed === "Upload Bukti Penyerahan Jurnal/Skripsi"
-  ) {
-    return "required-pdf";
-  }
   return "optional-document";
 }
 
@@ -533,8 +539,14 @@ export default function SipalingApp() {
   const [proposalData, setProposalData] = useState<ProposalRecord | null>(null);
   const [proposalCode, setProposalCode] = useState("");
   const [fileInfo, setFileInfo] = useState("");
+  // Nama berkas terpilih untuk tiap bagian bukti penyerahan, ditandai dengan
+  // id bagiannya (cover / isi / pustaka / full).
+  const [buktiInfo, setBuktiInfo] = useState<Record<string, string>>({});
   const [revFileInfo, setRevFileInfo] = useState("");
   const [copiedNote, setCopiedNote] = useState("");
+  // Penanda gembok pada tombol Cakrawala. Hanya status kuncinya yang dibaca —
+  // daftar kodenya tidak pernah dikirim ke halaman publik.
+  const [cakrawalaLocked, setCakrawalaLocked] = useState(false);
 
   function doCopy(ticket: string) {
     copyTicketToClipboard(ticket, () => {
@@ -552,8 +564,11 @@ export default function SipalingApp() {
   const PAYMENT_NOTICE_TYPES: ServiceType[] = ["Layanan Umum", "Layanan Prodi", "Layanan Akademik", "Layanan Perpustakaan"];
   const showPaymentNotice = PAYMENT_NOTICE_TYPES.includes(serviceType);
   const isAcademicReview = serviceType === "Layanan Tugas Akhir";
-  const uploadMode = getUploadMode(serviceType, selectedNeed);
-  const requiresFile = uploadMode !== "optional-document";
+  // Empat kotak unggah menggantikan lampiran tunggal pada kebutuhan bukti
+  // penyerahan, supaya berkas sampai ke Admin Perpustakaan sudah tersortir.
+  const isBuktiEmpatBagian = isBuktiPenyerahan(serviceType, selectedNeed);
+  const uploadMode = getUploadMode(serviceType);
+  const requiresFile = !isBuktiEmpatBagian && uploadMode !== "optional-document";
   const rawDriveUrl = process.env.NEXT_PUBLIC_SURAT_LAINNYA_DRIVE_URL?.trim() || "";
   const suratLainnyaDriveUrl = /^https:\/\/(drive|docs)\.google\.com\//i.test(rawDriveUrl)
     ? rawDriveUrl
@@ -592,6 +607,12 @@ export default function SipalingApp() {
         if (!cancelled && payload && payload.status) {
           setServiceState({ status: payload.status, message: payload.message || "Semua layanan aktif" });
         }
+      })
+      .catch(() => {});
+    fetch("/api/cakrawala-access")
+      .then((response) => response.json())
+      .then((payload: { locked?: boolean }) => {
+        if (!cancelled) setCakrawalaLocked(payload?.locked === true);
       })
       .catch(() => {});
     return () => {
@@ -738,6 +759,23 @@ export default function SipalingApp() {
       formData.set("absensiKunjungan", String(attendanceInfo.nextVisit));
     }
 
+    // Empat bagian bukti penyerahan diperiksa satu per satu supaya pesannya
+    // menyebut bagian mana yang bermasalah, bukan sekadar "lampiran salah".
+    if (isBuktiEmpatBagian) {
+      for (const part of BUKTI_PARTS) {
+        const entry = formData.get(part.field);
+        const partFile = entry instanceof File && entry.name ? entry : null;
+        const check = periksaBuktiFile(part, partFile);
+        if (!check.ok) {
+          setSubmitError(check.pesan);
+          return;
+        }
+      }
+      // Lampiran tunggal tidak dipakai pada jalur ini; ikut terkirim kosong
+      // hanya akan membingungkan pemeriksaan di server.
+      formData.delete("file");
+    }
+
     if (requiresFile && !isAcceptedFile(file, uploadMode)) {
       setSubmitError(
         uploadMode === "required-pdf"
@@ -786,6 +824,7 @@ export default function SipalingApp() {
       );
       form.reset();
       setFileInfo("");
+      setBuktiInfo({});
       setServiceType(serviceTypes[0]);
       setSelectedNeed(serviceCatalog[serviceTypes[0]].needs[0]);
       clearLecturerSearch();
@@ -893,8 +932,12 @@ export default function SipalingApp() {
               <button type="button" className="hero-button" onClick={() => selectTab("revisi")}>
                 Upload Revisi
               </button>
-              <a className="hero-button" href="/alat">
-                Cakrawala
+              <a
+                className={cakrawalaLocked ? "hero-button hero-button-locked" : "hero-button"}
+                href="/alat"
+                title={cakrawalaLocked ? "Cakrawala terkunci — lihat pratinjaunya dan masukkan kode akses" : undefined}
+              >
+                Cakrawala{cakrawalaLocked && <em>🔒 VIP</em>}
               </a>
               <a className={sessionRole ? "hero-button hero-button-logged" : "hero-button"} href="/dashboard">
                 {sessionRole ? `● Dashboard ${DASH_ROLE_LABEL[sessionRole] || "Admin"}` : "Login Dosen/Admin"}
@@ -1084,8 +1127,22 @@ export default function SipalingApp() {
                 ) : (
                 <>
                 <div className="field-group field-full">
-                  <label htmlFor="title">{isAcademicReview ? "Judul Skripsi / Jurnal" : "Ringkasan Kebutuhan"} <em>*</em></label>
-                  <input id="title" name="title" type="text" placeholder={isAcademicReview ? "Masukkan judul lengkap" : "Tuliskan inti kebutuhan layanan Anda"} required />
+                  <label htmlFor="title">
+                    {isAcademicReview || isBuktiEmpatBagian ? "Judul Skripsi / Jurnal" : "Ringkasan Kebutuhan"} <em>*</em>
+                  </label>
+                  <input
+                    id="title"
+                    name="title"
+                    type="text"
+                    placeholder={
+                      isAcademicReview
+                        ? "Masukkan judul lengkap"
+                        : isBuktiEmpatBagian
+                          ? "Tuliskan judul skripsi/jurnal yang diserahkan"
+                          : "Tuliskan inti kebutuhan layanan Anda"
+                    }
+                    required
+                  />
                 </div>
                 {showPaymentNotice && (
                   <div className="field-group field-full requirements-box">
@@ -1099,7 +1156,7 @@ export default function SipalingApp() {
                     <ul className="requirements-list">{currentService.requirements.map((req, idx) => <li key={idx}>{req}</li>)}</ul>
                   </div>
                 )}
-                {currentService.needRequirements?.[selectedNeed] && (
+                {currentService.needRequirements?.[selectedNeed] && !isBuktiEmpatBagian && (
                   <div className="field-group field-full requirements-box">
                     <div className="requirements-title"><span>!</span> Persyaratan Upload</div>
                     <ul className="requirements-list">{currentService.needRequirements[selectedNeed].map((req, idx) => <li key={idx}>{req}</li>)}</ul>
@@ -1153,15 +1210,56 @@ export default function SipalingApp() {
                   <label htmlFor="studentNote">Catatan Mahasiswa</label>
                   <textarea id="studentNote" name="studentNote" placeholder="Contoh: Mohon dibantu untuk pengecekan data atau BAB I sampai BAB V." />
                 </div>
-                <div className="field-group field-full upload-box">
-                  <label htmlFor="file">Lampiran {requiresFile && <em>*</em>}</label>
-                  <div className="file-input-wrap"><input id="file" name="file" type="file" accept={uploadMode === "required-pdf" ? ".pdf,application/pdf" : uploadMode === "required-docx" ? ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" : ".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"} required={requiresFile} onChange={(event) => { const f = event.target.files && event.target.files[0]; setFileInfo(f ? `${f.name} · ${(f.size / 1024 / 1024).toFixed(2).replace(".", ",")} MB` : ""); }} /></div>
-                  {fileInfo && <span className="file-chosen">📄 {fileInfo}</span>}
-                  <p className="helper">{uploadMode === "required-pdf" ? "Wajib satu file PDF maksimal 10 MB." : uploadMode === "required-docx" ? "Wajib file DOCX maksimal 10 MB." : "Lampiran PDF atau DOCX opsional, maksimal 10 MB."}</p>
-                </div>
+                {isBuktiEmpatBagian ? (
+                  <div className="field-group field-full bukti-box">
+                    <p className="bukti-intro">Upload dibagi menjadi 4 bagian agar dokumen lebih rapi dan mudah diperiksa.</p>
+                    <div className="bukti-syarat">
+                      <b>Persyaratan Upload</b>
+                      <ol>
+                        {BUKTI_PARTS.map((part) => <li key={part.id}>{part.requirement}</li>)}
+                      </ol>
+                    </div>
+                    {BUKTI_PARTS.map((part) => (
+                      <div className="bukti-slot" key={part.id}>
+                        <label htmlFor={part.field}>{part.label} <em>*</em></label>
+                        <div className="file-input-wrap">
+                          <input
+                            id={part.field}
+                            name={part.field}
+                            type="file"
+                            accept={buktiAccept(part.format)}
+                            required
+                            onChange={(event) => {
+                              const chosen = event.target.files && event.target.files[0];
+                              setBuktiInfo((current) => ({
+                                ...current,
+                                [part.id]: chosen
+                                  ? `${chosen.name} · ${(chosen.size / 1024 / 1024).toFixed(2).replace(".", ",")} MB`
+                                  : "",
+                              }));
+                            }}
+                          />
+                        </div>
+                        {buktiInfo[part.id] && <span className="file-chosen">📄 {buktiInfo[part.id]}</span>}
+                        <p className="helper">{part.helper} Maksimal 10 MB.</p>
+                      </div>
+                    ))}
+                    <p className="bukti-tutup">
+                      Keempat berkas dikirim dalam satu tiket dan langsung diterima Admin Perpustakaan dalam keadaan
+                      terpisah, jadi tidak perlu digabung sendiri.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="field-group field-full upload-box">
+                    <label htmlFor="file">Lampiran {requiresFile && <em>*</em>}</label>
+                    <div className="file-input-wrap"><input id="file" name="file" type="file" accept={uploadMode === "required-pdf" ? ".pdf,application/pdf" : uploadMode === "required-docx" ? ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" : ".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"} required={requiresFile} onChange={(event) => { const f = event.target.files && event.target.files[0]; setFileInfo(f ? `${f.name} · ${(f.size / 1024 / 1024).toFixed(2).replace(".", ",")} MB` : ""); }} /></div>
+                    {fileInfo && <span className="file-chosen">📄 {fileInfo}</span>}
+                    <p className="helper">{uploadMode === "required-pdf" ? "Wajib satu file PDF maksimal 10 MB." : uploadMode === "required-docx" ? "Wajib file DOCX maksimal 10 MB." : "Lampiran PDF atau DOCX opsional, maksimal 10 MB."}</p>
+                  </div>
+                )}
                 <div className="form-actions field-full">
                   <button type="submit" className="button button-primary" disabled={isSubmitting}>{isSubmitting ? "Mengirim..." : "Kirim Layanan"}<span>→</span></button>
-                  <button type="reset" className="button button-light" onClick={() => { setServiceType(serviceTypes[0]); setSelectedNeed(firstFormNeed(serviceTypes[0], finalTaskType)); setAttendanceInfo(null); clearLecturerSearch(); setFileInfo(""); setSubmitError(""); setSubmitMessage(null); }}>Reset</button>
+                  <button type="reset" className="button button-light" onClick={() => { setServiceType(serviceTypes[0]); setSelectedNeed(firstFormNeed(serviceTypes[0], finalTaskType)); setAttendanceInfo(null); clearLecturerSearch(); setFileInfo(""); setBuktiInfo({}); setSubmitError(""); setSubmitMessage(null); }}>Reset</button>
                 </div>
                 </>
                 )}
@@ -1254,6 +1352,19 @@ export default function SipalingApp() {
                     <div><small>Revisi Ke</small><strong>{statusData.revisionCount}</strong></div>
                     <div><small>Pengajuan</small><strong>{formatDate(statusData.createdAt)}</strong></div>
                   </div>
+                  {statusData.attachments && statusData.attachments.length > 0 && (
+                    <div className="report-files">
+                      <small>Berkas yang diterima</small>
+                      <ul>
+                        {statusData.attachments.map((item) => (
+                          <li key={item.part}>
+                            <b>{item.label}</b>
+                            <span>{item.fileName} · {(item.fileSize / 1024 / 1024).toFixed(2).replace(".", ",")} MB</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   <div className="report-notes"><div><small>Catatan Dosen</small><p>{statusData.lecturerNote || "Belum ada catatan dosen."}</p></div><div><small>Catatan Admin</small><p>{statusData.adminNote || "Belum ada catatan admin."}</p></div></div>
                   {statusData.status === "Revisi" && <button type="button" className="text-action" onClick={() => selectTab("revisi")}>Status revisi: unggah berkas terbaru →</button>}
                 </div>
