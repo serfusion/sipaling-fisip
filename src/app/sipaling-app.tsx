@@ -925,9 +925,6 @@ export default function SipalingApp() {
                 href="/alat"
                 title={cakrawalaLocked ? "Cakrawala terkunci — lihat pratinjaunya dan masukkan kode akses" : undefined}
               >
-                <svg className="hero-petir" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M13.5 2 L6 13.2 h4.6 l-1.6 8.8 L17.5 10.4 h-4.6 z" />
-                </svg>
                 <span className="hero-kilau">Cakrawala</span>
               </a>
               <a className={sessionRole ? "hero-button hero-button-logged" : "hero-button"} href="/dashboard">

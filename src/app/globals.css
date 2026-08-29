@@ -2996,11 +2996,11 @@ a.al-mini:hover { color: var(--al-ink); }
    terbaca seperti lubang hitam, bukan seperti tombol. */
 .hero-button-locked { position: relative; overflow: hidden; isolation: isolate;
   border-color: rgba(245, 197, 66, .42);
-  background: linear-gradient(150deg, #1b2748 0%, #24325a 56%, #2d3d6f 100%);
+  background: linear-gradient(150deg, #445787 0%, #4f6299 56%, #5a6faf 100%);
   color: #f6ecd0;
-  box-shadow: 0 0 0 1px rgba(245,197,66,.16), 0 10px 26px -12px rgba(4,10,26,.8); }
+  box-shadow: 0 0 0 1px rgba(245,197,66,.18), 0 8px 20px -12px rgba(4,10,26,.55); }
 .hero-button-locked:hover { border-color: rgba(245, 197, 66, .78);
-  box-shadow: 0 0 0 1px rgba(245,197,66,.3), 0 14px 32px -12px rgba(4,10,26,.9); }
+  box-shadow: 0 0 0 1px rgba(245,197,66,.34), 0 12px 26px -12px rgba(4,10,26,.65); }
 
 /* Kilau yang menyapu permukaannya: tipis dan miring, meniru pantulan cahaya
    pada permukaan gelap yang licin, bukan kilatan putih yang menyilaukan. */
@@ -3019,17 +3019,8 @@ a.al-mini:hover { color: var(--al-ink); }
    supaya keduanya terbaca sebagai satu kejadian dan bukan dua animasi yang
    kebetulan berjalan bersamaan. */
 .hero-button-locked::before { content: ""; position: absolute; inset: 0;
-  background: radial-gradient(120% 140% at 62% 40%, rgba(214, 232, 255, .5), rgba(245,197,66,.16) 45%, transparent 72%);
+  background: radial-gradient(120% 140% at 62% 40%, rgba(226, 240, 255, .38), rgba(245,197,66,.14) 45%, transparent 72%);
   opacity: 0; animation: hero-kilat 5.4s linear infinite; pointer-events: none; z-index: -1; }
-
-/* Petirnya menyambar DI BELAKANG tulisan, selebar tinggi tombol, bukan
-   menempel di tepi sebagai ikon kecil. Ditaruh di tepi ia berdesakan dengan
-   huruf terakhir dan terbaca seperti lencana; di belakang tulisan ia menyatu
-   dengan kilaunya, persis seperti yang diminta. */
-.hero-petir { position: absolute; left: 50%; top: 50%; width: 44px; height: 44px;
-  margin: -22px 0 0 -22px; fill: #fff3cd; opacity: 0;
-  filter: drop-shadow(0 0 9px rgba(255, 233, 168, .95));
-  animation: hero-petir 5.4s linear infinite; pointer-events: none; z-index: 0; }
 
 .hero-kilau { position: relative; z-index: 1;
   background: linear-gradient(96deg, #d8bd80 0%, #f4e4b6 26%, #fffaea 48%, #f4e4b6 70%, #d8bd80 100%);
@@ -3050,24 +3041,14 @@ a.al-mini:hover { color: var(--al-ink); }
   39% { opacity: 0; }
   100% { opacity: 0; }
 }
-@keyframes hero-petir {
-  0%, 28% { opacity: 0; transform: scale(.82); }
-  30% { opacity: .62; transform: scale(1.1); }
-  33% { opacity: .06; transform: scale(1); }
-  35% { opacity: .5; transform: scale(1.04); }
-  40% { opacity: 0; transform: scale(.94); }
-  100% { opacity: 0; transform: scale(.82); }
-}
 
 /* Gerak yang terus berulang melelahkan sebagian orang, dan sebagian lagi
    memang menyetel peramban agar meredam animasi. Kilat yang berkedip tajam
    lebih perlu dihormati daripada kilau yang bergerak halus. */
 @media (prefers-reduced-motion: reduce) {
   .hero-button-locked::after,
-  .hero-button-locked::before,
-  .hero-petir { animation: none; }
+  .hero-button-locked::before { animation: none; }
   .hero-button-locked::after { opacity: 0; }
-  .hero-petir { opacity: .28; }
   .hero-kilau { animation: none; background-position: 50% 0; }
 }
 
