@@ -36,6 +36,10 @@ export const serviceRequests = pgTable("service_requests", {
   title: text("title").notNull(),
   lecturerId: integer("lecturer_id").references(() => lecturers.id, { onDelete: "set null" }),
   studentNote: text("student_note"),
+  // Penyerahan skripsi/jurnal ke perpustakaan memakai folder Google Drive
+  // milik perpustakaan; portal hanya menyimpan tautannya. Kolom ini kosong
+  // untuk layanan lain. (migrasi v8)
+  driveUrl: text("drive_url"),
   fileName: varchar("file_name", { length: 255 }),
   fileMime: varchar("file_mime", { length: 160 }),
   fileSize: integer("file_size"),
@@ -51,10 +55,10 @@ export const serviceRequests = pgTable("service_requests", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-// Lampiran bernama untuk satu pengajuan. Dipakai oleh kebutuhan yang
-// mengunggah beberapa berkas sekaligus — saat ini "Upload Bukti Penyerahan
-// Jurnal/Skripsi" yang dibagi menjadi empat bagian, sehingga admin
-// perpustakaan menerima berkas yang sudah tersortir.
+// Lampiran bernama untuk satu pengajuan. Dipakai kebutuhan yang mengunggah
+// beberapa berkas sekaligus. Sejak v8 penyerahan skripsi pindah ke Google
+// Drive perpustakaan, jadi tabel ini hanya melayani tiket lama yang berkasnya
+// sudah terlanjur naik ke penyimpanan portal.
 export const requestAttachments = pgTable("request_attachments", {
   id: serial("id").primaryKey(),
   requestId: integer("request_id").notNull().references(() => serviceRequests.id, { onDelete: "cascade" }),

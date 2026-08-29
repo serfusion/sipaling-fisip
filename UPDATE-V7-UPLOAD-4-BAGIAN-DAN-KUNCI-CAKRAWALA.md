@@ -1,3 +1,9 @@
+> **Catatan v8 (lebih baru):** unggah empat bagian ke portal sudah diganti.
+> Penyerahan skripsi/jurnal kini memakai folder Google Drive milik
+> perpustakaan; portal hanya menyimpan tautannya. Lihat
+> `UPDATE-V8-PERPUS-DRIVE-DAN-CAKRAWALA.md`. Berkas tiket lama tetap dapat
+> diunduh admin seperti biasa.
+
 # Pembaruan v7: unggah bukti penyerahan 4 bagian & kunci menu Cakrawala
 
 Dua perubahan besar dan satu perbaikan penting. Dua yang pertama membutuhkan

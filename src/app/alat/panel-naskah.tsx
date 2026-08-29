@@ -439,9 +439,9 @@ function PanelAlihBahasa({
       <section className="al-card">
         <h3 className="al-h4">Alihbahasakan naskah Indonesia Anda</h3>
         <p className="al-note">
-          Naskah diolah di peramban Anda sendiri: tidak dikirim ke mana pun, dan tidak ada mesin penerjemah daring
-          yang dihubungi. Hasilnya <b>draf</b> yang mengikuti pedoman penulisan artikel — judul bagian bergaya
-          IMRaD bernomor Romawi, kala yang menyesuaikan bagian, dan rumusan baku yang lazim dipakai jurnal.
+          Naskah diolah di peramban Anda sendiri: tidak dikirim ke mana pun, tanpa mesin penerjemah daring.
+          Hasilnya <b>draf</b> yang mengikuti pedoman artikel: judul bagian IMRaD bernomor Romawi, kala yang
+          menyesuaikan bagian, dan rumusan baku yang lazim di jurnal.
         </p>
         <Rinci judul="Sejauh mana ini bisa diandalkan?">
           <p>
@@ -520,8 +520,8 @@ function PanelAlihBahasa({
             <section className="al-card">
               <h3 className="al-h4">Istilah yang belum ada padanannya</h3>
               <p className="al-note">
-                Ditandai «begini» di dalam draf. Tentukan padanannya sendiri, lalu pakai konsisten di seluruh naskah —
-                peninjau menandai istilah yang berganti-ganti sebagai naskah yang tidak dirawat.
+                Ditandai «begini» di dalam draf. Tentukan padanannya sendiri, lalu pakai konsisten di seluruh
+                naskah. Istilah yang berganti-ganti terbaca sebagai naskah yang tidak dirawat.
               </p>
               <p className="al-padanan">
                 {hasil.belum.slice(0, 40).map((b) => (

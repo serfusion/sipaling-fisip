@@ -278,7 +278,7 @@ function SisiSumber({
 
           {hasil.perSumber.map((s) => (
             <div key={s.nama}>
-              <h3 className="al-h4">{s.nama} — {s.persen}% naskah Anda cocok</h3>
+              <h3 className="al-h4">{s.nama} · {s.persen}% naskah Anda cocok</h3>
               {s.rentang.length === 0 ? (
                 <p className="al-good">Tidak ada deret delapan kata atau lebih yang sama dengan sumber ini.</p>
               ) : (

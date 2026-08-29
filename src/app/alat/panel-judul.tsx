@@ -92,7 +92,7 @@ export function PanelJudul({
     <>
       <section className="al-card">
         <Kepala ikon={IKON.judul} judul="Perumus Judul dan Metode"
-          sub="Katakan apa yang ingin Anda teliti, lalu lihat metode mana yang benar-benar dapat menjawabnya" />
+          sub="Sebutkan yang ingin Anda teliti, lalu lihat metode mana yang dapat menjawabnya" />
         <p className="al-note">
           Jawab pertanyaan di bawah, lalu rancangan penelitiannya disusun beserta peringatan bila judul dan metode
           tidak sejalan.
@@ -124,7 +124,7 @@ export function PanelJudul({
           ))}
         </div>
 
-        <h3 className="al-h4">3 · Data apa yang benar-benar bisa Anda kumpulkan?</h3>
+        <h3 className="al-h4">3 · Data apa yang bisa Anda kumpulkan?</h3>
         <p className="al-note">
           Jawab sejujurnya, bukan seidealnya. Jawaban di sini yang menentukan apakah judul Anda dapat dikerjakan.
         </p>

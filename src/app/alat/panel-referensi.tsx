@@ -103,7 +103,7 @@ export function PanelReferensi({
               aria-pressed={saringan.hanyaBisaDiunduh}
               onClick={() => setSaringan({ ...saringan, hanyaBisaDiunduh: !saringan.hanyaBisaDiunduh })}>
               <b>Hanya yang bisa diunduh gratis</b>
-              <small>Naskah lengkapnya terbuka, bukan hanya abstraknya</small>
+              <small>Naskah lengkapnya terbuka, bukan abstrak saja</small>
             </button>
             <button type="button" className={`al-tile ${saringan.hanyaDoaj ? "on" : ""}`}
               aria-pressed={saringan.hanyaDoaj}

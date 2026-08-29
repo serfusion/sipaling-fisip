@@ -55,14 +55,16 @@ type RequestRow = {
   adminNote: string | null;
   revisionCount: number;
   fileName: string | null;
+  // Folder Google Drive perpustakaan pada penyerahan skripsi/jurnal.
+  driveUrl?: string | null;
   lecturerId: number | null;
   createdAt: string;
   updatedAt: string;
   lecturerName: string | null;
 };
 
-// Lampiran bernama: empat bagian bukti penyerahan jurnal/skripsi yang
-// diunggah mahasiswa secara terpisah.
+// Lampiran bernama pada tiket lama, dari masa penyerahan skripsi masih
+// diunggah ke penyimpanan portal.
 type AttachmentRow = {
   id: number;
   part: string;
@@ -1416,6 +1418,11 @@ export default function DashboardApp({ profile }: { profile: SessionProfile | nu
                 <div><dt>Dosen tujuan</dt><dd>{selected.lecturerName || "Admin unit layanan"}</dd></div>
                 <div><dt>Revisi ke</dt><dd>{selected.revisionCount}</dd></div>
               </dl>
+              {selected.driveUrl && (
+                <a className="dlink dlink-file" href={selected.driveUrl} target="_blank" rel="noreferrer">
+                  ↗ Buka folder Drive penyerahan
+                </a>
+              )}
               {attachments.length > 0 ? (
                 <div className="dbagian">
                   <div className="dbagian-h">
@@ -1442,7 +1449,7 @@ export default function DashboardApp({ profile }: { profile: SessionProfile | nu
                 <div className="nofile">Memuat lampiran…</div>
               ) : selected.fileName ? (
                 <a className="dlink dlink-file" href={`/api/files/${selected.id}`} target="_blank" rel="noreferrer">⇩ Unduh {selected.fileName}</a>
-              ) : (
+              ) : selected.driveUrl ? null : (
                 <div className="nofile">Tidak ada lampiran pada pengajuan ini.</div>
               )}
               <form className="upd" onSubmit={saveSelected}>

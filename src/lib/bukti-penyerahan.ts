@@ -1,139 +1,75 @@
 // ============================================================
-// UPLOAD BUKTI PENYERAHAN JURNAL/SKRIPSI — DIBAGI EMPAT BAGIAN
+// PENYERAHAN SKRIPSI/JURNAL KE PERPUSTAKAAN — LEWAT GOOGLE DRIVE
 //
-// Sebelumnya kebutuhan ini hanya menerima SATU berkas PDF gabungan. Admin
-// Perpustakaan lalu harus membuka berkas itu dan memilah sendiri mana cover,
-// mana isi, dan mana daftar pustaka — pekerjaan yang berulang untuk setiap
-// mahasiswa.
+// Sebelumnya empat berkas skripsi diunggah ke penyimpanan portal. Satu
+// mahasiswa bisa memakai puluhan MB, dan kuota penyimpanan cepat penuh.
 //
-// Sekarang mahasiswa mengunggah empat bagian terpisah sesuai persyaratan yang
-// sudah lama tertulis di form. Berkas datang sudah tersortir, jadi admin
-// tinggal mengunduh bagian yang dia perlukan.
+// Sekarang berkasnya diunggah ke folder Google Drive milik perpustakaan.
+// Portal hanya menyimpan tautannya, jadi berkas tetap dipegang perpustakaan
+// dan penyimpanan portal tidak ikut terisi.
 //
 // Berkas ini SENGAJA bebas dari database dan Supabase supaya boleh diimpor
 // dari komponen client (form mahasiswa, dashboard) maupun dari route API.
 // ============================================================
 
-export const BUKTI_PENYERAHAN_NEED = "Upload Bukti Penyerahan Jurnal/Skripsi";
+/** Nama kebutuhan yang dipakai sekarang. */
+export const PENYERAHAN_NEED = "Penyerahan Skripsi/Jurnal";
 
-/** Jenis berkas yang boleh diunggah pada sebuah bagian. */
-export type BuktiFormat = "pdf" | "pdf-atau-gambar";
+/** Nama lama sebelum pindah ke Google Drive. Tetap diterima supaya tiket dan
+ *  tautan yang sudah tersebar tidak menjadi tidak valid. */
+export const PENYERAHAN_NEED_LAMA = "Upload Bukti Penyerahan Jurnal/Skripsi";
 
-export type BuktiPart = {
-  /** Kode bagian; ikut tersimpan di database dan dipakai untuk mengurutkan. */
+export const ABSENSI_NEED = "Absensi Perpustakaan";
+
+export type BagianPenyerahan = {
   id: string;
-  /** Nama field pada FormData. */
-  field: string;
-  /** Judul kotak unggah. */
+  /** Nama berkas yang harus ada di folder Drive. */
   label: string;
-  /** Satu baris penjelas di bawah kotak unggah. */
-  helper: string;
-  /** Kalimat persyaratan yang tampil di kotak kuning. */
-  requirement: string;
-  format: BuktiFormat;
+  /** Satu baris penjelas. */
+  keterangan: string;
 };
 
-export const BUKTI_PARTS: BuktiPart[] = [
-  {
-    id: "cover",
-    field: "fileCover",
-    label: "Upload Cover s/d Daftar Isi",
-    helper: "Boleh PDF atau gambar sesuai dokumen yang tersedia.",
-    requirement: "Upload cover sampai daftar isi.",
-    format: "pdf-atau-gambar",
-  },
-  {
-    id: "isi",
-    field: "fileIsi",
-    label: "Upload BAB I s/d BAB V",
-    helper: "Bagian isi skripsi.",
-    requirement: "Upload bagian isi skripsi BAB I sampai BAB V.",
-    format: "pdf-atau-gambar",
-  },
-  {
-    id: "pustaka",
-    field: "filePustaka",
-    label: "Upload Daftar Pustaka s/d Selesai",
-    helper: "Bagian akhir skripsi.",
-    requirement: "Upload daftar pustaka sampai selesai.",
-    format: "pdf-atau-gambar",
-  },
-  {
-    id: "full",
-    field: "fileFull",
-    label: "Upload File Skripsi Full PDF",
-    helper: "File skripsi lengkap format PDF.",
-    requirement: "Upload file skripsi full dalam format PDF.",
-    format: "pdf",
-  },
+/** Daftar berkas yang harus diunggah mahasiswa ke folder Drive perpustakaan. */
+export const BAGIAN_PENYERAHAN: BagianPenyerahan[] = [
+  { id: "cover", label: "Cover sampai daftar isi", keterangan: "PDF atau hasil pindai." },
+  { id: "isi", label: "BAB I sampai BAB V", keterangan: "Bagian isi skripsi." },
+  { id: "pustaka", label: "Daftar pustaka sampai selesai", keterangan: "Bagian akhir skripsi." },
+  { id: "full", label: "Skripsi full format PDF", keterangan: "Satu berkas lengkap." },
 ];
 
-/** Bagian yang juga disalin ke kolom lampiran utama tiket (kompatibilitas). */
-export const BUKTI_PART_UTAMA = "full";
-
-export const BUKTI_MAX_BYTES = 10 * 1024 * 1024;
-
-export function isBuktiPenyerahan(serviceType: string, serviceNeed: string) {
-  return serviceType === "Layanan Perpustakaan" && serviceNeed === BUKTI_PENYERAHAN_NEED;
+export function isPenyerahanPerpus(serviceType: string, serviceNeed: string) {
+  return (
+    serviceType === "Layanan Perpustakaan" &&
+    (serviceNeed === PENYERAHAN_NEED || serviceNeed === PENYERAHAN_NEED_LAMA)
+  );
 }
 
-export function buktiPart(id: string) {
-  return BUKTI_PARTS.find((part) => part.id === id) || null;
-}
-
-/** Atribut accept untuk <input type="file">. */
-export function buktiAccept(format: BuktiFormat) {
-  return format === "pdf"
-    ? ".pdf,application/pdf"
-    : ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png";
-}
-
-const EXT_PDF = [".pdf"];
-const EXT_GAMBAR = [".jpg", ".jpeg", ".png"];
-
-export function buktiExtensions(format: BuktiFormat) {
-  return format === "pdf" ? EXT_PDF : [...EXT_PDF, ...EXT_GAMBAR];
+export function isAbsensiPerpus(serviceType: string, serviceNeed: string) {
+  return serviceType === "Layanan Perpustakaan" && serviceNeed === ABSENSI_NEED;
 }
 
 /**
- * Pemeriksaan yang dipakai bersama oleh peramban dan server.
+ * Pemeriksaan tautan Drive yang dipakai bersama peramban dan server.
  *
  * Sisi klien memakainya supaya mahasiswa mendapat pesan yang jelas sebelum
- * berkas dikirim; sisi server memakainya lagi karena pemeriksaan di peramban
- * selalu bisa dilewati. Aturannya satu, jadi keduanya tidak mungkin berbeda.
+ * mengirim; sisi server memakainya lagi karena pemeriksaan di peramban selalu
+ * bisa dilewati. Aturannya satu, jadi keduanya tidak mungkin berbeda.
  */
-export function periksaBuktiFile(
-  part: BuktiPart,
-  file: { name: string; size: number } | null,
-): { ok: true } | { ok: false; pesan: string } {
-  if (!file || !file.name) {
-    return { ok: false, pesan: `${part.label} belum dipilih.` };
+export function periksaTautanDrive(
+  nilai: string | null | undefined,
+): { ok: true; tautan: string } | { ok: false; pesan: string } {
+  const tautan = (nilai || "").trim();
+  if (!tautan) {
+    return { ok: false, pesan: "Tautan Google Drive belum diisi." };
   }
-  const nama = file.name.toLowerCase();
-  const diterima = buktiExtensions(part.format);
-  if (!diterima.some((ext) => nama.endsWith(ext))) {
+  if (tautan.length > 500) {
+    return { ok: false, pesan: "Tautan Google Drive terlalu panjang." };
+  }
+  if (!/^https:\/\/(drive|docs)\.google\.com\/\S+$/i.test(tautan)) {
     return {
       ok: false,
-      pesan:
-        part.format === "pdf"
-          ? `${part.label} harus berupa file PDF.`
-          : `${part.label} harus berupa PDF, JPG, atau PNG.`,
+      pesan: "Tautan harus dimulai dengan https://drive.google.com/ atau https://docs.google.com/",
     };
   }
-  if (file.size > BUKTI_MAX_BYTES) {
-    return { ok: false, pesan: `${part.label} melebihi 10 MB. Perkecil dulu berkasnya.` };
-  }
-  if (file.size <= 0) {
-    return { ok: false, pesan: `${part.label} kosong atau gagal dibaca. Pilih ulang berkasnya.` };
-  }
-  return { ok: true };
-}
-
-/** Tipe MIME yang disimpan bila peramban tidak mengirimkan file.type. */
-export function buktiMime(fileName: string, fallback: string) {
-  const nama = fileName.toLowerCase();
-  if (nama.endsWith(".pdf")) return "application/pdf";
-  if (nama.endsWith(".png")) return "image/png";
-  if (nama.endsWith(".jpg") || nama.endsWith(".jpeg")) return "image/jpeg";
-  return fallback || "application/octet-stream";
+  return { ok: true, tautan };
 }
