@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { lecturers, libraryAttendance, serviceRequests } from "@/db/schema";
+import { lecturers, libraryAttendance, requestAttachments, serviceRequests } from "@/db/schema";
 import { and, desc, eq, gte, ilike, lt, sql } from "drizzle-orm";
 import {
   MAX_DOCUMENT_BYTES,
@@ -10,9 +10,10 @@ import {
   ABSENSI_NEED,
   PENYERAHAN_NEED,
   PENYERAHAN_NEED_LAMA,
+  BAGIAN_PENYERAHAN,
   isAbsensiPerpus,
   isPenyerahanPerpus,
-  periksaTautanDrive,
+  periksaBerkasBagian,
 } from "@/lib/bukti-penyerahan";
 import { kolomDriveSiap } from "@/lib/kolom-drive";
 import { getCurrentProfile, serviceTypeForProfile } from "@/lib/supabase-server";
@@ -183,20 +184,24 @@ export async function POST(request: Request) {
       }
     }
 
-    // Penyerahan skripsi/jurnal ke perpustakaan tidak lagi mengunggah berkas
-    // ke penyimpanan portal: berkasnya ada di folder Google Drive milik
-    // perpustakaan, dan yang tersimpan di sini hanya tautannya.
+    // Penyerahan skripsi ke perpustakaan mengunggah empat bagian sekaligus.
+    // Aturan ukurannya sama persis dengan yang dipakai peramban, karena
+    // keduanya memanggil pemeriksa yang sama.
     const penyerahan = isPenyerahanPerpus(serviceType, serviceNeed);
-    let driveUrl: string | null = null;
+    const bagianBerkas: Array<{ id: string; label: string; urut: number; berkas: File }> = [];
     if (penyerahan) {
-      const cek = periksaTautanDrive(textValue(form, "driveUrl"));
-      if (!cek.ok) {
-        return Response.json({ success: false, message: cek.pesan }, { status: 400 });
+      for (const [urut, bagian] of BAGIAN_PENYERAHAN.entries()) {
+        const isi = form.get(`bagian_${bagian.id}`);
+        const berkas = isi instanceof File && isi.name ? isi : null;
+        const cek = periksaBerkasBagian(bagian.id, berkas);
+        if (!cek.ok) {
+          return Response.json({ success: false, message: cek.pesan }, { status: 400 });
+        }
+        bagianBerkas.push({ id: bagian.id, label: bagian.label, urut, berkas: berkas as File });
       }
-      driveUrl = cek.tautan;
     }
 
-    // Absensi dan penyerahan Drive sama sekali tidak memakai lampiran.
+    // Absensi tidak memakai lampiran apa pun; penyerahan memakai jalurnya sendiri.
     const tanpaLampiran = absensi || penyerahan;
     const fileEntry = tanpaLampiran ? null : form.get("file");
     const file = fileEntry instanceof File && fileEntry.name ? fileEntry : null;
@@ -236,6 +241,7 @@ export async function POST(request: Request) {
     // berikutnya gagal, semuanya dihapus kembali supaya tidak ada berkas
     // yatim yang memakan kuota penyimpanan.
     const uploadedPaths: string[] = [];
+    const jalurBagian: Array<{ id: string; label: string; urut: number; berkas: File; jalur: string }> = [];
     let fileName: string | null = null;
     let fileMime: string | null = null;
     let fileSize: number | null = null;
@@ -249,18 +255,22 @@ export async function POST(request: Request) {
         fileStoragePath = await uploadDocument({ folder: "requests", ticket, file, contentType: fileMime });
         uploadedPaths.push(fileStoragePath);
       }
+      for (const b of bagianBerkas) {
+        const jalur = await uploadDocument({
+          folder: "requests",
+          ticket,
+          file: b.berkas,
+          contentType: b.berkas.type || PDF_MIME,
+        });
+        uploadedPaths.push(jalur);
+        jalurBagian.push({ ...b, jalur });
+      }
     } catch (error) {
       await Promise.all(uploadedPaths.map((path) => removeDocument(path).catch(() => undefined)));
       throw error;
     }
 
-    // Kolom drive_url baru ada setelah migrasi v8. Selama belum dijalankan,
-    // tautannya menumpang di catatan mahasiswa supaya pengajuan tidak gagal
-    // dan admin perpustakaan tetap menerima tautannya.
-    const simpanDrive = driveUrl ? await kolomDriveSiap() : false;
-    const catatan = driveUrl && !simpanDrive
-      ? [`[DRIVE] ${driveUrl}`, studentNote].filter(Boolean).join(" | ")
-      : studentNote;
+    const catatan = studentNote;
 
     let finalTicket = ticket;
     let requestId: number | null = null;
@@ -280,7 +290,6 @@ export async function POST(request: Request) {
               title,
               lecturerId,
               studentNote: catatan || null,
-              ...(simpanDrive ? { driveUrl } : {}),
               fileName,
               fileMime,
               fileSize,
@@ -304,6 +313,29 @@ export async function POST(request: Request) {
     } catch (error) {
       await Promise.all(uploadedPaths.map((path) => removeDocument(path).catch(() => undefined)));
       throw error;
+    }
+
+    // Catat keempat bagian. Bila pencatatan gagal, berkasnya ikut dihapus
+    // supaya tidak ada berkas yatim yang memakan kuota tanpa ada tiket
+    // yang menunjuknya.
+    if (requestId && jalurBagian.length > 0) {
+      try {
+        await db.insert(requestAttachments).values(
+          jalurBagian.map((b) => ({
+            requestId,
+            part: b.id,
+            label: b.label,
+            sortOrder: b.urut,
+            fileName: b.berkas.name,
+            fileMime: b.berkas.type || PDF_MIME,
+            fileSize: b.berkas.size,
+            fileStoragePath: b.jalur,
+          })),
+        );
+      } catch (error) {
+        await Promise.all(uploadedPaths.map((path) => removeDocument(path).catch(() => undefined)));
+        throw error;
+      }
     }
 
     // Catat kunjungan perpustakaan otomatis agar penghitung "Kunjungan ke-" berjalan.

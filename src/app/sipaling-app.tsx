@@ -13,7 +13,8 @@ import {
   PENYERAHAN_NEED,
   isAbsensiPerpus,
   isPenyerahanPerpus,
-  periksaTautanDrive,
+  periksaBerkasBagian,
+  batasBagianMb,
 } from "@/lib/bukti-penyerahan";
 import { LecturerPicker, type LecturerOption } from "./lecturer-picker";
 import TitleProposalForm from "./title-proposal-form";
@@ -537,7 +538,8 @@ export default function SipalingApp() {
   const [proposalCode, setProposalCode] = useState("");
   const [fileInfo, setFileInfo] = useState("");
   // Tautan folder Google Drive milik mahasiswa untuk penyerahan skripsi.
-  const [driveLink, setDriveLink] = useState("");
+  // Empat bagian berkas penyerahan skripsi ke perpustakaan.
+  const [bagianBerkas, setBagianBerkas] = useState<Record<string, File | null>>({});
   const [revFileInfo, setRevFileInfo] = useState("");
   const [copiedNote, setCopiedNote] = useState("");
   // Penanda gembok pada tombol Cakrawala. Hanya status kuncinya yang dibaca —
@@ -689,7 +691,7 @@ export default function SipalingApp() {
     setServiceType(type);
     setSelectedNeed(nextNeed);
     setAttendanceInfo(null);
-    setDriveLink("");
+    setBagianBerkas({});
     setActiveTab(isTitleProposalNeed(nextNeed) ? "judul" : "form");
     window.setTimeout(() => {
       document.getElementById("workspace")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -713,7 +715,7 @@ export default function SipalingApp() {
 
   function selectNeed(need: string) {
     setSelectedNeed(need);
-    setDriveLink("");
+    setBagianBerkas({});
     if (isTitleProposalNeed(need)) {
       // Kebutuhan "Pengajuan Judul" memakai template resmi, bukan form biasa.
       if (need === "Pengajuan Judul Jurnal") setFinalTaskType("Jurnal");
@@ -762,15 +764,19 @@ export default function SipalingApp() {
       formData.delete("file");
     }
 
-    // Penyerahan skripsi: berkasnya sudah ada di Drive perpustakaan, yang
-    // dikirim ke portal hanya tautannya.
+    // Penyerahan skripsi mengunggah empat bagian sekaligus. Diperiksa di sini
+    // supaya mahasiswa tahu masalahnya sebelum menunggu unggahan selesai;
+    // server memeriksanya lagi dengan aturan yang sama.
     if (isPenyerahan) {
-      const cek = periksaTautanDrive(driveLink);
-      if (!cek.ok) {
-        setSubmitError(cek.pesan);
-        return;
+      for (const bagian of BAGIAN_PENYERAHAN) {
+        const berkas = bagianBerkas[bagian.id] ?? null;
+        const cek = periksaBerkasBagian(bagian.id, berkas);
+        if (!cek.ok) {
+          setSubmitError(cek.pesan);
+          return;
+        }
+        formData.set(`bagian_${bagian.id}`, berkas as File);
       }
-      formData.set("driveUrl", cek.tautan);
       formData.delete("file");
     }
 
@@ -806,7 +812,7 @@ export default function SipalingApp() {
       );
       form.reset();
       setFileInfo("");
-      setDriveLink("");
+      setBagianBerkas({});
       setServiceType(serviceTypes[0]);
       setSelectedNeed(serviceCatalog[serviceTypes[0]].needs[0]);
       clearLecturerSearch();
@@ -1073,7 +1079,7 @@ export default function SipalingApp() {
                 )}
                 <div className="field-group">
                   <label htmlFor="serviceType">Jenis Layanan <em>*</em></label>
-                  <select id="serviceType" name="serviceType" value={serviceType} onChange={(event) => { const t = event.target.value as ServiceType; const nextNeed = needsFor(t, finalTaskType)[0]; setServiceType(t); setSelectedNeed(nextNeed); setAttendanceInfo(null); setDriveLink(""); if (isTitleProposalNeed(nextNeed)) selectTab("judul"); }} required>
+                  <select id="serviceType" name="serviceType" value={serviceType} onChange={(event) => { const t = event.target.value as ServiceType; const nextNeed = needsFor(t, finalTaskType)[0]; setServiceType(t); setSelectedNeed(nextNeed); setAttendanceInfo(null); setBagianBerkas({}); if (isTitleProposalNeed(nextNeed)) selectTab("judul"); }} required>
                     {serviceTypes.map((type) => <option value={type} key={type}>{type}</option>)}
                   </select>
                 </div>
@@ -1205,48 +1211,51 @@ export default function SipalingApp() {
                   </div>
                 )}
                 {isAbsensi ? null : isPenyerahan ? (
-                  <div className={`field-group field-full drive-serah ${perpusDriveUrl ? "" : "drive-serah-belum"}`}>
-                    <div className="drive-serah-kepala">
+                  <div className="field-group field-full serah-box">
+                    <div className="serah-kepala">
                       <Animasi nama="digital" className="perpus-anim" cadangan="🗂" />
                       <div>
-                        <b>Berkas diunggah ke Google Drive perpustakaan</b>
-                        <span>Portal hanya menyimpan tautannya, bukan berkasnya.</span>
+                        <b>Unggah berkas skripsi</b>
+                        <span>Dibagi empat bagian agar dokumen lebih rapi dan mudah diperiksa.</span>
                       </div>
                     </div>
-                    <ol className="drive-serah-daftar">
-                      {BAGIAN_PENYERAHAN.map((bagian, urutan) => (
-                        <li key={bagian.id}>
-                          <b>{urutan + 1}. {bagian.label}</b>
-                          <span>{bagian.keterangan}</span>
-                        </li>
-                      ))}
+
+                    <div className="requirements-title"><span>!</span> Persyaratan Upload</div>
+                    <ol className="serah-syarat">
+                      <li>Upload cover sampai daftar isi.</li>
+                      <li>Upload bagian isi skripsi BAB I sampai BAB V.</li>
+                      <li>Upload daftar pustaka sampai selesai.</li>
+                      <li>Upload file skripsi full dalam format PDF.</li>
                     </ol>
-                    <button
-                      type="button"
-                      className="drive-upload-button"
-                      onClick={() => perpusDriveUrl && window.open(perpusDriveUrl, "_blank", "noopener,noreferrer")}
-                      disabled={!perpusDriveUrl}
-                    >
-                      Buka Folder Drive Perpustakaan <span>↗</span>
-                    </button>
-                    <div className="drive-serah-tautan">
-                      <label htmlFor="driveUrl">Tautan Google Drive Anda <em>*</em></label>
-                      <input
-                        id="driveUrl"
-                        name="driveUrl"
-                        type="url"
-                        inputMode="url"
-                        placeholder="https://drive.google.com/…"
-                        value={driveLink}
-                        onChange={(event) => setDriveLink(event.target.value)}
-                        required
-                      />
-                      <p className="helper">
-                        Unggah keempat berkas ke folder di atas, buat foldernya dapat diakses, lalu tempel tautannya
-                        di sini.
-                        {!perpusDriveUrl && " Folder perpustakaan belum diatur: atur NEXT_PUBLIC_PERPUS_DRIVE_URL pada environment hosting."}
-                      </p>
-                    </div>
+
+                    {BAGIAN_PENYERAHAN.map((bagian) => {
+                      const berkas = bagianBerkas[bagian.id] ?? null;
+                      const lewatBatas = berkas ? berkas.size > batasBagianMb(bagian.id) * 1024 * 1024 : false;
+                      return (
+                        <div className="serah-slot" key={bagian.id}>
+                          <label htmlFor={`bagian_${bagian.id}`}>{bagian.label} <em>*</em></label>
+                          <input
+                            id={`bagian_${bagian.id}`}
+                            type="file"
+                            accept="application/pdf,.pdf"
+                            onChange={(event) =>
+                              setBagianBerkas((kini) => ({ ...kini, [bagian.id]: event.target.files?.[0] ?? null }))
+                            }
+                          />
+                          <p className={`helper ${lewatBatas ? "helper-error" : ""}`}>
+                            {berkas
+                              ? `${berkas.name} · ${(berkas.size / (1024 * 1024)).toFixed(1)} MB${lewatBatas ? ` — melebihi batas ${batasBagianMb(bagian.id)} MB` : ""}`
+                              : bagian.keterangan}
+                          </p>
+                        </div>
+                      );
+                    })}
+
+                    <p className="helper serah-catatan">
+                      Berkas disimpan di portal hanya sampai admin perpustakaan mengarsipkannya, lalu dihapus dari
+                      penyimpanan. Ukuran besar biasanya karena halaman dipindai sebagai foto; simpan ulang sebagai
+                      PDF teks bila melebihi batas.
+                    </p>
                   </div>
                 ) : (
                   <div className="field-group field-full upload-box">
@@ -1258,7 +1267,7 @@ export default function SipalingApp() {
                 )}
                 <div className="form-actions field-full">
                   <button type="submit" className="button button-primary" disabled={isSubmitting}>{isSubmitting ? (isAbsensi ? "Mencatat…" : "Mengirim…") : isAbsensi ? "Absen Sekarang" : "Kirim Layanan"}<span>→</span></button>
-                  <button type="reset" className="button button-light" onClick={() => { setServiceType(serviceTypes[0]); setSelectedNeed(firstFormNeed(serviceTypes[0], finalTaskType)); setAttendanceInfo(null); clearLecturerSearch(); setFileInfo(""); setDriveLink(""); setSubmitError(""); setSubmitMessage(null); }}>Reset</button>
+                  <button type="reset" className="button button-light" onClick={() => { setServiceType(serviceTypes[0]); setSelectedNeed(firstFormNeed(serviceTypes[0], finalTaskType)); setAttendanceInfo(null); clearLecturerSearch(); setFileInfo(""); setBagianBerkas({}); setSubmitError(""); setSubmitMessage(null); }}>Reset</button>
                 </div>
                 </>
                 )}

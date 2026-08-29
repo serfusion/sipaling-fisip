@@ -95,6 +95,8 @@ type AttendanceRow = {
   note: string | null;
 };
 
+import ArsipSkripsi from "./arsip-skripsi";
+
 type ViewId =
   | "ringkasan"
   | "statistik"
@@ -104,6 +106,7 @@ type ViewId =
   | "database"
   | "template"
   | "arsip"
+  | "skripsi"
   | "absensi"
   | "pengumuman"
   | "maintenance"
@@ -224,6 +227,7 @@ const MENU: Array<{ id: ViewId; icon: string; label: string; roles: Role[] | "al
   { id: "database", icon: "🗄", label: "Database Dokumen", roles: DATABASE_ROLES },
   { id: "template", icon: "▤", label: "Template Dokumen", roles: ARCHIVE_ROLES },
   { id: "arsip", icon: "⬢", label: "Arsip Drive", roles: ARCHIVE_ROLES },
+  { id: "skripsi", icon: "⇩", label: "Arsip Skripsi", roles: ["super_admin", "admin", "admin_perpustakaan"] },
   { id: "absensi", icon: "◔", label: "Absensi Perpustakaan", roles: ATTENDANCE_ROLES },
   { id: "pengumuman", icon: "✎", label: "Pengumuman & Status", roles: ["super_admin", "admin"] },
   { id: "maintenance", icon: "☾", label: "Mode Maintenance", roles: ["super_admin"] },
@@ -240,6 +244,7 @@ const VIEW_TITLES: Record<ViewId, string> = {
   database: "Database Dokumen",
   template: "Template Dokumen",
   arsip: "Arsip Drive",
+  skripsi: "Arsip Skripsi",
   absensi: "Absensi Perpustakaan",
   pengumuman: "Pengumuman & Status",
   maintenance: "Mode Maintenance",
@@ -1034,6 +1039,10 @@ export default function DashboardApp({ profile }: { profile: SessionProfile | nu
                 </table>
               </div>
             </section>
+          )}
+
+          {view === "skripsi" && ["super_admin", "admin", "admin_perpustakaan"].includes(profile.role) && (
+            <ArsipSkripsi bolehHapus={profile.role === "super_admin" || profile.role === "admin"} />
           )}
 
           {view === "absensi" && (

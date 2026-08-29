@@ -2399,6 +2399,57 @@ a.al-mini:hover { color: var(--al-ink); }
 .al-acuan-isi li b { display: block; color: var(--al-ink); font-size: 12px; font-weight: 700; line-height: 1.5; }
 .al-acuan-isi li span { display: block; margin-top: 2px; color: var(--al-muted); font-size: 11.5px; line-height: 1.5; }
 
+/* ============================================================
+   PENYERAHAN SKRIPSI: KOTAK UNGGAH MAHASISWA
+   ============================================================ */
+.serah-box { border: 1px solid #c8dcf5; border-radius: 12px; background: #f8fbff; padding: 14px 15px; }
+.serah-kepala { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.serah-kepala b { display: block; color: #16324f; font-size: 13px; font-weight: 800; }
+.serah-kepala span { display: block; color: #64748b; font-size: 11.5px; line-height: 1.45; }
+.serah-syarat { margin: 0 0 14px; padding-left: 20px; color: #4b5568; font-size: 12px; line-height: 1.7; }
+.serah-slot { padding: 11px 12px; margin-bottom: 9px; border: 1px dashed #b9d3f0; border-radius: 10px; background: #fff; }
+.serah-slot label { display: block; margin-bottom: 6px; color: #16324f; font-size: 12.5px; font-weight: 700; }
+.serah-slot label em { font-style: normal; color: #dc2626; }
+.serah-slot input[type="file"] { width: 100%; font-size: 12px; color: #4b5568; }
+.serah-slot .helper { margin: 6px 0 0; font-size: 11.5px; overflow-wrap: anywhere; }
+.serah-catatan { margin-top: 12px !important; padding-top: 10px; border-top: 1px solid #dbeafe; }
+
+/* ============================================================
+   DASHBOARD: ARSIP PENYERAHAN SKRIPSI
+   ============================================================ */
+.arsip-skripsi { display: flex; flex-direction: column; gap: 14px; }
+.arsip-jelas { margin: 0; color: #64748b; font-size: 12.5px; line-height: 1.65; }
+.arsip-jelas b { color: #16324f; }
+.arsip-kosong { margin: 0; padding: 18px; text-align: center; color: #64748b; font-size: 13px;
+  background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 10px; }
+.arsip-angka { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+.arsip-angka > div { padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
+.arsip-angka b { display: block; font-size: 20px; font-weight: 800; color: #16324f; font-variant-numeric: tabular-nums; }
+.arsip-angka span { display: block; margin-top: 2px; color: #64748b; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em; }
+/* Kuota Supabase gratis 1 GB; di atas 700 MB sudah waktunya diarsipkan. */
+.arsip-angka > div.bahaya { border-color: #fca5a5; background: #fef2f2; }
+.arsip-angka > div.bahaya b { color: #b91c1c; }
+.arsip-daftar { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px;
+  max-height: 320px; overflow-y: auto; }
+.arsip-daftar li { display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+  border: 1px solid #e2e8f0; border-radius: 9px; background: #fff; }
+.arsip-daftar li > div { min-width: 0; flex: 1 1 auto; }
+.arsip-daftar b { display: block; color: #16324f; font-size: 12.5px; font-weight: 700;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arsip-daftar span { display: block; margin-top: 2px; color: #64748b; font-size: 11px; }
+.arsip-daftar code { flex: 0 0 auto; padding: 3px 8px; border-radius: 6px; background: #f1f5f9;
+  color: #475569; font-size: 10.5px; }
+.arsip-maju { display: flex; flex-direction: column; gap: 6px; }
+.arsip-bar { height: 7px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
+.arsip-bar i { display: block; height: 100%; border-radius: 999px; background: #1565d8; transition: width .2s ease; }
+.arsip-maju span { color: #64748b; font-size: 11.5px; font-variant-numeric: tabular-nums;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arsip-aksi { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.arsip-pasti { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; padding: 9px 12px;
+  border: 1px solid #fca5a5; border-radius: 10px; background: #fef2f2; }
+.arsip-pasti b { color: #b91c1c; font-size: 12px; }
+
 /* --- Sangkalan tetap --- */
 .al-sangkal { margin-top: 18px; padding: 14px 16px; background: var(--al-surface);
   border: 1px solid var(--al-line); border-left: 4px solid var(--al-abu-line); border-radius: 12px;
