@@ -9,6 +9,25 @@ import { useEffect } from "react";
 const IDLE_LIMIT_MS = 30 * 60 * 1000;
 const STORAGE_KEY = "sipaling_last_activity";
 
+/**
+ * Nyalakan ulang jam diam ini.
+ *
+ * WAJIB dipanggil begitu login berhasil. Tanpa itu, penanda dari sesi
+ * sebelumnya masih tersimpan di peramban: dashboard baru terbuka, hook di
+ * bawah membaca penanda kemarin, menganggap pengguna sudah diam berjam-jam,
+ * lalu langsung melempar balik ke halaman login. Pengguna kemudian harus
+ * login dua kali — kali kedua berhasil hanya karena forceLogout sudah
+ * menghapus penandanya.
+ */
+export function mulaiJamDiam() {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, String(Date.now()));
+  } catch {
+    // Penyimpanan diblokir (mode penyamaran). Hook di bawah membaca 0 dan
+    // memperlakukannya sebagai sesi yang baru dimulai, jadi tidak apa-apa.
+  }
+}
+
 async function forceLogout() {
   try {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -23,7 +42,9 @@ export function useAutoLogout(active: boolean) {
     if (!active) return;
 
     const last = Number(window.localStorage.getItem(STORAGE_KEY) || "0");
-    if (last && Date.now() - last > IDLE_LIMIT_MS) {
+    // Penanda yang lebih baru daripada sekarang berarti jam perangkat pernah
+    // mundur. Dihitung sebagai baru aktif, bukan sebagai diam selamanya.
+    if (last && last <= Date.now() && Date.now() - last > IDLE_LIMIT_MS) {
       void forceLogout();
       return;
     }

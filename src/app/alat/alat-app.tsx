@@ -14,10 +14,10 @@ import { JENIS_LABEL } from "@/lib/project";
 import Animasi from "../animasi";
 
 const MENU: Array<{ id: Tab; label: string; sub: string; ikon: string }> = [
-  { id: "beranda", label: "Beranda", sub: "Project dan naskah", ikon: IKON.beranda },
-  { id: "judul", label: "Judul dan Metode", sub: "Sebelum judul ditetapkan", ikon: IKON.judul },
+  { id: "beranda", label: "Project & Laporan", sub: "Beranda, naskah, dan laporan", ikon: IKON.beranda },
+  { id: "judul", label: "Perumus Judul & Metode", sub: "Sebelum judul ditetapkan", ikon: IKON.judul },
   { id: "referensi", label: "Cari Referensi", sub: "Jurnal ilmiah yang sahih", ikon: IKON.referensi },
-  { id: "kemiripan", label: "Cek Kemiripan", sub: "Sitasi dan parafrase", ikon: IKON.kemiripan },
+  { id: "kemiripan", label: "Cek Kemiripan & Parafrase", sub: "Sitasi dan parafrase", ikon: IKON.kemiripan },
   { id: "struktur", label: "Struktur Naskah", sub: "Bab skripsi ke IMRaD", ikon: IKON.struktur },
   { id: "inggris", label: "Naskah Inggris", sub: "Padanan ragam jurnal", ikon: IKON.inggris },
   { id: "sitasi", label: "Verifikasi Sitasi", sub: "Cek referensi fiktif", ikon: IKON.sitasi },
@@ -204,17 +204,17 @@ export default function AlatApp() {
           </div>
 
           <section className="al-sangkal">
-            <b>Cakrawala alat bantu, bukan penentu.</b> Semua yang keluar di sini adalah gambaran awal untuk Anda
-            periksa sendiri, bukan patokan yang bisa dijadikan pegangan. Alat ini tidak menilai, tidak meluluskan,
-            dan tidak menggantikan pembacaan dosen pembimbing maupun penguji. Keputusan akademik tetap ada pada
-            mereka.
+            <b>Cakrawala bukan pengganti Dosen.</b> Cakrawala hanya membantu, keputusan tetap di tanganmu. Gunakan
+            hasil dari Cakrawala sebagai bahan pertimbangan, bukan sebagai jawaban akhir. Tetap periksa kembali
+            informasi, jurnal, dan hasil tulisan sebelum digunakan dalam tugas akhir. Cakrawala membantu kamu
+            bekerja lebih cepat; kamu tetap yang menentukan hasil akhirnya.
           </section>
         </main>
       </div>
 
       <footer className="al-kaki">
         <strong>SiPaling FISIP</strong>
-        <span>Cakrawala · Concept Superfal Dev</span>
+        <span>Cakrawala · Concept by Superfal Dev</span>
         <Link href="/">Kembali ke portal →</Link>
       </footer>
     </div>

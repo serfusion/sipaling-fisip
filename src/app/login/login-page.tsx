@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { mulaiJamDiam } from "@/lib/use-auto-logout";
 
 function BrandLogoSmall() {
   return (
@@ -23,7 +24,7 @@ function BrandLogoSmall() {
   );
 }
 
-export default function LoginPage() {
+export default function LoginPage({ habisWaktu = false }: { habisWaktu?: boolean }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -38,6 +39,10 @@ export default function LoginPage() {
       .then((payload: { profile?: { role?: string } | null; configured?: boolean }) => {
         setConfigured(Boolean(payload.configured));
         if (payload.profile) {
+          // Sesi masih hidup di server, tetapi jam diamnya belum tentu.
+          // Dinyalakan di sini juga supaya dashboard tidak langsung
+          // memulangkan pengguna ke halaman ini.
+          mulaiJamDiam();
           router.replace("/dashboard");
         }
       })
@@ -65,6 +70,11 @@ export default function LoginPage() {
         await supabase.auth.signOut();
         throw new Error("Akun Anda belum terdaftar di daftar profil SiPaling FISIP.");
       }
+      // Jam diam dinyalakan SEBELUM berpindah. Dashboard membaca penanda ini
+      // begitu ia terpasang; kalau yang terbaca masih penanda sesi kemarin,
+      // ia menyimpulkan pengguna sudah lama diam dan langsung memulangkannya
+      // ke sini — itulah yang membuat login seperti harus dua kali.
+      mulaiJamDiam();
       setInfo(`Selamat datang, ${me.profile.fullName}. Mengalihkan ke dashboard...`);
       router.replace("/dashboard");
     } catch (reason: unknown) {
@@ -85,6 +95,11 @@ export default function LoginPage() {
         {configured === false && (
           <div className="login-info">
             <strong>Supabase belum terhubung lengkap.</strong> Tambahkan URL, publishable/anon key, dan secret/service-role key Supabase pada environment hosting (mis. Vercel), lalu deploy ulang.
+          </div>
+        )}
+        {habisWaktu && !error && !info && (
+          <div className="login-info">
+            <strong>Sesi berakhir.</strong> Anda keluar otomatis setelah 30 menit tanpa aktivitas. Masuk lagi untuk melanjutkan.
           </div>
         )}
         {configured && (

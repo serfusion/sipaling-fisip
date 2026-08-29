@@ -8,6 +8,14 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default function Page() {
-  return <LoginPage />;
+// Penanda ?timeout=1 dipasang useAutoLogout ketika sesi berakhir karena diam.
+// Dibaca di server supaya halaman kliennya tidak perlu useSearchParams
+// sekaligus Suspense hanya untuk satu pemberitahuan.
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  return <LoginPage habisWaktu={params.timeout === "1"} />;
 }
