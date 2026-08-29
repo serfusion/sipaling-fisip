@@ -72,15 +72,29 @@ Teks kepala halaman juga diganti, dan seluruh teks halaman dipendekkan.
 
 ---
 
-## 4. Dua animasi baru
+## 4. Tiga animasi baru
 
 - **Buku terbang** di kepala halaman Cakrawala dan pada kotak Absensi
   Perpustakaan.
 - **Digital** pada bagian "Tiga langkah" Cakrawala dan pada kotak penyerahan
   skripsi.
+- **Books** di sudut kartu kesembilan menu Cakrawala.
 
-Keduanya berhenti pada satu bingkai bila perangkat pengguna mematikan
+Semuanya berhenti pada satu bingkai bila perangkat pengguna mematikan
 animasi, dan diganti lambang biasa bila berkasnya gagal dimuat.
+
+### Supaya tidak memberatkan ponsel
+
+Sembilan kartu memakai animasi yang sama. Dua hal menjaganya tetap ringan:
+
+1. **Animasi baru dibuat ketika kotaknya masuk layar, dan dijeda begitu
+   keluar layar.** Diukur pada throttle CPU 6× (setara ponsel kelas bawah):
+   satu animasi memakai ±22% main thread, tiga animasi ±30%, sembilan
+   animasi sekaligus ±58%. Karena hanya yang terlihat yang berjalan, di
+   ponsel paling banyak dua sampai tiga kartu aktif bersamaan, dan nol
+   ketika bagian kartunya belum tergulung. Semua keadaan tetap 60 fps.
+2. **Berkasnya diambil sekali** lalu dipakai bersama seluruh kartu:
+   `books.json` 2,3 KB terkirim, satu permintaan untuk sembilan kartu.
 
 ---
 

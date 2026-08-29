@@ -2449,7 +2449,7 @@ a.al-mini:hover { color: var(--al-ink); }
   transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
 .cw-kartu:hover { transform: translateY(-3px); border-color: rgba(77,126,247,.5);
   box-shadow: 0 18px 40px rgba(3,8,20,.55); }
-.cw-kartu-visual { height: 132px; padding: 14px; display: grid; place-items: center;
+.cw-kartu-visual { position: relative; height: 132px; padding: 14px; display: grid; place-items: center;
   background:
     radial-gradient(28rem 12rem at 20% 0%, rgba(77,126,247,.24), transparent 65%),
     linear-gradient(160deg, #101c3a 0%, #0a1224 100%);
@@ -2644,6 +2644,11 @@ a.al-mini:hover { color: var(--al-ink); }
 .cw-anim-digital { display: none; filter: hue-rotate(202deg) saturate(0.8); }
 @media (min-width: 640px) { .cw-anim-digital { display: block; flex: 0 0 150px; width: 150px; height: 103px; opacity: .95; } }
 @media (min-width: 960px) { .cw-anim-digital { flex-basis: 186px; width: 186px; height: 128px; } }
+
+/* Buku di sudut tiap kartu menu Cakrawala. Sengaja kecil: gambaran tampilan
+   panelnya yang harus tetap jadi isi utama kartu, bukan hiasannya. */
+.cw-kartu-anim { position: absolute; top: 6px; right: 8px; width: 46px; height: 46px; opacity: .92; }
+@media (min-width: 720px) { .cw-kartu-anim { width: 52px; height: 52px; } }
 
 /* Animasi kecil pada kotak layanan perpustakaan di portal mahasiswa. */
 .perpus-anim { flex: 0 0 54px; width: 54px; height: 54px; }

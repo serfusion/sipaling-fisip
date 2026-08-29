@@ -363,7 +363,10 @@ export default function PratinjauCakrawala() {
           <div className="cw-grid">
             {SOROTAN.map((item) => (
               <article className="cw-kartu" id={`menu-${item.id}`} key={item.id}>
-                <div className="cw-kartu-visual"><Mock jenis={item.mock} /></div>
+                <div className="cw-kartu-visual">
+                  <Mock jenis={item.mock} />
+                  <Animasi nama="books" className="cw-kartu-anim" cadangan="📗" />
+                </div>
                 <div className="cw-kartu-isi">
                   <span className="cw-kartu-ic"><Ic d={item.ikon} /></span>
                   <h3>{item.nama}</h3>
