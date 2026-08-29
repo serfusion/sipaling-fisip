@@ -1041,7 +1041,8 @@ export default function SipalingApp() {
 
               <div className="selected-service-banner">
                 <span className="selected-service-icon"><ServiceIcon type={serviceType} /></span>
-                <div><strong>{serviceType}</strong><span>{currentService.description}</span></div>
+                <div className="selected-service-copy"><strong>{serviceType}</strong><span>{currentService.description}</span></div>
+                <Animasi nama="books" className="selected-service-anim" cadangan="📗" />
               </div>
 
               <form className="form-grid" onSubmit={submitService}>

@@ -143,7 +143,11 @@ button:disabled { cursor: wait; opacity: .65; }
 .selected-service-banner { display: flex; align-items: center; gap: 10px; margin: 16px 0 14px; padding: 11px 13px; border: 1px solid #c8dcf5; border-radius: 10px; background: var(--blue-soft); }
 .selected-service-icon { width: 32px; height: 32px; display: grid; place-items: center; flex: 0 0 32px; border-radius: 8px; color: var(--primary); background: white; font-size: 16px; }
 .selected-service-icon svg { width: 20px; height: 20px; }
-.selected-service-banner div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.selected-service-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+/* Buku pada panel layanan yang sedang dipilih. Tampil di tiap menu, tepat di
+   atas form yang akan dikirim. */
+.selected-service-anim { flex: 0 0 46px; width: 46px; height: 46px; margin-left: auto; }
+@media (min-width: 640px) { .selected-service-anim { flex-basis: 56px; width: 56px; height: 56px; } }
 .selected-service-banner strong { color: var(--primary-dark); font-size: 12px; font-weight: 800; }
 .selected-service-banner span { color: var(--muted); font-size: 10px; line-height: 1.35; }
 
