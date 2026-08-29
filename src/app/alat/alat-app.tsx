@@ -119,7 +119,11 @@ export default function AlatApp() {
               aria-pressed={tema === "terang"}
               title={tema === "malam" ? "Ganti ke mode terang" : "Ganti ke mode malam"}
             >
-              <Ic d={tema === "malam" ? IKON_MATAHARI : IKON_BULAN} />
+              <span className="al-tema-rel">
+                <span className="al-tema-knop">
+                  <Ic d={tema === "terang" ? IKON_MATAHARI : IKON_BULAN} />
+                </span>
+              </span>
               {tema === "malam" ? "Mode Terang" : "Mode Malam"}
             </button>
           </div>

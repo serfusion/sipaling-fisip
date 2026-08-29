@@ -22,6 +22,9 @@ type Sorot = {
   nama: string;
   /** Satu baris pendek untuk deretan sorotan di kepala halaman. */
   singkat: string;
+  /** Pertanyaan pembuka. Mahasiswa berhenti membaca pada keluhannya
+      sendiri, bukan pada nama alat yang belum ia kenal. */
+  kail: string;
   janji: string;
   rinci: string;
   otomatis: string;
@@ -36,6 +39,7 @@ const SOROTAN: Sorot[] = [
     ikon: IKON.judul,
     nama: "Perumus Judul dan Metode",
     singkat: "Judul, rumusan masalah, dan metode",
+    kail: "Bingung menentukan judul?",
     janji: "Dari topik menjadi judul yang siap diajukan",
     rinci:
       "Isi topik, lokasi, dan sasaran penelitian. Keluar beberapa pilihan judul, rumusan masalah, dan metode yang cocok untuk menjawabnya.",
@@ -47,6 +51,7 @@ const SOROTAN: Sorot[] = [
     ikon: IKON.referensi,
     nama: "Cari Referensi",
     singkat: "Jurnal ilmiah dari katalog OpenAlex",
+    kail: "Males cari jurnal?",
     janji: "Jurnal ilmiah yang jelas sumbernya",
     rinci:
       "Ketik topik Anda, katalog OpenAlex langsung disisir. Inti tiap penelitian ditampilkan ringkas supaya terlihat mana yang layak dibaca utuh.",
@@ -58,6 +63,7 @@ const SOROTAN: Sorot[] = [
     ikon: IKON.kemiripan,
     nama: "Cek Kemiripan dan Parafrase",
     singkat: "Kalimat berisiko dan saran gantinya",
+    kail: "Takut tulisanmu mirip punya orang lain?",
     janji: "Rapikan dulu sebelum jatah unggah Turnitin terpakai",
     rinci:
       "Kalimat yang berisiko dianggap mirip ditandai beserta alasannya. Contoh parafrasenya ikut disediakan dengan makna yang tetap sama.",
@@ -69,6 +75,7 @@ const SOROTAN: Sorot[] = [
     ikon: IKON.struktur,
     nama: "Struktur Naskah",
     singkat: "BAB I sampai V jadi kerangka IMRaD",
+    kail: "Disuruh bikin artikel jurnal?",
     janji: "Skripsi lima bab berubah jadi kerangka artikel jurnal",
     rinci:
       "Tiap bab dipetakan ke bagian IMRaD lengkap dengan target jumlah katanya, jadi terlihat bagian mana yang kelebihan dan mana yang kurang.",
@@ -80,6 +87,7 @@ const SOROTAN: Sorot[] = [
     ikon: IKON.inggris,
     nama: "Naskah Inggris",
     singkat: "Alih bahasa ke ragam jurnal",
+    kail: "Pusing bahasa Inggris?",
     janji: "Padanan yang lazim dipakai jurnal berbahasa Inggris",
     rinci:
       "Rumusan baku skripsi Anda dialihkan ke padanan yang lazim di jurnal berbahasa Inggris, lalu ragam hasilnya diperiksa ulang.",
@@ -91,6 +99,7 @@ const SOROTAN: Sorot[] = [
     ikon: IKON.sitasi,
     nama: "Verifikasi Sitasi",
     singkat: "Daftar pustaka dicek ke Crossref",
+    kail: "Daftar pustaka bikin pusing?",
     janji: "Pastikan tiap referensi ada datanya",
     rinci:
       "Tempel daftar pustaka Anda. Tiap entri dicari ke Crossref dan OpenAlex, lalu ditandai: nyata, meragukan, atau tidak ditemukan.",
@@ -102,6 +111,7 @@ const SOROTAN: Sorot[] = [
     ikon: IKON.radar,
     nama: "Radar Jurnal",
     singkat: "Periksa ISSN sebelum kirim naskah",
+    kail: "Sudah punya jurnal tujuan?",
     janji: "Periksa jurnalnya dulu, baru kirim naskah",
     rinci:
       "Masukkan ISSN. DOAJ, Crossref, dan OpenAlex diperiksa bersamaan, lalu tanda bahayanya ditampilkan beserta angkanya.",
@@ -113,6 +123,7 @@ const SOROTAN: Sorot[] = [
     ikon: IKON.bahasa,
     nama: "Periksa Bahasa",
     singkat: "Ejaan dan kata baku PUEBI",
+    kail: "Takut typo atau salah tulis?",
     janji: "Ragam ilmiah Indonesia menurut PUEBI dan KBBI",
     rinci:
       "Ejaan, kata tidak baku, tanda baca, dan kalimat berputar ditandai satu per satu beserta usul perbaikannya.",
@@ -124,6 +135,7 @@ const SOROTAN: Sorot[] = [
     ikon: IKON.dokumen,
     nama: "Project & Laporan",
     singkat: "Naskah tersimpan, hasil siap dicetak",
+    kail: "Capek copy-paste berkali-kali?",
     janji: "Tempel naskah sekali, dipakai seluruh alat",
     rinci:
       "Naskah tersimpan di perangkat Anda, bukan di server kami. Hasil tiap alat dapat dicetak jadi laporan rapi untuk dibawa ke bimbingan.",
@@ -314,8 +326,18 @@ export default function PratinjauCakrawala() {
           </span>
           <h1>Cakrawala</h1>
           <p className="cw-lead">
-            Nikmati kemudahan menyusun tugas akhir dengan sistem otomatis yang akurat.
-            Semudah membalikkan telapak tangan.
+            Bikin tugas akhir jadi lebih gampang. Nikmati kemudahan menyusun tugas akhir dengan sistem otomatis
+            yang akurat, semudah membalikkan telapak tangan.
+          </p>
+          <ul className="cw-keluhan" aria-label="Yang biasanya bikin pusing">
+            <li>Bingung cari judul?</li>
+            <li>Males cari jurnal?</li>
+            <li>Pusing urusan sitasi?</li>
+            <li>Takut tulisanmu banyak salah?</li>
+          </ul>
+          <p className="cw-lead cw-lead-tegas">
+            Cakrawala bantu kamu mengurus semuanya dalam satu tempat.
+            Tinggal masukkan data, klik, dapat hasil.
           </p>
           <div className="cw-hero-aksi">
             <a className="cw-btn cw-btn-utama" href="#kode">Punya kode? Buka sekarang</a>
@@ -366,6 +388,7 @@ export default function PratinjauCakrawala() {
                 <div className="cw-kartu-visual"><Mock jenis={item.mock} /></div>
                 <div className="cw-kartu-isi">
                   <span className="cw-kartu-ic"><Ic d={item.ikon} /></span>
+                  <p className="cw-kail">{item.kail}</p>
                   <h3>{item.nama}</h3>
                   <p className="cw-kartu-janji">{item.janji}</p>
                   <p className="cw-kartu-rinci">{item.rinci}</p>

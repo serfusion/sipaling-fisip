@@ -919,7 +919,7 @@ export default function SipalingApp() {
                 href="/alat"
                 title={cakrawalaLocked ? "Cakrawala terkunci — lihat pratinjaunya dan masukkan kode akses" : undefined}
               >
-                Cakrawala{cakrawalaLocked && <em>🔒 VIP</em>}
+                <span className="hero-kilau">Cakrawala</span>
               </a>
               <a className={sessionRole ? "hero-button hero-button-logged" : "hero-button"} href="/dashboard">
                 {sessionRole ? `● Dashboard ${DASH_ROLE_LABEL[sessionRole] || "Admin"}` : "Login Dosen/Admin"}
