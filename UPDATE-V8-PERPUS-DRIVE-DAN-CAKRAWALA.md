@@ -78,23 +78,24 @@ Teks kepala halaman juga diganti, dan seluruh teks halaman dipendekkan.
   Perpustakaan.
 - **Digital** pada bagian "Tiga langkah" Cakrawala dan pada kotak penyerahan
   skripsi.
-- **Books** di sudut kartu kesembilan menu Cakrawala.
+- **Books** pada panel layanan yang sedang dipilih di Form Layanan portal.
+  Panel itu tampil di tiap menu, tepat di atas form yang akan dikirim, jadi
+  bukunya ikut berganti bersama menu yang dipilih mahasiswa.
 
 Semuanya berhenti pada satu bingkai bila perangkat pengguna mematikan
 animasi, dan diganti lambang biasa bila berkasnya gagal dimuat.
 
 ### Supaya tidak memberatkan ponsel
 
-Sembilan kartu memakai animasi yang sama. Dua hal menjaganya tetap ringan:
+Animasi baru dibuat ketika kotaknya masuk layar, dan dijeda begitu keluar
+layar. Diukur pada throttle CPU 6× (setara ponsel kelas bawah): satu animasi
+memakai ±22% main thread, tiga animasi ±30%, sembilan sekaligus ±58%. Karena
+hanya yang terlihat yang berjalan, di halaman mana pun paling banyak satu
+sampai dua animasi aktif bersamaan. Semua keadaan tetap 60 fps.
 
-1. **Animasi baru dibuat ketika kotaknya masuk layar, dan dijeda begitu
-   keluar layar.** Diukur pada throttle CPU 6× (setara ponsel kelas bawah):
-   satu animasi memakai ±22% main thread, tiga animasi ±30%, sembilan
-   animasi sekaligus ±58%. Karena hanya yang terlihat yang berjalan, di
-   ponsel paling banyak dua sampai tiga kartu aktif bersamaan, dan nol
-   ketika bagian kartunya belum tergulung. Semua keadaan tetap 60 fps.
-2. **Berkasnya diambil sekali** lalu dipakai bersama seluruh kartu:
-   `books.json` 2,3 KB terkirim, satu permintaan untuk sembilan kartu.
+Berkasnya juga diambil sekali per nama animasi lalu dipakai bersama seluruh
+kotak, jadi satu halaman tidak pernah meminta berkas yang sama dua kali.
+`books.json` hanya 2,3 KB terkirim.
 
 ---
 
