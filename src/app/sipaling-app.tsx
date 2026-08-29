@@ -19,6 +19,7 @@ import {
 import { LecturerPicker, type LecturerOption } from "./lecturer-picker";
 import TitleProposalForm from "./title-proposal-form";
 import Animasi from "./animasi";
+import PilihBerkas, { keteranganBerkas } from "./pilih-berkas";
 
 type Tab = "form" | "judul" | "status" | "revisi" | "about";
 type ServiceType = (typeof serviceTypes)[number];
@@ -82,6 +83,9 @@ type StatusRecord = {
   // Bagian-bagian berkas untuk tiket lama yang berkasnya masih tersimpan di
   // penyimpanan portal; kosong pada tiket baru.
   attachments?: Array<{ part: string; label: string; fileName: string; fileSize: number }>;
+  // Terisi hanya untuk tiket Absensi Perpustakaan. Keberadaannya yang
+  // menentukan tampilan Cek Status, bukan pencocokan nama layanan di sini.
+  absensi?: { visitNumber: number; visitDate: string } | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -261,6 +265,61 @@ function formatDate(value: string | null | undefined) {
     dateStyle: "medium",
     timeStyle: "short",
   });
+}
+
+/** Waktu kunjungan, dieja lengkap: jam, tanggal, bulan, tahun. */
+function waktuKunjungan(value: string) {
+  const waktu = new Date(value);
+  const jam = waktu.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+  const tanggal = waktu.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+  return `${jam} · ${tanggal}`;
+}
+
+/**
+ * Kartu untuk tiket Absensi Perpustakaan.
+ *
+ * Absensi tidak melewati satu pun langkah pemeriksaan: mahasiswa datang,
+ * kunjungannya tercatat, selesai. Menampilkannya dengan lini masa lima
+ * langkah dan kolom catatan dosen membuatnya tampak seperti pengajuan yang
+ * sedang ditunggu keputusannya, padahal tidak ada yang perlu diputuskan.
+ */
+function KartuAbsensi({
+  data,
+  onCopy,
+}: {
+  data: StatusRecord & { absensi: { visitNumber: number; visitDate: string } };
+  onCopy: (teks: string) => void;
+}) {
+  return (
+    <div className="report-box absen-box">
+      <div className="report-header">
+        <div>
+          <p className="section-eyebrow">CATATAN KUNJUNGAN</p>
+          <h3>Absensi Perpustakaan</h3>
+          <span>
+            {data.ticket}{" "}
+            <button type="button" className="copy-mini" title="Salin nomor tiket" onClick={() => onCopy(data.ticket)}>⧉</button>
+          </span>
+        </div>
+        <span className="status-pill status-selesai">Tercatat</span>
+      </div>
+
+      <div className="absen-utama">
+        <small>Kunjungan ke</small>
+        <b>{data.absensi.visitNumber > 0 ? data.absensi.visitNumber : "—"}</b>
+        <span>{waktuKunjungan(data.absensi.visitDate)}</span>
+      </div>
+
+      <div className="report-grid">
+        <div><small>Nama Mahasiswa</small><strong>{data.studentName}</strong></div>
+        <div><small>NIM</small><strong>{data.nim}</strong></div>
+      </div>
+
+      <p className="absen-catatan">
+        Absensi tidak melalui pemeriksaan. Kunjungan Anda sudah tercatat dan tidak perlu ditunggu.
+      </p>
+    </div>
+  );
 }
 
 function isAcceptedFile(file: File | null, mode: UploadMode) {
@@ -1234,17 +1293,17 @@ export default function SipalingApp() {
                       return (
                         <div className="serah-slot" key={bagian.id}>
                           <label htmlFor={`bagian_${bagian.id}`}>{bagian.label} <em>*</em></label>
-                          <input
+                          <PilihBerkas
                             id={`bagian_${bagian.id}`}
-                            type="file"
                             accept="application/pdf,.pdf"
-                            onChange={(event) =>
-                              setBagianBerkas((kini) => ({ ...kini, [bagian.id]: event.target.files?.[0] ?? null }))
+                            terpilih={keteranganBerkas(berkas)}
+                            onPilih={(dipilih) =>
+                              setBagianBerkas((kini) => ({ ...kini, [bagian.id]: dipilih }))
                             }
                           />
                           <p className={`helper ${lewatBatas ? "helper-error" : ""}`}>
-                            {berkas
-                              ? `${berkas.name} · ${(berkas.size / (1024 * 1024)).toFixed(1)} MB${lewatBatas ? ` — melebihi batas ${batasBagianMb(bagian.id)} MB` : ""}`
+                            {lewatBatas
+                              ? `Melebihi batas ${batasBagianMb(bagian.id)} MB. Simpan ulang sebagai PDF teks.`
                               : bagian.keterangan}
                           </p>
                         </div>
@@ -1260,9 +1319,15 @@ export default function SipalingApp() {
                 ) : (
                   <div className="field-group field-full upload-box">
                     <label htmlFor="file">Lampiran {requiresFile && <em>*</em>}</label>
-                    <div className="file-input-wrap"><input id="file" name="file" type="file" accept={uploadMode === "required-pdf" ? ".pdf,application/pdf" : uploadMode === "required-docx" ? ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" : ".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"} required={requiresFile} onChange={(event) => { const f = event.target.files && event.target.files[0]; setFileInfo(f ? `${f.name} · ${(f.size / 1024 / 1024).toFixed(2).replace(".", ",")} MB` : ""); }} /></div>
-                    {fileInfo && <span className="file-chosen">📄 {fileInfo}</span>}
-                    <p className="helper">{uploadMode === "required-pdf" ? "Wajib satu file PDF maksimal 10 MB." : uploadMode === "required-docx" ? "Wajib file DOCX maksimal 10 MB." : "Lampiran PDF atau DOCX opsional, maksimal 10 MB."}</p>
+                    <PilihBerkas
+                      id="file"
+                      name="file"
+                      accept={uploadMode === "required-pdf" ? ".pdf,application/pdf" : uploadMode === "required-docx" ? ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" : ".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
+                      required={requiresFile}
+                      terpilih={fileInfo}
+                      onPilih={(berkas) => setFileInfo(keteranganBerkas(berkas))}
+                      catatan={uploadMode === "required-pdf" ? "Wajib satu file PDF maksimal 10 MB." : uploadMode === "required-docx" ? "Wajib file DOCX maksimal 10 MB." : "Lampiran PDF atau DOCX opsional, maksimal 10 MB."}
+                    />
                   </div>
                 )}
                 <div className="form-actions field-full">
@@ -1345,7 +1410,8 @@ export default function SipalingApp() {
               {statusError && <ErrorNotice message={statusError} />}
               {statusMessage && !statusError && <div className="notice notice-info">{statusMessage}</div>}
               {proposalData && <ProposalReport proposal={proposalData} onCopy={doCopy} />}
-              {statusData && (
+              {statusData?.absensi && <KartuAbsensi data={{ ...statusData, absensi: statusData.absensi }} onCopy={doCopy} />}
+              {statusData && !statusData.absensi && (
                 <div className="report-box">
                   <div className="report-header"><div><p className="section-eyebrow">RINGKASAN PENGAJUAN</p><h3>{statusData.serviceNeed}</h3><span>{statusData.ticket} <button type="button" className="copy-mini" title="Salin nomor tiket" onClick={() => doCopy(statusData.ticket)}>⧉</button></span></div><StatusPill status={statusData.status} /></div>
                   <StatusTimeline status={statusData.status} />
@@ -1400,7 +1466,7 @@ export default function SipalingApp() {
                 <div className="field-group"><label htmlFor="revisionTicket">Nomor Tiket <em>*</em></label><input id="revisionTicket" name="ticket" type="text" placeholder="Masukkan nomor tiket" required /></div>
                 <div className="field-group"><label htmlFor="revisionNim">NIM <em>*</em></label><input id="revisionNim" name="nim" type="text" inputMode="numeric" placeholder="Nomor induk mahasiswa" required /></div>
                 <div className="field-group field-full"><label htmlFor="revisionNote">Catatan Revisi Mahasiswa</label><textarea id="revisionNote" name="note" placeholder="Contoh: Revisi BAB II sudah diperbaiki sesuai arahan dosen." /></div>
-                <div className="field-group field-full upload-box"><label htmlFor="revisionFile">Upload File Revisi .DOCX <em>*</em></label><div className="file-input-wrap"><input id="revisionFile" name="file" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required onChange={(event) => { const f = event.target.files && event.target.files[0]; setRevFileInfo(f ? `${f.name} · ${(f.size / 1024 / 1024).toFixed(2).replace(".", ",")} MB` : ""); }} /></div>{revFileInfo && <span className="file-chosen">📄 {revFileInfo}</span>}<p className="helper">File wajib .DOCX, maksimal 10 MB.</p></div>
+                <div className="field-group field-full upload-box"><label htmlFor="revisionFile">Upload File Revisi .DOCX <em>*</em></label><PilihBerkas id="revisionFile" name="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required terpilih={revFileInfo} onPilih={(berkas) => setRevFileInfo(keteranganBerkas(berkas))} catatan="File wajib .DOCX, maksimal 10 MB." /></div>
                 <div className="form-actions field-full"><button type="submit" className="button button-primary" disabled={isUploadingRevision}>{isUploadingRevision ? "Mengunggah..." : "Kirim Revisi"}<span>→</span></button></div>
               </form>
               {revisionError && <ErrorNotice message={revisionError} />}

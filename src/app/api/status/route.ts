@@ -1,6 +1,7 @@
 import { db } from "@/db";
-import { lecturers, requestAttachments, serviceRequests } from "@/db/schema";
-import { and, asc, eq } from "drizzle-orm";
+import { lecturers, libraryAttendance, requestAttachments, serviceRequests } from "@/db/schema";
+import { and, asc, desc, eq } from "drizzle-orm";
+import { isAbsensiPerpus } from "@/lib/bukti-penyerahan";
 import { kolomDriveSiap } from "@/lib/kolom-drive";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
@@ -77,6 +78,38 @@ export async function POST(request: Request) {
       console.error("baca lampiran bernama", error);
     }
 
+    // Absensi bukan pengajuan yang diperiksa siapa pun, jadi yang dikirim
+    // hanya catatan kunjungannya: kapan datang dan kunjungan yang keberapa.
+    // Halaman Cek Status memakai keberadaan bidang ini untuk memilih tampilan,
+    // bukan mencocokkan nama layanan sendiri.
+    let absensi: { visitNumber: number; visitDate: string } | null = null;
+    if (isAbsensiPerpus(row.serviceType, row.serviceNeed)) {
+      try {
+        const kunjungan = await db
+          .select({ visitNumber: libraryAttendance.visitNumber, visitDate: libraryAttendance.visitDate })
+          .from(libraryAttendance)
+          .where(eq(libraryAttendance.requestId, row.id))
+          .orderBy(desc(libraryAttendance.visitDate))
+          .limit(1);
+        const satu = kunjungan[0];
+        if (satu) {
+          absensi = {
+            visitNumber: satu.visitNumber,
+            visitDate: (satu.visitDate instanceof Date ? satu.visitDate : new Date(satu.visitDate)).toISOString(),
+          };
+        } else {
+          // Tiket absensi lama yang catatan kunjungannya belum sempat dibuat:
+          // waktu pengajuannya tetap waktu kedatangannya.
+          absensi = {
+            visitNumber: 0,
+            visitDate: (row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt)).toISOString(),
+          };
+        }
+      } catch (error) {
+        console.error("baca kunjungan absensi", error);
+      }
+    }
+
     return Response.json({
       success: true,
       data: {
@@ -98,6 +131,7 @@ export async function POST(request: Request) {
         fileName: row.fileName,
         driveUrl: "driveUrl" in row ? row.driveUrl : null,
         attachments,
+        absensi,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
       },

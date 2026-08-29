@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { lecturers, libraryAttendance, requestAttachments, serviceRequests } from "@/db/schema";
-import { and, desc, eq, gte, ilike, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, lt, not, sql } from "drizzle-orm";
 import {
   MAX_DOCUMENT_BYTES,
   removeDocument,
@@ -290,6 +290,12 @@ export async function POST(request: Request) {
               title,
               lecturerId,
               studentNote: catatan || null,
+              // Absensi tidak diperiksa siapa pun: mahasiswa datang, tercatat,
+              // selesai. Kalau ia masuk berstatus "Masuk" seperti pengajuan
+              // biasa, ia menumpuk di antrean admin perpustakaan sebagai
+              // pekerjaan yang tidak pernah bisa dikerjakan, sekaligus
+              // menggelembungkan penghitung "Masuk" di ringkasan.
+              ...(absensi ? { status: "Selesai", administrativeStatus: "Tercatat" } : {}),
               fileName,
               fileMime,
               fileSize,
@@ -397,6 +403,15 @@ export async function GET(request: Request) {
       : unitServiceType
         ? eq(serviceRequests.serviceType, unitServiceType)
         : undefined;
+    // Absensi perpustakaan tidak pernah masuk antrean. Ia punya panelnya
+    // sendiri ("Absensi Perpustakaan") yang membaca library_attendance, dan
+    // tidak ada satu pun langkah pemeriksaan yang berlaku untuknya.
+    const bukanAbsensi = not(
+      and(
+        eq(serviceRequests.serviceType, "Layanan Perpustakaan"),
+        eq(serviceRequests.serviceNeed, ABSENSI_NEED),
+      )!,
+    );
     const rows = await db
       .select({
         id: serviceRequests.id,
@@ -422,7 +437,7 @@ export async function GET(request: Request) {
       })
       .from(serviceRequests)
       .leftJoin(lecturers, eq(serviceRequests.lecturerId, lecturers.id))
-      .where(and(query ? ilike(serviceRequests.ticket, `%${query}%`) : undefined, accessFilter, periodFilter))
+      .where(and(query ? ilike(serviceRequests.ticket, `%${query}%`) : undefined, accessFilter, periodFilter, bukanAbsensi))
       .orderBy(desc(serviceRequests.createdAt))
       .limit(hasYear ? 2000 : 200);
 

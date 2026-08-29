@@ -3211,3 +3211,42 @@ a.al-mini:hover { color: var(--al-ink); }
   .lap-kaki-dev { font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #0a2a5e;
     white-space: nowrap; }
 }
+
+
+/* --- Kotak "Pilih file" yang dipakai seluruh unggahan --- */
+.pilih-berkas { display: grid; gap: 6px; min-width: 0; }
+.pb-kotak { position: relative; display: flex; align-items: center; gap: 11px;
+  padding: 12px 13px; border: 1.6px dashed #93b4e8; border-radius: 12px;
+  background: #f6f9ff; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+.pb-kotak:hover { border-color: #2563eb; background: #eef4ff; }
+/* Fokus papan tik jatuh pada input yang tembus pandang, jadi cincinnya
+   digambar pada kotaknya supaya tetap terlihat. */
+.pb-kotak:focus-within { border-color: #2563eb; border-style: solid;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .18); }
+.pb-isi { border-style: solid; border-color: #86b98a; background: #f2fbf3; }
+.pb-ikon { flex: 0 0 auto; font-size: 19px; line-height: 1; }
+.pb-teks { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.pb-teks b { color: #16324f; font-size: 12.5px; font-weight: 800; }
+.pb-teks small { color: #64748b; font-size: 11px; overflow-wrap: anywhere; }
+.pb-isi .pb-teks small { color: #2f6b39; }
+.pb-aksi { flex: 0 0 auto; padding: 6px 11px; border-radius: 999px; background: #1d4ed8;
+  color: #fff; font-size: 11px; font-weight: 800; }
+.pb-kotak:hover .pb-aksi { background: #1e40af; }
+/* Ditumpangkan penuh, bukan disembunyikan: input tanpa ukuran tidak dapat
+   difokuskan, sehingga pesan "wajib diisi" bawaan peramban gagal tampil. */
+.pb-input { position: absolute; inset: 0; width: 100%; height: 100%;
+  opacity: 0; cursor: pointer; }
+@media (max-width: 520px) {
+  .pb-kotak { gap: 9px; padding: 11px; }
+  .pb-aksi { padding: 6px 9px; font-size: 10.5px; }
+}
+
+/* --- Kartu absensi pada Cek Status --- */
+.absen-utama { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px;
+  padding: 16px; border-bottom: 1px solid #e2e8f0; background: #f6f9ff; }
+.absen-utama small { flex: 0 0 100%; color: #64748b; font-size: 10px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .07em; }
+.absen-utama b { color: #16324f; font-size: 34px; font-weight: 800; line-height: 1; }
+.absen-utama span { color: #1d4ed8; font-size: 13px; font-weight: 700; }
+.absen-catatan { margin: 0; padding: 13px 16px; border-top: 1px solid #e2e8f0;
+  color: #64748b; font-size: 11.5px; line-height: 1.6; }

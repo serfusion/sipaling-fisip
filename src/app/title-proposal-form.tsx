@@ -11,6 +11,7 @@ import {
   type FinalTaskType,
 } from "@/lib/academic";
 import { LecturerPicker, type LecturerOption } from "./lecturer-picker";
+import PilihBerkas, { keteranganBerkas } from "./pilih-berkas";
 
 type Props = {
   lecturers: LecturerOption[];
@@ -293,17 +294,14 @@ export default function TitleProposalForm({
       <div className="tp-upload">
         <span className="tp-statement-title">Bukti Keuangan <em>*</em></span>
         <p className="helper">Bukti pembayaran semester berjalan. PDF/JPG/PNG, maks. 10 MB.</p>
-        <input
-          type="file"
+        <PilihBerkas
+          id="paymentFile"
           name="paymentFile"
           accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
           required
-          onChange={(event) => {
-            const file = event.target.files && event.target.files[0];
-            setProofName(file ? `${file.name} · ${(file.size / 1024 / 1024).toFixed(2).replace(".", ",")} MB` : "");
-          }}
+          terpilih={proofName}
+          onPilih={(berkas) => setProofName(keteranganBerkas(berkas))}
         />
-        {proofName && <span className="file-chosen">📄 {proofName}</span>}
       </div>
 
       <div className="tp-lecturers">
