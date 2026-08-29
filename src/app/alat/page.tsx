@@ -6,7 +6,7 @@ import { cakrawalaAccess } from "@/lib/cakrawala-store";
 export const metadata: Metadata = {
   title: "Cakrawala · SiPaling FISIP",
   description:
-    "Sembilan alat untuk naskah Anda: perumus judul, pencari referensi, cek kemiripan, struktur naskah, alih bahasa Inggris, verifikasi sitasi, radar jurnal, dan pemeriksa ragam ilmiah Bahasa Indonesia.",
+    "Sembilan alat naskah tugas akhir: perumus judul dan metode, cari referensi, cek kemiripan dan parafrase, struktur naskah, naskah Inggris, verifikasi sitasi, radar jurnal, dan periksa bahasa.",
 };
 
 // Halaman ini selalu dihitung ulang: status kuncinya dapat berubah kapan saja

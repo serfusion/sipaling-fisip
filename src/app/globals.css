@@ -185,13 +185,42 @@ button:disabled { cursor: wait; opacity: .65; }
 .lecturer-search-clear { color: #334155; background: #e2e8f0; }
 .lecturer-search-clear:hover { background: #cbd5e1; }
 
-.attendance-box { padding: 14px 16px; border: 1px solid #bae6fd; border-radius: 12px; background: #f0f9ff; }
-.attendance-header { display: flex; align-items: center; gap: 8px; color: #0369a1; font-size: 13px; font-weight: 800; margin-bottom: 6px; }
-.attendance-desc { color: #075985; font-size: 11px; line-height: 1.5; margin: 0 0 12px; }
+.attendance-box { padding: 14px 16px; border: 1px solid #bae6fd; border-radius: 12px; background: #f0f9ff;
+  display: flex; flex-direction: column; gap: 11px; }
+.attendance-header { display: flex; align-items: center; gap: 11px; }
+.attendance-header > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.attendance-header b { color: #0369a1; font-size: 13.5px; font-weight: 800; }
+.attendance-header span { color: #0c4a6e; font-size: 11.5px; line-height: 1.5; }
+.attendance-desc { margin: 0; color: #075985; font-size: 11px; line-height: 1.55; }
 .attendance-auto { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; font-size: 12px; }
-.attendance-auto div { background: white; padding: 8px 10px; border-radius: 8px; border: 1px solid #bae6fd; }
-.attendance-auto strong { color: #0c4a6e; }
-.attendance-auto span { color: #0369a1; font-weight: 700; }
+.attendance-auto div { display: flex; flex-direction: column; gap: 2px; background: white; padding: 9px 11px; border-radius: 8px; border: 1px solid #bae6fd; }
+.attendance-auto strong { color: #64748b; font-size: 9.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.attendance-auto span { color: #0c4a6e; font-size: 12.5px; font-weight: 800; }
+
+/* =====================================================================
+   PENYERAHAN SKRIPSI KE PERPUSTAKAAN — LEWAT GOOGLE DRIVE
+   Berkasnya tidak naik ke portal: mahasiswa mengunggahnya ke folder Drive
+   milik perpustakaan lalu menempelkan tautannya. Daftar berkas yang harus
+   ada tetap ditampilkan supaya tidak ada bagian yang tertinggal.
+   ===================================================================== */
+.drive-serah { padding: 16px; border: 1px solid #bfdbfe; border-radius: 14px; background: #f5f9ff;
+  display: flex; flex-direction: column; gap: 12px; }
+.drive-serah-kepala { display: flex; align-items: center; gap: 12px; }
+.drive-serah-kepala > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.drive-serah-kepala b { color: #123e73; font-size: 13px; font-weight: 800; line-height: 1.35; }
+.drive-serah-kepala span { color: #486581; font-size: 11.5px; line-height: 1.5; }
+.drive-serah-daftar { margin: 0; padding: 12px 14px; list-style: none; border: 1px solid #dbeafe; border-radius: 11px;
+  background: #ffffff; display: grid; gap: 8px; }
+.drive-serah-daftar li { display: flex; flex-direction: column; gap: 1px; }
+.drive-serah-daftar b { color: #0b4aa8; font-size: 12.5px; font-weight: 800; }
+.drive-serah-daftar span { color: #64748b; font-size: 11px; line-height: 1.45; }
+.drive-serah .drive-upload-button { align-self: flex-start; }
+.drive-serah-tautan { display: flex; flex-direction: column; }
+.drive-serah-tautan label { margin-bottom: 7px; color: #16324f; font-size: 12.5px; font-weight: 800; }
+.drive-serah-tautan label em { color: #dc2626; font-style: normal; }
+.drive-serah-tautan .helper { margin-top: 7px; color: #64748b; }
+.drive-serah-belum { border-color: #fecaca; background: #fff7f7; }
+.drive-serah-belum .drive-serah-kepala b { color: #991b1b; }
 .file-input-wrap { border: 1px solid #cbd5e1; background: white; border-radius: 8px; overflow: hidden; }
 .file-input-wrap input { border: 0; box-shadow: none; padding: 9px; height: auto; cursor: pointer; font-size: 12px; }
 .file-input-wrap input:focus { box-shadow: none; }
@@ -408,6 +437,7 @@ button:disabled { cursor: wait; opacity: .65; }
   .service-card-copy small { font-size: 10.5px; }
   .drive-upload-box { align-items: stretch; flex-direction: column; }
   .drive-upload-button { width: 100%; }
+  .drive-serah .drive-upload-button { align-self: stretch; }
   .lecturer-search { grid-template-columns: minmax(0, 1fr) auto; }
   .lecturer-search-clear { grid-column: 1 / -1; min-height: 34px; }
   .flow-item { font-size: 10px; padding: 5px 9px 5px 5px; }
@@ -2369,18 +2399,35 @@ a.al-mini:hover { color: var(--al-ink); }
 .cw-btn-terang:hover { background: #e8eeff; }
 .cw-btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
 
-.cw-angka { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
-@media (min-width: 720px) { .cw-angka { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.cw-angka div { padding: 12px 14px; border: 1px solid var(--cw-line); border-radius: 13px;
-  background: rgba(14,23,48,.72); display: flex; flex-direction: column; gap: 3px; }
-.cw-angka b { font-size: 22px; font-weight: 900; color: #ffffff; }
-.cw-angka span { color: var(--cw-muted); font-size: 11.5px; line-height: 1.45; }
+/* Deretan sorotan menu di kepala halaman. Menggantikan kotak angka lama:
+   nama menunya sendiri lebih berguna daripada statistik. Tiap kotak menaut
+   ke kartu menu yang sama di bawahnya. */
+.cw-sorot { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin-top: 10px; }
+@media (min-width: 620px) { .cw-sorot { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 960px) { .cw-sorot { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; } }
+.cw-sorot-item { display: flex; align-items: flex-start; gap: 10px; padding: 11px 12px;
+  border: 1px solid var(--cw-line); border-radius: 13px; background: rgba(14,23,48,.72);
+  color: inherit; text-decoration: none; transition: .16s ease; }
+.cw-sorot-item:hover { border-color: rgba(245,197,66,.45); background: rgba(20,32,64,.9); transform: translateY(-2px); }
+.cw-sorot-ic { flex: 0 0 28px; width: 28px; height: 28px; display: grid; place-items: center;
+  border-radius: 9px; background: rgba(245,197,66,.14); color: var(--cw-emas); }
+.cw-sorot-ic svg { width: 16px; height: 16px; }
+.cw-sorot-teks { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cw-sorot-teks b { color: #ffffff; font-size: 12.5px; font-weight: 800; line-height: 1.3; }
+.cw-sorot-teks small { color: var(--cw-muted); font-size: 11px; line-height: 1.4; }
+/* Di layar sempit hanya nama menunya yang tampil: sembilan kotak dengan dua
+   baris teks masing-masing membuat kepala halaman terlalu jauh dari isinya. */
+@media (max-width: 619px) {
+  .cw-sorot-item { padding: 9px 10px; }
+  .cw-sorot-teks small { display: none; }
+}
 
 /* --- Isi --- */
 .cw-body { max-width: 1080px; margin: 0 auto; padding: 26px 16px 60px; display: flex; flex-direction: column; gap: 30px; }
 
 .cw-langkah { border: 1px solid var(--cw-line); border-radius: 18px; padding: 20px;
   background: linear-gradient(150deg, rgba(77,126,247,.12), rgba(139,92,246,.08)); }
+.cw-langkah-kepala { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .cw-langkah-kepala h2 { margin-top: 4px; font-size: clamp(19px, 4vw, 24px); }
 .cw-langkah ol { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 12px; }
 @media (min-width: 800px) { .cw-langkah ol { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
@@ -2397,7 +2444,7 @@ a.al-mini:hover { color: var(--al-ink); }
 @media (min-width: 720px) { .cw-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1040px) { .cw-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
-.cw-kartu { display: flex; flex-direction: column; overflow: hidden;
+.cw-kartu { scroll-margin-top: 18px; display: flex; flex-direction: column; overflow: hidden;
   border: 1px solid var(--cw-line); border-radius: 17px; background: var(--cw-panel);
   transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
 .cw-kartu:hover { transform: translateY(-3px); border-color: rgba(77,126,247,.5);
@@ -2551,34 +2598,16 @@ a.al-mini:hover { color: var(--al-ink); }
 .hero-button-locked em { font-style: normal; margin-left: 7px; padding: 2px 7px; border-radius: 999px;
   background: rgba(245,197,66,.22); color: #f5c542; font-size: 9.5px; font-weight: 800; letter-spacing: .08em; }
 
-/* =====================================================================
-   UPLOAD BUKTI PENYERAHAN — EMPAT BAGIAN
-   Satu panel biru menampung persyaratan sekaligus keempat kotak unggahnya,
-   supaya mahasiswa membaca syaratnya persis di tempat berkasnya dipilih.
-   Setiap bagian memakai bingkai putus-putus sendiri: batas antar bagian
-   harus terlihat sekali pandang agar tidak ada yang salah tempat.
-   ===================================================================== */
-.bukti-box { padding: 16px; border: 1px solid #bfdbfe; border-radius: 14px; background: #f5f9ff; display: flex; flex-direction: column; gap: 12px; }
-.bukti-intro { margin: 0; color: #475569; font-size: 12px; line-height: 1.55; }
-.bukti-syarat { padding: 12px 14px; border: 1px solid #dbeafe; border-radius: 11px; background: #ffffff; }
-.bukti-syarat b { display: block; margin-bottom: 6px; color: #0b4aa8; font-size: 12.5px; font-weight: 800; }
-.bukti-syarat ol { margin: 0; padding-left: 20px; color: #475569; font-size: 12px; line-height: 1.65;
-  list-style: decimal; }
-.bukti-syarat li::marker { color: #0b4aa8; font-weight: 800; }
-.bukti-slot { padding: 13px 14px; border: 1px dashed #93b4e8; border-radius: 12px; background: #ffffff; display: flex; flex-direction: column; }
-.bukti-slot label { margin-bottom: 7px; color: #16324f; font-size: 12.5px; font-weight: 800; }
-.bukti-slot label em { color: #dc2626; font-style: normal; }
-.bukti-slot .helper { margin-top: 7px; color: #64748b; }
-.bukti-slot .file-chosen { align-self: flex-start; }
-.bukti-tutup { margin: 0; color: #0b4aa8; font-size: 11.5px; line-height: 1.55; font-weight: 600; }
-
-/* Rincian berkas per bagian pada hasil Cek Status milik mahasiswa. */
+/* Rincian berkas per bagian pada hasil Cek Status milik mahasiswa.
+   Hanya tampil untuk tiket lama, dari masa penyerahan skripsi masih
+   diunggah ke penyimpanan portal. */
 .report-files { padding: 14px 16px; border-top: 1px solid #e2e8f0; background: #ffffff; }
 .report-files > small { display: block; margin-bottom: 8px; color: #94a3b8; font-size: 9px; text-transform: uppercase; letter-spacing: .06em; font-weight: 800; }
 .report-files ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; }
 .report-files li { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 9px; background: #f8fafc; }
 .report-files b { color: #16324f; font-size: 12px; }
 .report-files span { color: #64748b; font-size: 11px; word-break: break-word; }
+.report-files a { color: #0b4aa8; font-weight: 700; }
 
 /* Daftar unduhan per bagian pada laci detail tiket (dashboard admin). */
 .dbagian { margin: 6px 0 10px; display: grid; gap: 6px; }
@@ -2591,6 +2620,36 @@ a.al-mini:hover { color: var(--al-ink); }
 .dbagian-teks { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .dbagian-teks b { color: #16324f; font-size: 11.5px; }
 .dbagian-teks small { color: #64748b; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* =====================================================================
+   ANIMASI LOTTIE
+   Satu komponen dipakai di beberapa halaman. Ukuran dan letaknya diatur
+   lewat kelas tambahan di tempat pemakaian, bukan di komponennya.
+   ===================================================================== */
+.anim { display: block; line-height: 0; pointer-events: none; }
+.anim-stage { width: 100%; height: 100%; }
+.anim-stage svg { display: block; width: 100%; height: 100%; }
+.anim-cadangan { display: block; text-align: center; font-size: 26px; line-height: 1; }
+
+/* Buku terbang di kepala pratinjau Cakrawala. Diletakkan pada .cw-hero yang
+   sudah position: relative + overflow: hidden, jadi tidak pernah meluber. */
+.cw-anim-buku { position: absolute; top: 8px; right: 8px; width: 72px; height: 72px; opacity: .95; z-index: 1; }
+@media (min-width: 720px) { .cw-anim-buku { top: 20px; right: 26px; width: 122px; height: 122px; } }
+@media (min-width: 1100px) { .cw-anim-buku { right: 5%; width: 146px; height: 146px; } }
+
+/* Animasi digital pada bagian "tiga langkah". Warna aslinya merah terang dan
+   berkelahi dengan palet Cakrawala, jadi rona warnanya diputar ke biru.
+   Disembunyikan di layar sempit: di sana ruangnya lebih berguna untuk teks
+   langkahnya. */
+.cw-anim-digital { display: none; filter: hue-rotate(202deg) saturate(0.8); }
+@media (min-width: 640px) { .cw-anim-digital { display: block; flex: 0 0 150px; width: 150px; height: 103px; opacity: .95; } }
+@media (min-width: 960px) { .cw-anim-digital { flex-basis: 186px; width: 186px; height: 128px; } }
+
+/* Animasi kecil pada kotak layanan perpustakaan di portal mahasiswa. */
+.perpus-anim { flex: 0 0 54px; width: 54px; height: 54px; }
+@media (min-width: 640px) { .perpus-anim { flex-basis: 72px; width: 72px; height: 72px; } }
+/* Animasi digital aslinya merah terang; dibiruikan agar sewarna kotaknya. */
+.drive-serah .perpus-anim { filter: hue-rotate(202deg) saturate(0.8); }
 
 /* ============================================================
    LAPORAN CETAK

@@ -12,6 +12,7 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Ic, IKON } from "./ikon";
+import Animasi from "../animasi";
 
 const KONTAK = "@superfaldev";
 
@@ -19,42 +20,47 @@ type Sorot = {
   id: string;
   ikon: string;
   nama: string;
+  /** Satu baris pendek untuk deretan sorotan di kepala halaman. */
+  singkat: string;
   janji: string;
   rinci: string;
   otomatis: string;
   mock: string;
 };
 
-// Deskripsi mengikuti apa yang benar-benar dikerjakan tiap panel di dalam,
-// bukan janji yang lebih besar dari alatnya.
+// Keterangan mengikuti apa yang dikerjakan tiap panel di dalam, bukan janji
+// yang lebih besar dari alatnya.
 const SOROTAN: Sorot[] = [
   {
     id: "judul",
     ikon: IKON.judul,
     nama: "Perumus Judul dan Metode",
-    janji: "Dari “ingin meneliti apa” menjadi judul yang siap diajukan",
+    singkat: "Judul, rumusan masalah, dan metode",
+    janji: "Dari topik menjadi judul yang siap diajukan",
     rinci:
-      "Katakan topik, lokasi, dan siapa yang diteliti. Cakrawala menyusun beberapa alternatif judul sekaligus menunjukkan metode mana yang benar-benar sanggup menjawabnya.",
-    otomatis: "Judul, rumusan masalah, dan usulan metode tersusun sendiri",
+      "Isi topik, lokasi, dan sasaran penelitian. Keluar beberapa pilihan judul, rumusan masalah, dan metode yang cocok untuk menjawabnya.",
+    otomatis: "Judul, rumusan masalah, dan metode tersusun sendiri",
     mock: "judul",
   },
   {
     id: "referensi",
     ikon: IKON.referensi,
     nama: "Cari Referensi",
-    janji: "Jurnal ilmiah yang sahih, bukan hasil pencarian acak",
+    singkat: "Jurnal ilmiah dari katalog OpenAlex",
+    janji: "Jurnal ilmiah yang jelas sumbernya",
     rinci:
-      "Tuliskan topik Anda, lalu katalog OpenAlex disisir langsung. Inti tiap penelitian ditampilkan ringkas supaya Anda tahu mana yang layak dibaca utuh.",
-    otomatis: "Pencarian, penyaringan, dan ringkasan berjalan sekali klik",
+      "Ketik topik Anda, katalog OpenAlex langsung disisir. Inti tiap penelitian ditampilkan ringkas supaya terlihat mana yang layak dibaca utuh.",
+    otomatis: "Cari, saring, dan ringkas dalam sekali klik",
     mock: "referensi",
   },
   {
     id: "kemiripan",
     ikon: IKON.kemiripan,
     nama: "Cek Kemiripan dan Parafrase",
-    janji: "Bereskan sendiri sebelum jatah unggah Turnitin terpakai",
+    singkat: "Kalimat berisiko dan saran gantinya",
+    janji: "Rapikan dulu sebelum jatah unggah Turnitin terpakai",
     rinci:
-      "Kalimat yang berisiko dianggap mirip ditandai beserta alasannya, lengkap dengan contoh parafrase yang tetap menjaga makna aslinya.",
+      "Kalimat yang berisiko dianggap mirip ditandai beserta alasannya. Contoh parafrasenya ikut disediakan dengan makna yang tetap sama.",
     otomatis: "Penandaan kalimat dan saran perbaikan muncul otomatis",
     mock: "kemiripan",
   },
@@ -62,9 +68,10 @@ const SOROTAN: Sorot[] = [
     id: "struktur",
     ikon: IKON.struktur,
     nama: "Struktur Naskah",
-    janji: "BAB I sampai V berubah menjadi kerangka artikel jurnal",
+    singkat: "BAB I sampai V jadi kerangka IMRaD",
+    janji: "Skripsi lima bab berubah jadi kerangka artikel jurnal",
     rinci:
-      "Tiap bab dipetakan ke bagian IMRaD beserta target jumlah katanya, sehingga terlihat bagian mana yang harus dipangkas dan mana yang masih kurang.",
+      "Tiap bab dipetakan ke bagian IMRaD lengkap dengan target jumlah katanya, jadi terlihat bagian mana yang kelebihan dan mana yang kurang.",
     otomatis: "Pemetaan bab dan hitungan kata dikerjakan sendiri",
     mock: "struktur",
   },
@@ -72,9 +79,10 @@ const SOROTAN: Sorot[] = [
     id: "inggris",
     ikon: IKON.inggris,
     nama: "Naskah Inggris",
-    janji: "Padanan ragam jurnal, bukan terjemahan kata per kata",
+    singkat: "Alih bahasa ke ragam jurnal",
+    janji: "Padanan yang lazim dipakai jurnal berbahasa Inggris",
     rinci:
-      "Rumusan baku skripsi Anda dialihkan ke padanan yang lazim dipakai jurnal berbahasa Inggris, lalu ragam hasilnya diperiksa ulang.",
+      "Rumusan baku skripsi Anda dialihkan ke padanan yang lazim di jurnal berbahasa Inggris, lalu ragam hasilnya diperiksa ulang.",
     otomatis: "Alih bahasa dan pemeriksaan ragam sekali jalan",
     mock: "inggris",
   },
@@ -82,9 +90,10 @@ const SOROTAN: Sorot[] = [
     id: "sitasi",
     ikon: IKON.sitasi,
     nama: "Verifikasi Sitasi",
-    janji: "Pastikan tiap referensi benar-benar ada",
+    singkat: "Daftar pustaka dicek ke Crossref",
+    janji: "Pastikan tiap referensi ada datanya",
     rinci:
-      "Tempel daftar pustaka Anda. Tiap entri dicari datanya ke Crossref dan OpenAlex, lalu ditandai: nyata, meragukan, atau tidak ditemukan.",
+      "Tempel daftar pustaka Anda. Tiap entri dicari ke Crossref dan OpenAlex, lalu ditandai: nyata, meragukan, atau tidak ditemukan.",
     otomatis: "Seluruh daftar pustaka diperiksa sekaligus",
     mock: "sitasi",
   },
@@ -92,9 +101,10 @@ const SOROTAN: Sorot[] = [
     id: "radar",
     ikon: IKON.radar,
     nama: "Radar Jurnal",
+    singkat: "Periksa ISSN sebelum kirim naskah",
     janji: "Periksa jurnalnya dulu, baru kirim naskah",
     rinci:
-      "Masukkan ISSN. DOAJ, Crossref, dan OpenAlex diperiksa bersamaan, lalu tanda bahayanya ditampilkan beserta bukti angkanya.",
+      "Masukkan ISSN. DOAJ, Crossref, dan OpenAlex diperiksa bersamaan, lalu tanda bahayanya ditampilkan beserta angkanya.",
     otomatis: "Tiga sumber diperiksa serentak dalam hitungan detik",
     mock: "radar",
   },
@@ -102,29 +112,24 @@ const SOROTAN: Sorot[] = [
     id: "bahasa",
     ikon: IKON.bahasa,
     nama: "Periksa Bahasa",
+    singkat: "Ejaan dan kata baku PUEBI",
     janji: "Ragam ilmiah Indonesia menurut PUEBI dan KBBI",
     rinci:
-      "Ejaan, kata tidak baku, tanda baca, dan kalimat yang berputar-putar ditandai satu per satu beserta usul perbaikannya.",
-    otomatis: "Temuan langsung muncul sambil naskah ditempel",
+      "Ejaan, kata tidak baku, tanda baca, dan kalimat berputar ditandai satu per satu beserta usul perbaikannya.",
+    otomatis: "Temuan muncul begitu naskah ditempel",
     mock: "bahasa",
   },
   {
     id: "beranda",
     ikon: IKON.dokumen,
     nama: "Project & Laporan",
+    singkat: "Naskah tersimpan, hasil siap dicetak",
     janji: "Tempel naskah sekali, dipakai seluruh alat",
     rinci:
-      "Naskah tersimpan di perangkat Anda sendiri, bukan di server kami. Hasil tiap alat dapat dicetak menjadi laporan rapi untuk dibawa ke bimbingan.",
+      "Naskah tersimpan di perangkat Anda, bukan di server kami. Hasil tiap alat dapat dicetak jadi laporan rapi untuk dibawa ke bimbingan.",
     otomatis: "Naskah dan hasil tersimpan sendiri, siap dicetak",
     mock: "beranda",
   },
-];
-
-const ANGKA = [
-  { nilai: "9", label: "alat dalam satu tempat" },
-  { nilai: "3", label: "katalog ilmiah dunia disisir langsung" },
-  { nilai: "0", label: "naskah yang dititipkan ke server" },
-  { nilai: "1×", label: "tempel naskah untuk semua alat" },
 ];
 
 /** Gambaran tampilan tiap menu. Digambar dengan elemen biasa, bukan berkas
@@ -297,6 +302,7 @@ export default function PratinjauCakrawala() {
   return (
     <div className="cw">
       <header className="cw-hero">
+        <Animasi nama="flying-book" className="cw-anim-buku" cadangan="📚" />
         <div className="cw-hero-in">
           <Link href="/" className="cw-back">← Portal Mahasiswa</Link>
           <span className="cw-gembok">
@@ -308,20 +314,22 @@ export default function PratinjauCakrawala() {
           </span>
           <h1>Cakrawala</h1>
           <p className="cw-lead">
-            Sembilan alat yang mengerjakan bagian paling melelahkan dari menulis tugas akhir — merumuskan judul,
-            mencari referensi, memeriksa kemiripan, sampai memastikan jurnal tujuan bukan jurnal abal-abal.
-            Semuanya otomatis, semudah membalikkan telapak tangan.
+            Nikmati kemudahan menyusun tugas akhir dengan sistem otomatis yang akurat.
+            Semudah membalikkan telapak tangan.
           </p>
           <div className="cw-hero-aksi">
             <a className="cw-btn cw-btn-utama" href="#kode">Punya kode? Buka sekarang</a>
             <a className="cw-btn" href="#etalase">Lihat isinya dulu</a>
           </div>
-          <div className="cw-angka">
-            {ANGKA.map((item) => (
-              <div key={item.label}>
-                <b>{item.nilai}</b>
-                <span>{item.label}</span>
-              </div>
+          <div className="cw-sorot">
+            {SOROTAN.map((item) => (
+              <a className="cw-sorot-item" key={item.id} href={`#menu-${item.id}`}>
+                <span className="cw-sorot-ic"><Ic d={item.ikon} /></span>
+                <span className="cw-sorot-teks">
+                  <b>{item.nama}</b>
+                  <small>{item.singkat}</small>
+                </span>
+              </a>
             ))}
           </div>
         </div>
@@ -330,28 +338,31 @@ export default function PratinjauCakrawala() {
       <main className="cw-body">
         <section className="cw-langkah" aria-label="Cara memakai Cakrawala">
           <div className="cw-langkah-kepala">
-            <p className="cw-eyebrow">SEMUDAH MEMBALIKKAN TELAPAK TANGAN</p>
-            <h2>Tiga langkah, sisanya dikerjakan sendiri</h2>
+            <div>
+              <p className="cw-eyebrow">SEMUDAH MEMBALIKKAN TELAPAK TANGAN</p>
+              <h2>Tiga langkah, sisanya dikerjakan sendiri</h2>
+            </div>
+            <Animasi nama="digital" className="cw-anim-digital" cadangan="⚙" />
           </div>
           <ol>
-            <li><b>1</b><span><strong>Tempel naskah sekali.</strong> Seluruh alat langsung memakainya, tidak perlu unggah berulang.</span></li>
-            <li><b>2</b><span><strong>Pilih alatnya.</strong> Satu klik, tanpa pengaturan yang membingungkan.</span></li>
-            <li><b>3</b><span><strong>Ambil hasilnya.</strong> Temuan tampil beserta alasannya, dan siap dicetak jadi laporan.</span></li>
+            <li><b>1</b><span><strong>Tempel naskah sekali.</strong> Semua alat langsung memakainya, tanpa unggah ulang.</span></li>
+            <li><b>2</b><span><strong>Pilih alatnya.</strong> Satu klik, tanpa pengaturan rumit.</span></li>
+            <li><b>3</b><span><strong>Ambil hasilnya.</strong> Temuan tampil beserta alasannya, siap dicetak jadi laporan.</span></li>
           </ol>
         </section>
 
         <section id="etalase" className="cw-etalase" aria-label="Keunggulan tiap menu Cakrawala">
           <div className="cw-etalase-kepala">
             <p className="cw-eyebrow">ISI CAKRAWALA</p>
-            <h2>Setiap menu, dan apa yang dikerjakannya untuk Anda</h2>
+            <h2>Setiap menu dan apa yang dikerjakannya</h2>
             <p className="cw-etalase-sub">
-              Gambaran tampilan di bawah ini diambil dari bentuk asli tiap panel. Yang terkunci hanyalah pintunya —
-              alatnya sendiri sudah jadi dan berjalan.
+              Gambaran di bawah diambil dari bentuk asli tiap panel. Yang terkunci hanya pintunya; alatnya sudah jadi
+              dan berjalan.
             </p>
           </div>
           <div className="cw-grid">
             {SOROTAN.map((item) => (
-              <article className="cw-kartu" key={item.id}>
+              <article className="cw-kartu" id={`menu-${item.id}`} key={item.id}>
                 <div className="cw-kartu-visual"><Mock jenis={item.mock} /></div>
                 <div className="cw-kartu-isi">
                   <span className="cw-kartu-ic"><Ic d={item.ikon} /></span>
@@ -370,8 +381,8 @@ export default function PratinjauCakrawala() {
             <p className="cw-eyebrow">PINTU MASUK</p>
             <h2>Punya kode akses?</h2>
             <p>
-              Masukkan kode yang Anda terima. Sekali dibuka, perangkat ini diingat selama 30 hari, jadi Anda tidak
-              perlu mengetiknya setiap kali datang.
+              Masukkan kode yang Anda terima. Sekali dibuka, perangkat ini diingat 30 hari, jadi tidak perlu
+              diketik setiap kali datang.
             </p>
           </div>
           <form className="cw-kunci-form" onSubmit={bukaKunci}>
@@ -395,8 +406,8 @@ export default function PratinjauCakrawala() {
             </div>
             {galat && <p className="cw-galat" role="alert">{galat}</p>}
             <p className="cw-kunci-catatan">
-              Kode bersifat pribadi. Bila kode Anda ditolak padahal baru diterima, hubungi pemberi kodenya —
-              kode dapat dinonaktifkan sewaktu-waktu.
+              Kode bersifat pribadi dan dapat dinonaktifkan sewaktu-waktu. Bila kode baru Anda ditolak, hubungi
+              pemberinya.
             </p>
           </form>
         </section>
@@ -406,8 +417,7 @@ export default function PratinjauCakrawala() {
             <p className="cw-eyebrow">BELUM PUNYA KODE?</p>
             <h2>Wanna? Contact Me {KONTAK}</h2>
             <p>
-              Cakrawala dibuka terbatas supaya setiap penggunanya benar-benar terbantu. Kirim pesan, sebutkan
-              kebutuhan Anda, dan kode akses akan diberikan.
+              Cakrawala dibuka terbatas. Kirim pesan, sebutkan kebutuhan Anda, lalu kode akses diberikan.
             </p>
           </div>
           <button type="button" className="cw-btn cw-btn-terang" onClick={salinKontak}>
@@ -416,9 +426,8 @@ export default function PratinjauCakrawala() {
         </section>
 
         <p className="cw-sangkal">
-          <b>Cakrawala alat bantu, bukan penentu.</b> Semua yang keluar di dalamnya adalah gambaran awal untuk
-          diperiksa sendiri. Alat ini tidak menilai, tidak meluluskan, dan tidak menggantikan pembacaan dosen
-          pembimbing maupun penguji.
+          <b>Cakrawala alat bantu, bukan penentu.</b> Hasilnya gambaran awal yang tetap perlu Anda periksa. Alat ini
+          tidak menilai, tidak meluluskan, dan tidak menggantikan dosen pembimbing maupun penguji.
         </p>
       </main>
 

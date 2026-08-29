@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { lecturers, requestAttachments, serviceRequests } from "@/db/schema";
 import { and, asc, eq } from "drizzle-orm";
+import { kolomDriveSiap } from "@/lib/kolom-drive";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,7 @@ export async function POST(request: Request) {
       return Response.json({ success: false, message: "Nomor tiket wajib diisi." }, { status: 400 });
     }
 
+    const withDrive = await kolomDriveSiap();
     const rows = await db
       .select({
         id: serviceRequests.id,
@@ -39,6 +41,7 @@ export async function POST(request: Request) {
         lecturerNote: serviceRequests.lecturerNote,
         adminNote: serviceRequests.adminNote,
         fileName: serviceRequests.fileName,
+        ...(withDrive ? { driveUrl: serviceRequests.driveUrl } : {}),
         createdAt: serviceRequests.createdAt,
         updatedAt: serviceRequests.updatedAt,
       })
@@ -52,12 +55,12 @@ export async function POST(request: Request) {
       return Response.json({ success: false, message: "Data tidak ditemukan. Pastikan nomor tiket sudah benar." }, { status: 404 });
     }
 
-    // Nama berkas per bagian ditampilkan agar mahasiswa yakin keempat unggahan
-    // bukti penyerahan benar-benar diterima. Hanya nama dan ukurannya —
+    // Nama berkas per bagian hanya ada pada tiket lama, dari masa penyerahan
+    // skripsi masih diunggah ke portal. Hanya nama dan ukurannya yang tampil;
     // berkasnya sendiri tetap tidak dapat diunduh tanpa login.
     //
-    // SENGAJA GAGAL-LUNAK: bila tabelnya belum dibuat (migrasi v7 belum
-    // dijalankan), pelacakan status tetap berjalan tanpa daftar bagian.
+    // SENGAJA GAGAL-LUNAK: bila tabelnya belum dibuat, pelacakan status tetap
+    // berjalan tanpa daftar bagian.
     let attachments: Array<{ part: string; label: string; fileName: string; fileSize: number }> = [];
     try {
       attachments = await db
@@ -93,6 +96,7 @@ export async function POST(request: Request) {
         lecturerNote: row.lecturerNote,
         adminNote: row.adminNote,
         fileName: row.fileName,
+        driveUrl: "driveUrl" in row ? row.driveUrl : null,
         attachments,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,

@@ -41,6 +41,7 @@ Buka **Netlify > sipalingfisip.web.id > Site configuration > Environment variabl
 | `SUPABASE_SECRET_KEY` | Secret key baru; server-only |
 | `SUPABASE_DOCUMENT_BUCKET` | `service-documents` (opsional) |
 | `NEXT_PUBLIC_SURAT_LAINNYA_DRIVE_URL` | URL folder Google Drive (opsional) |
+| `NEXT_PUBLIC_PERPUS_DRIVE_URL` | URL folder Google Drive perpustakaan untuk penyerahan skripsi |
 
 Pastikan variabel dipasang pada site Netlify yang benar-benar terhubung ke
 domain `sipalingfisip.web.id`, bukan site lama yang sudah tidak dipakai.

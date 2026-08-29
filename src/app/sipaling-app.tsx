@@ -8,13 +8,16 @@ import {
   type FinalTaskType,
 } from "@/lib/academic";
 import {
-  BUKTI_PARTS,
-  buktiAccept,
-  isBuktiPenyerahan,
-  periksaBuktiFile,
+  ABSENSI_NEED,
+  BAGIAN_PENYERAHAN,
+  PENYERAHAN_NEED,
+  isAbsensiPerpus,
+  isPenyerahanPerpus,
+  periksaTautanDrive,
 } from "@/lib/bukti-penyerahan";
 import { LecturerPicker, type LecturerOption } from "./lecturer-picker";
 import TitleProposalForm from "./title-proposal-form";
+import Animasi from "./animasi";
 
 type Tab = "form" | "judul" | "status" | "revisi" | "about";
 type ServiceType = (typeof serviceTypes)[number];
@@ -73,8 +76,10 @@ type StatusRecord = {
   lecturerNote: string | null;
   adminNote: string | null;
   fileName: string | null;
-  // Bagian-bagian berkas untuk kebutuhan yang mengunggah lebih dari satu
-  // lampiran; kosong pada kebutuhan lain.
+  // Tautan folder Google Drive pada penyerahan skripsi ke perpustakaan.
+  driveUrl?: string | null;
+  // Bagian-bagian berkas untuk tiket lama yang berkasnya masih tersimpan di
+  // penyimpanan portal; kosong pada tiket baru.
   attachments?: Array<{ part: string; label: string; fileName: string; fileSize: number }>;
   createdAt: string;
   updatedAt: string;
@@ -166,19 +171,11 @@ const serviceCatalog: Record<ServiceType, ServiceMeta> = {
     description: "Absensi, bebas pustaka, repository, dan penyerahan karya.",
     icon: "▤",
     needs: [
-      "Absensi Perpustakaan",
+      ABSENSI_NEED,
       "Request Bebas Pustaka",
       "Permintaan Cek Repository",
-      "Upload Bukti Penyerahan Jurnal/Skripsi",
+      PENYERAHAN_NEED,
     ],
-    needRequirements: {
-      "Upload Bukti Penyerahan Jurnal/Skripsi": [
-        "Upload cover sampai daftar isi.",
-        "Upload bagian isi skripsi BAB I sampai BAB V.",
-        "Upload daftar pustaka sampai selesai.",
-        "Upload file skripsi full dalam format PDF.",
-      ],
-    },
   },
   "Layanan Laboratorium": {
     short: "Laboratorium",
@@ -223,9 +220,9 @@ function firstFormNeed(type: ServiceType, finalTaskType: FinalTaskType) {
 
 type UploadMode = "required-docx" | "required-pdf" | "optional-document";
 
-// Kebutuhan "Upload Bukti Penyerahan Jurnal/Skripsi" tidak muncul di sini:
-// berkasnya empat buah, jadi kotak lampiran tunggal diganti seluruhnya oleh
-// blok unggah empat bagian dan mode ini tidak dipakai untuknya.
+// Absensi dan penyerahan skripsi tidak muncul di sini: keduanya tidak memakai
+// kotak lampiran sama sekali. Absensi cukup ditekan tombolnya, dan berkas
+// penyerahan naik ke Google Drive perpustakaan, bukan ke portal.
 function getUploadMode(serviceType: ServiceType): UploadMode {
   if (serviceType === "Layanan Tugas Akhir") return "required-docx";
   if (serviceType === "Layanan PDDIKTI") return "required-pdf";
@@ -539,9 +536,8 @@ export default function SipalingApp() {
   const [proposalData, setProposalData] = useState<ProposalRecord | null>(null);
   const [proposalCode, setProposalCode] = useState("");
   const [fileInfo, setFileInfo] = useState("");
-  // Nama berkas terpilih untuk tiap bagian bukti penyerahan, ditandai dengan
-  // id bagiannya (cover / isi / pustaka / full).
-  const [buktiInfo, setBuktiInfo] = useState<Record<string, string>>({});
+  // Tautan folder Google Drive milik mahasiswa untuk penyerahan skripsi.
+  const [driveLink, setDriveLink] = useState("");
   const [revFileInfo, setRevFileInfo] = useState("");
   const [copiedNote, setCopiedNote] = useState("");
   // Penanda gembok pada tombol Cakrawala. Hanya status kuncinya yang dibaca —
@@ -561,17 +557,23 @@ export default function SipalingApp() {
   // form itu hanya punya satu Dosen Tujuan, sedangkan pengajuan judul wajib
   // tiga usulan dosen. Semua jalur masuk diarahkan ke templatenya.
   const isProposalNeed = isTitleProposalNeed(selectedNeed);
-  const PAYMENT_NOTICE_TYPES: ServiceType[] = ["Layanan Umum", "Layanan Prodi", "Layanan Akademik", "Layanan Perpustakaan"];
-  const showPaymentNotice = PAYMENT_NOTICE_TYPES.includes(serviceType);
   const isAcademicReview = serviceType === "Layanan Tugas Akhir";
-  // Empat kotak unggah menggantikan lampiran tunggal pada kebutuhan bukti
-  // penyerahan, supaya berkas sampai ke Admin Perpustakaan sudah tersortir.
-  const isBuktiEmpatBagian = isBuktiPenyerahan(serviceType, selectedNeed);
+  // Penyerahan skripsi memakai folder Google Drive perpustakaan; portal hanya
+  // menerima tautannya. Absensi tidak meminta berkas maupun tulisan apa pun.
+  const isPenyerahan = isPenyerahanPerpus(serviceType, selectedNeed);
+  const isAbsensi = isAbsensiPerpus(serviceType, selectedNeed);
+  const PAYMENT_NOTICE_TYPES: ServiceType[] = ["Layanan Umum", "Layanan Prodi", "Layanan Akademik", "Layanan Perpustakaan"];
+  // Absensi hanya menekan tombol; tidak ada syarat yang perlu dibaca dulu.
+  const showPaymentNotice = PAYMENT_NOTICE_TYPES.includes(serviceType) && !isAbsensi;
   const uploadMode = getUploadMode(serviceType);
-  const requiresFile = !isBuktiEmpatBagian && uploadMode !== "optional-document";
+  const requiresFile = !isPenyerahan && !isAbsensi && uploadMode !== "optional-document";
   const rawDriveUrl = process.env.NEXT_PUBLIC_SURAT_LAINNYA_DRIVE_URL?.trim() || "";
   const suratLainnyaDriveUrl = /^https:\/\/(drive|docs)\.google\.com\//i.test(rawDriveUrl)
     ? rawDriveUrl
+    : "";
+  const rawPerpusDriveUrl = process.env.NEXT_PUBLIC_PERPUS_DRIVE_URL?.trim() || "";
+  const perpusDriveUrl = /^https:\/\/(drive|docs)\.google\.com\//i.test(rawPerpusDriveUrl)
+    ? rawPerpusDriveUrl
     : "";
   const isSuratLainnya = serviceType === "Layanan Umum" && selectedNeed === "Kebutuhan Lainnya";
 
@@ -622,7 +624,7 @@ export default function SipalingApp() {
 
   // Auto load absensi perpustakaan ketika NIM diisi
   useEffect(() => {
-    if (serviceType !== "Layanan Perpustakaan" || selectedNeed !== "Absensi Perpustakaan") {
+    if (!isAbsensiPerpus(serviceType, selectedNeed)) {
       const resetTimer = window.setTimeout(() => setAttendanceInfo(null), 0);
       return () => window.clearTimeout(resetTimer);
     }
@@ -636,23 +638,19 @@ export default function SipalingApp() {
         setAttendanceInfo(null);
         return;
       }
+      const now = new Date();
+      // Waktu selalu terisi dari perangkat. Nomor kunjungan butuh server, dan
+      // bila server tidak menjawab absennya tetap boleh dikirim: nomor
+      // sebenarnya dihitung ulang di server saat kunjungan dicatat.
+      let nextVisit = 0;
       try {
         const res = await fetch(`/api/attendance?nim=${nim}`);
         const data = await res.json();
-        if (!data.success) return;
-
-        const now = new Date();
-        const dateStr = localDateString(now);
-        const timeStr = now.toTimeString().slice(0, 5);
-
-        setAttendanceInfo({
-          nextVisit: data.nextVisit || 1,
-          date: dateStr,
-          time: timeStr,
-        });
+        if (data.success) nextVisit = data.nextVisit || 0;
       } catch {
-        setAttendanceInfo(null);
+        nextVisit = 0;
       }
+      setAttendanceInfo({ nextVisit, date: localDateString(now), time: now.toTimeString().slice(0, 5) });
     };
 
     nimInput.addEventListener("input", handler);
@@ -691,7 +689,7 @@ export default function SipalingApp() {
     setServiceType(type);
     setSelectedNeed(nextNeed);
     setAttendanceInfo(null);
-    setBuktiInfo({});
+    setDriveLink("");
     setActiveTab(isTitleProposalNeed(nextNeed) ? "judul" : "form");
     window.setTimeout(() => {
       document.getElementById("workspace")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -715,7 +713,7 @@ export default function SipalingApp() {
 
   function selectNeed(need: string) {
     setSelectedNeed(need);
-    setBuktiInfo({});
+    setDriveLink("");
     if (isTitleProposalNeed(need)) {
       // Kebutuhan "Pengajuan Judul" memakai template resmi, bukan form biasa.
       if (need === "Pengajuan Judul Jurnal") setFinalTaskType("Jurnal");
@@ -752,29 +750,27 @@ export default function SipalingApp() {
       return;
     }
 
-    // Auto-absensi perpustakaan: isi data otomatis ke formData
-    if (serviceType === "Layanan Perpustakaan" && selectedNeed === "Absensi Perpustakaan" && attendanceInfo) {
-      formData.set("absensiAuto", "1");
-      formData.set("absensiHari", new Intl.DateTimeFormat("id-ID", { weekday: "long" }).format(new Date(attendanceInfo.date)));
-      formData.set("absensiTanggal", attendanceInfo.date);
-      formData.set("absensiJam", attendanceInfo.time);
-      formData.set("absensiKunjungan", String(attendanceInfo.nextVisit));
+    // Absensi: seluruh datanya dihitung sendiri, mahasiswa tidak menulis
+    // apa pun. Judul dan catatan tiketnya diisi di sini.
+    if (isAbsensi) {
+      const kini = new Date();
+      const info = attendanceInfo ?? { nextVisit: 0, date: localDateString(kini), time: kini.toTimeString().slice(0, 5) };
+      const hari = new Intl.DateTimeFormat("id-ID", { weekday: "long" }).format(new Date(info.date));
+      const kunjungan = info.nextVisit ? `, Kunjungan ke-${info.nextVisit}` : "";
+      formData.set("title", ABSENSI_NEED);
+      formData.set("studentNote", `[ABSENSI PERPUSTAKAAN] ${hari}, ${info.date}, jam ${info.time}${kunjungan}`);
+      formData.delete("file");
     }
 
-    // Empat bagian bukti penyerahan diperiksa satu per satu supaya pesannya
-    // menyebut bagian mana yang bermasalah, bukan sekadar "lampiran salah".
-    if (isBuktiEmpatBagian) {
-      for (const part of BUKTI_PARTS) {
-        const entry = formData.get(part.field);
-        const partFile = entry instanceof File && entry.name ? entry : null;
-        const check = periksaBuktiFile(part, partFile);
-        if (!check.ok) {
-          setSubmitError(check.pesan);
-          return;
-        }
+    // Penyerahan skripsi: berkasnya sudah ada di Drive perpustakaan, yang
+    // dikirim ke portal hanya tautannya.
+    if (isPenyerahan) {
+      const cek = periksaTautanDrive(driveLink);
+      if (!cek.ok) {
+        setSubmitError(cek.pesan);
+        return;
       }
-      // Lampiran tunggal tidak dipakai pada jalur ini; ikut terkirim kosong
-      // hanya akan membingungkan pemeriksaan di server.
+      formData.set("driveUrl", cek.tautan);
       formData.delete("file");
     }
 
@@ -789,22 +785,6 @@ export default function SipalingApp() {
     if (!requiresFile && file && !isAcceptedFile(file, "optional-document")) {
       setSubmitError("Lampiran opsional harus berupa PDF atau DOCX maksimal 10 MB.");
       return;
-    }
-
-    // Gabungkan field absensi ke catatan jika layanan perpustakaan + absensi
-    const serviceNeed = String(formData.get("serviceNeed") || "");
-    if (serviceType === "Layanan Perpustakaan" && serviceNeed === "Absensi Perpustakaan") {
-      const hari = String(formData.get("absensiHari") || "").trim();
-      const tanggal = String(formData.get("absensiTanggal") || "").trim();
-      const jam = String(formData.get("absensiJam") || "").trim();
-      const kunjungan = String(formData.get("absensiKunjungan") || "").trim();
-      if (!hari || !tanggal || !jam || !kunjungan) {
-        setSubmitError("Mohon lengkapi data absensi perpustakaan (hari, tanggal, jam, dan kunjungan ke-).");
-        return;
-      }
-      const absensiNote = `[ABSENSI PERPUSTAKAAN] Hari: ${hari}, Tanggal: ${tanggal}, Jam: ${jam}, Kunjungan ke-${kunjungan}`;
-      const existingNote = String(formData.get("studentNote") || "").trim();
-      formData.set("studentNote", existingNote ? `${absensiNote} | ${existingNote}` : absensiNote);
     }
 
     setIsSubmitting(true);
@@ -826,7 +806,7 @@ export default function SipalingApp() {
       );
       form.reset();
       setFileInfo("");
-      setBuktiInfo({});
+      setDriveLink("");
       setServiceType(serviceTypes[0]);
       setSelectedNeed(serviceCatalog[serviceTypes[0]].needs[0]);
       clearLecturerSearch();
@@ -1084,13 +1064,15 @@ export default function SipalingApp() {
                     <option value="Ilmu Pemerintahan">Ilmu Pemerintahan</option>
                   </select>
                 </div>
-                <div className="field-group">
-                  <label htmlFor="contact">Email / WhatsApp</label>
-                  <input id="contact" name="contact" type="text" placeholder="0812xxxx / email mahasiswa" />
-                </div>
+                {!isAbsensi && (
+                  <div className="field-group">
+                    <label htmlFor="contact">Email / WhatsApp</label>
+                    <input id="contact" name="contact" type="text" placeholder="0812xxxx / email mahasiswa" />
+                  </div>
+                )}
                 <div className="field-group">
                   <label htmlFor="serviceType">Jenis Layanan <em>*</em></label>
-                  <select id="serviceType" name="serviceType" value={serviceType} onChange={(event) => { const t = event.target.value as ServiceType; const nextNeed = needsFor(t, finalTaskType)[0]; setServiceType(t); setSelectedNeed(nextNeed); setAttendanceInfo(null); setBuktiInfo({}); if (isTitleProposalNeed(nextNeed)) selectTab("judul"); }} required>
+                  <select id="serviceType" name="serviceType" value={serviceType} onChange={(event) => { const t = event.target.value as ServiceType; const nextNeed = needsFor(t, finalTaskType)[0]; setServiceType(t); setSelectedNeed(nextNeed); setAttendanceInfo(null); setDriveLink(""); if (isTitleProposalNeed(nextNeed)) selectTab("judul"); }} required>
                     {serviceTypes.map((type) => <option value={type} key={type}>{type}</option>)}
                   </select>
                 </div>
@@ -1128,24 +1110,26 @@ export default function SipalingApp() {
                   </div>
                 ) : (
                 <>
-                <div className="field-group field-full">
-                  <label htmlFor="title">
-                    {isAcademicReview || isBuktiEmpatBagian ? "Judul Skripsi / Jurnal" : "Ringkasan Kebutuhan"} <em>*</em>
-                  </label>
-                  <input
-                    id="title"
-                    name="title"
-                    type="text"
-                    placeholder={
-                      isAcademicReview
-                        ? "Masukkan judul lengkap"
-                        : isBuktiEmpatBagian
-                          ? "Tuliskan judul skripsi/jurnal yang diserahkan"
-                          : "Tuliskan inti kebutuhan layanan Anda"
-                    }
-                    required
-                  />
-                </div>
+                {!isAbsensi && (
+                  <div className="field-group field-full">
+                    <label htmlFor="title">
+                      {isAcademicReview || isPenyerahan ? "Judul Skripsi / Jurnal" : "Ringkasan Kebutuhan"} <em>*</em>
+                    </label>
+                    <input
+                      id="title"
+                      name="title"
+                      type="text"
+                      placeholder={
+                        isAcademicReview
+                          ? "Masukkan judul lengkap"
+                          : isPenyerahan
+                            ? "Tuliskan judul skripsi/jurnal yang diserahkan"
+                            : "Tuliskan inti kebutuhan layanan Anda"
+                      }
+                      required
+                    />
+                  </div>
+                )}
                 {showPaymentNotice && (
                   <div className="field-group field-full requirements-box">
                     <div className="requirements-title"><span>!</span> Persyaratan Pengajuan</div>
@@ -1158,7 +1142,7 @@ export default function SipalingApp() {
                     <ul className="requirements-list">{currentService.requirements.map((req, idx) => <li key={idx}>{req}</li>)}</ul>
                   </div>
                 )}
-                {currentService.needRequirements?.[selectedNeed] && !isBuktiEmpatBagian && (
+                {currentService.needRequirements?.[selectedNeed] && (
                   <div className="field-group field-full requirements-box">
                     <div className="requirements-title"><span>!</span> Persyaratan Upload</div>
                     <ul className="requirements-list">{currentService.needRequirements[selectedNeed].map((req, idx) => <li key={idx}>{req}</li>)}</ul>
@@ -1179,16 +1163,21 @@ export default function SipalingApp() {
                     </button>
                   </div>
                 )}
-                {serviceType === "Layanan Perpustakaan" && selectedNeed === "Absensi Perpustakaan" && (
+                {isAbsensi && (
                   <div className="field-group field-full attendance-box">
-                    <div className="attendance-header"><span>📍</span> Absensi Perpustakaan (otomatis)</div>
-                    <p className="attendance-desc">Sistem akan otomatis mendeteksi hari, tanggal, dan jam saat NIM dimasukkan. Nomor kunjungan dihitung otomatis berdasarkan riwayat NIM tersebut. Admin tetap dapat mengubah data jika diperlukan.</p>
-                    <div className="attendance-auto">
-                      <div><strong>Hari & Tanggal:</strong> <span>{attendanceInfo ? new Date(attendanceInfo.date).toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "Menunggu NIM..."}</span></div>
-                      <div><strong>Jam:</strong> <span>{attendanceInfo ? attendanceInfo.time : "-"}</span></div>
-                      <div><strong>Kunjungan ke-:</strong> <span>{attendanceInfo ? attendanceInfo.nextVisit : "-"}</span></div>
+                    <div className="attendance-header">
+                      <Animasi nama="flying-book" className="perpus-anim" cadangan="📚" />
+                      <div>
+                        <b>Absensi Perpustakaan</b>
+                        <span>Isi NIM, nama, dan prodi. Sisanya terisi sendiri.</span>
+                      </div>
                     </div>
-                    <input type="hidden" name="absensiAuto" value="1" />
+                    <div className="attendance-auto">
+                      <div><strong>Hari & Tanggal</strong><span>{attendanceInfo ? new Date(attendanceInfo.date).toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "Menunggu NIM…"}</span></div>
+                      <div><strong>Jam</strong><span>{attendanceInfo ? attendanceInfo.time : "-"}</span></div>
+                      <div><strong>Kunjungan ke-</strong><span>{attendanceInfo?.nextVisit ? attendanceInfo.nextVisit : "Dihitung saat absen"}</span></div>
+                    </div>
+                    <p className="attendance-desc">Tanpa unggah berkas dan tanpa catatan. Tekan tombol di bawah, kunjungan langsung tercatat.</p>
                   </div>
                 )}
                 {isAcademicReview ? (
@@ -1205,51 +1194,58 @@ export default function SipalingApp() {
                     />
                     {lecturerError && <p className="helper helper-error">{lecturerError}</p>}
                   </div>
-                ) : (
-                  <div className="context-note field-full"><span>i</span><p>Pengajuan akan diteruskan ke admin unit <strong>{serviceCatalog[serviceType].short}</strong> untuk ditindaklanjuti.</p></div>
+                ) : isAbsensi ? null : (
+                  <div className="context-note field-full"><span>i</span><p>Pengajuan diteruskan ke admin unit <strong>{serviceCatalog[serviceType].short}</strong>.</p></div>
                 )}
-                <div className="field-group field-full">
-                  <label htmlFor="studentNote">Catatan Mahasiswa</label>
-                  <textarea id="studentNote" name="studentNote" placeholder="Contoh: Mohon dibantu untuk pengecekan data atau BAB I sampai BAB V." />
-                </div>
-                {isBuktiEmpatBagian ? (
-                  <div className="field-group field-full bukti-box">
-                    <p className="bukti-intro">Upload dibagi menjadi 4 bagian agar dokumen lebih rapi dan mudah diperiksa.</p>
-                    <div className="bukti-syarat">
-                      <b>Persyaratan Upload</b>
-                      <ol>
-                        {BUKTI_PARTS.map((part) => <li key={part.id}>{part.requirement}</li>)}
-                      </ol>
-                    </div>
-                    {BUKTI_PARTS.map((part) => (
-                      <div className="bukti-slot" key={part.id}>
-                        <label htmlFor={part.field}>{part.label} <em>*</em></label>
-                        <div className="file-input-wrap">
-                          <input
-                            id={part.field}
-                            name={part.field}
-                            type="file"
-                            accept={buktiAccept(part.format)}
-                            required
-                            onChange={(event) => {
-                              const chosen = event.target.files && event.target.files[0];
-                              setBuktiInfo((current) => ({
-                                ...current,
-                                [part.id]: chosen
-                                  ? `${chosen.name} · ${(chosen.size / 1024 / 1024).toFixed(2).replace(".", ",")} MB`
-                                  : "",
-                              }));
-                            }}
-                          />
-                        </div>
-                        {buktiInfo[part.id] && <span className="file-chosen">📄 {buktiInfo[part.id]}</span>}
-                        <p className="helper">{part.helper} Maksimal 10 MB.</p>
+                {!isAbsensi && (
+                  <div className="field-group field-full">
+                    <label htmlFor="studentNote">Catatan Mahasiswa</label>
+                    <textarea id="studentNote" name="studentNote" placeholder="Contoh: mohon dibantu pengecekan data, atau BAB I sampai BAB V." />
+                  </div>
+                )}
+                {isAbsensi ? null : isPenyerahan ? (
+                  <div className={`field-group field-full drive-serah ${perpusDriveUrl ? "" : "drive-serah-belum"}`}>
+                    <div className="drive-serah-kepala">
+                      <Animasi nama="digital" className="perpus-anim" cadangan="🗂" />
+                      <div>
+                        <b>Berkas diunggah ke Google Drive perpustakaan</b>
+                        <span>Portal hanya menyimpan tautannya, bukan berkasnya.</span>
                       </div>
-                    ))}
-                    <p className="bukti-tutup">
-                      Keempat berkas dikirim dalam satu tiket dan langsung diterima Admin Perpustakaan dalam keadaan
-                      terpisah, jadi tidak perlu digabung sendiri.
-                    </p>
+                    </div>
+                    <ol className="drive-serah-daftar">
+                      {BAGIAN_PENYERAHAN.map((bagian, urutan) => (
+                        <li key={bagian.id}>
+                          <b>{urutan + 1}. {bagian.label}</b>
+                          <span>{bagian.keterangan}</span>
+                        </li>
+                      ))}
+                    </ol>
+                    <button
+                      type="button"
+                      className="drive-upload-button"
+                      onClick={() => perpusDriveUrl && window.open(perpusDriveUrl, "_blank", "noopener,noreferrer")}
+                      disabled={!perpusDriveUrl}
+                    >
+                      Buka Folder Drive Perpustakaan <span>↗</span>
+                    </button>
+                    <div className="drive-serah-tautan">
+                      <label htmlFor="driveUrl">Tautan Google Drive Anda <em>*</em></label>
+                      <input
+                        id="driveUrl"
+                        name="driveUrl"
+                        type="url"
+                        inputMode="url"
+                        placeholder="https://drive.google.com/…"
+                        value={driveLink}
+                        onChange={(event) => setDriveLink(event.target.value)}
+                        required
+                      />
+                      <p className="helper">
+                        Unggah keempat berkas ke folder di atas, buat foldernya dapat diakses, lalu tempel tautannya
+                        di sini.
+                        {!perpusDriveUrl && " Folder perpustakaan belum diatur: atur NEXT_PUBLIC_PERPUS_DRIVE_URL pada environment hosting."}
+                      </p>
+                    </div>
                   </div>
                 ) : (
                   <div className="field-group field-full upload-box">
@@ -1260,8 +1256,8 @@ export default function SipalingApp() {
                   </div>
                 )}
                 <div className="form-actions field-full">
-                  <button type="submit" className="button button-primary" disabled={isSubmitting}>{isSubmitting ? "Mengirim..." : "Kirim Layanan"}<span>→</span></button>
-                  <button type="reset" className="button button-light" onClick={() => { setServiceType(serviceTypes[0]); setSelectedNeed(firstFormNeed(serviceTypes[0], finalTaskType)); setAttendanceInfo(null); clearLecturerSearch(); setFileInfo(""); setBuktiInfo({}); setSubmitError(""); setSubmitMessage(null); }}>Reset</button>
+                  <button type="submit" className="button button-primary" disabled={isSubmitting}>{isSubmitting ? (isAbsensi ? "Mencatat…" : "Mengirim…") : isAbsensi ? "Absen Sekarang" : "Kirim Layanan"}<span>→</span></button>
+                  <button type="reset" className="button button-light" onClick={() => { setServiceType(serviceTypes[0]); setSelectedNeed(firstFormNeed(serviceTypes[0], finalTaskType)); setAttendanceInfo(null); clearLecturerSearch(); setFileInfo(""); setDriveLink(""); setSubmitError(""); setSubmitMessage(null); }}>Reset</button>
                 </div>
                 </>
                 )}
@@ -1354,6 +1350,19 @@ export default function SipalingApp() {
                     <div><small>Revisi Ke</small><strong>{statusData.revisionCount}</strong></div>
                     <div><small>Pengajuan</small><strong>{formatDate(statusData.createdAt)}</strong></div>
                   </div>
+                  {statusData.driveUrl && (
+                    <div className="report-files">
+                      <small>Tautan berkas</small>
+                      <ul>
+                        <li>
+                          <b>Folder Google Drive</b>
+                          <span>
+                            <a href={statusData.driveUrl} target="_blank" rel="noreferrer">{statusData.driveUrl}</a>
+                          </span>
+                        </li>
+                      </ul>
+                    </div>
+                  )}
                   {statusData.attachments && statusData.attachments.length > 0 && (
                     <div className="report-files">
                       <small>Berkas yang diterima</small>

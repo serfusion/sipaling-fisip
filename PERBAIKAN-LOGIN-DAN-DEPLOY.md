@@ -25,6 +25,8 @@ Buka site Netlify yang memiliki domain `sipalingfisip.web.id`, lalu buka
 - `DATABASE_URL`
 - `NEXT_PUBLIC_SURAT_LAINNYA_DRIVE_URL` — URL folder Google Drive untuk
   upload dokumen pada kebutuhan **Surat Lainnya**
+- `NEXT_PUBLIC_PERPUS_DRIVE_URL` — URL folder Google Drive milik
+  perpustakaan, tempat mahasiswa mengunggah berkas penyerahan skripsi
 
 Secret key hanya boleh berada di Netlify. Jangan menaruhnya di source code,
 GitHub, atau variable yang diawali `NEXT_PUBLIC_`.

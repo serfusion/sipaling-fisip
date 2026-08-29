@@ -60,7 +60,7 @@ export function PanelSitasi({
   return (
     <>
       <section className="al-card">
-        <Kepala ikon={IKON.sitasi} judul="Pastikan tiap referensi Anda benar-benar ada"
+        <Kepala ikon={IKON.sitasi} judul="Pastikan tiap referensi ada datanya"
           sub="Tempel daftar pustaka → mencari data ke Crossref dan OpenAlex → lihat mana yang nyata" />
         <Rinci>
           <p>

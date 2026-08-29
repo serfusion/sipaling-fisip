@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { lecturers, libraryAttendance, requestAttachments, serviceRequests } from "@/db/schema";
+import { lecturers, libraryAttendance, serviceRequests } from "@/db/schema";
 import { and, desc, eq, gte, ilike, lt, sql } from "drizzle-orm";
 import {
   MAX_DOCUMENT_BYTES,
@@ -7,13 +7,14 @@ import {
   uploadDocument,
 } from "@/lib/document-storage";
 import {
-  BUKTI_PARTS,
-  BUKTI_PART_UTAMA,
-  buktiMime,
-  isBuktiPenyerahan,
-  periksaBuktiFile,
-  type BuktiPart,
+  ABSENSI_NEED,
+  PENYERAHAN_NEED,
+  PENYERAHAN_NEED_LAMA,
+  isAbsensiPerpus,
+  isPenyerahanPerpus,
+  periksaTautanDrive,
 } from "@/lib/bukti-penyerahan";
+import { kolomDriveSiap } from "@/lib/kolom-drive";
 import { getCurrentProfile, serviceTypeForProfile } from "@/lib/supabase-server";
 import { explainServerError } from "@/lib/api-errors";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
@@ -74,11 +75,15 @@ const serviceCatalog: Record<string, string[]> = {
     "Surat Keterangan Aktif Kuliah",
     "Surat Lainnya",
   ],
+  // Nama terakhir adalah sebutan lama untuk penyerahan skripsi sebelum
+  // pindah ke Google Drive perpustakaan. Tetap diterima supaya halaman yang
+  // sudah terbuka di tab mahasiswa tidak ikut ditolak.
   "Layanan Perpustakaan": [
-    "Absensi Perpustakaan",
+    ABSENSI_NEED,
     "Request Bebas Pustaka",
     "Permintaan Cek Repository",
-    "Upload Bukti Penyerahan Jurnal/Skripsi",
+    PENYERAHAN_NEED,
+    PENYERAHAN_NEED_LAMA,
   ],
   "Layanan Laboratorium": [
     "Peminjaman Ruang Laboratorium",
@@ -126,7 +131,6 @@ export async function POST(request: Request) {
     const contact = textValue(form, "contact");
     const serviceType = textValue(form, "serviceType");
     const serviceNeed = textValue(form, "serviceNeed");
-    const title = textValue(form, "title");
     const studentNote = textValue(form, "studentNote");
     const lecturerIdValue = textValue(form, "lecturerId");
 
@@ -138,11 +142,19 @@ export async function POST(request: Request) {
     if (!/^\d{4,20}$/.test(nim)) {
       return Response.json({ success: false, message: "NIM harus berupa angka 4 sampai 20 digit." }, { status: 400 });
     }
-    if (!studentName || !studyProgram || !serviceType || !serviceNeed || !title) {
+    if (!studentName || !studyProgram || !serviceType || !serviceNeed) {
       return Response.json({ success: false, message: "Mohon lengkapi semua field yang bertanda wajib." }, { status: 400 });
     }
     if (!serviceCatalog[serviceType] || !serviceCatalog[serviceType].includes(serviceNeed)) {
       return Response.json({ success: false, message: "Pilihan layanan tidak valid." }, { status: 400 });
+    }
+
+    const absensi = isAbsensiPerpus(serviceType, serviceNeed);
+    // Absensi tidak meminta mahasiswa menulis apa pun: judulnya diisi sendiri
+    // supaya tiketnya tetap punya keterangan yang terbaca di dashboard.
+    const title = textValue(form, "title") || (absensi ? ABSENSI_NEED : "");
+    if (!title) {
+      return Response.json({ success: false, message: "Mohon lengkapi semua field yang bertanda wajib." }, { status: 400 });
     }
 
     const isTugasAkhir =
@@ -171,33 +183,32 @@ export async function POST(request: Request) {
       }
     }
 
-    // Bukti penyerahan jurnal/skripsi memakai jalurnya sendiri: empat berkas
-    // terpisah, bukan satu lampiran gabungan.
-    const multiPart = isBuktiPenyerahan(serviceType, serviceNeed);
-    const buktiFiles: Array<{ part: BuktiPart; file: File }> = [];
-    if (multiPart) {
-      for (const part of BUKTI_PARTS) {
-        const entry = form.get(part.field);
-        const candidate = entry instanceof File && entry.name ? entry : null;
-        const check = periksaBuktiFile(part, candidate);
-        if (!check.ok) {
-          return Response.json({ success: false, message: check.pesan }, { status: 400 });
-        }
-        buktiFiles.push({ part, file: candidate as File });
+    // Penyerahan skripsi/jurnal ke perpustakaan tidak lagi mengunggah berkas
+    // ke penyimpanan portal: berkasnya ada di folder Google Drive milik
+    // perpustakaan, dan yang tersimpan di sini hanya tautannya.
+    const penyerahan = isPenyerahanPerpus(serviceType, serviceNeed);
+    let driveUrl: string | null = null;
+    if (penyerahan) {
+      const cek = periksaTautanDrive(textValue(form, "driveUrl"));
+      if (!cek.ok) {
+        return Response.json({ success: false, message: cek.pesan }, { status: 400 });
       }
+      driveUrl = cek.tautan;
     }
 
-    const fileEntry = form.get("file");
+    // Absensi dan penyerahan Drive sama sekali tidak memakai lampiran.
+    const tanpaLampiran = absensi || penyerahan;
+    const fileEntry = tanpaLampiran ? null : form.get("file");
     const file = fileEntry instanceof File && fileEntry.name ? fileEntry : null;
     const requiresDocx = isTugasAkhir;
     const requiresPdf = serviceType === "Layanan PDDIKTI";
-    if (!multiPart && (requiresDocx || requiresPdf) && !file) {
+    if ((requiresDocx || requiresPdf) && !file) {
       return Response.json(
         { success: false, message: requiresPdf ? "Satu file PDF wajib dilampirkan untuk layanan ini." : "File DOCX wajib dilampirkan untuk Layanan Tugas Akhir." },
         { status: 400 },
       );
     }
-    if (file && !multiPart) {
+    if (file) {
       const name = file.name.toLowerCase();
       const okExt = requiresPdf
         ? name.endsWith(".pdf")
@@ -229,49 +240,9 @@ export async function POST(request: Request) {
     let fileMime: string | null = null;
     let fileSize: number | null = null;
     let fileStoragePath: string | null = null;
-    const attachmentRows: Array<{
-      part: string;
-      label: string;
-      sortOrder: number;
-      fileName: string;
-      fileMime: string;
-      fileSize: number;
-      fileStoragePath: string;
-    }> = [];
 
     try {
-      if (multiPart) {
-        for (let index = 0; index < buktiFiles.length; index++) {
-          const { part, file: partFile } = buktiFiles[index];
-          const mime = buktiMime(partFile.name, partFile.type);
-          let path: string;
-          try {
-            path = await uploadDocument({ folder: "requests", ticket, file: partFile, contentType: mime });
-          } catch (reason) {
-            // Nama bagiannya ikut disebut, supaya mahasiswa tahu berkas mana
-            // dari keempatnya yang harus diperbaiki.
-            throw new Error(`${part.label}: ${(reason as Error).message}`);
-          }
-          uploadedPaths.push(path);
-          attachmentRows.push({
-            part: part.id,
-            label: part.label,
-            sortOrder: index,
-            fileName: partFile.name,
-            fileMime: mime,
-            fileSize: partFile.size,
-            fileStoragePath: path,
-          });
-          // Skripsi full sekaligus menjadi lampiran utama tiket, sehingga
-          // tombol unduh yang sudah ada tetap menunjuk berkas yang benar.
-          if (part.id === BUKTI_PART_UTAMA) {
-            fileName = partFile.name;
-            fileMime = mime;
-            fileSize = partFile.size;
-            fileStoragePath = path;
-          }
-        }
-      } else if (file) {
+      if (file) {
         fileName = file.name;
         fileMime = file.type || (file.name.toLowerCase().endsWith(".pdf") ? PDF_MIME : DOCX_MIME);
         fileSize = file.size;
@@ -282,6 +253,14 @@ export async function POST(request: Request) {
       await Promise.all(uploadedPaths.map((path) => removeDocument(path).catch(() => undefined)));
       throw error;
     }
+
+    // Kolom drive_url baru ada setelah migrasi v8. Selama belum dijalankan,
+    // tautannya menumpang di catatan mahasiswa supaya pengajuan tidak gagal
+    // dan admin perpustakaan tetap menerima tautannya.
+    const simpanDrive = driveUrl ? await kolomDriveSiap() : false;
+    const catatan = driveUrl && !simpanDrive
+      ? [`[DRIVE] ${driveUrl}`, studentNote].filter(Boolean).join(" | ")
+      : studentNote;
 
     let finalTicket = ticket;
     let requestId: number | null = null;
@@ -300,7 +279,8 @@ export async function POST(request: Request) {
               serviceNeed,
               title,
               lecturerId,
-              studentNote: studentNote || null,
+              studentNote: catatan || null,
+              ...(simpanDrive ? { driveUrl } : {}),
               fileName,
               fileMime,
               fileSize,
@@ -321,28 +301,13 @@ export async function POST(request: Request) {
           throw error;
         }
       }
-
-      // Empat lampiran bernama disimpan setelah tiketnya ada. Bila langkah
-      // ini gagal, tiket yang baru saja dibuat ikut dihapus supaya tidak
-      // tersisa pengajuan yang berkasnya tidak lengkap.
-      const savedId = requestId;
-      if (attachmentRows.length && savedId) {
-        try {
-          await db.insert(requestAttachments).values(
-            attachmentRows.map((row) => ({ ...row, requestId: savedId })),
-          );
-        } catch (error) {
-          await db.delete(serviceRequests).where(eq(serviceRequests.id, savedId));
-          throw error;
-        }
-      }
     } catch (error) {
       await Promise.all(uploadedPaths.map((path) => removeDocument(path).catch(() => undefined)));
       throw error;
     }
 
     // Catat kunjungan perpustakaan otomatis agar penghitung "Kunjungan ke-" berjalan.
-    if (serviceType === "Layanan Perpustakaan" && serviceNeed === "Absensi Perpustakaan") {
+    if (absensi) {
       try {
         const countRows = await db
           .select({ count: sql<number>`count(*)::int` })
@@ -352,7 +317,7 @@ export async function POST(request: Request) {
           nim,
           studentName,
           visitNumber: (countRows[0]?.count ?? 0) + 1,
-          note: studentNote || null,
+          note: catatan || null,
           requestId,
         });
       } catch (error) {
@@ -394,6 +359,7 @@ export async function GET(request: Request) {
       return Response.json({ success: true, requests: [] });
     }
     const unitServiceType = serviceTypeForProfile(profile);
+    const withDrive = await kolomDriveSiap();
     const accessFilter = profile.role === "dosen"
       ? eq(serviceRequests.lecturerId, profile.lecturerId as number)
       : unitServiceType
@@ -416,6 +382,7 @@ export async function GET(request: Request) {
         adminNote: serviceRequests.adminNote,
         revisionCount: serviceRequests.revisionCount,
         fileName: serviceRequests.fileName,
+        ...(withDrive ? { driveUrl: serviceRequests.driveUrl } : {}),
         lecturerId: serviceRequests.lecturerId,
         createdAt: serviceRequests.createdAt,
         updatedAt: serviceRequests.updatedAt,
