@@ -43,7 +43,7 @@ const SOROTAN: Sorot[] = [
     janji: "Dari topik menjadi judul yang siap diajukan",
     rinci:
       "Isi topik, lokasi, dan sasaran penelitian. Keluar beberapa pilihan judul, rumusan masalah, dan metode yang cocok untuk menjawabnya.",
-    otomatis: "Judul, rumusan masalah, dan metode tersusun sendiri",
+    otomatis: "Tidak perlu lagi menatap halaman kosong.",
     mock: "judul",
   },
   {
@@ -54,8 +54,8 @@ const SOROTAN: Sorot[] = [
     kail: "Males cari jurnal?",
     janji: "Jurnal ilmiah yang jelas sumbernya",
     rinci:
-      "Ketik topik Anda, katalog OpenAlex langsung disisir. Inti tiap penelitian ditampilkan ringkas supaya terlihat mana yang layak dibaca utuh.",
-    otomatis: "Cari, saring, dan ringkas dalam sekali klik",
+      "Ketik topik Anda, langsung dicari di katalog OpenAlex. Inti tiap penelitian ditampilkan ringkas supaya terlihat mana yang layak dibaca utuh.",
+    otomatis: "Cari jurnal lebih cepat, pilih yang paling cocok.",
     mock: "referensi",
   },
   {
@@ -67,7 +67,7 @@ const SOROTAN: Sorot[] = [
     janji: "Rapikan dulu sebelum jatah unggah Turnitin terpakai",
     rinci:
       "Kalimat yang berisiko dianggap mirip ditandai beserta alasannya. Contoh parafrasenya ikut disediakan dengan makna yang tetap sama.",
-    otomatis: "Penandaan kalimat dan saran perbaikan muncul otomatis",
+    otomatis: "Jadi Anda tahu bagian mana yang perlu diperbaiki.",
     mock: "kemiripan",
   },
   {
@@ -79,7 +79,7 @@ const SOROTAN: Sorot[] = [
     janji: "Skripsi lima bab berubah jadi kerangka artikel jurnal",
     rinci:
       "Tiap bab dipetakan ke bagian IMRaD lengkap dengan target jumlah katanya, jadi terlihat bagian mana yang kelebihan dan mana yang kurang.",
-    otomatis: "Pemetaan bab dan hitungan kata dikerjakan sendiri",
+    otomatis: "Tidak perlu bingung mulai dari bagian mana.",
     mock: "struktur",
   },
   {
@@ -91,7 +91,7 @@ const SOROTAN: Sorot[] = [
     janji: "Padanan yang lazim dipakai jurnal berbahasa Inggris",
     rinci:
       "Rumusan baku skripsi Anda dialihkan ke padanan yang lazim di jurnal berbahasa Inggris, lalu ragam hasilnya diperiksa ulang.",
-    otomatis: "Alih bahasa dan pemeriksaan ragam sekali jalan",
+    otomatis: "Cocok untuk abstrak, artikel, dan keperluan akademik lain.",
     mock: "inggris",
   },
   {
@@ -103,7 +103,7 @@ const SOROTAN: Sorot[] = [
     janji: "Pastikan tiap referensi ada datanya",
     rinci:
       "Tempel daftar pustaka Anda. Tiap entri dicari ke Crossref dan OpenAlex, lalu ditandai: nyata, meragukan, atau tidak ditemukan.",
-    otomatis: "Seluruh daftar pustaka diperiksa sekaligus",
+    otomatis: "Tidak perlu mengecek referensi satu per satu.",
     mock: "sitasi",
   },
   {
@@ -115,7 +115,7 @@ const SOROTAN: Sorot[] = [
     janji: "Periksa jurnalnya dulu, baru kirim naskah",
     rinci:
       "Masukkan ISSN. DOAJ, Crossref, dan OpenAlex diperiksa bersamaan, lalu tanda bahayanya ditampilkan beserta angkanya.",
-    otomatis: "Tiga sumber diperiksa serentak dalam hitungan detik",
+    otomatis: "Cek dulu sebelum submit.",
     mock: "radar",
   },
   {
@@ -126,8 +126,8 @@ const SOROTAN: Sorot[] = [
     kail: "Takut typo atau salah tulis?",
     janji: "Ragam ilmiah Indonesia menurut PUEBI dan KBBI",
     rinci:
-      "Ejaan, kata tidak baku, tanda baca, dan kalimat berputar ditandai satu per satu beserta usul perbaikannya.",
-    otomatis: "Temuan muncul begitu naskah ditempel",
+      "Ejaan, kata tidak baku, tanda baca, dan kalimat bertele-tele ditandai satu per satu beserta usul perbaikannya.",
+    otomatis: "Biar tulisan Anda rapi sebelum bimbingan.",
     mock: "bahasa",
   },
   {
@@ -139,7 +139,7 @@ const SOROTAN: Sorot[] = [
     janji: "Tempel naskah sekali, dipakai seluruh alat",
     rinci:
       "Naskah tersimpan di perangkat Anda, bukan di server kami. Hasil tiap alat dapat dicetak jadi laporan rapi untuk dibawa ke bimbingan.",
-    otomatis: "Naskah dan hasil tersimpan sendiri, siap dicetak",
+    otomatis: "Sekali masukkan, bisa dipakai untuk banyak keperluan.",
     mock: "beranda",
   },
 ];
@@ -336,7 +336,7 @@ export default function PratinjauCakrawala() {
             <li>Takut tulisanmu banyak salah?</li>
           </ul>
           <p className="cw-lead cw-lead-tegas">
-            Cakrawala bantu kamu mengurus semuanya dalam satu tempat.
+            Cakrawala bantu Anda mengurus semuanya dalam satu tempat.
             Tinggal masukkan data, klik, dapat hasil.
           </p>
           <div className="cw-hero-aksi">
@@ -362,7 +362,7 @@ export default function PratinjauCakrawala() {
           <div className="cw-langkah-kepala">
             <div>
               <p className="cw-eyebrow">SEMUDAH MEMBALIKKAN TELAPAK TANGAN</p>
-              <h2>Tiga langkah, sisanya dikerjakan sendiri</h2>
+              <h2>Tiga langkah, Anda bisa tentukan arahnya</h2>
             </div>
             <Animasi nama="digital" className="cw-anim-digital" cadangan="⚙" />
           </div>
@@ -376,7 +376,7 @@ export default function PratinjauCakrawala() {
         <section id="etalase" className="cw-etalase" aria-label="Keunggulan tiap menu Cakrawala">
           <div className="cw-etalase-kepala">
             <p className="cw-eyebrow">ISI CAKRAWALA</p>
-            <h2>Setiap menu dan apa yang dikerjakannya</h2>
+            <h2>Isi tiap menu, dan apa gunanya untuk Anda</h2>
             <p className="cw-etalase-sub">
               Gambaran di bawah diambil dari bentuk asli tiap panel. Yang terkunci hanya pintunya; alatnya sudah jadi
               dan berjalan.

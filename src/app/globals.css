@@ -2970,30 +2970,38 @@ a.al-mini:hover { color: var(--al-ink); }
 
 /* Penanda gembok pada tombol Cakrawala di beranda mahasiswa. */
 /* Menu Cakrawala yang terkunci.
-   Lencana "VIP" diganti kilau yang menyapu tulisannya: lencana menempelkan
-   label pada tombol, sedangkan kilau membuat tombolnya sendiri terasa lain
-   daripada menu di sebelahnya. */
-.hero-button-locked { position: relative; overflow: hidden;
-  border-color: rgba(245, 197, 66, .5);
-  background: linear-gradient(120deg, rgba(245,197,66,.14), rgba(139,92,246,.12));
-  box-shadow: 0 0 0 1px rgba(245,197,66,.16), 0 6px 20px -8px rgba(245,197,66,.5); }
-.hero-button-locked:hover { border-color: rgba(245, 197, 66, .8);
-  box-shadow: 0 0 0 1px rgba(245,197,66,.3), 0 10px 26px -8px rgba(245,197,66,.65); }
+   Warnanya mengikuti latar halaman Cakrawala itu sendiri: hitam kebiruan
+   pekat dengan aksen emas tipis. Tombolnya karena itu terasa seperti pintu
+   menuju ruangan lain, bukan sekadar menu bertanda VIP. */
+.hero-button-locked { position: relative; overflow: hidden; isolation: isolate;
+  border-color: rgba(245, 197, 66, .34);
+  background: linear-gradient(150deg, #070d1c 0%, #0e1730 58%, #131f3f 100%);
+  color: #f3e7c2;
+  box-shadow: 0 0 0 1px rgba(245,197,66,.12), 0 10px 26px -12px rgba(0,0,0,.85); }
+.hero-button-locked:hover { border-color: rgba(245, 197, 66, .68);
+  box-shadow: 0 0 0 1px rgba(245,197,66,.24), 0 14px 32px -12px rgba(0,0,0,.9); }
 
-/* Pita cahaya yang melintas di atas tombol. */
-.hero-button-locked::after { content: ""; position: absolute; inset: 0;
-  background: linear-gradient(105deg, transparent 38%, rgba(255,255,255,.5) 50%, transparent 62%);
-  transform: translateX(-130%); animation: hero-sapu 4.2s cubic-bezier(.4,0,.2,1) infinite; pointer-events: none; }
+/* Kilau yang menyapu permukaannya. Tipis dan miring, meniru pantulan cahaya
+   pada permukaan gelap yang licin, bukan kilatan putih yang menyilaukan. */
+.hero-button-locked::after { content: ""; position: absolute; inset: -40% -10%;
+  background: linear-gradient(104deg,
+    transparent 40%,
+    rgba(245, 197, 66, .09) 46%,
+    rgba(255, 246, 214, .42) 50%,
+    rgba(245, 197, 66, .09) 54%,
+    transparent 60%);
+  transform: translateX(-120%); animation: hero-sapu 5.4s cubic-bezier(.45,0,.15,1) infinite;
+  pointer-events: none; z-index: -1; }
 
-/* Tulisannya sendiri berkilau emas, bergerak lebih lambat daripada pitanya
-   supaya keduanya tidak menyatu menjadi satu kedipan. */
-.hero-kilau { position: relative; z-index: 1;
-  background: linear-gradient(96deg, #fff 20%, #ffe9a8 40%, #f5c542 52%, #ffe9a8 64%, #fff 84%);
+/* Tulisannya emas pucat dengan kilau yang bergerak lebih lambat daripada
+   pitanya, supaya keduanya tidak menyatu jadi satu kedipan. */
+.hero-kilau { position: relative;
+  background: linear-gradient(96deg, #c9ac6a 0%, #f0dfae 26%, #fff6d6 48%, #f0dfae 70%, #c9ac6a 100%);
   background-size: 260% 100%; -webkit-background-clip: text; background-clip: text;
-  color: transparent; animation: hero-emas 5.6s ease-in-out infinite; }
-.hero-button-locked:hover::after { animation-duration: 1.6s; }
+  color: transparent; animation: hero-emas 7s ease-in-out infinite; }
+.hero-button-locked:hover::after { animation-duration: 2s; }
 
-@keyframes hero-sapu { 0% { transform: translateX(-130%); } 55%, 100% { transform: translateX(130%); } }
+@keyframes hero-sapu { 0% { transform: translateX(-120%); } 58%, 100% { transform: translateX(120%); } }
 @keyframes hero-emas { 0%, 100% { background-position: 130% 0; } 50% { background-position: -30% 0; } }
 
 /* Gerak yang terus berulang melelahkan sebagian orang, dan sebagian lagi
