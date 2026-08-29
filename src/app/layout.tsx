@@ -13,7 +13,11 @@ export const metadata: Metadata = {
 // Dengan cara ini build selalu sukses dan browser pengguna yang memuat font.
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="id">
+    // Mode baca Cakrawala dipasang sebagai atribut data-cakrawala pada <html>
+    // oleh skrip kecil di /alat, sebelum React menghidrasi halaman. React
+    // membandingkan atribut <html> hasil server dengan yang ada di peramban,
+    // jadi atribut tambahan itu perlu dinyatakan wajar di sini.
+    <html lang="id" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
