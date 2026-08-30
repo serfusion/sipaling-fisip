@@ -63,3 +63,34 @@ export function parseMaintenance(value: string | null | undefined): MaintenanceS
     return DEFAULT_MAINTENANCE;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Siapa yang boleh memakai sesinya ketika portal ditutup
+// ---------------------------------------------------------------------------
+
+/**
+ * Satu-satunya peran yang lolos saat maintenance menyala.
+ *
+ * Super Admin yang memegang tombolnya, jadi ia harus tetap bisa masuk untuk
+ * mematikannya lagi. Kalau perannya sendiri ikut terkunci, portal yang
+ * ditutup tidak akan pernah bisa dibuka dari dalam.
+ */
+export const PERAN_LOLOS_MAINTENANCE = "super_admin";
+
+/**
+ * Apakah sesi ini ditahan karena portal sedang ditutup?
+ *
+ * Dipisahkan menjadi fungsi murni supaya keputusannya dapat diuji tanpa
+ * database maupun sesi sungguhan — ini aturan hak akses, dan aturan hak akses
+ * tidak boleh hanya "kelihatannya benar".
+ *
+ * Belum login BUKAN "tertahan": tidak ada sesi yang ditahan di situ.
+ */
+export function sesiTertahanMaintenance(
+  role: string | null | undefined,
+  maintenanceAktif: boolean,
+) {
+  if (!role) return false;
+  if (role === PERAN_LOLOS_MAINTENANCE) return false;
+  return maintenanceAktif === true;
+}

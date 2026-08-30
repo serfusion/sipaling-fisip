@@ -10,7 +10,6 @@ import {
   parseMaintenance,
   type MaintenanceState,
 } from "@/lib/maintenance";
-import { getCurrentProfile } from "@/lib/supabase-server";
 
 /**
  * Membaca status maintenance.
@@ -42,32 +41,4 @@ export async function writeMaintenanceState(state: MaintenanceState) {
       target: appSettings.key,
       set: { value, updatedAt: new Date() },
     });
-}
-
-/**
- * Penjaga untuk endpoint yang dipakai MAHASISWA (kirim pengajuan, unggah
- * revisi, ajukan judul). Selama maintenance, pengunjung umum ditolak dengan
- * 503 supaya halaman yang sudah terlanjur terbuka di tab lama tidak bisa
- * menyelinap mengirim data.
- *
- * Dosen/admin yang sudah login TIDAK diblokir: mereka justru sedang bekerja
- * membereskan sesuatu ketika portal ditutup.
- *
- * Mengembalikan Response bila harus ditolak, atau null bila boleh lanjut.
- */
-export async function blockedByMaintenance(): Promise<Response | null> {
-  const state = await readMaintenanceState();
-  if (!state.enabled) return null;
-
-  const profile = await getCurrentProfile();
-  if (profile) return null;
-
-  return Response.json(
-    {
-      success: false,
-      message:
-        "Portal sedang dalam mode maintenance, jadi pengiriman ditutup sementara. Silakan coba lagi setelah layanan kembali dibuka.",
-    },
-    { status: 503 },
-  );
 }

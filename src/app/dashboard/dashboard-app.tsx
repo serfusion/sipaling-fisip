@@ -269,7 +269,14 @@ function pillClass(status: string) {
   return `pill s-${status.toLowerCase()}`;
 }
 
-export default function DashboardApp({ profile }: { profile: SessionProfile | null }) {
+export default function DashboardApp({
+  profile,
+  maintenanceLocked = false,
+}: {
+  profile: SessionProfile | null;
+  /** Akunnya sah, tetapi portal sedang ditutup dan perannya bukan Super Admin. */
+  maintenanceLocked?: boolean;
+}) {
   useAutoLogout(Boolean(profile));
   const meta = profile ? ROLE_META[profile.role] : ROLE_META.admin;
   const [view, setView] = useState<ViewId>("ringkasan");
@@ -477,9 +484,21 @@ export default function DashboardApp({ profile }: { profile: SessionProfile | nu
       <div className="dsh" style={accentStyle(ROLE_META.admin)}>
         <main className="dsh-locked">
           <section className="panel dsh-locked-card">
-            <h2>Login diperlukan</h2>
-            <p>Halaman dashboard hanya bisa diakses oleh Super Admin, Admin unit, atau Dosen yang sudah login.</p>
-            <a href="/login" className="btn btn-primary">Masuk ke Dashboard →</a>
+            {maintenanceLocked ? (
+              <>
+                <h2>Portal sedang maintenance</h2>
+                <p>
+                  Akun Anda tidak bermasalah. Selama portal ditutup, hanya Super Admin yang dapat masuk ke
+                  dashboard. Silakan coba lagi setelah portal dibuka kembali.
+                </p>
+              </>
+            ) : (
+              <>
+                <h2>Login diperlukan</h2>
+                <p>Halaman dashboard hanya bisa diakses oleh Super Admin, Admin unit, atau Dosen yang sudah login.</p>
+                <a href="/login" className="btn btn-primary">Masuk ke Dashboard →</a>
+              </>
+            )}
             <Link href="/" className="dsh-locked-back">← Kembali ke portal mahasiswa</Link>
           </section>
         </main>

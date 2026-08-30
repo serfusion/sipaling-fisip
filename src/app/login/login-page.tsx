@@ -32,12 +32,17 @@ export default function LoginPage({ habisWaktu = false }: { habisWaktu?: boolean
   const [info, setInfo] = useState("");
   const [loading, setLoading] = useState(false);
   const [configured, setConfigured] = useState<boolean | null>(null);
+  // Cookie sesinya masih hidup, tetapi portal sedang ditutup dan perannya
+  // bukan Super Admin. Diberitahukan sejak halaman terbuka supaya orangnya
+  // tidak mengetik kata sandi dulu baru ditolak.
+  const [terkunciMaintenance, setTerkunciMaintenance] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/me", { cache: "no-store" })
       .then((response) => response.json())
-      .then((payload: { profile?: { role?: string } | null; configured?: boolean }) => {
+      .then((payload: { profile?: { role?: string } | null; configured?: boolean; maintenanceLocked?: boolean }) => {
         setConfigured(Boolean(payload.configured));
+        setTerkunciMaintenance(payload.maintenanceLocked === true);
         if (payload.profile) {
           // Sesi masih hidup di server, tetapi jam diamnya belum tentu.
           // Dinyalakan di sini juga supaya dashboard tidak langsung
@@ -66,6 +71,15 @@ export default function LoginPage({ habisWaktu = false }: { habisWaktu?: boolean
         cache: "no-store",
         credentials: "include",
       }).then((r) => r.json());
+      // Kata sandinya benar dan akunnya terdaftar; yang menahan adalah mode
+      // maintenance. Menyebutnya "belum terdaftar" akan mengirim orang mencari
+      // masalah yang tidak ada.
+      if (me.maintenanceLocked) {
+        await supabase.auth.signOut();
+        throw new Error(
+          "Portal sedang dalam mode maintenance. Selama ditutup, hanya Super Admin yang dapat masuk. Silakan coba lagi setelah portal dibuka kembali.",
+        );
+      }
       if (!me.profile) {
         await supabase.auth.signOut();
         throw new Error("Akun Anda belum terdaftar di daftar profil SiPaling FISIP.");
@@ -97,7 +111,13 @@ export default function LoginPage({ habisWaktu = false }: { habisWaktu?: boolean
             <strong>Supabase belum terhubung lengkap.</strong> Tambahkan URL, publishable/anon key, dan secret/service-role key Supabase pada environment hosting (mis. Vercel), lalu deploy ulang.
           </div>
         )}
-        {habisWaktu && !error && !info && (
+        {terkunciMaintenance && !error && (
+          <div className="login-info">
+            <strong>Portal sedang maintenance.</strong> Selama ditutup, hanya Super Admin yang dapat masuk ke
+            dashboard. Akun Anda tidak bermasalah — coba lagi setelah portal dibuka.
+          </div>
+        )}
+        {habisWaktu && !terkunciMaintenance && !error && !info && (
           <div className="login-info">
             <strong>Sesi berakhir.</strong> Anda keluar otomatis setelah 30 menit tanpa aktivitas. Masuk lagi untuk melanjutkan.
           </div>

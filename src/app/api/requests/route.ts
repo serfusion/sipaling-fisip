@@ -19,7 +19,7 @@ import { kolomDriveSiap } from "@/lib/kolom-drive";
 import { getCurrentProfile, serviceTypeForProfile } from "@/lib/supabase-server";
 import { explainServerError } from "@/lib/api-errors";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
-import { blockedByMaintenance } from "@/lib/maintenance-store";
+import { blockedByMaintenance } from "@/lib/maintenance-gate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

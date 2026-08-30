@@ -6,6 +6,8 @@ import {
   getSupabaseSecretKey,
   getSupabaseUrl,
 } from "@/lib/supabase-config";
+import { readMaintenanceState } from "@/lib/maintenance-store";
+import { PERAN_LOLOS_MAINTENANCE, sesiTertahanMaintenance } from "@/lib/maintenance";
 
 export function isSupabaseConfigured() {
   return Boolean(getSupabaseUrl() && getSupabasePublishableKey());
@@ -90,7 +92,7 @@ export type SessionProfile = {
   lecturerId: number | null;
 };
 
-export async function getCurrentProfile(): Promise<SessionProfile | null> {
+async function bacaProfil(): Promise<SessionProfile | null> {
   if (!isProfileLookupConfigured()) return null;
   const supabase = await createBrowserClientFromServer();
   if (!supabase) return null;
@@ -137,6 +139,48 @@ export async function getCurrentProfile(): Promise<SessionProfile | null> {
     role: data.role as Role,
     lecturerId: (data.lecturer_id as number | null) ?? null,
   };
+}
+
+export type StatusSesi = {
+  /** Profil yang boleh dipakai. null bila belum login ATAU sedang ditahan. */
+  profile: SessionProfile | null;
+  /** Akunnya sah, tetapi ditahan karena portal sedang maintenance. */
+  tertahanMaintenance: boolean;
+};
+
+/**
+ * Keadaan sesi lengkap beserta ALASAN kalau profilnya kosong.
+ *
+ * Dipakai halaman login dan dashboard supaya keduanya dapat membedakan
+ * "belum login" dari "ditahan maintenance". Selebihnya cukup memanggil
+ * getCurrentProfile.
+ */
+export async function getSessionState(): Promise<StatusSesi> {
+  const profile = await bacaProfil();
+  if (!profile) return { profile: null, tertahanMaintenance: false };
+  // Super Admin memegang tombol maintenance, jadi ia tidak pernah tertahan;
+  // untuk peran itu status maintenance tidak perlu dibaca sama sekali.
+  if (profile.role === PERAN_LOLOS_MAINTENANCE) return { profile, tertahanMaintenance: false };
+
+  // Selama portal ditutup, tidak ada peran lain yang boleh memakai sesinya —
+  // termasuk admin unit dan dosen yang cookie-nya masih hidup dari sebelum
+  // maintenance dinyalakan. Pemeriksaannya diletakkan di sini, bukan di
+  // halaman login, supaya tidak ada satu pun route yang terlewat: seluruh
+  // API dan halaman dashboard membaca sesinya lewat jalur yang sama.
+  //
+  // readMaintenanceState GAGAL-TERBUKA: kalau pembacaannya gagal, statusnya
+  // dianggap tidak maintenance. Satu baris pengaturan yang tidak terbaca
+  // tidak boleh mengunci seluruh admin di luar sistemnya sendiri.
+  const { enabled } = await readMaintenanceState();
+  if (sesiTertahanMaintenance(profile.role, enabled)) {
+    return { profile: null, tertahanMaintenance: true };
+  }
+
+  return { profile, tertahanMaintenance: false };
+}
+
+export async function getCurrentProfile(): Promise<SessionProfile | null> {
+  return (await getSessionState()).profile;
 }
 
 export function hasAtLeast(profile: SessionProfile | null, minimum: Role) {

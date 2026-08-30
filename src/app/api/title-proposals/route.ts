@@ -17,7 +17,7 @@ import { canReviewProposals, type ProposalChoiceRow } from "@/lib/proposal-acces
 import { PRODI_AUDIENCE, pushNotification } from "@/lib/notify";
 import { explainServerError } from "@/lib/api-errors";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
-import { blockedByMaintenance } from "@/lib/maintenance-store";
+import { blockedByMaintenance } from "@/lib/maintenance-gate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

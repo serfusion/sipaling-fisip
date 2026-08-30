@@ -8,7 +8,7 @@ import {
 } from "@/lib/document-storage";
 import { explainServerError } from "@/lib/api-errors";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
-import { blockedByMaintenance } from "@/lib/maintenance-store";
+import { blockedByMaintenance } from "@/lib/maintenance-gate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
