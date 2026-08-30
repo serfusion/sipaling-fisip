@@ -2456,6 +2456,29 @@ a.al-mini:hover { color: var(--al-ink); }
   color: var(--al-muted); font-size: 12px; line-height: 1.65; }
 .al-sangkal b { color: var(--al-ink); }
 
+/* --- Bilah kemajuan pembacaan berkas naskah ---
+   Word dan PDF dibongkar di pekerja latar, dan skripsi 250 halaman memang
+   makan waktu beberapa detik. Tanpa tanda apa pun, jeda itu terbaca sebagai
+   halaman yang macet — jadi yang ditampilkan bukan sekadar pemutar berputar,
+   melainkan halaman keberapa yang sedang dibaca, berikut tombol batalnya. */
+.al-muat { margin-top: 14px; padding: 13px 15px; border: 1px solid var(--al-line);
+  border-radius: 12px; background: var(--al-bg-lembut); }
+.al-muat-atas { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.al-muat-atas b { color: var(--al-ink); font-size: 12.5px; overflow-wrap: anywhere; }
+.al-muat-bilah { margin: 10px 0 7px; height: 6px; border-radius: 999px;
+  background: var(--al-track); overflow: hidden; }
+.al-muat-bilah span { display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--al-accent), var(--al-emas));
+  transition: width .25s ease; }
+.al-muat small { color: var(--al-muted); font-size: 11.5px; }
+
+/* --- Sisa daftar yang belum digambar ---
+   Daftar temuan ditampilkan bertahap supaya naskah panjang tidak menggambar
+   ribuan baris sekaligus. */
+.al-lebih { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--al-line);
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.al-lebih span { color: var(--al-muted); font-size: 12px; flex: 1 1 12rem; }
+
 /* --- Baris tombol cetak --- */
 .al-cetak-baris { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--al-line);
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }

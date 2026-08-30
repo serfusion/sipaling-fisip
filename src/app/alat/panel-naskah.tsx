@@ -6,15 +6,17 @@ import {
   BAGIAN_LABEL,
   BERAT_INGGRIS_LABEL,
   PORSI_TARGET,
-  periksaInggris,
   petakanNaskah,
   type BagianJurnal,
   type BagianSkripsi,
   type BeratInggris,
+  type TemuanInggris,
 } from "@/lib/manuscript";
-import { cariFrasa, kelompokkan } from "@/lib/frasa-akademik";
+import { kelompokkan } from "@/lib/frasa-akademik";
 import { alihBahasa, apaKeIeee, BAGIAN_EN_LABEL, type HasilAlih } from "@/lib/alih-bahasa";
 import type { Project } from "@/lib/project";
+import { LebihBanyak, useSebagian } from "./daftar";
+import { useAnalisis } from "./use-analisis";
 
 const KELAS_ING: Record<BeratInggris, string> = { ganti: "bad", rapikan: "warn", pertimbangkan: "abu" };
 
@@ -234,9 +236,17 @@ export function PanelInggris({
     () => (project ? project.bab.map((b) => `${b.judul}\n${b.isi}`).join("\n\n") : ""),
     [project],
   );
-  const frasa = useMemo(() => (indonesia.trim() ? kelompokkan(cariFrasa(indonesia)) : []), [indonesia]);
+  // Kedua pemeriksaan dijalankan pekerja latar: yang pertama menyisir seluruh
+  // naskah Indonesia untuk tiap rumusan di bank frasa, yang kedua menyisir
+  // naskah Inggris untuk tiap pola ragam. Di utas utama, membuka alat ini pada
+  // skripsi utuh membekukan layar.
+  const muatanFrasa = useMemo(() => (indonesia.trim() ? { teks: indonesia } : null), [indonesia]);
+  const { hasil: temuanFrasa, sibuk: sibukFrasa } = useAnalisis("frasa", muatanFrasa);
+  const frasa = useMemo(() => (temuanFrasa ? kelompokkan(temuanFrasa) : []), [temuanFrasa]);
+
   const inggris = project?.naskahInggris ?? "";
-  const cek = useMemo(() => (inggris.trim() ? periksaInggris(inggris) : null), [inggris]);
+  const muatanInggris = useMemo(() => (inggris.trim() ? { teks: inggris } : null), [inggris]);
+  const { hasil: cek, sibuk: sibukInggris } = useAnalisis("inggris", muatanInggris);
 
   if (!project) {
     return (
@@ -282,7 +292,11 @@ export function PanelInggris({
         <section className="al-card">
           {indonesia.trim() === "" ? (
             <p className="al-galat">
-              Naskah Indonesia project ini masih kosong. Buka Beranda dan tempelkan naskah skripsi Anda dulu.
+              Naskah Indonesia project ini masih kosong. Buka Beranda dan unggah naskah skripsi Anda dulu.
+            </p>
+          ) : sibukFrasa ? (
+            <p className="al-note" style={{ margin: 0 }} role="status" aria-live="polite">
+              Menyisir naskah… Halaman tetap dapat dipakai selama ini berjalan.
             </p>
           ) : jumlahFrasa === 0 ? (
             <p className="al-good">
@@ -334,6 +348,14 @@ export function PanelInggris({
             </label>
           </section>
 
+          {sibukInggris && !cek && (
+            <section className="al-card">
+              <p className="al-note" style={{ margin: 0 }} role="status" aria-live="polite">
+                Memeriksa naskah Inggris…
+              </p>
+            </section>
+          )}
+
           {cek && (
             <section className="al-card">
               <div className="al-stats">
@@ -350,18 +372,7 @@ export function PanelInggris({
                   Tidak ada pola yang biasa ditandai peninjau. Ini bukan jaminan bebas kesalahan.
                 </p>
               ) : (
-                <ul className="al-list">
-                  {cek.temuan.map((t, i) => (
-                    <li key={`${t.posisi}-${i}`} className={`al-item ${KELAS_ING[t.berat]}`}>
-                      <div className="al-item-atas">
-                        <span className="al-tag">{BERAT_INGGRIS_LABEL[t.berat]}</span>
-                        <code>{t.kutipan}</code>
-                      </div>
-                      <p>{t.pesan}</p>
-                      {t.saran && <p className="al-fix">Coba: <b>{t.saran}</b></p>}
-                    </li>
-                  ))}
-                </ul>
+                <DaftarTemuanInggris temuan={cek.temuan} />
               )}
             </section>
           )}
@@ -369,6 +380,29 @@ export function PanelInggris({
       )}
 
       <SumberAcuan kunci="inggris" />
+    </>
+  );
+}
+
+/** Temuan naskah Inggris, ditampilkan bertahap supaya naskah panjang tidak
+ *  menggambar ribuan baris sekaligus. */
+function DaftarTemuanInggris({ temuan }: { temuan: TemuanInggris[] }) {
+  const { tampil, sisa, lagi, semua } = useSebagian(temuan);
+  return (
+    <>
+      <ul className="al-list">
+        {tampil.map((t, i) => (
+          <li key={`${t.posisi}-${i}`} className={`al-item ${KELAS_ING[t.berat]}`}>
+            <div className="al-item-atas">
+              <span className="al-tag">{BERAT_INGGRIS_LABEL[t.berat]}</span>
+              <code>{t.kutipan}</code>
+            </div>
+            <p>{t.pesan}</p>
+            {t.saran && <p className="al-fix">Coba: <b>{t.saran}</b></p>}
+          </li>
+        ))}
+      </ul>
+      <LebihBanyak sisa={sisa} lagi={lagi} semua={semua} />
     </>
   );
 }
