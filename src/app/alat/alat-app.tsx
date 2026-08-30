@@ -11,6 +11,7 @@ import { PanelReferensi } from "./panel-referensi";
 import { PanelKemiripan } from "./panel-kemiripan";
 import { PanelSitasi, PanelRadar, PanelBahasa } from "./panel-periksa";
 import { JENIS_LABEL } from "@/lib/project";
+import { PenyediaCetak } from "./laporan";
 import Animasi from "../animasi";
 
 const MENU: Array<{ id: Tab; label: string; sub: string; ikon: string }> = [
@@ -177,6 +178,10 @@ export default function AlatApp() {
         <main>
           {p.galat && <p className="al-galat" role="alert">{p.galat}</p>}
 
+          {/* Laporan cetak baru disusun saat tombol Cetak ditekan. Penyedianya
+              berada di luar pembungkus berkunci supaya keadaan "sedang
+              mencetak" tidak ikut disetel ulang tiap ganti alat. */}
+          <PenyediaCetak>
           {/* Kunci pada pembungkus: tiap alat masuk sebagai panel baru,
               sehingga gerak masuknya terulang di tiap perpindahan. */}
           <div className="al-panel" key={tab}>
@@ -202,6 +207,7 @@ export default function AlatApp() {
             {tab === "radar" && <PanelRadar project={p.aktif} ubah={p.ubah} />}
             {tab === "bahasa" && <PanelBahasa project={p.aktif} />}
           </div>
+          </PenyediaCetak>
 
           <section className="al-sangkal">
             <b>Cakrawala bukan pengganti Dosen.</b> Cakrawala hanya membantu, keputusan tetap di tanganmu. Gunakan

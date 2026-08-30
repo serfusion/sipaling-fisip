@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Ic, IKON, Kepala, Rinci } from "./ikon";
-import { MAKS_UKURAN_MB, bacaTeks } from "@/lib/berkas";
+import { ACCEPT_NASKAH, JENIS_LABEL_BERKAS, MAKS_MB, bacaTeks, ejaUkuran } from "@/lib/berkas";
+import { Dibatalkan, bacaNaskah } from "@/lib/pekerja-klien";
 import {
   JENIS_LABEL,
   buatCadangan,
@@ -209,9 +210,12 @@ function KotakNaskah({
   const [teks, setTeks] = useState(awal);
   const [status, setStatus] = useState<"diam" | "menyimpan" | "tersimpan">("diam");
   const [galat, setGalat] = useState("");
+  const [kabar, setKabar] = useState("");
+  const [muat, setMuat] = useState<{ nama: string; nilai: number; pesan: string } | null>(null);
   const berkas = useRef<HTMLInputElement | null>(null);
   const tunda = useRef<number | null>(null);
   const pertama = useRef(true);
+  const kendali = useRef<AbortController | null>(null);
 
   // Penguraian bab tidak dijalankan tiap ketikan: pada naskah dua puluh ribu
   // kata itu terasa tersendat. Ditunda sampai mengetik berhenti sejenak.
@@ -226,17 +230,63 @@ function KotakNaskah({
     return () => { if (tunda.current) window.clearTimeout(tunda.current); };
   }, [teks, gantiNaskah]);
 
+  // Pembacaan yang masih berjalan saat pengguna berpindah project atau menutup
+  // halaman dihentikan, supaya pekerja latar tidak menguraikan berkas yang
+  // hasilnya tidak akan dipakai siapa pun.
+  useEffect(() => () => kendali.current?.abort(), []);
+
   async function muatBerkas(event: React.ChangeEvent<HTMLInputElement>) {
     const f = event.target.files?.[0];
     event.target.value = "";
     if (!f) return;
+
+    kendali.current?.abort();
+    const punyaKini = new AbortController();
+    kendali.current = punyaKini;
+
     setGalat("");
-    const hasil = await bacaTeks(f);
-    if (!hasil.ok) { setGalat(hasil.pesan); return; }
-    setTeks(hasil.teks);
-    if (hasil.dipangkas) {
-      setGalat("Berkas sangat panjang, jadi hanya bagian awalnya yang dimuat. Sisanya dapat Anda tempel sendiri.");
+    setKabar("");
+    setMuat({ nama: f.name, nilai: 0.02, pesan: "Memuat berkas…" });
+
+    try {
+      const hasil = await bacaNaskah(f, {
+        sinyal: punyaKini.signal,
+        lapor: (nilai, pesan) => setMuat({ nama: f.name, nilai, pesan }),
+      });
+
+      if (punyaKini.signal.aborted) return;
+      if (!hasil.ok) { setGalat(hasil.pesan); return; }
+
+      setTeks(hasil.teks);
+
+      const kabarBaru = [
+        `${JENIS_LABEL_BERKAS[hasil.jenis]} “${f.name}” (${ejaUkuran(f.size)}) berhasil dibaca.`,
+        hasil.catatan,
+        hasil.dipangkas
+          ? "Naskahnya melewati batas panjang, jadi hanya bagian awalnya yang dimuat. Sisanya dapat Anda tempel sendiri."
+          : null,
+        "Periksa sebentar hasilnya di kotak naskah: tabel dan gambar tidak ikut terbawa.",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      setKabar(kabarBaru);
+    } catch (alasan: unknown) {
+      if (alasan instanceof Dibatalkan) return;
+      setGalat(alasan instanceof Error ? alasan.message : "Berkas tidak dapat dibaca.");
+    } finally {
+      if (kendali.current === punyaKini) {
+        kendali.current = null;
+        setMuat(null);
+      }
     }
+  }
+
+  function batalkanMuat() {
+    kendali.current?.abort();
+    kendali.current = null;
+    setMuat(null);
+    setKabar("");
+    setGalat("Pembacaan berkas dibatalkan.");
   }
 
   // Dihitung dari bab, bukan dari teks mentah: judul bab bukan isi naskah, dan
@@ -246,7 +296,7 @@ function KotakNaskah({
   return (
     <section className="al-card">
       <Kepala ikon={IKON.dokumen} judul="Naskah project ini"
-        sub="Tempel sekali di sini, lalu seluruh alat memakainya" />
+        sub="Unggah berkas Word atau PDF-nya sekali, lalu seluruh alat memakainya" />
 
       <label className="al-field">
         <span>
@@ -269,18 +319,38 @@ function KotakNaskah({
       </label>
 
       <div className="al-aksi">
-        <button type="button" className="al-mini" onClick={() => berkas.current?.click()}>
-          <Ic d={IKON.unggah} /> Muat berkas .txt
+        <button type="button" className="al-mini" onClick={() => berkas.current?.click()} disabled={muat !== null}>
+          <Ic d={IKON.unggah} /> Muat dari Word, PDF, atau teks
         </button>
-        {teks && (
-          <button type="button" className="al-mini" onClick={() => setTeks("")}>Kosongkan</button>
+        {teks && !muat && (
+          <button type="button" className="al-mini" onClick={() => { setTeks(""); setKabar(""); setGalat(""); }}>
+            Kosongkan
+          </button>
         )}
-        <input ref={berkas} type="file" accept=".txt,.md,text/plain" hidden onChange={muatBerkas} />
+        <input ref={berkas} type="file" accept={ACCEPT_NASKAH} hidden onChange={muatBerkas} />
       </div>
+
+      {muat && (
+        <div className="al-muat" role="status" aria-live="polite">
+          <div className="al-muat-atas">
+            <b>{muat.nama}</b>
+            <button type="button" className="al-link" onClick={batalkanMuat}>Batalkan</button>
+          </div>
+          <div className="al-muat-bilah">
+            <span style={{ width: `${Math.round(Math.min(1, Math.max(0.02, muat.nilai)) * 100)}%` }} />
+          </div>
+          <small>{muat.pesan}</small>
+        </div>
+      )}
+
+      {kabar && <p className="al-good" style={{ marginTop: 14 }}>{kabar}</p>}
       {galat && <p className="al-galat" role="alert">{galat}</p>}
 
       <p className="al-tail">
-        Berkas .docx dan .pdf belum dapat dibaca. Salin isinya dari Word, lalu tempel di kotak ini.
+        Word (.docx) sampai {MAKS_MB.docx} MB, PDF sampai {MAKS_MB.pdf} MB, teks polos sampai {MAKS_MB.teks} MB.
+        Berkasnya dibuka di perangkat Anda sendiri — tidak diunggah ke server mana pun. PDF hasil pindaian atau
+        foto tidak bisa dibaca karena tidak punya lapisan teks; untuk itu unggah berkas Word aslinya. Word versi
+        lama (.doc) perlu disimpan ulang sebagai .docx lebih dulu.
       </p>
 
       {project.bab.length > 0 && (
