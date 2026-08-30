@@ -13,6 +13,15 @@ export type MaintenanceState = {
   enabled: boolean;
   /** Titik pada huruf "i" kata "maintenance" menjadi tautan rahasia ke /login. */
   secretDoor: boolean;
+  /**
+   * Admin unit dan dosen boleh memakai sesinya selama portal ditutup.
+   *
+   * Mati secara bawaan: saat portal ditutup, biasanya justru tidak ada yang
+   * boleh menyentuh datanya. Dinyalakan bila memang butuh banyak tangan untuk
+   * membereskan sesuatu selagi portal tutup. Super Admin tidak terpengaruh
+   * sakelar ini — ia yang memegangnya.
+   */
+  adminLogin: boolean;
   /** Kalimat kecil di atas kata "maintenance". */
   lead: string;
   /** Kalimat utama yang menjelaskan situasinya. */
@@ -24,6 +33,7 @@ export type MaintenanceState = {
 export const DEFAULT_MAINTENANCE: MaintenanceState = {
   enabled: false,
   secretDoor: true,
+  adminLogin: false,
   lead: "Ssst… jangan berisik ya.",
   message:
     "Server kami sedang tidur siang ditemani kucing penjaga. Tim admin lagi mengelus-elus mesinnya biar cepat bangun. Data Anda aman, cuma ikut rebahan sebentar.",
@@ -49,6 +59,10 @@ export function normalizeMaintenance(input: unknown): MaintenanceState {
     enabled: raw.enabled === true,
     // Pintu rahasia menyala secara bawaan; hanya mati bila diminta tegas.
     secretDoor: raw.secretDoor !== false,
+    // Kebalikannya: izin masuk admin MATI secara bawaan, dan hanya menyala
+    // bila diminta tegas. Pengaturan lama yang belum punya kolom ini karena
+    // itu terbaca sebagai terkunci — sama seperti perilaku sebelumnya.
+    adminLogin: raw.adminLogin === true,
     lead: clean(raw.lead, DEFAULT_MAINTENANCE.lead, LIMIT.lead),
     message: clean(raw.message, DEFAULT_MAINTENANCE.message, LIMIT.message),
     note: clean(raw.note, DEFAULT_MAINTENANCE.note, LIMIT.note),
@@ -85,12 +99,17 @@ export const PERAN_LOLOS_MAINTENANCE = "super_admin";
  * tidak boleh hanya "kelihatannya benar".
  *
  * Belum login BUKAN "tertahan": tidak ada sesi yang ditahan di situ.
+ *
+ * adminBolehMasuk sengaja berbawaan false. Kalau parameternya lupa diisi di
+ * suatu tempat, yang terjadi adalah menutup, bukan membuka.
  */
 export function sesiTertahanMaintenance(
   role: string | null | undefined,
   maintenanceAktif: boolean,
+  adminBolehMasuk = false,
 ) {
   if (!role) return false;
   if (role === PERAN_LOLOS_MAINTENANCE) return false;
-  return maintenanceAktif === true;
+  if (!maintenanceAktif) return false;
+  return adminBolehMasuk !== true;
 }

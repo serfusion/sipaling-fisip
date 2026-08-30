@@ -74,10 +74,14 @@ export default function LoginPage({ habisWaktu = false }: { habisWaktu?: boolean
       // Kata sandinya benar dan akunnya terdaftar; yang menahan adalah mode
       // maintenance. Menyebutnya "belum terdaftar" akan mengirim orang mencari
       // masalah yang tidak ada.
+      //
+      // Peran yang masih boleh masuk sengaja TIDAK disebut. Menyebutkannya
+      // memberi tahu setiap orang yang mencoba bahwa ada satu pintu yang masih
+      // terbuka, sekaligus peran apa yang membukanya.
       if (me.maintenanceLocked) {
         await supabase.auth.signOut();
         throw new Error(
-          "Portal sedang dalam mode maintenance. Selama ditutup, hanya Super Admin yang dapat masuk. Silakan coba lagi setelah portal dibuka kembali.",
+          "Portal sedang dalam mode maintenance. Login ditutup sementara, silakan coba lagi setelah portal dibuka kembali.",
         );
       }
       if (!me.profile) {
@@ -113,8 +117,8 @@ export default function LoginPage({ habisWaktu = false }: { habisWaktu?: boolean
         )}
         {terkunciMaintenance && !error && (
           <div className="login-info">
-            <strong>Portal sedang maintenance.</strong> Selama ditutup, hanya Super Admin yang dapat masuk ke
-            dashboard. Akun Anda tidak bermasalah — coba lagi setelah portal dibuka.
+            <strong>Portal sedang maintenance.</strong> Login ditutup sementara. Akun Anda tidak bermasalah —
+            silakan coba lagi setelah portal dibuka kembali.
           </div>
         )}
         {habisWaktu && !terkunciMaintenance && !error && !info && (

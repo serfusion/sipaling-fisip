@@ -171,8 +171,8 @@ export async function getSessionState(): Promise<StatusSesi> {
   // readMaintenanceState GAGAL-TERBUKA: kalau pembacaannya gagal, statusnya
   // dianggap tidak maintenance. Satu baris pengaturan yang tidak terbaca
   // tidak boleh mengunci seluruh admin di luar sistemnya sendiri.
-  const { enabled } = await readMaintenanceState();
-  if (sesiTertahanMaintenance(profile.role, enabled)) {
+  const { enabled, adminLogin } = await readMaintenanceState();
+  if (sesiTertahanMaintenance(profile.role, enabled, adminLogin)) {
     return { profile: null, tertahanMaintenance: true };
   }
 

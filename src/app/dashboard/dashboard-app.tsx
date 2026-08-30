@@ -488,8 +488,8 @@ export default function DashboardApp({
               <>
                 <h2>Portal sedang maintenance</h2>
                 <p>
-                  Akun Anda tidak bermasalah. Selama portal ditutup, hanya Super Admin yang dapat masuk ke
-                  dashboard. Silakan coba lagi setelah portal dibuka kembali.
+                  Akun Anda tidak bermasalah. Dashboard ditutup sementara selama portal dalam perbaikan.
+                  Silakan coba lagi setelah portal dibuka kembali.
                 </p>
               </>
             ) : (
@@ -1141,7 +1141,9 @@ export default function DashboardApp({
                     <b>{mt.enabled ? "Portal sedang ditutup" : "Portal terbuka normal"}</b>
                     <span>
                       {mt.enabled
-                        ? "Pengunjung umum melihat halaman kucing tidur. Dosen dan admin yang sudah login tetap memakai portal seperti biasa."
+                        ? mt.adminLogin
+                          ? "Pengunjung umum melihat halaman kucing tidur. Admin unit dan dosen tetap dapat masuk seperti biasa."
+                          : "Pengunjung umum melihat halaman kucing tidur. Admin unit dan dosen ikut terkunci; hanya Anda yang dapat masuk."
                         : "Mahasiswa dapat mengakses seluruh layanan seperti biasa."}
                     </span>
                   </div>
@@ -1154,6 +1156,27 @@ export default function DashboardApp({
                       checked={mt.enabled}
                       disabled={mtBusy}
                       onChange={(event) => void saveMaintenance({ ...mtDraft, enabled: event.target.checked })}
+                    />
+                    <i aria-hidden="true" />
+                  </label>
+                </div>
+
+                <div className="mtp-row">
+                  <div className="mtp-row-copy">
+                    <b>Admin dan dosen boleh masuk selama maintenance</b>
+                    <span>
+                      {mt.adminLogin
+                        ? "MENYALA — Admin unit dan dosen dapat login dan bekerja seperti biasa selagi portal ditutup. Pilih ini bila perbaikannya butuh banyak tangan."
+                        : "MATI — Admin unit dan dosen tidak dapat login selama portal ditutup, dan yang sesinya masih hidup ikut dikeluarkan. Hanya Anda sebagai Super Admin yang tetap masuk."}
+                      {" "}Sakelar ini tidak berpengaruh pada akun Anda sendiri.
+                    </span>
+                  </div>
+                  <label className="mtp-switch" title="Izinkan / tutup login admin dan dosen selama maintenance">
+                    <input
+                      type="checkbox"
+                      checked={mt.adminLogin}
+                      disabled={mtBusy}
+                      onChange={(event) => void saveMaintenance({ ...mtDraft, adminLogin: event.target.checked })}
                     />
                     <i aria-hidden="true" />
                   </label>
@@ -1246,9 +1269,10 @@ export default function DashboardApp({
                 <div className="mtp-hint">
                   <b>Yang perlu diketahui.</b> Menu ini hanya tampil untuk Super Admin, dan server pun hanya menerima
                   perubahan dari Super Admin — Admin biasa ditolak. Selama maintenance menyala, pengiriman form dari
-                  pengunjung umum ditolak sementara, sedangkan dosen dan admin yang sudah login tidak terpengaruh.
-                  Halaman login tetap bisa dibuka langsung lewat <code>/login</code>, jadi Anda tidak akan pernah
-                  terkunci di luar walaupun pintu rahasianya dimatikan.
+                  pengunjung umum ditolak sementara. Akun Super Admin Anda tidak pernah ikut terkunci, dan halaman
+                  login tetap bisa dibuka langsung lewat <code>/login</code>, jadi Anda tidak akan pernah terkunci
+                  di luar walaupun pintu rahasianya dimatikan. Yang ditolak tidak diberi tahu bahwa masih ada peran
+                  yang bisa masuk; pesannya hanya menyebut portal sedang maintenance.
                 </div>
               </div>
             </section>
