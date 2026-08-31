@@ -84,34 +84,52 @@ bebas Anda?", padahal penelitiannya memang tidak punya.
 Isi kedua bagan diambil dari masukan yang sama dengan yang dipakai menyusun
 bab metode, jadi bagan dan bab metode tidak mungkin bercerita lain.
 
-### 4. Empat contoh, satu untuk tiap rancangan yang paling sering dipakai
+### 4. Empat judul siap pilih, metodenya menyusul di bawahnya
 
-Menyuruh mahasiswa memilih antara kuantitatif dan kualitatif tidak menolong
-kalau ia belum tahu bedanya. Karena itu tersedia empat contoh cerita yang
-tinggal ditekan, dua di tiap jalur:
+Yang dicari mahasiswa adalah judulnya. Metode penting, tetapi ia jawaban atas
+judul, bukan pintu masuknya. Karena itu empat contoh disajikan sebagai
+**empat judul**, dengan metodenya sebagai keterangan kecil di bawah masing-masing:
 
-| Contoh | Jalur | Metode yang keluar | Menjawab pertanyaan |
-| --- | --- | --- | --- |
-| **Pengaruh** | kuantitatif | Kuantitatif eksplanatif | Apakah A benar-benar memengaruhi B |
-| **Analisis Isi** | kuantitatif | Analisis isi kuantitatif | Apa yang sebenarnya ada di dalam pemberitaan |
-| **Fenomenologi** | kualitatif | Kualitatif fenomenologi | Bagaimana orang memaknai yang mereka alami |
-| **Studi Kasus** | kualitatif | Kualitatif studi kasus | Bagaimana sebuah lembaga menjalankan sesuatu |
+| Judul contoh | Metode |
+| --- | --- |
+| Pengaruh Terpaan Konten Berita di TikTok terhadap Minat Baca Berita pada Mahasiswa Ilmu Komunikasi di Universitas Serang Raya | Kuantitatif, menguji pengaruh |
+| Analisis Isi Banjir dalam Kompas.com | Analisis Isi, menghitung isi teks |
+| Pengalaman Ibu Rumah Tangga dalam Berjualan Online di Kota Serang | Fenomenologi, menggali pengalaman |
+| Strategi Humas Dinas Komunikasi dan Informatika Kota Serang dalam Mengelola Akun Resminya | Studi Kasus, menelusuri satu kasus |
 
-Menekannya bergantian memperlihatkan hal yang paling sulit dijelaskan dengan
-kata-kata: keempat cerita itu sama-sama masuk akal, tetapi menghasilkan metode
-yang sama sekali berbeda. Yang menentukan jalurnya adalah bentuk
-pertanyaannya, bukan selera penelitinya.
+Keempatnya berangkat dari cerita yang sama-sama masuk akal, dan metodenya jadi
+berbeda-beda karena bentuk pertanyaannya berbeda. Itu hal yang paling sulit
+dijelaskan dengan kata-kata dan paling mudah ditunjukkan.
 
-Kartu contohnya diberi bilah warna di tepi atas, biru untuk kuantitatif dan
-emas untuk kualitatif, sehingga jalurnya terbaca sebelum tulisannya sempat
-dibaca. Contoh yang sama tersedia di kedua tempat: di halaman kunci dan di
-dalam Perumus Judul.
+Judul pada kartunya **tidak diketik tangan**. Ia dihasilkan mesin yang sama
+dengan yang bekerja ketika kartunya ditekan, jadi judul yang terpampang tidak
+mungkin berbeda dari judul yang muncul sesudahnya. Berkas uji membandingkan
+keduanya, satu per satu.
 
-Tiap contoh benar-benar dijalankan lewat pembaca yang sama, bukan hasil yang
-sudah disiapkan. Berkas uji memastikan keempatnya memang mengeluarkan metode
-yang tertulis pada kartunya.
+Kartunya diberi bilah warna di tepi atas, biru untuk kuantitatif dan emas
+untuk kualitatif, dan tersedia di dua tempat: halaman kunci dan Perumus Judul
+di dalam.
 
-### 5. Etalase yang benar-benar bekerja di halaman kunci
+### 5. Nama metode dalam bahasa ruang bimbingan
+
+"Kuantitatif eksplanatif (asosiatif kausal)" adalah nama yang benar, dan
+memang itu yang harus tertulis di bab metode. Tetapi ia bukan kalimat yang
+menenangkan mahasiswa yang baru bertanya.
+
+Yang tampil besar di layar sekarang **judulnya**, lalu nama metode yang
+dikenal sehari-hari, lalu satu frasa tentang apa yang dikerjakannya:
+
+> **KUANTITATIF** · menguji pengaruh · *nama resminya di bab metode:
+> kuantitatif eksplanatif (asosiatif kausal)*
+
+Nama resminya tetap disebut, hanya tidak lagi menjadi hal pertama yang dibaca,
+dan tetap dipakai apa adanya pada laporan cetak.
+
+Satu hal kecil ikut dibetulkan: nama yang huruf kapitalnya di tengah kini
+dipertahankan saat judul dikapitalisasi, sehingga tercetak "TikTok", bukan
+"Tiktok" yang langsung terbaca sebagai salah ketik.
+
+### 6. Etalase yang benar-benar bekerja di halaman kunci
 
 Halaman kunci Cakrawala selama ini berisi gambaran tampilan tiap menu.
 Sekarang di paling atasnya ada satu bagian yang **benar-benar bekerja**:
@@ -120,9 +138,10 @@ contoh, lalu langsung melihat hasilnya.
 
 **Yang dibuka penuh:**
 
-- metode yang cocok beserta paradigmanya;
+- judul yang cocok, tercetak paling besar di kartunya;
+- metodenya beserta paradigmanya, di bawah judul;
 - cerita pengunjung dibacakan ulang dalam bahasa metode;
-- satu usulan judul dan satu rumusan masalah;
+- satu pilihan judul lain dan satu rumusan masalah;
 - jumlah ketidakcocokan judul-metode yang ditemukan, bila ada;
 - **bagan kerangka berpikirnya**, terbaca utuh.
 

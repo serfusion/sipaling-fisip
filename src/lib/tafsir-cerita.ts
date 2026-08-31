@@ -21,6 +21,7 @@
 // Yang keluar dari sini tetap dugaan, dan mahasiswa dapat membetulkannya
 // lewat formulir yang sama seperti sebelumnya.
 
+import { JENIS_KERJA, JENIS_LABEL, JENIS_UMUM, rancang } from "./metodologi";
 import type { Data, Masukan, Prodi, Tujuan, Unit } from "./metodologi";
 
 export type Yakin = "kuat" | "sedang" | "terka";
@@ -51,14 +52,19 @@ export type Jalur = "kuantitatif" | "kualitatif";
 
 export type ContohIde = {
   id: string;
-  /** Nama pendek untuk tombolnya. */
+  /** Nama pendek untuk penanda jalurnya. */
   label: string;
   jalur: Jalur;
-  /** Metode yang akan keluar bila contoh ini dibaca. */
-  metode: string;
-  /** Satu baris tentang jenis pertanyaan yang dijawab metode itu. */
-  ket: string;
   cerita: string;
+};
+
+/** Contoh yang sudah dibacakan: judul dan metodenya diambil dari mesin yang
+ *  sama, bukan diketik ulang di sini. */
+export type ContohSiap = ContohIde & {
+  judul: string;
+  metode: string;
+  metodeResmi: string;
+  kerja: string;
 };
 
 /**
@@ -79,8 +85,6 @@ export const CONTOH_IDE: ContohIde[] = [
     id: "pengaruh",
     label: "Pengaruh",
     jalur: "kuantitatif",
-    metode: "Kuantitatif eksplanatif",
-    ket: "Apakah A benar-benar memengaruhi B",
     cerita:
       "Aku mau meneliti soal mahasiswa yang sekarang kebanyakan cari berita dari TikTok. " +
       "Kayaknya makin sering mereka buka TikTok, makin turun minat baca berita di media " +
@@ -93,8 +97,6 @@ export const CONTOH_IDE: ContohIde[] = [
     id: "isi",
     label: "Analisis Isi",
     jalur: "kuantitatif",
-    metode: "Analisis isi kuantitatif",
-    ket: "Apa yang sebenarnya ada di dalam pemberitaan",
     cerita:
       "Saya mau melakukan analisis isi pemberitaan banjir di Kompas.com selama Januari " +
       "sampai Maret 2025. Yang ingin saya tahu, framing apa yang paling sering dipakai " +
@@ -105,8 +107,6 @@ export const CONTOH_IDE: ContohIde[] = [
     id: "fenomenologi",
     label: "Fenomenologi",
     jalur: "kualitatif",
-    metode: "Kualitatif fenomenologi",
-    ket: "Bagaimana orang memaknai yang mereka alami",
     cerita:
       "Untuk skripsi Ilmu Komunikasi, saya tertarik meneliti pengalaman ibu rumah " +
       "tangga yang berjualan online di " +
@@ -118,8 +118,6 @@ export const CONTOH_IDE: ContohIde[] = [
     id: "studi-kasus",
     label: "Studi Kasus",
     jalur: "kualitatif",
-    metode: "Kualitatif studi kasus",
-    ket: "Bagaimana sebuah lembaga menjalankan sesuatu",
     cerita:
       "Saya ingin meneliti bagaimana strategi humas Dinas Komunikasi dan Informatika " +
       "Kota Serang dalam mengelola akun resminya. Bagaimana proses penyusunan kontennya " +
@@ -130,6 +128,27 @@ export const CONTOH_IDE: ContohIde[] = [
 
 /** Contoh bawaan, dipakai tombol "Isi dengan contoh" di dalam Cakrawala. */
 export const CONTOH_CERITA = CONTOH_IDE[0].cerita;
+
+/**
+ * Bacakan keempat contoh, lalu kembalikan judul dan metodenya.
+ *
+ * Judulnya sengaja tidak ditulis tangan di berkas ini. Ia dihasilkan mesin
+ * yang sama dengan yang dipakai saat contohnya ditekan, sehingga judul yang
+ * terpampang pada kartu tidak mungkin berbeda dari judul yang muncul
+ * sesudahnya. Perhitungannya sepersekian milidetik untuk keempatnya.
+ */
+export function contohSiap(): ContohSiap[] {
+  return CONTOH_IDE.map((c) => {
+    const rancangan = rancang(tafsirkan(c.cerita).masukan);
+    return {
+      ...c,
+      judul: rancangan.judul[0],
+      metode: JENIS_UMUM[rancangan.jenis],
+      metodeResmi: JENIS_LABEL[rancangan.jenis],
+      kerja: JENIS_KERJA[rancangan.jenis],
+    };
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Perkakas kecil

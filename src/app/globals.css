@@ -2475,17 +2475,29 @@ a.al-mini:hover { color: var(--al-ink); }
 
 /* Empat contoh ide pada kotak cerita di dalam Cakrawala. Bilah warna di tepi
    atas membedakan jalur kuantitatif dan kualitatif sebelum tulisannya dibaca. */
-.al-tiles-contoh { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-@media (min-width: 900px) { .al-tiles-contoh { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.al-tile-contoh { display: flex; flex-direction: column; gap: 3px; border-top-width: 3px; }
+.al-tiles-contoh { grid-template-columns: 1fr; }
+@media (min-width: 760px) { .al-tiles-contoh { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.al-tile-contoh { display: flex; flex-direction: column; gap: 9px; border-top-width: 3px; }
 .al-tile-contoh:disabled { opacity: .5; cursor: default; }
-.al-jalur { font-size: 9.5px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+.al-tile-contoh b { font-size: 14px; line-height: 1.45; }
+.al-jalur { font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+  padding: 3px 9px; border-radius: 999px; border: 1px solid currentColor; }
 .al-tile-contoh.kuantitatif { border-top-color: var(--al-accent); }
 .al-tile-contoh.kuantitatif .al-jalur { color: var(--al-accent-dark); }
 .al-tile-contoh.kualitatif { border-top-color: var(--al-emas); }
 .al-tile-contoh.kualitatif .al-jalur { color: var(--al-emas); }
-.al-tile-metode { margin-top: 5px; padding-top: 5px; border-top: 1px dashed var(--al-line);
-  color: var(--al-muted); font-size: 11px; }
+.al-tile-metode { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding-top: 9px; border-top: 1px dashed var(--al-line); color: var(--al-muted); font-size: 11.5px; }
+
+/* Kartu putusan: judulnya lebih dulu dan lebih besar daripada nama metodenya. */
+.al-verdict-mata { color: var(--al-muted); font-size: 10px; font-weight: 800; letter-spacing: .15em; }
+.al-verdict-judul { margin: 6px 0 8px; font-size: clamp(17px, 3.4vw, 22px); line-height: 1.35;
+  letter-spacing: -.015em; }
+.al-verdict-metode { display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  margin-bottom: 10px; color: var(--al-muted); font-size: 12.5px; }
+.al-verdict-metode em { font-style: normal; opacity: .82; font-size: 11.5px; }
+.al-cap { color: var(--al-accent-dark); font-size: 10.5px; font-weight: 800; letter-spacing: .12em;
+  text-transform: uppercase; padding: 3px 10px; border-radius: 999px; border: 1px solid currentColor; }
 
 /* --- Bilah kemajuan pembacaan berkas naskah ---
    Word dan PDF dibongkar di pekerja latar, dan skripsi 250 halaman memang
@@ -2891,8 +2903,15 @@ a.al-mini:hover { color: var(--al-ink); }
   background: rgba(34,197,94,.09); display: flex; flex-direction: column; gap: 10px; }
 .cw-hasil-tanda { color: #6ee7a8; font-size: 10.5px; font-weight: 800; letter-spacing: .16em; }
 .cw-hasil-buka h3 { font-size: clamp(17px, 3.6vw, 22px); }
+/* Judulnya yang dicari mahasiswa, jadi judulnya yang paling besar di kartu ini. */
+.cw-hasil-judul { font-size: clamp(19px, 4.2vw, 27px); line-height: 1.32; letter-spacing: -.02em; }
+.cw-hasil-metode { display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  color: var(--cw-muted); font-size: 12.5px; }
+.cw-hasil-metode em { font-style: normal; color: var(--cw-muted); opacity: .8; font-size: 11.5px; }
+.cw-hasil-cap { color: #6ee7a8; font-size: 10.5px; font-weight: 800; letter-spacing: .12em;
+  text-transform: uppercase; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid rgba(110,231,168,.42); }
 .cw-hasil-baca { color: var(--cw-ink); font-size: 14px; line-height: 1.75; }
-.cw-hasil-paradigma { color: var(--cw-muted); font-size: 12.5px; line-height: 1.7; }
 .cw-hasil-duo { display: grid; gap: 12px; grid-template-columns: 1fr; margin-top: 4px; }
 @media (min-width: 720px) { .cw-hasil-duo { grid-template-columns: 1fr 1fr; } }
 .cw-hasil-duo > div { border: 1px solid var(--cw-line); border-radius: 11px; padding: 12px 13px;
@@ -2910,21 +2929,26 @@ a.al-mini:hover { color: var(--al-ink); }
    sebelum tulisannya sempat dibaca. */
 .cw-contoh { display: flex; flex-direction: column; gap: 12px; }
 .cw-contoh-judul { color: var(--cw-muted); font-size: 12.5px; line-height: 1.7; max-width: 68ch; }
-.cw-contoh-baris { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-@media (min-width: 780px) { .cw-contoh-baris { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.cw-contoh-kartu { display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
-  text-align: left; cursor: pointer; padding: 11px 13px; border-radius: 12px;
-  border: 1px solid var(--cw-line); border-top: 2px solid var(--cw-line);
+/* Dua kolom, bukan empat: yang dipamerkan judulnya, dan judul skripsi butuh
+   lebar untuk terbaca sebagai judul, bukan sebagai potongan teks. */
+.cw-contoh-baris { display: grid; gap: 10px; grid-template-columns: 1fr; }
+@media (min-width: 720px) { .cw-contoh-baris { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.cw-contoh-kartu { display: flex; flex-direction: column; align-items: flex-start; gap: 9px;
+  text-align: left; cursor: pointer; padding: 14px 16px; border-radius: 12px;
+  border: 1px solid var(--cw-line); border-top: 3px solid var(--cw-line);
   background: rgba(8,15,34,.62); color: var(--cw-ink); font: inherit; transition: .14s; }
 .cw-contoh-kartu:hover:not(:disabled) { transform: translateY(-2px); background: rgba(255,255,255,.07); }
 .cw-contoh-kartu:disabled { opacity: .5; cursor: default; }
-.cw-contoh-kartu b { font-size: 14px; }
+.cw-contoh-kartu b { font-size: 15px; font-weight: 700; line-height: 1.45; letter-spacing: -.01em; }
+.cw-contoh-kaki { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  width: 100%; padding-top: 9px; border-top: 1px dashed var(--cw-line); }
 .cw-contoh-kartu small { color: var(--cw-muted); font-size: 11.5px; line-height: 1.5; }
-.cw-contoh-jalur { font-size: 9.5px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+.cw-contoh-metode { font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+  padding: 3px 9px; border-radius: 999px; border: 1px solid currentColor; }
 .cw-contoh-kartu.kuantitatif { border-top-color: var(--cw-biru); }
-.cw-contoh-kartu.kuantitatif .cw-contoh-jalur { color: #9fb9ff; }
+.cw-contoh-kartu.kuantitatif .cw-contoh-metode { color: #9fb9ff; }
 .cw-contoh-kartu.kualitatif { border-top-color: var(--cw-emas); }
-.cw-contoh-kartu.kualitatif .cw-contoh-jalur { color: var(--cw-emas); }
+.cw-contoh-kartu.kualitatif .cw-contoh-metode { color: var(--cw-emas); }
 
 /* --- Bagan yang terlihat separuh ---
    Tanpa gembok dan tanpa tirai. Bagan kerangka berpikirnya dibuka utuh, karena

@@ -63,6 +63,43 @@ export const JENIS_LABEL: Record<Jenis, string> = {
   "evaluasi-program": "Penelitian evaluasi",
 };
 
+/**
+ * Nama metode dalam bahasa yang dipakai sehari-hari di ruang bimbingan.
+ *
+ * `JENIS_LABEL` di atas adalah nama resminya, dan memang itu yang harus
+ * tertulis di bab metode. Tetapi "kuantitatif eksplanatif (asosiatif kausal)"
+ * bukan kalimat yang menenangkan mahasiswa yang baru bertanya. Yang mereka
+ * kenal adalah "kuantitatif" dan "studi kasus". Nama pendek dipakai di layar,
+ * nama resminya disebut di bawahnya supaya tetap terbawa ke naskah.
+ */
+export const JENIS_UMUM: Record<Jenis, string> = {
+  "kuantitatif-eksplanatif": "Kuantitatif",
+  "kuantitatif-korelasional": "Kuantitatif",
+  "kuantitatif-komparatif": "Kuantitatif",
+  "kuantitatif-deskriptif": "Kuantitatif",
+  "kualitatif-deskriptif": "Kualitatif",
+  fenomenologi: "Fenomenologi",
+  "studi-kasus": "Studi Kasus",
+  "analisis-isi": "Analisis Isi",
+  "analisis-wacana": "Analisis Wacana",
+  "evaluasi-program": "Evaluasi Program",
+};
+
+/** Satu kata tentang apa yang dikerjakan metode itu, untuk mendampingi nama
+ *  pendeknya tanpa mengulang istilah teknis. */
+export const JENIS_KERJA: Record<Jenis, string> = {
+  "kuantitatif-eksplanatif": "menguji pengaruh",
+  "kuantitatif-korelasional": "menguji hubungan",
+  "kuantitatif-komparatif": "membandingkan kelompok",
+  "kuantitatif-deskriptif": "memetakan keadaan",
+  "kualitatif-deskriptif": "menggali tema",
+  fenomenologi: "menggali pengalaman",
+  "studi-kasus": "menelusuri satu kasus",
+  "analisis-isi": "menghitung isi teks",
+  "analisis-wacana": "membedah makna teks",
+  "evaluasi-program": "menilai capaian program",
+};
+
 export type Masukan = {
   variabelX: string;
   /** Variabel bebas kedua, bila ada. Kosong berarti hanya satu X. */
@@ -255,7 +292,12 @@ function bangunTeori(m: Masukan): string[] {
 /**
  * Kapitalisasi judul menurut PUEBI: setiap kata diawali huruf kapital,
  * kecuali kata tugas (di, ke, dari, dan, pada, terhadap, dalam, untuk, yang)
- * yang tidak berada di awal judul. Akronim yang sudah kapital dibiarkan utuh.
+ * yang tidak berada di awal judul.
+ *
+ * Dua bentuk dibiarkan apa adanya: akronim yang seluruhnya kapital (KPU,
+ * UMKM), dan nama yang huruf kapitalnya berada di tengah (TikTok, YouTube,
+ * WhatsApp). Tanpa pengecualian kedua, judul skripsi tentang media sosial
+ * akan tercetak "Tiktok", dan itu langsung terbaca sebagai salah ketik.
  */
 export function kapitalJudul(judul: string) {
   const tugas = new Set([
@@ -267,6 +309,7 @@ export function kapitalJudul(judul: string) {
     .map((kata, i) => {
       if (!kata) return kata;
       if (kata === kata.toUpperCase() && /[A-Z]/.test(kata)) return kata;
+      if (/\p{Lu}/u.test(kata.slice(1))) return kata.charAt(0).toUpperCase() + kata.slice(1);
       const kecil = kata.toLowerCase();
       if (i > 0 && tugas.has(kecil.replace(/[^a-z]/g, ""))) return kecil;
       return kecil.charAt(0).toUpperCase() + kecil.slice(1);
