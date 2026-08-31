@@ -218,22 +218,65 @@ const DATABASE_ROLES: Role[] = [...ARCHIVE_ROLES, "dosen"];
 // tetapi tidak untuk dosen — dosen melihat bimbingannya sendiri.
 const STAT_ROLES: Role[] = ARCHIVE_ROLES;
 
-const MENU: Array<{ id: ViewId; icon: string; label: string; roles: Role[] | "all" }> = [
-  { id: "ringkasan", icon: "◫", label: "Ringkasan", roles: "all" },
-  { id: "statistik", icon: "◕", label: "Statistik", roles: STAT_ROLES },
+// Menu dikelompokkan supaya daftarnya tidak sepanjang layar. Super Admin
+// melihat tiga belas menu sekaligus, dan pada ponsel yang paling bawah —
+// termasuk tombol keluar — tidak pernah kelihatan. "Akun" dan "Keluar" karena
+// itu pindah ke menu profil di pojok kanan atas, bukan lagi di daftar ini.
+type GrupId = "ringkasan" | "dokumen";
+
+const GRUP: Record<GrupId, { label: string; icon: string }> = {
+  ringkasan: { label: "Ringkasan", icon: "◫" },
+  dokumen: { label: "Dokumen & Arsip", icon: "🗄" },
+};
+
+type MenuItem = { id: ViewId; icon: string; label: string; roles: Role[] | "all"; grup?: GrupId };
+
+const MENU: MenuItem[] = [
+  { id: "ringkasan", icon: "◫", label: "Ringkasan", roles: "all", grup: "ringkasan" },
+  { id: "statistik", icon: "◕", label: "Statistik", roles: STAT_ROLES, grup: "ringkasan" },
+  { id: "judul", icon: "✎", label: "Pengajuan Judul", roles: PROPOSAL_ROLES, grup: "ringkasan" },
+  // Antrean tetap di luar grup: ini pekerjaan harian, dan lencana jumlahnya
+  // kehilangan gunanya kalau tersembunyi di balik satu ketukan.
   { id: "antrean", icon: "☰", label: "Antrean Layanan", roles: "all" },
-  { id: "judul", icon: "✎", label: "Pengajuan Judul", roles: PROPOSAL_ROLES },
   { id: "bimbingan", icon: "⚘", label: "Bimbingan & Surat Tugas", roles: ["dosen"] },
-  { id: "database", icon: "🗄", label: "Database Dokumen", roles: DATABASE_ROLES },
-  { id: "template", icon: "▤", label: "Template Dokumen", roles: ARCHIVE_ROLES },
-  { id: "arsip", icon: "⬢", label: "Arsip Drive", roles: ARCHIVE_ROLES },
-  { id: "skripsi", icon: "⇩", label: "Arsip Skripsi", roles: ["super_admin", "admin", "admin_perpustakaan"] },
-  { id: "absensi", icon: "◔", label: "Absensi Perpustakaan", roles: ATTENDANCE_ROLES },
+  { id: "database", icon: "🗄", label: "Database Dokumen", roles: DATABASE_ROLES, grup: "dokumen" },
+  { id: "template", icon: "▤", label: "Template Dokumen", roles: ARCHIVE_ROLES, grup: "dokumen" },
+  { id: "arsip", icon: "⬢", label: "Arsip Drive", roles: ARCHIVE_ROLES, grup: "dokumen" },
+  { id: "skripsi", icon: "⇩", label: "Arsip Skripsi", roles: ["super_admin", "admin", "admin_perpustakaan"], grup: "dokumen" },
+  { id: "absensi", icon: "◔", label: "Absensi Perpustakaan", roles: ATTENDANCE_ROLES, grup: "dokumen" },
   { id: "pengumuman", icon: "✎", label: "Pengumuman & Status", roles: ["super_admin", "admin"] },
   { id: "maintenance", icon: "☾", label: "Mode Maintenance", roles: ["super_admin"] },
   { id: "cakrawala", icon: "✧", label: "Kunci Cakrawala", roles: ["super_admin"] },
   { id: "akun", icon: "⚙", label: "Akun", roles: "all" },
 ];
+
+/**
+ * Susun menu yang boleh dilihat peran ini menjadi baris tunggal dan grup.
+ *
+ * Grup yang hanya berisi satu menu dibongkar kembali menjadi baris biasa:
+ * dosen misalnya cuma punya satu menu di grup "Dokumen & Arsip", dan
+ * menyembunyikannya di balik satu ketukan hanya menambah pekerjaan.
+ */
+type BarisMenu =
+  | { jenis: "satu"; item: MenuItem }
+  | { jenis: "grup"; id: GrupId; label: string; icon: string; anak: MenuItem[] };
+
+function susunMenu(boleh: MenuItem[]): BarisMenu[] {
+  const baris: BarisMenu[] = [];
+  const sudah = new Set<GrupId>();
+  for (const item of boleh) {
+    if (!item.grup) {
+      baris.push({ jenis: "satu", item });
+      continue;
+    }
+    if (sudah.has(item.grup)) continue;
+    sudah.add(item.grup);
+    const anak = boleh.filter((lain) => lain.grup === item.grup);
+    if (anak.length === 1) baris.push({ jenis: "satu", item: anak[0] });
+    else baris.push({ jenis: "grup", id: item.grup, label: GRUP[item.grup].label, icon: GRUP[item.grup].icon, anak });
+  }
+  return baris;
+}
 
 const VIEW_TITLES: Record<ViewId, string> = {
   ringkasan: "Ringkasan",
@@ -281,6 +324,9 @@ export default function DashboardApp({
   const meta = profile ? ROLE_META[profile.role] : ROLE_META.admin;
   const [view, setView] = useState<ViewId>("ringkasan");
   const [sideOpen, setSideOpen] = useState(false);
+  // Menu profil di pojok kanan atas: tempat "Akun" dan "Keluar" sekarang.
+  const [meBuka, setMeBuka] = useState(false);
+  const meRef = useRef<HTMLDivElement | null>(null);
   const [quoteIndex, setQuoteIndex] = useState(() => Math.floor(Math.random() * QUOTES.length));
 
   // Quote berganti otomatis tiap 5 detik.
@@ -321,6 +367,9 @@ export default function DashboardApp({
   const [archiveError, setArchiveError] = useState("");
 
   const [attendance, setAttendance] = useState<AttendanceRow[]>([]);
+  // Baris yang sedang menunggu penegasan hapus. Penghapusan tidak dapat
+  // dibatalkan, jadi tidak pernah terjadi hanya dari satu ketukan.
+  const [attHapus, setAttHapus] = useState<number | null>(null);
   const attendanceLoadedRef = useRef(false);
   const [attForm, setAttForm] = useState({ nim: "", studentName: "", note: "" });
   const [attMessage, setAttMessage] = useState("");
@@ -463,9 +512,38 @@ export default function DashboardApp({
   }, [view, profile]);
 
   const allowedMenu = useMemo(
-    () => MENU.filter((item) => profile && (item.roles === "all" || item.roles.includes(profile.role))),
+    () =>
+      MENU.filter(
+        (item) =>
+          // "Akun" tetap terdaftar demi judul halaman dan hak aksesnya, tetapi
+          // tempatnya kini di menu profil, bukan di daftar samping.
+          item.id !== "akun" && profile && (item.roles === "all" || item.roles.includes(profile.role)),
+      ),
     [profile],
   );
+  const barisMenu = useMemo(() => susunMenu(allowedMenu), [allowedMenu]);
+
+  // Grup yang sedang terbuka. Grup yang memuat halaman aktif ikut terbuka
+  // sendiri, supaya menu yang sedang dibaca tidak pernah tersembunyi.
+  const [grupBuka, setGrupBuka] = useState<Record<string, boolean>>({});
+  const grupTerbuka = (b: Extract<BarisMenu, { jenis: "grup" }>) =>
+    grupBuka[b.id] ?? b.anak.some((anak) => anak.id === view);
+
+  useEffect(() => {
+    if (!meBuka) return;
+    function diLuar(event: MouseEvent) {
+      if (meRef.current && !meRef.current.contains(event.target as Node)) setMeBuka(false);
+    }
+    function tekanEsc(event: KeyboardEvent) {
+      if (event.key === "Escape") setMeBuka(false);
+    }
+    document.addEventListener("mousedown", diLuar);
+    document.addEventListener("keydown", tekanEsc);
+    return () => {
+      document.removeEventListener("mousedown", diLuar);
+      document.removeEventListener("keydown", tekanEsc);
+    };
+  }, [meBuka]);
 
   const filteredRows = useMemo(
     () => (chip === "Semua" ? rowsAll : rowsAll.filter((row) => row.status === chip)),
@@ -594,6 +672,28 @@ export default function DashboardApp({
       setArchiveMessage("Metadata tersimpan — file tetap berada di Google Drive.");
     } catch (reason: unknown) {
       setArchiveError(reason instanceof Error ? reason.message : "Arsip belum tersimpan.");
+    }
+  }
+
+  /**
+   * Hapus satu catatan kunjungan. Hanya Super Admin yang melihat tombolnya,
+   * dan servernya memeriksa lagi — tombol yang disembunyikan bukan penjagaan.
+   */
+  async function hapusAbsensi(id: number) {
+    setAttMessage("");
+    try {
+      const response = await fetch("/api/attendance", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [id] }),
+      });
+      const payload = (await response.json()) as { success?: boolean; message?: string; pesan?: string };
+      if (!response.ok || !payload.success) throw new Error(payload.message || "Catatan gagal dihapus.");
+      setAttendance((rows) => rows.filter((row) => row.id !== id));
+      setAttHapus(null);
+      setAttMessage(payload.pesan || "Catatan kunjungan dihapus.");
+    } catch (reason: unknown) {
+      setAttMessage(reason instanceof Error ? reason.message : "Catatan gagal dihapus.");
     }
   }
 
@@ -776,17 +876,53 @@ export default function DashboardApp({
           <span><b>{meta.label}</b><small>{meta.scope}</small></span>
         </div>
         <nav className="nav">
-          {allowedMenu.map((item) => (
-            <button type="button" key={item.id} className={view === item.id ? "on" : ""} onClick={() => openView(item.id)}>
-              <span className="ic">{item.icon}</span>
-              {item.label}
-              {item.id === "antrean" && stats.incoming > 0 && <span className="badge">{stats.incoming}</span>}
-            </button>
-          ))}
+          {barisMenu.map((baris) =>
+            baris.jenis === "satu" ? (
+              <button
+                type="button"
+                key={baris.item.id}
+                className={view === baris.item.id ? "on" : ""}
+                onClick={() => openView(baris.item.id)}
+              >
+                <span className="ic">{baris.item.icon}</span>
+                {baris.item.label}
+                {baris.item.id === "antrean" && stats.incoming > 0 && <span className="badge">{stats.incoming}</span>}
+              </button>
+            ) : (
+              <div className="nav-grup" key={baris.id}>
+                <button
+                  type="button"
+                  className={`nav-grup-kepala ${grupTerbuka(baris) ? "buka" : ""} ${
+                    baris.anak.some((anak) => anak.id === view) ? "aktif" : ""
+                  }`}
+                  aria-expanded={grupTerbuka(baris)}
+                  onClick={() => setGrupBuka((kini) => ({ ...kini, [baris.id]: !grupTerbuka(baris) }))}
+                >
+                  <span className="ic">{baris.icon}</span>
+                  {baris.label}
+                  <span className="nav-grup-tanda" aria-hidden="true">▾</span>
+                </button>
+                {grupTerbuka(baris) && (
+                  <div className="nav-grup-anak">
+                    {baris.anak.map((anak) => (
+                      <button
+                        type="button"
+                        key={anak.id}
+                        className={view === anak.id ? "on" : ""}
+                        onClick={() => openView(anak.id)}
+                      >
+                        <span className="ic">{anak.icon}</span>
+                        {anak.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ),
+          )}
         </nav>
         <div className="side-foot">
           <Link href="/">← Portal Mahasiswa</Link>
-          <button type="button" onClick={logout}>⎋ Keluar</button>
         </div>
       </aside>
       {sideOpen && <button type="button" className="backdrop" aria-label="Tutup menu" onClick={() => setSideOpen(false)} />}
@@ -818,9 +954,37 @@ export default function DashboardApp({
               }
             }}
           />
-          <div className="me">
-            <span className="ava">{initials}</span>
-            <div><b>{profile.fullName}</b><small>{meta.label}</small></div>
+          <div className="me" ref={meRef}>
+            <button
+              type="button"
+              className="me-btn"
+              onClick={() => setMeBuka((buka) => !buka)}
+              aria-expanded={meBuka}
+              aria-haspopup="menu"
+              title="Akun dan keluar"
+            >
+              <span className="ava">{initials}</span>
+              <span className="me-nama"><b>{profile.fullName}</b><small>{meta.label}</small></span>
+              <span className="me-tanda" aria-hidden="true">▾</span>
+            </button>
+            {meBuka && (
+              <div className="me-menu" role="menu">
+                <div className="me-menu-kepala">
+                  <b>{profile.fullName}</b>
+                  <small>{profile.email}</small>
+                  <span>{meta.label}</span>
+                </div>
+                <button type="button" role="menuitem" onClick={() => { setMeBuka(false); openView("akun"); }}>
+                  <span aria-hidden="true">⚙</span> Akun
+                </button>
+                <Link role="menuitem" href="/" onClick={() => setMeBuka(false)}>
+                  <span aria-hidden="true">←</span> Portal Mahasiswa
+                </Link>
+                <button type="button" role="menuitem" className="me-keluar" onClick={() => void logout()}>
+                  <span aria-hidden="true">⎋</span> Keluar
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1079,10 +1243,15 @@ export default function DashboardApp({
               </form>
               <div className="panel qtable-wrap">
                 <table className="qt">
-                  <thead><tr><th>NIM</th><th>Nama</th><th>Kunjungan ke-</th><th>Waktu</th><th>Catatan</th></tr></thead>
+                  <thead>
+                    <tr>
+                      <th>NIM</th><th>Nama</th><th>Kunjungan ke-</th><th>Waktu</th><th>Catatan</th>
+                      {profile.role === "super_admin" && <th aria-label="Aksi" />}
+                    </tr>
+                  </thead>
                   <tbody>
                     {attendance.length === 0 ? (
-                      <tr><td colSpan={5}><div className="dempty">Belum ada data kunjungan. Kunjungan dari form mahasiswa (Absensi Perpustakaan) otomatis tercatat di sini.</div></td></tr>
+                      <tr><td colSpan={profile.role === "super_admin" ? 6 : 5}><div className="dempty">Belum ada data kunjungan. Kunjungan dari form mahasiswa (Absensi Perpustakaan) otomatis tercatat di sini.</div></td></tr>
                     ) : (
                       attendance.map((row) => (
                         <tr key={row.id}>
@@ -1091,6 +1260,26 @@ export default function DashboardApp({
                           <td>{row.visitNumber}</td>
                           <td>{formatDate(row.visitDate)}</td>
                           <td>{row.note || "—"}</td>
+                          {profile.role === "super_admin" && (
+                            <td className="qt-aksi">
+                              {attHapus === row.id ? (
+                                <span className="qt-pasti">
+                                  <b>Hapus?</b>
+                                  <button type="button" className="btn btn-danger btn-mini" onClick={() => void hapusAbsensi(row.id)}>Ya</button>
+                                  <button type="button" className="btn btn-light btn-mini" onClick={() => setAttHapus(null)}>Batal</button>
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="btn btn-light btn-mini"
+                                  title="Hapus catatan kunjungan ini"
+                                  onClick={() => setAttHapus(row.id)}
+                                >
+                                  Hapus
+                                </button>
+                              )}
+                            </td>
+                          )}
                         </tr>
                       ))
                     )}

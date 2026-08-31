@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { libraryAttendance } from "@/db/schema";
-import { desc, eq, sql } from "drizzle-orm";
+import { desc, eq, inArray, sql } from "drizzle-orm";
 import { getCurrentProfile, type SessionProfile } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -146,5 +146,58 @@ export async function PATCH(request: Request) {
   } catch (error: unknown) {
     console.error("update attendance", error);
     return Response.json({ success: false, message: "Absensi gagal diubah." }, { status: 500 });
+  }
+}
+
+/**
+ * Hapus catatan kunjungan. HANYA SUPER ADMIN.
+ *
+ * Absensi tidak melewati pemeriksaan siapa pun, jadi salah catat — NIM keliru,
+ * satu orang terhitung dua kali, uji coba yang terlanjur tersimpan — tidak
+ * punya jalan perbaikan lain selain dihapus. Haknya dipegang satu peran saja:
+ * ini menghapus bukti kehadiran orang, dan admin unit tidak perlu bisa
+ * melakukannya.
+ *
+ * Nomor kunjungan yang tersisa SENGAJA tidak dihitung ulang. Nomor itu sudah
+ * terlanjur dipakai pada tiket yang dipegang mahasiswa; mengubahnya membuat
+ * bukti yang ada di tangan mereka tidak lagi cocok dengan yang tercatat.
+ */
+export async function DELETE(request: Request) {
+  try {
+    const profile = await getCurrentProfile();
+    if (!profile || profile.role !== "super_admin") {
+      return Response.json(
+        { success: false, message: "Hanya Super Admin yang dapat menghapus catatan absensi." },
+        { status: 403 },
+      );
+    }
+
+    let muatan: { ids?: unknown };
+    try {
+      muatan = (await request.json()) as { ids?: unknown };
+    } catch {
+      return Response.json({ success: false, message: "Permintaan tidak terbaca." }, { status: 400 });
+    }
+
+    const ids = Array.isArray(muatan.ids)
+      ? muatan.ids.filter((x): x is number => Number.isInteger(x) && (x as number) > 0).slice(0, 200)
+      : [];
+    if (ids.length === 0) {
+      return Response.json({ success: false, message: "Tidak ada catatan yang dipilih." }, { status: 400 });
+    }
+
+    const dihapus = await db
+      .delete(libraryAttendance)
+      .where(inArray(libraryAttendance.id, ids))
+      .returning({ id: libraryAttendance.id });
+
+    return Response.json({
+      success: true,
+      dihapus: dihapus.map((baris) => baris.id),
+      pesan: `${dihapus.length} catatan kunjungan dihapus.`,
+    });
+  } catch (error: unknown) {
+    console.error("hapus absensi", error);
+    return Response.json({ success: false, message: "Catatan absensi gagal dihapus." }, { status: 500 });
   }
 }
