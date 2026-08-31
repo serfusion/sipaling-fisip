@@ -94,14 +94,8 @@ Yang tertera pada tombol contoh hanya nama pendek jalurnya: **Pengaruh**,
 dibocorkan lebih dulu. Kejutannya justru terletak sesudah tombolnya ditekan:
 satu cerita keluar menjadi **empat judul dengan empat metode sekaligus**.
 
-Contoh, dari cerita tentang karyawan di sebuah perusahaan:
-
-| Judul yang keluar | Metode |
-| --- | --- |
-| Pengaruh Lingkungan Kerja dan Kompensasi terhadap Kepuasan Karyawan melalui Komitmen Organisasional pada Karyawan di PT Sinar Mandiri Serang | Kuantitatif, menguji pengaruh |
-| Analisis Isi Lingkungan Kerja dalam [sebutkan medianya] di PT Sinar Mandiri Serang | Analisis Isi, menghitung isi teks |
-| Makna Lingkungan Kerja bagi Karyawan di PT Sinar Mandiri Serang | Fenomenologi, menggali pengalaman |
-| Lingkungan Kerja pada Karyawan di PT Sinar Mandiri Serang: Studi Kasus | Studi Kasus, menelusuri satu kasus |
+Contoh dan daftar rancangannya kemudian dibedakan menurut prodi; lihat
+`UPDATE-V12-PRODI-DAN-EMPAT-LAPIS.md` untuk bentuknya yang berlaku sekarang.
 
 Keempatnya berangkat dari cerita yang sama. Metodenya berbeda karena bentuk
 pertanyaannya berbeda, bukan karena seleranya berbeda. Itu hal yang paling
