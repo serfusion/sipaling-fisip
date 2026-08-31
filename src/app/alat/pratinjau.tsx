@@ -9,15 +9,17 @@
 // sehingga halaman ini tidak dapat dilewati lewat alat pengembang.
 // ============================================================
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Ic, IKON } from "./ikon";
 import Animasi from "../animasi";
 import { BaganAlurPikir, BaganKerangka, ContohGrafik } from "./grafik";
-import { susunAlurPikir, susunKerangka, type AlurPikir, type Kerangka } from "@/lib/kerangka";
-import { JENIS_KERJA, JENIS_LABEL, JENIS_UMUM, rancang, type Rancangan } from "@/lib/metodologi";
-import { usulkanVisual, type Usul } from "@/lib/visual";
-import { MINIMAL_KATA, contohSiap, hitungKataCerita, tafsirkan, type Bacaan } from "@/lib/tafsir-cerita";
+import { susunAlurPikir, susunKerangka } from "@/lib/kerangka";
+import { usulkanVisual } from "@/lib/visual";
+import {
+  CONTOH_IDE, MINIMAL_KATA, empatJalur, hitungKataCerita, tafsirkan,
+  type Bacaan, type JalurAlternatif,
+} from "@/lib/tafsir-cerita";
 
 const KONTAK = "@superfaldev";
 
@@ -319,16 +321,10 @@ function Mock({ jenis }: { jenis: string }) {
 
 type HasilCoba = {
   bacaan: Bacaan;
-  rancangan: Rancangan;
-  kerangka: Kerangka | null;
-  alur: AlurPikir | null;
-  visual: Usul[];
+  jalur: JalurAlternatif[];
 };
 
 function EtalaseCoba() {
-  // Keempat contoh dibacakan sekali di sini, sehingga judul yang terpampang
-  // pada kartunya persis judul yang muncul ketika kartunya ditekan.
-  const contoh = useMemo(() => contohSiap(), []);
   const [cerita, setCerita] = useState("");
   const [sibuk, setSibuk] = useState(false);
   const [hasil, setHasil] = useState<HasilCoba | null>(null);
@@ -344,15 +340,7 @@ function EtalaseCoba() {
     // "menekan tombol" ke "hasil muncul" terbaca sebagai satu kejadian.
     window.setTimeout(() => {
       const bacaan = tafsirkan(teks);
-      const rancangan = rancang(bacaan.masukan);
-      const pakaiVariabel = bacaan.masukan.tujuan === "pengaruh" || bacaan.masukan.tujuan === "hubungan";
-      setHasil({
-        bacaan,
-        rancangan,
-        kerangka: pakaiVariabel ? susunKerangka(bacaan.masukan) : null,
-        alur: pakaiVariabel ? null : susunAlurPikir(bacaan.masukan, rancangan.jenis, rancangan.teori),
-        visual: usulkanVisual(rancangan.jenis),
-      });
+      setHasil({ bacaan, jalur: empatJalur(bacaan) });
       setSibuk(false);
     }, 700);
   }
@@ -392,11 +380,10 @@ function EtalaseCoba() {
 
       <div className="cw-contoh">
         <p className="cw-contoh-judul">
-          Belum kepikiran judulnya? Tekan salah satu dari empat judul ini. Keempatnya berangkat dari cerita yang
-          sama-sama masuk akal, dan metodenya jadi berbeda-beda karena bentuk pertanyaannya berbeda.
+          Belum kepikiran? Tekan salah satu contoh ini, lalu lihat sendiri hasilnya.
         </p>
         <div className="cw-contoh-baris">
-          {contoh.map((c) => (
+          {CONTOH_IDE.map((c) => (
             <button
               key={c.id}
               type="button"
@@ -404,11 +391,8 @@ function EtalaseCoba() {
               disabled={sibuk}
               onClick={() => { setCerita(c.cerita); carikan(c.cerita); }}
             >
-              <b>{c.judul}</b>
-              <span className="cw-contoh-kaki">
-                <span className="cw-contoh-metode">{c.metode}</span>
-                <small>{c.kerja}</small>
-              </span>
+              <b>{c.label}</b>
+              <small>{c.jalur}</small>
             </button>
           ))}
         </div>
@@ -420,7 +404,19 @@ function EtalaseCoba() {
 }
 
 function HasilCobaTampil({ hasil }: { hasil: HasilCoba }) {
-  const { bacaan, rancangan, kerangka, alur, visual } = hasil;
+  const { bacaan, jalur } = hasil;
+
+  // Yang paling sesuai ceritanya dipilih lebih dulu. Tiga sisanya tetap satu
+  // ketukan jauhnya, karena maksud bagian ini justru memperlihatkan bahwa
+  // satu topik bisa diteliti lebih dari satu cara.
+  const [pilih, setPilih] = useState(() => Math.max(0, jalur.findIndex((j) => j.pas)));
+  const j = jalur[pilih] ?? jalur[0];
+  const rancangan = j.rancangan;
+
+  const pakaiVariabel = j.masukan.tujuan === "pengaruh" || j.masukan.tujuan === "hubungan";
+  const kerangka = pakaiVariabel ? susunKerangka(j.masukan) : null;
+  const alur = pakaiVariabel ? null : susunAlurPikir(j.masukan, rancangan.jenis, rancangan.teori);
+  const visual = usulkanVisual(rancangan.jenis);
   const hambat = rancangan.peringatan.filter((p) => p.berat === "hambat").length;
 
   return (
@@ -433,38 +429,54 @@ function HasilCobaTampil({ hasil }: { hasil: HasilCoba }) {
       )}
 
       <div className="cw-hasil-buka">
-        <span className="cw-hasil-tanda">{bacaan.cukup ? "JUDUL YANG COCOK UNTUK CERITAMU" : "DUGAAN SEMENTARA"}</span>
-        <h3 className="cw-hasil-judul">{rancangan.judul[0]}</h3>
-
-        <p className="cw-hasil-metode">
-          <span className="cw-hasil-cap">{JENIS_UMUM[rancangan.jenis]}</span>
-          {JENIS_KERJA[rancangan.jenis]}
-          <em>nama resminya di bab metode: {JENIS_LABEL[rancangan.jenis].toLowerCase()}</em>
-        </p>
-
+        <span className="cw-hasil-tanda">EMPAT JUDUL DARI CERITAMU</span>
         <p className="cw-hasil-baca">{bacaan.ringkas}</p>
+
+        <div className="cw-judul-baris">
+          {jalur.map((k, i) => (
+            <button
+              key={k.id}
+              type="button"
+              className={`cw-judul-kartu ${k.jalur} ${i === pilih ? "on" : ""}`}
+              aria-pressed={i === pilih}
+              onClick={() => setPilih(i)}
+            >
+              {k.pas && <span className="cw-judul-pas">paling sesuai ceritamu</span>}
+              <b>{k.judul}</b>
+              <span className="cw-judul-kaki">
+                <span className="cw-judul-metode">{k.metode}</span>
+                <small>{k.kerja}</small>
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <p className="cw-judul-catatan">
+          Satu topik memang bisa diteliti lebih dari satu cara. Yang menentukan metodenya adalah bentuk
+          pertanyaan yang kamu pilih, bukan selera. Bagian dalam kurung siku isian yang kamu lengkapi sendiri.
+        </p>
 
         <div className="cw-hasil-duo">
           <div>
-            <b>Pilihan judul lain</b>
-            <p>{rancangan.judul[1] ?? rancangan.judul[0]}</p>
-          </div>
-          <div>
             <b>Rumusan masalah</b>
             <p>{rancangan.rumusan[0]}</p>
+          </div>
+          <div>
+            <b>Nama resmi metodenya di bab metode</b>
+            <p>{j.metodeResmi}</p>
           </div>
         </div>
 
         {hambat > 0 && (
           <p className="cw-hasil-hambat">
-            ⚠ Ada <b>{hambat}</b> hal pada rencanamu yang biasanya bikin pembimbing menyuruh ulang. Rinciannya
+            Ada <b>{hambat}</b> hal pada rencanamu yang biasanya bikin pembimbing menyuruh ulang. Rinciannya
             beserta jalan keluarnya ada di dalam Cakrawala.
           </p>
         )}
       </div>
 
       <div className="cw-separuh">
-        <p className="cw-separuh-judul">Kerangka berpikir yang tersusun dari ceritamu</p>
+        <p className="cw-separuh-judul">Kerangka berpikir untuk judul yang kamu pilih</p>
 
         {/* Bagannya dibuka utuh, tanpa gembok dan tanpa tirai. Inilah yang
             paling meyakinkan: bagan yang benar-benar jadi dari cerita yang

@@ -299,10 +299,19 @@ function bangunTeori(m: Masukan): string[] {
  * WhatsApp). Tanpa pengecualian kedua, judul skripsi tentang media sosial
  * akan tercetak "Tiktok", dan itu langsung terbaca sebagai salah ketik.
  */
-export function kapitalJudul(judul: string) {
+export function kapitalJudul(judul: string): string {
+  // Bagian dalam kurung siku adalah isian yang harus dilengkapi mahasiswa,
+  // bukan bagian judul. Dikapitalkan, ia berhenti terbaca sebagai perintah.
+  if (judul.includes("[")) {
+    return judul
+      .split(/(\[[^\]]*\])/)
+      .map((bagian) => (bagian.startsWith("[") ? bagian : kapitalJudul(bagian)))
+      .join("");
+  }
+
   const tugas = new Set([
     "di", "ke", "dari", "dan", "atau", "pada", "terhadap", "dalam", "untuk",
-    "yang", "dengan", "antara", "bagi", "sebagai", "oleh", "serta",
+    "yang", "dengan", "antara", "bagi", "sebagai", "oleh", "serta", "melalui",
   ]);
   return judul
     .split(" ")
@@ -325,14 +334,24 @@ function bangunJudul(jenis: Jenis, m: Masukan): string[] {
   const di = L ? ` di ${L}` : "";
   const pada = O ? ` pada ${O}` : "";
 
+  // Judul model dua sebab dan model jalur ditulis lengkap. Menyebut satu
+  // variabel bebas saja pada penelitian yang menguji dua akan membuat judul
+  // berselisih dengan bagan kerangka berpikir dan dengan hipotesisnya.
+  const X2 = (m.variabelX2 ?? "").trim();
+  const Z = (m.variabelZ ?? "").trim();
+  const sebab = X2 ? `${X} dan ${X2}` : X;
+  const lewat = Z ? ` melalui ${Z}` : "";
+
   switch (jenis) {
     case "kuantitatif-eksplanatif":
       return [
-        `Pengaruh ${X} terhadap ${Y}${pada}${di}`,
-        `Pengaruh ${X} terhadap ${Y}: Studi pada ${O}${di}`,
+        `Pengaruh ${sebab} terhadap ${Y}${lewat}${pada}${di}`,
+        Z
+          ? `Pengaruh ${sebab} terhadap ${Y} dengan ${Z} sebagai Variabel Intervening${pada}${di}`
+          : `Pengaruh ${sebab} terhadap ${Y}: Studi pada ${O}${di}`,
       ];
     case "kuantitatif-korelasional":
-      return [`Hubungan antara ${X} dengan ${Y}${pada}${di}`, `Korelasi ${X} dan ${Y}${pada}${di}`];
+      return [`Hubungan antara ${sebab} dengan ${Y}${pada}${di}`, `Korelasi ${sebab} dan ${Y}${pada}${di}`];
     case "kuantitatif-komparatif":
       return [`Perbandingan ${Y} antara ${X}${di}`, `Studi Komparatif ${Y}${pada}${di}`];
     case "kuantitatif-deskriptif":
@@ -357,8 +376,20 @@ function bangunRumusan(jenis: Jenis, m: Masukan): string[] {
   const Y = m.variabelY.trim() || "variabel terikat";
   const O = m.objek.trim() || "objek penelitian";
   switch (jenis) {
-    case "kuantitatif-eksplanatif":
-      return [`Apakah ${X} berpengaruh terhadap ${Y} pada ${O}?`, `Seberapa besar pengaruh ${X} terhadap ${Y} pada ${O}?`];
+    case "kuantitatif-eksplanatif": {
+      const X2 = (m.variabelX2 ?? "").trim();
+      const Z = (m.variabelZ ?? "").trim();
+      const daftar = [`Apakah ${X} berpengaruh terhadap ${Y} pada ${O}?`];
+      if (X2) daftar.push(`Apakah ${X2} berpengaruh terhadap ${Y} pada ${O}?`);
+      if (Z) {
+        daftar.push(`Apakah ${X}${X2 ? ` dan ${X2}` : ""} berpengaruh terhadap ${Z} pada ${O}?`);
+        daftar.push(`Apakah ${Z} berpengaruh terhadap ${Y} pada ${O}?`);
+        daftar.push(`Apakah ${X}${X2 ? ` dan ${X2}` : ""} berpengaruh terhadap ${Y} melalui ${Z} pada ${O}?`);
+      }
+      if (X2) daftar.push(`Apakah ${X} dan ${X2} secara serentak berpengaruh terhadap ${Y} pada ${O}?`);
+      if (!X2 && !Z) daftar.push(`Seberapa besar pengaruh ${X} terhadap ${Y} pada ${O}?`);
+      return daftar;
+    }
     case "kuantitatif-korelasional":
       return [`Apakah terdapat hubungan antara ${X} dengan ${Y} pada ${O}?`];
     case "kuantitatif-komparatif":

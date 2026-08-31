@@ -190,9 +190,16 @@ export function susunAlurPikir(m: Masukan, jenis: Jenis, teori: string[]): AlurP
   const siapa = (m.objek ?? "").trim();
   const tempat = (m.lokasi ?? "").trim();
 
-  const fenomena = [X, siapa ? `pada ${siapa}` : "", tempat ? `di ${tempat}` : ""]
-    .filter(Boolean)
-    .join(" ");
+  // Nama lembaga sering sudah menempel pada gagasannya sendiri: "humas Dinas
+  // Kominfo Kota Serang" sudah menyebut lembaganya. Menambahkan "pada Dinas
+  // Kominfo Kota Serang" di belakangnya hanya mencetak nama yang sama dua kali
+  // di dalam satu kotak.
+  const terpakai: string[] = [X];
+  const belumDisebut = (bagian: string) =>
+    bagian !== "" && !terpakai.some((t) => t.toLowerCase().includes(bagian.toLowerCase()));
+  const fenomena = [X];
+  if (belumDisebut(siapa)) { fenomena.push(`pada ${siapa}`); terpakai.push(siapa); }
+  if (belumDisebut(tempat)) fenomena.push(`di ${tempat}`);
 
   const fokus =
     jenis === "analisis-isi" || jenis === "analisis-wacana"
@@ -201,13 +208,19 @@ export function susunAlurPikir(m: Masukan, jenis: Jenis, teori: string[]): AlurP
         ? `Sejauh mana ${X} mencapai sasaran yang ditetapkan`
         : jenis === "fenomenologi"
           ? `Bagaimana ${siapa || "informan"} memaknai pengalaman ${X}`
-          : Y
-            ? `Bagaimana ${X} bertaut dengan ${Y}`
-            : `Bagaimana ${X} berlangsung sebenarnya`;
+          : jenis === "studi-kasus"
+            // Pada cerita berbentuk proses, Y berisi kegiatannya, bukan
+            // akibatnya. "Bagaimana A bertaut dengan mengelola akun resminya"
+            // tidak berbunyi; yang ditanyakan studi kasus memang bagaimana
+            // kegiatan itu dijalankan.
+            ? `Bagaimana ${X} dijalankan${Y ? `, khususnya dalam ${Y}` : ""}`
+            : Y
+              ? `Bagaimana ${X} bertaut dengan ${Y}`
+              : `Bagaimana ${X} berlangsung sebenarnya`;
 
   return {
     simpul: [
-      { tahap: "Fenomena", isi: fenomena },
+      { tahap: "Fenomena", isi: fenomena.join(" ") },
       { tahap: "Teori dan konsep", isi: namaTeori(teori) },
       { tahap: "Fokus penelitian", isi: fokus },
       { tahap: "Cara memeriksa", isi: CARA[jenis] },

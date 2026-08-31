@@ -2359,6 +2359,16 @@ a.al-mini:hover { color: var(--al-ink); }
 .kb-h { fill: var(--al-accent-dark); font-size: 12px; font-weight: 800; text-anchor: middle; }
 /* Bagan alur pikir: rantai tahap untuk rancangan yang tidak menguji variabel. */
 .al-bagan-alur svg { min-width: 420px; }
+/* Satu bagan digambar dua kali, mendatar dan menurun; yang dipakai dipilih di
+   sini menurut lebar layar. Di bawah 720 piksel, bagan mendatar tidak muat
+   tanpa memotong kotak akibatnya. */
+.al-bagan-tegak { display: none; }
+.al-bagan-tegak svg { min-width: 0; max-width: 430px; margin: 0 auto; }
+.al-bagan-alur.al-bagan-tegak svg { max-width: 390px; }
+@media (max-width: 720px) {
+  .al-bagan-lebar { display: none; }
+  .al-bagan-tegak { display: block; }
+}
 .ap-tahap { fill: var(--al-accent-dark); font-size: 11px; font-weight: 800; letter-spacing: .09em; }
 .ap-isi { fill: var(--al-ink); font-size: 13.5px; font-weight: 600; }
 
@@ -2488,6 +2498,25 @@ a.al-mini:hover { color: var(--al-ink); }
 .al-tile-contoh.kualitatif .al-jalur { color: var(--al-emas); }
 .al-tile-metode { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   padding-top: 9px; border-top: 1px dashed var(--al-line); color: var(--al-muted); font-size: 11.5px; }
+
+/* Empat judul dari satu cerita, di dalam Cakrawala. Menekan salah satunya
+   mengisikan rancangannya ke formulir di bawah. */
+.al-judul-baris { display: grid; gap: 10px; grid-template-columns: 1fr; }
+@media (min-width: 760px) { .al-judul-baris { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.al-judul-kartu { display: flex; flex-direction: column; align-items: flex-start; gap: 9px;
+  text-align: left; cursor: pointer; padding: 14px 15px; border-radius: 12px;
+  border: 1.5px solid var(--al-line); border-left-width: 3px;
+  background: var(--al-card); color: var(--al-ink); font: inherit; transition: .14s; }
+.al-judul-kartu:hover { transform: translateY(-1px); }
+.al-judul-kartu.on { border-color: var(--al-soft-line); background: var(--al-soft); }
+.al-judul-kartu b { font-size: 14px; font-weight: 700; line-height: 1.45; }
+.al-judul-kartu.kuantitatif { border-left-color: var(--al-accent); }
+.al-judul-kartu.kualitatif { border-left-color: var(--al-emas); }
+.al-judul-kartu.kuantitatif .al-jalur { color: var(--al-accent-dark); }
+.al-judul-kartu.kualitatif .al-jalur { color: var(--al-emas); }
+.al-pas { color: var(--al-ok); font-size: 9.5px; font-weight: 800; letter-spacing: .13em;
+  text-transform: uppercase; padding: 3px 9px; border-radius: 999px;
+  border: 1px solid var(--al-ok-line); background: var(--al-ok-bg); }
 
 /* Kartu putusan: judulnya lebih dulu dan lebih besar daripada nama metodenya. */
 .al-verdict-mata { color: var(--al-muted); font-size: 10px; font-weight: 800; letter-spacing: .15em; }
@@ -2903,14 +2932,6 @@ a.al-mini:hover { color: var(--al-ink); }
   background: rgba(34,197,94,.09); display: flex; flex-direction: column; gap: 10px; }
 .cw-hasil-tanda { color: #6ee7a8; font-size: 10.5px; font-weight: 800; letter-spacing: .16em; }
 .cw-hasil-buka h3 { font-size: clamp(17px, 3.6vw, 22px); }
-/* Judulnya yang dicari mahasiswa, jadi judulnya yang paling besar di kartu ini. */
-.cw-hasil-judul { font-size: clamp(19px, 4.2vw, 27px); line-height: 1.32; letter-spacing: -.02em; }
-.cw-hasil-metode { display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
-  color: var(--cw-muted); font-size: 12.5px; }
-.cw-hasil-metode em { font-style: normal; color: var(--cw-muted); opacity: .8; font-size: 11.5px; }
-.cw-hasil-cap { color: #6ee7a8; font-size: 10.5px; font-weight: 800; letter-spacing: .12em;
-  text-transform: uppercase; padding: 3px 10px; border-radius: 999px;
-  border: 1px solid rgba(110,231,168,.42); }
 .cw-hasil-baca { color: var(--cw-ink); font-size: 14px; line-height: 1.75; }
 .cw-hasil-duo { display: grid; gap: 12px; grid-template-columns: 1fr; margin-top: 4px; }
 @media (min-width: 720px) { .cw-hasil-duo { grid-template-columns: 1fr 1fr; } }
@@ -2929,26 +2950,53 @@ a.al-mini:hover { color: var(--al-ink); }
    sebelum tulisannya sempat dibaca. */
 .cw-contoh { display: flex; flex-direction: column; gap: 12px; }
 .cw-contoh-judul { color: var(--cw-muted); font-size: 12.5px; line-height: 1.7; max-width: 68ch; }
-/* Dua kolom, bukan empat: yang dipamerkan judulnya, dan judul skripsi butuh
-   lebar untuk terbaca sebagai judul, bukan sebagai potongan teks. */
-.cw-contoh-baris { display: grid; gap: 10px; grid-template-columns: 1fr; }
-@media (min-width: 720px) { .cw-contoh-baris { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.cw-contoh-kartu { display: flex; flex-direction: column; align-items: flex-start; gap: 9px;
-  text-align: left; cursor: pointer; padding: 14px 16px; border-radius: 12px;
+/* Tombol contoh sengaja pendek: judulnya baru muncul sesudah ditekan, dan di
+   situlah kejutannya. Membeberkan judulnya lebih dulu menghabiskan kejutan itu
+   sebelum pengunjung sempat menekan apa pun. */
+.cw-contoh-baris { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 720px) { .cw-contoh-baris { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.cw-contoh-kartu { display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  text-align: left; cursor: pointer; padding: 12px 14px; border-radius: 12px;
   border: 1px solid var(--cw-line); border-top: 3px solid var(--cw-line);
   background: rgba(8,15,34,.62); color: var(--cw-ink); font: inherit; transition: .14s; }
 .cw-contoh-kartu:hover:not(:disabled) { transform: translateY(-2px); background: rgba(255,255,255,.07); }
 .cw-contoh-kartu:disabled { opacity: .5; cursor: default; }
-.cw-contoh-kartu b { font-size: 15px; font-weight: 700; line-height: 1.45; letter-spacing: -.01em; }
-.cw-contoh-kaki { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  width: 100%; padding-top: 9px; border-top: 1px dashed var(--cw-line); }
-.cw-contoh-kartu small { color: var(--cw-muted); font-size: 11.5px; line-height: 1.5; }
-.cw-contoh-metode { font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
-  padding: 3px 9px; border-radius: 999px; border: 1px solid currentColor; }
+.cw-contoh-kartu b { font-size: 14.5px; font-weight: 700; }
+.cw-contoh-kartu small { font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 .cw-contoh-kartu.kuantitatif { border-top-color: var(--cw-biru); }
-.cw-contoh-kartu.kuantitatif .cw-contoh-metode { color: #9fb9ff; }
+.cw-contoh-kartu.kuantitatif small { color: #9fb9ff; }
 .cw-contoh-kartu.kualitatif { border-top-color: var(--cw-emas); }
-.cw-contoh-kartu.kualitatif .cw-contoh-metode { color: var(--cw-emas); }
+.cw-contoh-kartu.kualitatif small { color: var(--cw-emas); }
+
+/* --- Empat judul hasil ---
+   Inilah kejutannya: satu cerita keluar menjadi empat judul dengan empat
+   metode. Judulnya besar, metodenya kecil di bawah, dan yang paling sesuai
+   ceritanya ditandai supaya yang disodorkan bukan empat pilihan tanpa arah. */
+.cw-judul-baris { display: grid; gap: 10px; grid-template-columns: 1fr; margin-top: 4px; }
+@media (min-width: 720px) { .cw-judul-baris { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.cw-judul-kartu { position: relative; display: flex; flex-direction: column; align-items: flex-start;
+  gap: 9px; text-align: left; cursor: pointer; padding: 15px 16px; border-radius: 12px;
+  border: 1px solid var(--cw-line); border-left: 3px solid var(--cw-line);
+  background: rgba(8,15,34,.6); color: var(--cw-ink); font: inherit; transition: .14s; }
+.cw-judul-kartu:hover { background: rgba(255,255,255,.06); }
+.cw-judul-kartu b { font-size: 15px; font-weight: 700; line-height: 1.45; letter-spacing: -.01em; }
+.cw-judul-kartu.on { background: rgba(255,255,255,.09); box-shadow: 0 0 0 1px rgba(255,255,255,.14) inset; }
+.cw-judul-kartu.kuantitatif { border-left-color: var(--cw-biru); }
+.cw-judul-kartu.kualitatif { border-left-color: var(--cw-emas); }
+/* margin-top:auto menekan baris metode ke dasar kartunya. Panjang judul
+   keempatnya jauh berbeda, dan tanpa ini garis pemisahnya berhenti di tempat
+   yang berlainan pada tiap kartu. */
+.cw-judul-kaki { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  width: 100%; margin-top: auto; padding-top: 9px; border-top: 1px dashed var(--cw-line); }
+.cw-judul-kartu small { color: var(--cw-muted); font-size: 11.5px; line-height: 1.5; }
+.cw-judul-metode { font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+  padding: 3px 9px; border-radius: 999px; border: 1px solid currentColor; }
+.cw-judul-kartu.kuantitatif .cw-judul-metode { color: #9fb9ff; }
+.cw-judul-kartu.kualitatif .cw-judul-metode { color: var(--cw-emas); }
+.cw-judul-pas { align-self: flex-start; color: #6ee7a8; font-size: 9.5px; font-weight: 800;
+  letter-spacing: .13em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px;
+  border: 1px solid rgba(110,231,168,.42); background: rgba(34,197,94,.12); }
+.cw-judul-catatan { margin-top: 4px; color: var(--cw-muted); font-size: 12px; line-height: 1.7; }
 
 /* --- Bagan yang terlihat separuh ---
    Tanpa gembok dan tanpa tirai. Bagan kerangka berpikirnya dibuka utuh, karena
@@ -2964,14 +3012,13 @@ a.al-mini:hover { color: var(--al-ink); }
   overflow: hidden; background: rgba(8,15,34,.55); padding-top: 16px; }
 .cw-separuh-judul { padding: 0 18px 12px; color: var(--cw-ink); font-size: 14px; font-weight: 700; }
 .cw-separuh-jelas { padding: 0 18px 4px; }
+
 /* Bagan meminjam token warna dari .al; latar dan tinggi minimumnya dimatikan
    supaya ia menyatu dengan kartu di halaman kunci. */
 .cw .al { min-height: 0; background: transparent; }
-/* Bingkainya dilepas di sini, dan ruang kosong di atas serta di bawah bagan
-   variabel dipangkas: pada tata letak aslinya ruang itu tempat panah mediasi,
-   yang tidak muncul pada bagan sesederhana ini. */
+/* Bingkainya dilepas di sini supaya bagannya menyatu dengan kartu. Tinggi
+   bidangnya diurus bagannya sendiri, mengikuti jalur yang tergambar. */
 .cw-separuh-jelas .al-bagan { border: 0; padding: 0; background: transparent; margin: 0; }
-.cw-separuh-jelas .al-bagan:not(.al-bagan-alur) svg { margin: -7% 0 -10%; }
 .cw-separuh-sub { margin: 14px 0 10px; color: var(--cw-ink); font-size: 13.5px; font-weight: 700; }
 .cw-separuh .al-visual { display: grid; gap: 10px; grid-template-columns: 1fr; }
 @media (min-width: 780px) { .cw-separuh .al-visual { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
