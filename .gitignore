@@ -23,10 +23,17 @@ next-env.d.ts.timestamp
 .env.*
 !.env.example
 
-# Berkas uji sementara
-/uji-*.ts
+# Skrip peramban sekali pakai (Playwright, pemotret layar) — memang sementara.
 /uji-*.mjs
 /uji-mobile/
+
+# Berkas /uji-*.ts DULU ikut diabaikan sebagai "uji sementara". Sekarang tidak
+# lagi: kedua belas berkasnya sudah menjadi jaring pengaman sungguhan atas
+# aturan hak akses, penjaga berkas unggahan, dan perumus metodologi. Uji yang
+# tidak ikut tersimpan tidak menjaga apa pun — ia hilang bersama komputer yang
+# menjalankannya, dan aturan yang dikuncinya bebas berubah tanpa ketahuan.
+# Seluruhnya berdiri sendiri: tanpa jalur mutlak, tanpa berkas contoh dari
+# luar, tanpa jaringan. Jalankan dengan: npx tsx uji-<nama>.ts
 
 # Sistem operasi & editor
 .DS_Store
