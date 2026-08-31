@@ -528,12 +528,24 @@ button:disabled { cursor: wait; opacity: .65; }
 .topsearch button { flex: 0 0 auto; border: 0; background: var(--primary); color: white; border-radius: 9px; padding: 0 12px; font-size: 10.5px; font-weight: 800; cursor: pointer; }
 .me { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 .me .ava { width: 32px; height: 32px; flex: 0 0 32px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); font-size: 11px; font-weight: 800; }
-.me b { display: block; font-size: 10.5px; color: var(--navy); line-height: 1.1; }
-.me small { display: block; color: var(--muted); font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+.me-nama b { display: block; font-size: 10.5px; color: var(--navy); line-height: 1.1; }
+.me-nama small { display: block; color: var(--muted); font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
 @media (max-width: 680px) {
-  .me div { display: none; }
   .topbar { flex-wrap: wrap; padding: 8px 14px 10px; row-gap: 8px; }
-  .crumb { flex: 1 1 auto; }
+  /* Judul halaman boleh menyusut sampai habis. Tanpa ini, pada layar 320px ia
+     bertahan selebar 202px dan mendorong avatar turun ke baris sendiri di
+     tepi KIRI — lalu menunya, yang berpatokan pada tepi kanan avatar, jatuh
+     ke luar layar. */
+  .crumb { flex: 1 1 0; min-width: 0; }
+  .crumb small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Menunya berpatokan pada TOPBAR, bukan pada avatar. Avatar dapat berpindah
+     tempat ketika baris atasnya membungkus, dan patokan yang ikut berpindah
+     membuat menu melenceng ke luar layar. Topbar selalu selebar layarnya.
+     (.topbar position: sticky, jadi ia memang blok penampung yang sah.) */
+  .me { position: static; }
+  .me-menu { top: calc(100% + 6px); right: 14px; left: auto;
+    min-width: 0; width: min(288px, calc(100vw - 28px)); }
   .topsearch { order: 9; flex: 1 0 100%; margin-left: 0; }
   .topsearch input { width: auto; flex: 1 1 auto; height: 40px; font-size: 13px; }
   .topsearch button { min-width: 62px; min-height: 40px; font-size: 12px; }
@@ -3578,8 +3590,12 @@ a.al-mini:hover { color: var(--al-ink); }
   padding: 9px 11px; border: 0; border-radius: 9px; background: transparent; color: #16324f;
   font-size: 12px; font-weight: 700; text-align: left; text-decoration: none; cursor: pointer; }
 .me-menu button:hover, .me-menu a:hover { background: #f1f5fb; }
-.me-keluar { color: #b91c1c; }
-.me-keluar:hover { background: #fef2f2; }
+/* Ditulis ".me-menu .me-keluar", bukan ".me-keluar" saja: aturan warna di
+   atasnya memakai ".me-menu button" yang kekhususannya lebih tinggi daripada
+   satu kelas, sehingga merahnya kalah dan tombol keluar tampil sewarna menu
+   biasa. */
+.me-menu .me-keluar { color: #b91c1c; }
+.me-menu .me-keluar:hover { background: #fef2f2; }
 
 /* Kolom aksi pada tabel absensi: penegasan hapus muncul di tempat tombolnya. */
 .qt-aksi { white-space: nowrap; }
