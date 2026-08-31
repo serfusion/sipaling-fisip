@@ -14,7 +14,7 @@ import { Bagian, Butir, Catatan, LaporanCetak, TombolCetak } from "./laporan";
 import { BaganAlurPikir, BaganKerangka, ContohGrafik } from "./grafik";
 import { susunAlurPikir, susunKerangka } from "@/lib/kerangka";
 import { GRAFIK_NAMA, usulkanVisual } from "@/lib/visual";
-import { CONTOH_CERITA, MINIMAL_KATA, hitungKataCerita, tafsirkan, type Bacaan } from "@/lib/tafsir-cerita";
+import { CONTOH_IDE, MINIMAL_KATA, hitungKataCerita, tafsirkan, type Bacaan } from "@/lib/tafsir-cerita";
 
 const KOSONG: Masukan = {
   variabelX: "", variabelX2: "", variabelZ: "", variabelY: "", objek: "", lokasi: "",
@@ -553,10 +553,29 @@ function KotakCerita({
         </small>
       </label>
 
-      <div className="al-linkrow">
-        <button type="button" className="al-link" onClick={() => setCerita(CONTOH_CERITA)}>Isi dengan contoh</button>
-        {cerita && <button type="button" className="al-link" onClick={() => setCerita("")}>Kosongkan</button>}
+      <h3 className="al-h4">Belum kepikiran? Pakai salah satu contoh ini</h3>
+      <p className="al-note">
+        Keempatnya cerita yang sama-sama masuk akal, tetapi menghasilkan metode yang berbeda-beda. Menekannya
+        bergantian memperlihatkan apa yang membedakan jalur kuantitatif dan kualitatif: bentuk pertanyaannya,
+        bukan selera penelitinya.
+      </p>
+      <div className="al-tiles al-tiles-contoh">
+        {CONTOH_IDE.map((c) => (
+          <button key={c.id} type="button" className={`al-tile al-tile-contoh ${c.jalur}`}
+            disabled={sibuk} onClick={() => setCerita(c.cerita)}>
+            <span className="al-jalur">{c.jalur}</span>
+            <b>{c.label}</b>
+            <small>{c.ket}</small>
+            <span className="al-tile-metode">{c.metode}</span>
+          </button>
+        ))}
       </div>
+
+      {cerita && (
+        <div className="al-linkrow">
+          <button type="button" className="al-link" onClick={() => setCerita("")}>Kosongkan</button>
+        </div>
+      )}
 
       <button type="button" className="al-btn" disabled={!cukup || sibuk} onClick={() => onBacakan(cerita)}>
         {sibuk ? (

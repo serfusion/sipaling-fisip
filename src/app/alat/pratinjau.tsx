@@ -17,7 +17,7 @@ import { BaganAlurPikir, BaganKerangka, ContohGrafik } from "./grafik";
 import { susunAlurPikir, susunKerangka, type AlurPikir, type Kerangka } from "@/lib/kerangka";
 import { JENIS_LABEL, rancang, type Rancangan } from "@/lib/metodologi";
 import { usulkanVisual, type Usul } from "@/lib/visual";
-import { CONTOH_CERITA, MINIMAL_KATA, hitungKataCerita, tafsirkan, type Bacaan } from "@/lib/tafsir-cerita";
+import { CONTOH_IDE, MINIMAL_KATA, hitungKataCerita, tafsirkan, type Bacaan } from "@/lib/tafsir-cerita";
 
 const KONTAK = "@superfaldev";
 
@@ -304,13 +304,17 @@ function Mock({ jenis }: { jenis: string }) {
    menemukan metode dari sebuah cerita tidak pernah semeyakinkan menunjukkan
    ia melakukannya pada cerita pengunjung sendiri.
 
-   Yang dibuka: metodenya, paradigmanya, satu usulan judul, dan rumusan
-   masalahnya. Yang diburamkan: kerangka berpikir, visualisasi yang sesuai,
-   dan daftar ketidakcocokan judul-metode.
+   Empat contoh disediakan, satu untuk tiap rancangan yang paling sering
+   dipakai di FISIP: pengaruh, analisis isi, fenomenologi, dan studi kasus.
+   Menekannya bergantian memperlihatkan hal yang paling sulit dijelaskan
+   dengan kata-kata, yaitu bahwa jalur kuantitatif dan kualitatif ditentukan
+   oleh bentuk pertanyaannya, bukan oleh selera penelitinya.
 
-   Buram di sini penanda, bukan gembok. Gembok yang sebenarnya ada di server
-   (page.tsx) dan menjaga kesembilan alatnya; yang diburamkan di halaman ini
-   hanyalah bagan yang disusun dari cerita pengunjung itu sendiri.
+   Kerangka berpikirnya tidak ditutup, melainkan memudar: bagian atasnya
+   terbaca utuh, bagian bawahnya makin kabur. Tidak ada gembok dan tidak ada
+   tirai. Yang di halaman ini pun bukan rahasia siapa-siapa, melainkan bagan
+   yang disusun dari cerita pengunjung itu sendiri; gembok yang sebenarnya
+   ada di server (page.tsx) dan menjaga kesembilan alatnya.
    ========================================================================== */
 
 type HasilCoba = {
@@ -329,14 +333,14 @@ function EtalaseCoba() {
   const kata = hitungKataCerita(cerita);
   const cukup = kata >= MINIMAL_KATA;
 
-  function carikan() {
-    if (!cukup || sibuk) return;
+  function carikan(teks = cerita) {
+    if (sibuk || hitungKataCerita(teks) < MINIMAL_KATA) return;
     setSibuk(true);
     setHasil(null);
     // Perhitungannya seketika. Jeda pendek ini semata supaya perpindahan dari
     // "menekan tombol" ke "hasil muncul" terbaca sebagai satu kejadian.
     window.setTimeout(() => {
-      const bacaan = tafsirkan(cerita);
+      const bacaan = tafsirkan(teks);
       const rancangan = rancang(bacaan.masukan);
       const pakaiVariabel = bacaan.masukan.tujuan === "pengaruh" || bacaan.masukan.tujuan === "hubungan";
       setHasil({
@@ -374,16 +378,35 @@ function EtalaseCoba() {
           <span className="cw-coba-hitung">
             {kata} kata{cukup ? "" : ` · minimal ${MINIMAL_KATA} kata`}
           </span>
-          <button type="button" className="cw-link" onClick={() => setCerita(CONTOH_CERITA)}>
-            Isi dengan contoh
-          </button>
-          <button type="button" className="cw-btn cw-btn-utama" onClick={carikan} disabled={!cukup || sibuk}>
+          <button type="button" className="cw-btn cw-btn-utama" onClick={() => carikan()} disabled={!cukup || sibuk}>
             {sibuk ? "Membaca ceritamu…" : "Carikan metodenya"}
           </button>
         </div>
         <p className="cw-coba-aman">
           Ceritamu dibaca di perangkat ini juga dan <b>tidak dikirim ke server mana pun</b>.
         </p>
+      </div>
+
+      <div className="cw-contoh">
+        <p className="cw-contoh-judul">
+          Belum kepikiran? Tekan salah satu contoh ini. Keempatnya cerita yang sama-sama masuk akal, tetapi
+          menghasilkan metode yang berbeda-beda.
+        </p>
+        <div className="cw-contoh-baris">
+          {CONTOH_IDE.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className={`cw-contoh-kartu ${c.jalur}`}
+              disabled={sibuk}
+              onClick={() => { setCerita(c.cerita); carikan(c.cerita); }}
+            >
+              <span className="cw-contoh-jalur">{c.jalur}</span>
+              <b>{c.label}</b>
+              <small>{c.ket}</small>
+            </button>
+          ))}
+        </div>
       </div>
 
       {hasil && <HasilCobaTampil hasil={hasil} />}
@@ -429,47 +452,57 @@ function HasilCobaTampil({ hasil }: { hasil: HasilCoba }) {
         )}
       </div>
 
-      <div className="cw-kunci-lapis">
-        <div className="cw-buram" aria-hidden="true">
-          {/* Pembungkus .al hanya untuk meminjam token warna bagannya; latar
-              dan tinggi minimumnya dimatikan lewat .cw .al di berkas gaya. */}
-          <div className="al cw-buram-isi">
-            <div>
-              <h4>Kerangka berpikir</h4>
-              {kerangka ? <BaganKerangka kerangka={kerangka} /> : alur ? <BaganAlurPikir alur={alur} /> : null}
-            </div>
-            <div>
-              <h4>Visualisasi yang sesuai</h4>
-              <div className="al-visual">
-                {visual.slice(0, 3).map((v) => (
-                  <div key={v.nama} className={`al-visual-kartu ${v.utama ? "utama" : ""}`}>
-                    <ContohGrafik jenis={v.grafik} />
-                    <div className="al-visual-teks">
-                      <b>{v.nama}</b>
-                      <p>{v.untuk}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+      <div className="cw-separuh">
+        <p className="cw-separuh-judul">Kerangka berpikir yang tersusun dari ceritamu</p>
+
+        {/* Bagannya dibuka utuh, tanpa gembok dan tanpa tirai. Inilah yang
+            paling meyakinkan: bagan yang benar-benar jadi dari cerita yang
+            baru saja diketik pengunjung.
+
+            Pembungkus .al hanya untuk meminjam token warna bagannya; latar
+            dan tinggi minimumnya dimatikan lewat .cw .al di berkas gaya. */}
+        <div className="cw-separuh-jelas">
+          <div className="al">
+            {kerangka ? (
+              <BaganKerangka kerangka={kerangka} />
+            ) : alur ? (
+              // Tiga tahap pertama saja. Bagan alur pikir utuh lima tahap dan
+              // terlalu jangkung untuk etalase; tahap sisanya memang bagian
+              // dari "ini baru separuhnya", bukan sesuatu yang dikarang.
+              <BaganAlurPikir alur={{ ...alur, simpul: alur.simpul.slice(0, 3) }} />
+            ) : null}
           </div>
         </div>
 
-        <div className="cw-kunci-tirai">
-          <span className="cw-gembok cw-gembok-kecil">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="4" y="10" width="16" height="10" rx="2" />
-              <path d="M8 10V7a4 4 0 0 1 8 0v3" />
-            </svg>
-            TERKUNCI
-          </span>
-          <b>Kerangka berpikirmu sudah jadi, tinggal dilihat</b>
-          <p>
-            Bagan kerangka berpikir dan {visual.length} bentuk visualisasi yang sesuai untuk metode ini sudah
-            tersusun dari ceritamu barusan, lengkap dengan apa yang diletakkan di tiap sumbunya. Buka dengan kode
-            akses untuk melihatnya, mengubahnya, dan mencetaknya.
-          </p>
-          <a className="cw-btn cw-btn-terang" href="#kode">Buka dengan kode akses →</a>
+        {/* Yang di bawahnya memudar, bukan tertutup: kaburnya datang berangsur
+            sampai habis di tepi bawah, sehingga terbaca sebagai halaman yang
+            masih berlanjut. */}
+        <div className="cw-separuh-kabur">
+          <div className="al" aria-hidden="true">
+            <h4 className="cw-separuh-sub">Visualisasi yang sesuai untuk metode ini</h4>
+            <div className="al-visual">
+              {visual.slice(0, 3).map((v) => (
+                <div key={v.nama} className={`al-visual-kartu ${v.utama ? "utama" : ""}`}>
+                  <ContohGrafik jenis={v.grafik} />
+                  <div className="al-visual-teks">
+                    <b>{v.nama}</b>
+                    <p>{v.untuk}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="cw-lanjut">
+            <b>Ini baru separuhnya</b>
+            <p>
+              {kerangka
+                ? `Hipotesis bernomor, teknik sampling, uji statistik yang harus dipakai, dan ${visual.length} bentuk visualisasi berikut isi tiap sumbunya`
+                : `Dua tahap berikutnya pada bagan ini, teknik sampling, cara menjaga keabsahan data, dan ${visual.length} bentuk visualisasi berikut isi tiap sumbunya`}{" "}
+              ada di dalam Cakrawala, siap diubah dan dicetak.
+            </p>
+            <a className="cw-btn cw-btn-terang" href="#kode">Masuk dengan kode akses →</a>
+          </div>
         </div>
       </div>
     </div>

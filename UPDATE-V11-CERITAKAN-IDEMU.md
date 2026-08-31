@@ -84,28 +84,63 @@ bebas Anda?", padahal penelitiannya memang tidak punya.
 Isi kedua bagan diambil dari masukan yang sama dengan yang dipakai menyusun
 bab metode, jadi bagan dan bab metode tidak mungkin bercerita lain.
 
-### 4. Etalase yang benar-benar bekerja di halaman kunci
+### 4. Empat contoh, satu untuk tiap rancangan yang paling sering dipakai
+
+Menyuruh mahasiswa memilih antara kuantitatif dan kualitatif tidak menolong
+kalau ia belum tahu bedanya. Karena itu tersedia empat contoh cerita yang
+tinggal ditekan, dua di tiap jalur:
+
+| Contoh | Jalur | Metode yang keluar | Menjawab pertanyaan |
+| --- | --- | --- | --- |
+| **Pengaruh** | kuantitatif | Kuantitatif eksplanatif | Apakah A benar-benar memengaruhi B |
+| **Analisis Isi** | kuantitatif | Analisis isi kuantitatif | Apa yang sebenarnya ada di dalam pemberitaan |
+| **Fenomenologi** | kualitatif | Kualitatif fenomenologi | Bagaimana orang memaknai yang mereka alami |
+| **Studi Kasus** | kualitatif | Kualitatif studi kasus | Bagaimana sebuah lembaga menjalankan sesuatu |
+
+Menekannya bergantian memperlihatkan hal yang paling sulit dijelaskan dengan
+kata-kata: keempat cerita itu sama-sama masuk akal, tetapi menghasilkan metode
+yang sama sekali berbeda. Yang menentukan jalurnya adalah bentuk
+pertanyaannya, bukan selera penelitinya.
+
+Kartu contohnya diberi bilah warna di tepi atas, biru untuk kuantitatif dan
+emas untuk kualitatif, sehingga jalurnya terbaca sebelum tulisannya sempat
+dibaca. Contoh yang sama tersedia di kedua tempat: di halaman kunci dan di
+dalam Perumus Judul.
+
+Tiap contoh benar-benar dijalankan lewat pembaca yang sama, bukan hasil yang
+sudah disiapkan. Berkas uji memastikan keempatnya memang mengeluarkan metode
+yang tertulis pada kartunya.
+
+### 5. Etalase yang benar-benar bekerja di halaman kunci
 
 Halaman kunci Cakrawala selama ini berisi gambaran tampilan tiap menu.
 Sekarang di paling atasnya ada satu bagian yang **benar-benar bekerja**:
-pengunjung tanpa kode akses dapat menceritakan idenya dan langsung melihat
-hasilnya.
+pengunjung tanpa kode akses dapat menceritakan idenya, atau menekan salah satu
+contoh, lalu langsung melihat hasilnya.
 
-**Yang dibuka:**
+**Yang dibuka penuh:**
 
 - metode yang cocok beserta paradigmanya;
 - cerita pengunjung dibacakan ulang dalam bahasa metode;
 - satu usulan judul dan satu rumusan masalah;
-- jumlah ketidakcocokan judul-metode yang ditemukan, bila ada.
+- jumlah ketidakcocokan judul-metode yang ditemukan, bila ada;
+- **bagan kerangka berpikirnya**, terbaca utuh.
 
-**Yang diburamkan, dengan tirai bertuliskan "Terkunci":**
+**Yang memudar di bawahnya:**
 
-- bagan kerangka berpikirnya, yang sudah tersusun dari cerita itu;
-- bentuk visualisasi yang sesuai untuk metode tersebut.
+- bentuk visualisasi yang sesuai untuk metode tersebut;
+- pada rancangan kualitatif, dua tahap terakhir bagan alur pikir.
 
-Buramnya sengaja tidak pekat: yang perlu terlihat adalah bahwa bagannya
-**memang sudah jadi**, hanya belum boleh dibaca. Tombol di tirainya mengantar
-langsung ke kotak kode akses.
+Tidak ada gembok dan tidak ada tirai. Bagian bawahnya mengabur berangsur
+sampai habis di tepi, sehingga terbaca sebagai halaman yang masih berlanjut,
+bukan sebagai pintu yang ditutup. Bagan kerangka berpikirnya sendiri sengaja
+dibuka utuh, karena justru itu yang meyakinkan: bagan yang benar-benar jadi
+dari cerita yang baru saja diketik.
+
+Yang mengaburkan adalah `filter` biasa pada lapisan isinya, bukan
+`backdrop-filter`. Yang terakhir itu bergantung pada percepatan perangkat
+keras dan diam-diam tidak berfungsi di sebagian peramban dan ponsel, sehingga
+bagian yang seharusnya memudar akan tampil terang benderang.
 
 Ajakan di kepala halaman ikut diubah dari "Lihat isinya dulu" menjadi
 **"Coba dulu, gratis"**, karena sekarang memang ada yang bisa dicoba.
@@ -146,13 +181,13 @@ cukup satu fungsi `tafsirkan()` yang diganti. Yang perlu diputuskan lebih dulu
 bukan soal teknis, melainkan apakah cerita mahasiswa boleh dikirim keluar
 perangkat, dan siapa yang menanggung biayanya.
 
-## Catatan jujur: buram bukan gembok
+## Catatan jujur: memudar bukan mengunci
 
-Bagan yang diburamkan di halaman kunci **diburamkan lewat tampilan**, jadi
-pengunjung yang paham alat pengembang peramban dapat menghilangkan buramnya.
-Itu memang bukan pengaman, melainkan penanda, dan yang tersembunyi di situ
-adalah bagan yang disusun dari cerita pengunjung itu sendiri, bukan milik
-orang lain.
+Yang memudar di halaman kunci **memudar lewat tampilan**, jadi pengunjung yang
+paham alat pengembang peramban dapat menghilangkan kaburnya. Itu memang bukan
+pengaman, melainkan penanda bahwa halamannya masih berlanjut, dan yang ada di
+balik kabur itu pun bagan yang disusun dari cerita pengunjung itu sendiri,
+bukan milik orang lain.
 
 Gembok yang sebenarnya tidak berubah: kesembilan alat Cakrawala tetap dijaga
 di sisi server (`src/app/alat/page.tsx`), dan isinya tidak pernah ikut
@@ -165,7 +200,8 @@ terkirim ke pengunjung yang belum punya kode.
 Baru:
 
 - `src/lib/tafsir-cerita.ts`: pembaca cerita, kamus isyarat, pola kalimat,
-  dan penyusun isian rancangan berikut pertanyaan untuk yang belum terbaca.
+  penyusun isian rancangan berikut pertanyaan untuk yang belum terbaca, dan
+  empat contoh cerita siap pakai.
 
 Diubah:
 

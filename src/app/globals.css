@@ -2473,6 +2473,20 @@ a.al-mini:hover { color: var(--al-ink); }
 
 .al-list-rapat .al-item { padding: 12px 14px; }
 
+/* Empat contoh ide pada kotak cerita di dalam Cakrawala. Bilah warna di tepi
+   atas membedakan jalur kuantitatif dan kualitatif sebelum tulisannya dibaca. */
+.al-tiles-contoh { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 900px) { .al-tiles-contoh { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.al-tile-contoh { display: flex; flex-direction: column; gap: 3px; border-top-width: 3px; }
+.al-tile-contoh:disabled { opacity: .5; cursor: default; }
+.al-jalur { font-size: 9.5px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+.al-tile-contoh.kuantitatif { border-top-color: var(--al-accent); }
+.al-tile-contoh.kuantitatif .al-jalur { color: var(--al-accent-dark); }
+.al-tile-contoh.kualitatif { border-top-color: var(--al-emas); }
+.al-tile-contoh.kualitatif .al-jalur { color: var(--al-emas); }
+.al-tile-metode { margin-top: 5px; padding-top: 5px; border-top: 1px dashed var(--al-line);
+  color: var(--al-muted); font-size: 11px; }
+
 /* --- Bilah kemajuan pembacaan berkas naskah ---
    Word dan PDF dibongkar di pekerja latar, dan skripsi 250 halaman memang
    makan waktu beberapa detik. Tanpa tanda apa pun, jeda itu terbaca sebagai
@@ -2889,38 +2903,74 @@ a.al-mini:hover { color: var(--al-ink); }
 .cw-hasil-hambat { border: 1px solid rgba(245,197,66,.32); border-radius: 11px; padding: 11px 13px;
   background: rgba(245,197,66,.10); color: #f7d98a; font-size: 12.5px; line-height: 1.65; }
 
-/* Lapis terkunci: bagannya memang sudah jadi, hanya belum boleh dilihat. */
-.cw-kunci-lapis { position: relative; border: 1px solid var(--cw-line); border-radius: 14px;
-  overflow: hidden; background: rgba(8,15,34,.55); }
-/* Cukup buram untuk tidak terbaca, cukup jelas untuk terlihat bahwa bagannya
-   memang sudah jadi. Terlalu pekat, dan yang tampak hanya kotak gelap kosong. */
-.cw-buram { filter: blur(5px); opacity: .85; pointer-events: none; user-select: none;
-  padding: 18px; max-height: 400px; overflow: hidden; }
-/* Bagan dan contoh grafiknya diletakkan berdampingan: yang perlu terlihat bukan
-   salah satunya, melainkan bahwa keduanya memang sudah jadi. */
-.cw-buram-isi { display: grid; gap: 16px 20px; grid-template-columns: 1fr; }
-.cw-buram-isi h4 { margin: 0 0 10px; color: var(--cw-ink); font-size: 14px; }
-.cw-buram .al-visual { display: grid; gap: 10px; grid-template-columns: 1fr; }
-.cw-buram .al-bagan svg { min-width: 0; }
-@media (min-width: 820px) { .cw-buram-isi { grid-template-columns: 1.25fr 1fr; align-items: start; } }
-.cw-buram h4 { margin: 0 0 10px; color: var(--cw-ink); font-size: 14px; }
-.cw-buram h4 + * + h4 { margin-top: 18px; }
+/* --- Empat contoh ide ---
+   Perbedaan jalur kuantitatif dan kualitatif paling sulit dijelaskan dengan
+   kata-kata dan paling mudah ditunjukkan: empat cerita yang sama-sama masuk
+   akal, empat metode yang berbeda. Warna tepi kartunya membedakan jalurnya
+   sebelum tulisannya sempat dibaca. */
+.cw-contoh { display: flex; flex-direction: column; gap: 12px; }
+.cw-contoh-judul { color: var(--cw-muted); font-size: 12.5px; line-height: 1.7; max-width: 68ch; }
+.cw-contoh-baris { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 780px) { .cw-contoh-baris { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.cw-contoh-kartu { display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  text-align: left; cursor: pointer; padding: 11px 13px; border-radius: 12px;
+  border: 1px solid var(--cw-line); border-top: 2px solid var(--cw-line);
+  background: rgba(8,15,34,.62); color: var(--cw-ink); font: inherit; transition: .14s; }
+.cw-contoh-kartu:hover:not(:disabled) { transform: translateY(-2px); background: rgba(255,255,255,.07); }
+.cw-contoh-kartu:disabled { opacity: .5; cursor: default; }
+.cw-contoh-kartu b { font-size: 14px; }
+.cw-contoh-kartu small { color: var(--cw-muted); font-size: 11.5px; line-height: 1.5; }
+.cw-contoh-jalur { font-size: 9.5px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+.cw-contoh-kartu.kuantitatif { border-top-color: var(--cw-biru); }
+.cw-contoh-kartu.kuantitatif .cw-contoh-jalur { color: #9fb9ff; }
+.cw-contoh-kartu.kualitatif { border-top-color: var(--cw-emas); }
+.cw-contoh-kartu.kualitatif .cw-contoh-jalur { color: var(--cw-emas); }
+
+/* --- Bagan yang terlihat separuh ---
+   Tanpa gembok dan tanpa tirai. Bagan kerangka berpikirnya dibuka utuh, karena
+   justru itu yang meyakinkan: bagan yang benar-benar jadi dari cerita yang
+   baru saja diketik. Yang di bawahnya memudar, kaburnya datang berangsur
+   sampai habis di tepi bawah, sehingga terbaca sebagai halaman yang masih
+   berlanjut, bukan sebagai pintu yang ditutup.
+
+   Yang mengaburkan adalah filter biasa pada lapisan isinya sendiri, bukan
+   backdrop-filter: yang terakhir itu bergantung pada percepatan perangkat
+   keras dan diam-diam tidak berfungsi di sebagian peramban dan ponsel. */
+.cw-separuh { border: 1px solid var(--cw-line); border-radius: 14px;
+  overflow: hidden; background: rgba(8,15,34,.55); padding-top: 16px; }
+.cw-separuh-judul { padding: 0 18px 12px; color: var(--cw-ink); font-size: 14px; font-weight: 700; }
+.cw-separuh-jelas { padding: 0 18px 4px; }
 /* Bagan meminjam token warna dari .al; latar dan tinggi minimumnya dimatikan
    supaya ia menyatu dengan kartu di halaman kunci. */
 .cw .al { min-height: 0; background: transparent; }
+/* Bingkainya dilepas di sini, dan ruang kosong di atas serta di bawah bagan
+   variabel dipangkas: pada tata letak aslinya ruang itu tempat panah mediasi,
+   yang tidak muncul pada bagan sesederhana ini. */
+.cw-separuh-jelas .al-bagan { border: 0; padding: 0; background: transparent; margin: 0; }
+.cw-separuh-jelas .al-bagan:not(.al-bagan-alur) svg { margin: -7% 0 -10%; }
+.cw-separuh-sub { margin: 14px 0 10px; color: var(--cw-ink); font-size: 13.5px; font-weight: 700; }
+.cw-separuh .al-visual { display: grid; gap: 10px; grid-template-columns: 1fr; }
+@media (min-width: 780px) { .cw-separuh .al-visual { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
-.cw-kunci-tirai { position: absolute; inset: 0; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 22px;
-  background: linear-gradient(180deg, rgba(7,13,28,.18) 0%, rgba(7,13,28,.62) 42%, rgba(7,13,28,.84) 100%); }
-.cw-kunci-tirai b { color: #fff; font-size: clamp(15px, 3.4vw, 19px);
-  text-shadow: 0 2px 14px rgba(3,8,20,.95), 0 0 4px rgba(3,8,20,.9); }
-.cw-kunci-tirai p { color: #cdd9f2; font-size: 13px; line-height: 1.7; max-width: 54ch;
-  text-shadow: 0 2px 12px rgba(3,8,20,.95), 0 0 4px rgba(3,8,20,.9); }
-.cw-gembok-kecil { align-self: center; font-size: 10.5px; padding: 5px 11px; }
-.cw-gembok-kecil svg { width: 14px; height: 14px; }
+/* min-height menjaga pita ajakan tetap punya ruangnya sendiri. Tanpa itu,
+   pada rancangan yang kartunya berjajar tiga, blok ini menjadi pendek dan
+   pitanya naik sampai menindih bagan yang seharusnya terbaca utuh. */
+.cw-separuh-kabur { position: relative; padding: 0 18px;
+  min-height: 235px; max-height: 300px; overflow: hidden; }
+.cw-separuh-kabur > .al { filter: blur(5px); opacity: .92;
+  mask-image: linear-gradient(180deg, #000 0%, #000 24%, rgba(0,0,0,.22) 100%);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 24%, rgba(0,0,0,.22) 100%); }
+
+.cw-lanjut { position: absolute; left: 0; right: 0; bottom: 0; padding: 22px 18px 18px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;
+  background: linear-gradient(180deg, rgba(7,13,28,0) 0%, rgba(7,13,28,.72) 32%, rgba(7,13,28,.95) 100%); }
+.cw-lanjut b { color: #fff; font-size: clamp(15px, 3.4vw, 18px);
+  text-shadow: 0 2px 14px rgba(3,8,20,.95); }
+.cw-lanjut p { color: #cdd9f2; font-size: 12.5px; line-height: 1.7; max-width: 58ch;
+  text-shadow: 0 2px 12px rgba(3,8,20,.95); }
 @media (max-width: 560px) {
-  .cw-buram { max-height: 320px; }
-  .cw-kunci-tirai p { font-size: 12px; }
+  .cw-separuh-kabur { max-height: 230px; }
+  .cw-lanjut p { font-size: 11.5px; }
 }
 
 .cw-langkah { border: 1px solid var(--cw-line); border-radius: 18px; padding: 20px;

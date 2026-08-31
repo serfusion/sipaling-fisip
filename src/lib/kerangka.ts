@@ -174,6 +174,16 @@ const CARA: Record<Jenis, string> = {
  * Isinya diambil dari masukan yang sama dengan yang dipakai merancang metode,
  * sehingga bagan ini tidak mungkin bercerita lain daripada bab metodenya.
  */
+/** Nama teori untuk kotak bagan.
+ *
+ *  Ketika program studinya belum terbaca, `bangunTeori` mengembalikan kalimat
+ *  anjuran, bukan nama teori. Kalimat itu benar sebagai saran tetapi janggal
+ *  dicetak di dalam kotak bagan, jadi diringkas menjadi penanda. */
+function namaTeori(teori: string[]) {
+  const utama = teori.slice(0, 2).filter((t) => !/dosen pembimbing/i.test(t));
+  return utama.join(" · ") || "Ditetapkan bersama dosen pembimbing";
+}
+
 export function susunAlurPikir(m: Masukan, jenis: Jenis, teori: string[]): AlurPikir {
   const X = bersih(m.variabelX, "gagasan yang diteliti");
   const Y = (m.variabelY ?? "").trim();
@@ -198,7 +208,7 @@ export function susunAlurPikir(m: Masukan, jenis: Jenis, teori: string[]): AlurP
   return {
     simpul: [
       { tahap: "Fenomena", isi: fenomena },
-      { tahap: "Teori dan konsep", isi: teori.slice(0, 2).join(" · ") || "Belum ditetapkan" },
+      { tahap: "Teori dan konsep", isi: namaTeori(teori) },
       { tahap: "Fokus penelitian", isi: fokus },
       { tahap: "Cara memeriksa", isi: CARA[jenis] },
       { tahap: "Temuan yang diharapkan", isi: HARAPAN[jenis] },
