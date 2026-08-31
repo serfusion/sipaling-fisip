@@ -84,31 +84,44 @@ bebas Anda?", padahal penelitiannya memang tidak punya.
 Isi kedua bagan diambil dari masukan yang sama dengan yang dipakai menyusun
 bab metode, jadi bagan dan bab metode tidak mungkin bercerita lain.
 
-### 4. Empat judul siap pilih, metodenya menyusul di bawahnya
+### 4. Empat judul dari satu cerita, muncul setelah tombolnya ditekan
 
 Yang dicari mahasiswa adalah judulnya. Metode penting, tetapi ia jawaban atas
-judul, bukan pintu masuknya. Karena itu empat contoh disajikan sebagai
-**empat judul**, dengan metodenya sebagai keterangan kecil di bawah masing-masing:
+judul, bukan pintu masuknya.
 
-| Judul contoh | Metode |
+Yang tertera pada tombol contoh hanya nama pendek jalurnya: **Pengaruh**,
+**Analisis Isi**, **Fenomenologi**, **Studi Kasus**. Judulnya sengaja tidak
+dibocorkan lebih dulu. Kejutannya justru terletak sesudah tombolnya ditekan:
+satu cerita keluar menjadi **empat judul dengan empat metode sekaligus**.
+
+Contoh, dari cerita tentang karyawan di sebuah perusahaan:
+
+| Judul yang keluar | Metode |
 | --- | --- |
-| Pengaruh Terpaan Konten Berita di TikTok terhadap Minat Baca Berita pada Mahasiswa Ilmu Komunikasi di Universitas Serang Raya | Kuantitatif, menguji pengaruh |
-| Analisis Isi Banjir dalam Kompas.com | Analisis Isi, menghitung isi teks |
-| Pengalaman Ibu Rumah Tangga dalam Berjualan Online di Kota Serang | Fenomenologi, menggali pengalaman |
-| Strategi Humas Dinas Komunikasi dan Informatika Kota Serang dalam Mengelola Akun Resminya | Studi Kasus, menelusuri satu kasus |
+| Pengaruh Lingkungan Kerja dan Kompensasi terhadap Kepuasan Karyawan melalui Komitmen Organisasional pada Karyawan di PT Sinar Mandiri Serang | Kuantitatif, menguji pengaruh |
+| Analisis Isi Lingkungan Kerja dalam [sebutkan medianya] di PT Sinar Mandiri Serang | Analisis Isi, menghitung isi teks |
+| Makna Lingkungan Kerja bagi Karyawan di PT Sinar Mandiri Serang | Fenomenologi, menggali pengalaman |
+| Lingkungan Kerja pada Karyawan di PT Sinar Mandiri Serang: Studi Kasus | Studi Kasus, menelusuri satu kasus |
 
-Keempatnya berangkat dari cerita yang sama-sama masuk akal, dan metodenya jadi
-berbeda-beda karena bentuk pertanyaannya berbeda. Itu hal yang paling sulit
-dijelaskan dengan kata-kata dan paling mudah ditunjukkan.
+Keempatnya berangkat dari cerita yang sama. Metodenya berbeda karena bentuk
+pertanyaannya berbeda, bukan karena seleranya berbeda. Itu hal yang paling
+sulit dijelaskan dengan kata-kata dan paling mudah ditunjukkan.
 
-Judul pada kartunya **tidak diketik tangan**. Ia dihasilkan mesin yang sama
-dengan yang bekerja ketika kartunya ditekan, jadi judul yang terpampang tidak
-mungkin berbeda dari judul yang muncul sesudahnya. Berkas uji membandingkan
-keduanya, satu per satu.
+Judul yang paling sesuai ceritanya sendiri ditandai `paling sesuai ceritamu`
+dan sudah terpilih lebih dulu, sehingga yang disodorkan bukan empat pilihan
+tanpa arah melainkan satu anjuran beserta tiga kemungkinan lain. Menekan judul
+lain mengganti kerangka berpikir, rumusan masalah, dan nama metodenya
+seketika.
 
-Kartunya diberi bilah warna di tepi atas, biru untuk kuantitatif dan emas
+Bagian yang memang tidak disebut dalam ceritanya ditulis terbuka sebagai
+isian, misalnya `[sebutkan medianya]`, bukan ditebak-tebak. Cerita yang tidak
+menyebut medianya tidak boleh menghasilkan nama media yang dikarang.
+
+Kartunya diberi bilah warna di tepi kiri, biru untuk kuantitatif dan emas
 untuk kualitatif, dan tersedia di dua tempat: halaman kunci dan Perumus Judul
-di dalam.
+di dalam. Di dalam Cakrawala, menekan salah satu judul langsung mengisi
+seluruh formulir rancangan di bawahnya, dan judul yang ditekan itu pula yang
+menjadi kepala hasilnya.
 
 ### 5. Nama metode dalam bahasa ruang bimbingan
 
@@ -138,11 +151,11 @@ contoh, lalu langsung melihat hasilnya.
 
 **Yang dibuka penuh:**
 
-- judul yang cocok, tercetak paling besar di kartunya;
-- metodenya beserta paradigmanya, di bawah judul;
-- cerita pengunjung dibacakan ulang dalam bahasa metode;
-- satu pilihan judul lain dan satu rumusan masalah;
-- jumlah ketidakcocokan judul-metode yang ditemukan, bila ada;
+- empat judul dari ceritanya, tercetak besar, dengan metodenya sebagai
+  keterangan kecil di bawah masing-masing;
+- ceritanya dibacakan ulang dalam bahasa metode;
+- rumusan masalah dan nama resmi metodenya untuk judul yang dipilih;
+- jumlah ketidakcocokan judul dan metode yang ditemukan, bila ada;
 - **bagan kerangka berpikirnya**, terbaca utuh.
 
 **Yang memudar di bawahnya:**
@@ -163,6 +176,29 @@ bagian yang seharusnya memudar akan tampil terang benderang.
 
 Ajakan di kepala halaman ikut diubah dari "Lihat isinya dulu" menjadi
 **"Coba dulu, gratis"**, karena sekarang memang ada yang bisa dicoba.
+
+### 7. Bagan yang tetap utuh di layar ponsel
+
+Bagan kerangka berpikir mendatar butuh lebar sekitar 520 piksel supaya nama
+variabelnya masih terbaca. Di layar 390 piksel, kotak akibatnya jatuh di luar
+layar dan yang terlihat hanya separuh kiri bagannya; dikecilkan sampai muat
+pun hurufnya habis.
+
+Karena itu tiap bagan punya dua tata letak. Di layar lebar alurnya mendatar,
+sebab di kiri dan akibat di kanan. Di layar sempit alurnya menurun: sebab di
+atas, variabel antara di tengah, akibat di bawah, dan jalur langsungnya
+memutar lewat tepi kiri dan kanan. Isinya sama persis, termasuk nomor
+hipotesisnya, karena keduanya dibaca dari kerangka yang sama.
+
+Pemilihannya diserahkan ke berkas gaya, bukan ke JavaScript. Mengukur lebar
+layar saat halaman dipasang membuat bagannya sempat tergambar dengan tata
+letak yang keliru lalu melompat, dan pada halaman yang digambar lebih dulu di
+server juga menimbulkan ketidakcocokan antara gambar di server dan di
+peramban.
+
+Bagan alur pikir mendapat perlakuan yang sama: kotaknya lebih sempit dan
+kalimatnya dipenggal lebih pendek, dengan tinggi kotak mengikuti jumlah
+barisnya, sehingga seluruh kalimatnya terbaca tanpa perlu digeser ke samping.
 
 ---
 
@@ -219,21 +255,28 @@ terkirim ke pengunjung yang belum punya kode.
 Baru:
 
 - `src/lib/tafsir-cerita.ts`: pembaca cerita, kamus isyarat, pola kalimat,
-  penyusun isian rancangan berikut pertanyaan untuk yang belum terbaca, dan
-  empat contoh cerita siap pakai.
+  penyusun isian rancangan berikut pertanyaan untuk yang belum terbaca, empat
+  contoh cerita siap pakai, dan `empatJalur()` yang mengecor satu cerita
+  menjadi empat rancangan.
 
 Diubah:
 
+- `src/lib/metodologi.ts`: nama metode sehari-hari, variabel kedua dan
+  variabel antara pada penyusun judul, serta hipotesis lengkap untuk model
+  mediasi.
 - `src/lib/kerangka.ts`: penyusun bagan alur pikir untuk rancangan yang tidak
-  menguji variabel.
-- `src/app/alat/grafik.tsx`: `BaganAlurPikir`, bagan rantai tahap.
-- `src/app/alat/panel-judul.tsx`: kotak cerita, kartu hasil pembacaan, dan
-  bagan alur pikir untuk rancangan non-variabel.
+  menguji variabel, dan penjagaan supaya nama lembaga tidak tercetak dua kali
+  dalam satu kotak.
+- `src/app/alat/grafik.tsx`: `BaganAlurPikir` dan `BaganKerangka`, masing-masing
+  dengan tata letak mendatar dan menurun, plus bidang gambar yang
+  mengikuti jalur yang benar-benar tergambar.
+- `src/app/alat/panel-judul.tsx`: kotak cerita, kartu hasil pembacaan, empat
+  judul siap pilih, dan bagan alur pikir untuk rancangan non-variabel.
 - `src/app/alat/pratinjau.tsx`: etalase hidup di halaman kunci berikut lapis
-  buramnya.
-- `src/app/globals.css`: gaya kotak cerita, kartu bukti, bagan alur pikir,
-  dan lapis terkunci (mengikuti token warna yang sudah ada, ikut mode malam
-  dan mode terang).
+  memudarnya.
+- `src/app/globals.css`: gaya kotak cerita, kartu bukti, kartu judul, bagan
+  alur pikir, dan blok separuh (mengikuti token warna yang sudah ada, ikut
+  mode malam dan mode terang).
 
 ## Yang tidak berubah
 

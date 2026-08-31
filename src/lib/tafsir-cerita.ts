@@ -22,6 +22,7 @@
 // lewat formulir yang sama seperti sebelumnya.
 
 import { JENIS_KERJA, JENIS_LABEL, JENIS_UMUM, rancang } from "./metodologi";
+import type { Rancangan } from "./metodologi";
 import type { Data, Masukan, Prodi, Tujuan, Unit } from "./metodologi";
 
 export type Yakin = "kuat" | "sedang" | "terka";
@@ -44,6 +45,12 @@ export type Bacaan = {
   /** Cukup untuk disusun menjadi rancangan? */
   cukup: boolean;
   jumlahKata: number;
+  /** Nama media yang disebut, dipakai jalur analisis isi. */
+  media: string;
+  /** Nama lembaga yang disebut, dipakai jalur studi kasus. */
+  lembaga: string;
+  /** Populasi orang yang disebut, dipakai jalur pengaruh dan fenomenologi. */
+  orang: string;
 };
 
 export const MINIMAL_KATA = 12;
@@ -58,15 +65,6 @@ export type ContohIde = {
   cerita: string;
 };
 
-/** Contoh yang sudah dibacakan: judul dan metodenya diambil dari mesin yang
- *  sama, bukan diketik ulang di sini. */
-export type ContohSiap = ContohIde & {
-  judul: string;
-  metode: string;
-  metodeResmi: string;
-  kerja: string;
-};
-
 /**
  * Empat contoh cerita, satu untuk tiap rancangan yang paling sering dipakai
  * di FISIP.
@@ -77,8 +75,10 @@ export type ContohSiap = ContohIde & {
  * keempatnya bergantian, perbedaan itu terlihat sendiri: pertanyaan yang
  * sama-sama masuk akal menghasilkan metode yang sama sekali berbeda.
  *
- * Tiap cerita ditulis seperti mahasiswa bercerita, bukan seperti proposal,
- * dan memang menghasilkan metode yang tertulis di bawahnya.
+ * Tiap cerita ditulis seperti mahasiswa bercerita, bukan seperti proposal.
+ * Yang tertera pada tombolnya hanya nama pendek jalurnya; judulnya sengaja
+ * tidak dibocorkan lebih dulu, karena kejutannya justru terletak pada empat
+ * judul yang keluar sesudah tombolnya ditekan.
  */
 export const CONTOH_IDE: ContohIde[] = [
   {
@@ -86,12 +86,11 @@ export const CONTOH_IDE: ContohIde[] = [
     label: "Pengaruh",
     jalur: "kuantitatif",
     cerita:
-      "Aku mau meneliti soal mahasiswa yang sekarang kebanyakan cari berita dari TikTok. " +
-      "Kayaknya makin sering mereka buka TikTok, makin turun minat baca berita di media " +
-      "resmi. Aku pengen tahu apakah terpaan konten berita di TikTok itu benar-benar " +
-      "berpengaruh terhadap minat baca berita pada mahasiswa Ilmu Komunikasi di " +
-      "Universitas Serang Raya. Rencananya sebar kuesioner, populasinya sekitar 600 " +
-      "mahasiswa, target responden 100 orang.",
+      "Aku mau meneliti karyawan di PT Sinar Mandiri Serang. Aku menduga bahwa lingkungan " +
+      "kerja dan kompensasi berpengaruh terhadap kepuasan karyawan, tapi lewat komitmen " +
+      "organisasional dulu. Jadi komitmen organisasional sebagai variabel intervening. " +
+      "Rencananya sebar kuesioner, populasinya sekitar 180 karyawan, target responden " +
+      "125 orang.",
   },
   {
     id: "isi",
@@ -129,25 +128,146 @@ export const CONTOH_IDE: ContohIde[] = [
 /** Contoh bawaan, dipakai tombol "Isi dengan contoh" di dalam Cakrawala. */
 export const CONTOH_CERITA = CONTOH_IDE[0].cerita;
 
+// ---------------------------------------------------------------------------
+// EMPAT JALUR DARI SATU CERITA
+// ---------------------------------------------------------------------------
+//
+// Satu topik hampir selalu bisa diteliti lebih dari satu cara, dan mahasiswa
+// yang bingung biasanya tidak tahu itu. Ia mengira "metodeku apa" adalah
+// pertanyaan yang jawabannya satu, padahal jawabannya bergantung pada
+// pertanyaan mana yang ingin ia ajukan.
+//
+// Karena itu satu cerita dikeluarkan menjadi empat judul sekaligus, satu untuk
+// tiap rancangan yang paling sering dipakai di FISIP. Yang berubah hanya
+// bentuk pertanyaannya; topik, orang, dan tempatnya tetap milik mahasiswa.
+//
+// Jalur yang paling sesuai dengan ceritanya sendiri ditandai, supaya yang
+// disodorkan bukan empat pilihan tanpa arah melainkan satu anjuran beserta
+// tiga kemungkinan lain.
+
+export type JalurAlternatif = {
+  id: string;
+  label: string;
+  jalur: Jalur;
+  judul: string;
+  metode: string;
+  metodeResmi: string;
+  kerja: string;
+  masukan: Masukan;
+  rancangan: Rancangan;
+  /** Jalur ini yang paling sesuai dengan cerita aslinya. */
+  pas: boolean;
+};
+
+/** Bagian judul yang memang harus diisi sendiri mahasiswa. Ditulis terbuka
+ *  sebagai isian, bukan ditebak, karena ceritanya tidak menyebutnya. */
+function slot(nama: string) {
+  return `[sebutkan ${nama}]`;
+}
+
 /**
- * Bacakan keempat contoh, lalu kembalikan judul dan metodenya.
+ * Topik tanpa embel-embel medianya.
  *
- * Judulnya sengaja tidak ditulis tangan di berkas ini. Ia dihasilkan mesin
- * yang sama dengan yang dipakai saat contohnya ditekan, sehingga judul yang
- * terpampang pada kartu tidak mungkin berbeda dari judul yang muncul
- * sesudahnya. Perhitungannya sepersekian milidetik untuk keempatnya.
+ * "terpaan konten berita di TikTok" adalah nama variabel yang benar untuk
+ * penelitian pengaruh, tetapi untuk analisis isi yang diteliti bukan
+ * terpaannya melainkan kontennya, dan medianya pindah menjadi tempat teks itu
+ * berada. Tanpa pembersihan ini, judul analisis isinya berbunyi "Analisis Isi
+ * Terpaan Konten Berita di TikTok dalam TikTok".
  */
-export function contohSiap(): ContohSiap[] {
-  return CONTOH_IDE.map((c) => {
-    const rancangan = rancang(tafsirkan(c.cerita).masukan);
+function topikInti(x: string, media: string) {
+  let t = x;
+  if (media) {
+    t = t.replace(new RegExp(`\\s*\\b(?:di|pada|dalam|lewat|melalui)\\s+${media.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b.*$`, "i"), "");
+  }
+  t = t.replace(/^(?:terpaan|intensitas|frekuensi|penggunaan|pemakaian|tingkat)\s+/i, "");
+  return t.trim() || x;
+}
+
+export function empatJalur(b: Bacaan): JalurAlternatif[] {
+  const m = b.masukan;
+  const media = b.media;
+  const inti = topikInti(m.variabelX, media);
+  const asal = m.tujuan;
+
+  // Variabel terikat hanya sah bila ia memang sesuatu yang bisa berubah pada
+  // diri responden. Nama media bukan variabel terikat, dan begitu pula
+  // pekerjaan yang tertangkap dari cerita berbentuk proses: pada "bagaimana
+  // humas mengelola akun resminya", yang terbaca sebagai Y adalah kegiatannya,
+  // bukan akibat yang bisa diukur. Memakainya melahirkan judul yang tidak
+  // berbunyi, "Pengaruh Humas terhadap Mengelola Akun Resminya", jadi di jalur
+  // pengaruh bagian itu dikembalikan menjadi isian.
+  const yTerbaca = asal === "pengaruh" || asal === "hubungan" || asal === "perbedaan" ? m.variabelY : "";
+  const terikat = yTerbaca && yTerbaca !== media ? yTerbaca : slot("yang dipengaruhi");
+
+  const buat = (
+    id: string,
+    label: string,
+    jalur: Jalur,
+    urutJudul: number,
+    ubah: Partial<Masukan>,
+  ): JalurAlternatif => {
+    // Jalur yang memang sesuai ceritanya dipakai apa adanya, tanpa dicor
+    // ulang. Hasil bacaan aslinya selalu lebih rapi daripada hasil
+    // penyesuaian, karena ia tidak perlu menambal apa pun.
+    const pas = asal === (ubah.tujuan ?? m.tujuan);
+    const masukan: Masukan = pas ? m : { ...m, ...ubah };
+    // Nama tempat yang sama dengan nama yang diteliti hanya akan tercetak dua
+    // kali di judul yang sama.
+    if (masukan.objek && masukan.objek === masukan.lokasi) masukan.lokasi = "";
+    const rancangan = rancang(masukan);
     return {
-      ...c,
-      judul: rancangan.judul[0],
+      id,
+      label,
+      jalur,
+      judul: rancangan.judul[pas ? 0 : urutJudul] ?? rancangan.judul[0],
       metode: JENIS_UMUM[rancangan.jenis],
       metodeResmi: JENIS_LABEL[rancangan.jenis],
       kerja: JENIS_KERJA[rancangan.jenis],
+      masukan,
+      rancangan,
+      pas,
     };
-  });
+  };
+
+  return [
+    buat("pengaruh", "Pengaruh", "kuantitatif", 0, {
+      tujuan: "pengaruh",
+      unit: "individu",
+      data: ["kuesioner"],
+      variabelY: terikat,
+      objek: b.orang || m.objek || slot("respondennya"),
+    }),
+    buat("isi", "Analisis Isi", "kuantitatif", 0, {
+      tujuan: "isi",
+      unit: "teks",
+      data: ["dokumen"],
+      variabelX: inti,
+      variabelX2: "",
+      variabelZ: "",
+      variabelY: media || slot("medianya"),
+      // Korpus berita daring tidak berada di sebuah tempat, jadi keterangan
+      // lokasi hanya membuat judulnya keliru.
+      lokasi: media ? "" : m.lokasi,
+    }),
+    buat("fenomenologi", "Fenomenologi", "kualitatif", 1, {
+      tujuan: "makna",
+      unit: "individu",
+      data: ["wawancara"],
+      variabelX: inti,
+      variabelX2: "",
+      variabelZ: "",
+      objek: b.orang || m.objek || slot("informannya"),
+    }),
+    buat("studi-kasus", "Studi Kasus", "kualitatif", 1, {
+      tujuan: "proses",
+      unit: "organisasi",
+      data: ["wawancara", "dokumen", "observasi"],
+      variabelX: inti,
+      variabelX2: "",
+      variabelZ: "",
+      objek: b.lembaga || b.orang || m.objek || slot("lembaganya"),
+    }),
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -571,7 +691,51 @@ function cariKonsep(t: string): Array<{ nilai: string; posisi: number }> {
   return hasil.sort((a, b) => a.posisi - b.posisi);
 }
 
-type Variabel = { x: string; y: string; bukti: string | null; yakin: Yakin };
+type Variabel = {
+  x: string;
+  /** Variabel bebas kedua, bila ceritanya menyebut dua sebab. */
+  x2: string;
+  /** Variabel antara, bila ceritanya menyebut jalur tidak langsung. */
+  z: string;
+  y: string;
+  bukti: string | null;
+  yakin: Yakin;
+};
+
+/**
+ * Pisahkan "A dan B" menjadi dua variabel bebas.
+ *
+ * Model dua sebab adalah bentuk paling lazim pada skripsi kuantitatif FISIP:
+ * "pengaruh lingkungan kerja dan kompensasi terhadap kepuasan". Yang tidak
+ * boleh ikut terpisah adalah nama lembaga yang memang mengandung "dan",
+ * seperti Dinas Komunikasi dan Informatika, jadi frasa yang berhuruf kapital
+ * di awal dilewati.
+ */
+function pisahDuaSebab(frasa: string): [string, string] {
+  if (/^\p{Lu}/u.test(frasa)) return [frasa, ""];
+  const potong = frasa.split(/\s+(?:dan|serta|maupun)\s+/i);
+  if (potong.length !== 2) return [frasa, ""];
+  const [a, b] = potong.map((t) => rapikanFrasa(t, 6));
+  if (a.length < 4 || b.length < 4) return [frasa, ""];
+  return [a, b];
+}
+
+/** Variabel antara, ditulis dengan istilah yang memang dipakai di skripsi. */
+const POLA_ANTARA: RegExp[] = [
+  new RegExp(`${MULAI}(?:dengan\\s+)?(.{3,60}?)\\s+sebagai\\s+(?:variabel\\s+)?(?:intervening|mediasi|mediator|antara|perantara|penghubung)`, "i"),
+  new RegExp(`dimediasi\\s+(?:oleh\\s+)?(.{3,60}?)${HENTI}`, "i"),
+  new RegExp(`(?:lewat|melalui)\\s+(.{3,60}?)\\s+(?:dulu|lebih dulu|terlebih dahulu)`, "i"),
+];
+
+function bacaAntara(t: string): { z: string; bukti: string | null } {
+  for (const p of POLA_ANTARA) {
+    const m = t.match(p);
+    if (!m || typeof m.index !== "number") continue;
+    const z = bakukan(rapikanFrasa(m[1], 6));
+    if (z.length >= 4) return { z, bukti: kalimatSekitar(t, m.index) };
+  }
+  return { z: "", bukti: null };
+}
 
 /**
  * Ganti frasa tangkapan dengan istilah bakunya bila ada.
@@ -604,6 +768,8 @@ function cocokkanPola(t: string, daftar: PolaVariabel[]): Variabel | null {
     const letak = m.index + Math.max(0, m[0].indexOf(m[1]));
     return {
       x: balik ? dua : satu,
+      x2: "",
+      z: "",
       y: balik ? satu : dua,
       bukti: kalimatSekitar(t, letak),
       yakin: "kuat",
@@ -619,7 +785,28 @@ function bacaVariabel(t: string, tujuan: Tujuan): Variabel {
         : [...POLA_DUA_VARIABEL, ...POLA_TEKS, ...POLA_PROSES];
 
   const berpasangan = cocokkanPola(t, urutan);
-  if (berpasangan) return berpasangan;
+  if (berpasangan) {
+    // Model dua sebab dan model jalur hanya masuk akal pada rancangan yang
+    // memang menguji hubungan antarvariabel.
+    if (tujuan === "pengaruh" || tujuan === "hubungan") {
+      const [x1, x2] = pisahDuaSebab(berpasangan.x);
+      const antara = bacaAntara(t);
+      // Variabel antara tidak boleh sama dengan variabel yang sudah ada,
+      // jika tidak bagannya akan menggambar panah dari sebuah kotak ke
+      // dirinya sendiri.
+      const bedaSemua = [x1, x2, berpasangan.y]
+        .filter(Boolean)
+        .every((v) => v.toLowerCase() !== antara.z.toLowerCase());
+      return {
+        ...berpasangan,
+        x: x1,
+        x2,
+        z: bedaSemua ? antara.z : "",
+        bukti: berpasangan.bukti ?? antara.bukti,
+      };
+    }
+    return berpasangan;
+  }
 
   // Fenomenologi: yang dicari pengalamannya, bukan orang yang mengalaminya.
   // Orangnya sudah tercatat tersendiri sebagai populasi.
@@ -629,7 +816,7 @@ function bacaVariabel(t: string, tujuan: Tujuan): Variabel {
       let x = rapikanFrasa(m[1]);
       const anak = x.match(new RegExp(`^(?:${KATA_ORANG})[\\w\\s]*?\\s+yang\\s+(.+)$`, "i"));
       if (anak) x = rapikanFrasa(anak[1]);
-      if (x.length >= 3) return { x, y: "", bukti: kalimatSekitar(t, m.index), yakin: "kuat" };
+      if (x.length >= 3) return { x, x2: "", z: "", y: "", bukti: kalimatSekitar(t, m.index), yakin: "kuat" };
     }
   }
 
@@ -639,7 +826,7 @@ function bacaVariabel(t: string, tujuan: Tujuan): Variabel {
       const m = t.match(p);
       if (!m || typeof m.index !== "number") continue;
       const x = bakukan(rapikanFrasa(m[1]));
-      if (x.length >= 3) return { x, y: "", bukti: kalimatSekitar(t, m.index), yakin: "kuat" };
+      if (x.length >= 3) return { x, x2: "", z: "", y: "", bukti: kalimatSekitar(t, m.index), yakin: "kuat" };
     }
   }
 
@@ -648,13 +835,15 @@ function bacaVariabel(t: string, tujuan: Tujuan): Variabel {
   if (konsep.length >= 2) {
     return {
       x: konsep[0].nilai,
+      x2: "",
+      z: "",
       y: konsep[1].nilai,
       bukti: kalimatSekitar(t, konsep[0].posisi),
       yakin: "sedang",
     };
   }
   if (konsep.length === 1) {
-    return { x: konsep[0].nilai, y: "", bukti: kalimatSekitar(t, konsep[0].posisi), yakin: "terka" };
+    return { x: konsep[0].nilai, x2: "", z: "", y: "", bukti: kalimatSekitar(t, konsep[0].posisi), yakin: "terka" };
   }
 
   // Benar-benar tidak ada penanda: ambil frasa sesudah kata kerja meneliti.
@@ -663,9 +852,9 @@ function bacaVariabel(t: string, tujuan: Tujuan): Variabel {
   );
   if (sesudah && typeof sesudah.index === "number") {
     const x = rapikanFrasa(sesudah[1]);
-    if (x.length >= 3) return { x, y: "", bukti: kalimatSekitar(t, sesudah.index), yakin: "terka" };
+    if (x.length >= 3) return { x, x2: "", z: "", y: "", bukti: kalimatSekitar(t, sesudah.index), yakin: "terka" };
   }
-  return { x: "", y: "", bukti: null, yakin: "terka" };
+  return { x: "", x2: "", z: "", y: "", bukti: null, yakin: "terka" };
 }
 
 // ---------------------------------------------------------------------------
@@ -714,25 +903,56 @@ const POLA_LEMBAGA = new RegExp(
     "Koperasi|Perusahaan)\\s+[A-Z][\\w.'-]*(?:\\s+(?:dan|[A-Z][\\w.'-]*)){0,5})",
 );
 
-function bacaObjek(t: string, unit: Unit): Cocok | null {
-  if (unit === "organisasi") {
-    const m = t.match(POLA_LEMBAGA);
-    if (m && typeof m.index === "number") {
-      const nilai = rapikanFrasa(m[1], 7);
-      if (nilai.length >= 4) return { nilai, bukti: kalimatSekitar(t, m.index), posisi: m.index };
-    }
+function bacaLembaga(t: string): Cocok | null {
+  const m = t.match(POLA_LEMBAGA);
+  if (m && typeof m.index === "number") {
+    const nilai = rapikanFrasa(m[1], 7);
+    if (nilai.length >= 4) return { nilai, bukti: kalimatSekitar(t, m.index), posisi: m.index };
   }
+  return null;
+}
+
+function bacaOrang(t: string): Cocok | null {
   for (const p of POLA_OBJEK) {
     const m = t.match(p);
     if (m && typeof m.index === "number") {
       // Anak kalimat "yang …" menerangkan populasinya, bukan menamainya.
       // "ibu rumah tangga yang jadi penjual online" sebagai nama populasi
       // membuat judul usulan berbunyi janggal ketika keterangannya diulang.
-      const nilai = rapikanFrasa(m[1].split(/\s+yang\s+/i)[0], 7);
+      let nilai = rapikanFrasa(m[1].split(/\s+yang\s+/i)[0], 7);
+      // "stafnya" adalah cara bercerita, bukan nama populasi. Akhiran itu
+      // dilepas selama sisanya masih berupa kata utuh.
+      nilai = nilai.replace(/(\p{L}{3,})nya$/iu, "$1");
       if (nilai.length >= 4) return { nilai, bukti: kalimatSekitar(t, m.index), posisi: m.index };
     }
   }
   return null;
+}
+
+function bacaObjek(t: string, unit: Unit): Cocok | null {
+  if (unit === "organisasi") return bacaLembaga(t) ?? bacaOrang(t);
+  return bacaOrang(t);
+}
+
+/** Nama media dan pelantar yang lazim menjadi bahan analisis isi. Diperiksa
+ *  menurut panjangnya, supaya "Kompas.com" tidak keburu tertangkap sebagai
+ *  "Kompas". */
+const NAMA_MEDIA = [
+  "Kompas.com", "Detik.com", "Tribunnews", "CNN Indonesia", "Liputan6", "Tempo.co",
+  "TikTok", "Instagram", "Twitter", "Facebook", "YouTube", "WhatsApp", "Threads",
+  "Kompas", "Detik", "Tribun", "Tempo", "Antara", "Shopee", "Tokopedia",
+  "media sosial", "portal berita", "surat kabar", "koran", "televisi", "radio",
+];
+
+function bacaMedia(t: string): string {
+  const rendah = t.toLowerCase();
+  let terpanjang = "";
+  for (const nama of NAMA_MEDIA) {
+    const p = rendah.indexOf(nama.toLowerCase());
+    if (p < 0) continue;
+    if (nama.length > terpanjang.length) terpanjang = t.slice(p, p + nama.length);
+  }
+  return terpanjang;
 }
 
 function bacaLokasi(t: string): Cocok | null {
@@ -880,8 +1100,8 @@ export function tafsirkan(cerita: string, prodiBawaan: Prodi = "lain"): Bacaan {
 
   const masukan: Masukan = {
     variabelX: variabel.x,
-    variabelX2: "",
-    variabelZ: "",
+    variabelX2: variabel.x2,
+    variabelZ: variabel.z,
     variabelY: variabel.y,
     objek: objek?.nilai ?? "",
     lokasi: lokasi?.nilai ?? "",
@@ -904,6 +1124,22 @@ export function tafsirkan(cerita: string, prodiBawaan: Prodi = "lain"): Bacaan {
       nilai: variabel.x,
       bukti: variabel.bukti,
       yakin: variabel.yakin,
+    });
+  }
+  if (variabel.x2) {
+    temuan.push({
+      bidang: "Variabel bebas kedua (X2)",
+      nilai: variabel.x2,
+      bukti: variabel.bukti,
+      yakin: variabel.yakin,
+    });
+  }
+  if (variabel.z) {
+    temuan.push({
+      bidang: "Variabel antara (Z)",
+      nilai: variabel.z,
+      bukti: variabel.bukti,
+      yakin: "sedang",
     });
   }
   if (variabel.y) {
@@ -976,11 +1212,21 @@ export function tafsirkan(cerita: string, prodiBawaan: Prodi = "lain"): Bacaan {
   const ringkas = susunRingkas(masukan, tujuan.tujuan);
   const cukup = jumlahKata >= MINIMAL_KATA && Boolean(variabel.x || objek);
 
-  return { masukan, temuan, pertanyaan, ringkas, cukup, jumlahKata };
+  return {
+    masukan,
+    temuan,
+    pertanyaan,
+    ringkas,
+    cukup,
+    jumlahKata,
+    media: bacaMedia(t),
+    lembaga: bacaLembaga(t)?.nilai ?? "",
+    orang: bacaOrang(t)?.nilai ?? "",
+  };
 }
 
 function susunRingkas(m: Masukan, tujuan: Tujuan): string {
-  const X = m.variabelX || "gagasan yang Anda sebut";
+  const X = m.variabelX || "gagasan yang kamu sebut";
   const Y = m.variabelY || "hal yang terpengaruh";
   const siapa = m.objek ? ` pada ${m.objek}` : "";
   const tempat = m.lokasi ? ` di ${m.lokasi}` : "";
@@ -989,13 +1235,13 @@ function susunRingkas(m: Masukan, tujuan: Tujuan): string {
   const inti: Record<Tujuan, string> = {
     pengaruh: `apakah ${X} benar-benar memengaruhi ${Y}`,
     hubungan: `apakah ${X} berkaitan dengan ${Y}`,
-    perbedaan: `apakah ${Y} berbeda antar kelompok yang Anda bandingkan`,
+    perbedaan: `apakah ${Y} berbeda antar kelompok yang kamu bandingkan`,
     gambaran: `bagaimana keadaan ${X} sebenarnya`,
     makna: `bagaimana ${X} dimaknai oleh orang yang mengalaminya`,
     proses: `bagaimana ${X} dijalankan${m.variabelY ? ` untuk ${Y}` : ""}`,
-    isi: `apa yang sebenarnya terkandung dalam ${Y || "media yang Anda sebut"} ketika membicarakan ${X}`,
+    isi: `apa yang sebenarnya terkandung dalam ${Y || "media yang kamu sebut"} ketika membicarakan ${X}`,
     evaluasi: `sejauh mana ${X} mencapai sasarannya`,
   };
 
-  return `Yang Anda cari adalah ${inti[tujuan]}${siapa}${tempat}, dan datanya diambil lewat ${cara}.`;
+  return `Yang kamu cari adalah ${inti[tujuan]}${siapa}${tempat}, dan datanya diambil lewat ${cara}.`;
 }

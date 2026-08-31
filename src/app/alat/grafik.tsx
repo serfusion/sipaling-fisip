@@ -33,9 +33,9 @@ function bagiBaris(teks: string, maks = 22, maksBaris = 3) {
 }
 
 function Kotak({
-  x, y, w, h, label, kode,
-}: { x: number; y: number; w: number; h: number; label: string; kode: string }) {
-  const baris = bagiBaris(label.toUpperCase());
+  x, y, w, h, label, kode, maks,
+}: { x: number; y: number; w: number; h: number; label: string; kode: string; maks?: number }) {
+  const baris = bagiBaris(label.toUpperCase(), maks);
   const awal = y + h / 2 - ((baris.length - 1) * 15) / 2 - 7;
   return (
     <g>
@@ -48,17 +48,112 @@ function Kotak({
   );
 }
 
-function Panah({ d, label, lx, ly }: { d: string; label: string; lx: number; ly: number }) {
+function Panah({
+  d, label, lx, ly, ujung = "kb-ujung",
+}: { d: string; label: string; lx: number; ly: number; ujung?: string }) {
   return (
     <g>
-      <path d={d} className="kb-panah" markerEnd="url(#kb-ujung)" />
+      <path d={d} className="kb-panah" markerEnd={`url(#${ujung})`} />
       <rect x={lx - 15} y={ly - 11} width="30" height="16" rx="4" className="kb-lat" />
       <text x={lx} y={ly + 1} className="kb-h">{label}</text>
     </g>
   );
 }
 
+/**
+ * Bagan yang sama, disusun menurun untuk layar ponsel.
+ *
+ * Bagan mendatar butuh lebar sekitar 520 piksel supaya nama variabelnya masih
+ * terbaca. Di layar 390 piksel, kotak Y-nya jatuh di luar layar dan mahasiswa
+ * hanya melihat separuh kiri bagannya; dikecilkan sampai muat pun hurufnya
+ * habis. Karena itu di layar sempit alurnya dibalik menjadi menurun: sebab di
+ * atas, variabel antara di tengah, akibat di bawah, dan jalur langsungnya
+ * memutar lewat tepi kiri dan kanan. Isinya sama persis, termasuk nomor
+ * hipotesisnya, karena keduanya dibaca dari kerangka yang sama.
+ */
+function BaganKerangkaTegak({ kerangka }: { kerangka: Kerangka }) {
+  const { kotak, jalur, adaAntara } = kerangka;
+  const adaX2 = kotak.some((k) => k.id === "X2");
+  const cari = (id: string) => kotak.find((k) => k.id === id);
+  const kode = (dari: string, ke: string, lewat?: string) =>
+    jalur.find((j) => j.dari === dari && j.ke === ke && j.lewat === lewat)?.kode ?? "";
+
+  const L = 170, T = 78, TENGAH = 125;
+  const xKiri = adaX2 ? 24 : TENGAH;
+  const xKanan = 226;
+  const yY = adaAntara ? 350 : 200;
+  const tinggi = adaAntara ? 446 : 296;
+  const tengahY = yY + T / 2;
+
+  return (
+    <div className="al-bagan al-bagan-tegak">
+      <svg viewBox={`0 0 420 ${tinggi}`} role="img"
+        aria-label="Bagan kerangka berpikir yang disusun dari variabel penelitianmu">
+        <defs>
+          <marker id="kt-ujung" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" className="kb-isi" />
+          </marker>
+        </defs>
+
+        <Kotak x={xKiri} y={30} w={L} h={T} label={cari("X1")!.label} kode="X1" maks={18} />
+        {adaX2 && <Kotak x={xKanan} y={30} w={L} h={T} label={cari("X2")!.label} kode="X2" maks={18} />}
+        {adaAntara && <Kotak x={TENGAH} y={190} w={L} h={T} label={cari("Z")!.label} kode="Z" maks={18} />}
+        <Kotak x={TENGAH} y={yY} w={L} h={T} label={cari("Y")!.label} kode="Y" maks={18} />
+
+        {adaAntara ? (
+          <>
+            <Panah ujung="kt-ujung" d={`M${xKiri + L / 2} 108 L${adaX2 ? 180 : 210} 186`}
+              label={kode("X1", "Z")} lx={adaX2 ? 120 : 232} ly={152} />
+            {adaX2 && (
+              <Panah ujung="kt-ujung" d={`M${xKanan + L / 2} 108 L240 186`}
+                label={kode("X2", "Z")} lx={300} ly={152} />
+            )}
+            <Panah ujung="kt-ujung" d="M210 268 L210 346" label={kode("Z", "Y")} lx={232} ly={312} />
+            <Panah ujung="kt-ujung"
+              d={`M${xKiri} 69 L10 69 L10 ${tengahY} L${TENGAH - 4} ${tengahY}`}
+              label={kode("X1", "Y")} lx={62} ly={tengahY - 8} />
+            {adaX2 && (
+              <Panah ujung="kt-ujung"
+                d={`M${xKanan + L} 69 L410 69 L410 ${tengahY} L${TENGAH + L + 4} ${tengahY}`}
+                label={kode("X2", "Y")} lx={358} ly={tengahY - 8} />
+            )}
+          </>
+        ) : (
+          <>
+            <Panah ujung="kt-ujung" d={`M${xKiri + L / 2} 108 L${adaX2 ? 180 : 210} 196`}
+              label={kode("X1", "Y")} lx={adaX2 ? 120 : 232} ly={158} />
+            {adaX2 && (
+              <Panah ujung="kt-ujung" d={`M${xKanan + L / 2} 108 L240 196`}
+                label={kode("X2", "Y")} lx={300} ly={158} />
+            )}
+          </>
+        )}
+      </svg>
+    </div>
+  );
+}
+
+/**
+ * Bagan kerangka berpikir.
+ *
+ * Dua tata letak digambar sekaligus dan berkas gaya memilih salah satunya
+ * menurut lebar layar. Pemilihannya diserahkan ke CSS, bukan ke JavaScript,
+ * supaya tidak ada pengukuran lebar saat halaman dipasang: pengukuran seperti
+ * itu membuat bagannya sempat tergambar dengan tata letak yang keliru lalu
+ * melompat, dan pada halaman yang dicetak dari server juga menimbulkan
+ * ketidakcocokan antara gambar di server dan di peramban.
+ */
 export function BaganKerangka({ kerangka }: { kerangka: Kerangka }) {
+  return (
+    <>
+      <BaganKerangkaLebar kerangka={kerangka} />
+      <BaganKerangkaTegak kerangka={kerangka} />
+    </>
+  );
+}
+
+function BaganKerangkaLebar({ kerangka }: { kerangka: Kerangka }) {
   const { kotak, jalur, adaAntara } = kerangka;
   const adaX2 = kotak.some((k) => k.id === "X2");
   const cari = (id: string) => kotak.find((k) => k.id === id);
@@ -71,10 +166,18 @@ export function BaganKerangka({ kerangka }: { kerangka: Kerangka }) {
   const yX2 = 232;
   const tinggiX = adaX2 ? 86 : 104;
 
+  // Tinggi gambarnya mengikuti bagan yang benar-benar tergambar. Bagan
+  // mediasi memakai jalur yang melingkar lewat tepi atas dan tepi bawah,
+  // sedangkan bagan sesederhana X ke Y hanya memakai bagian tengahnya. Kalau
+  // bidangnya dipatok satu ukuran untuk keduanya, yang sederhana tercetak
+  // dengan ruang kosong tinggi di atas dan di bawahnya.
+  const atas = adaAntara ? 22 : adaX2 ? 100 : 120;
+  const bawah = adaAntara ? (adaX2 ? 360 : 262) : adaX2 ? 334 : 264;
+
   return (
-    <div className="al-bagan">
-      <svg viewBox="0 0 960 372" role="img"
-        aria-label="Bagan kerangka berpikir yang disusun dari variabel penelitian Anda">
+    <div className="al-bagan al-bagan-lebar">
+      <svg viewBox={`0 ${atas} 960 ${bawah - atas}`} role="img"
+        aria-label="Bagan kerangka berpikir yang disusun dari variabel penelitianmu">
         <defs>
           <marker id="kb-ujung" viewBox="0 0 10 10" refX="9" refY="5"
             markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -239,13 +342,72 @@ export function ContohGrafik({ jenis }: { jenis: JenisGrafik }) {
    kotak X dan Y, karena penelitian kualitatif memang tidak punya keduanya.
    ========================================================================== */
 
+/**
+ * Alur pikir untuk layar ponsel.
+ *
+ * Bentuknya sama, hanya kotaknya lebih sempit dan kalimatnya dipenggal lebih
+ * pendek supaya seluruhnya masuk tanpa perlu digeser ke samping. Tinggi tiap
+ * kotak mengikuti jumlah barisnya, karena "Fenomena" kadang satu baris
+ * sedangkan "Fokus penelitian" tiga.
+ */
+function BaganAlurPikirTegak({ alur }: { alur: AlurPikir }) {
+  const JARAK = 18;
+  const isi = alur.simpul.map((s) => ({ tahap: s.tahap, baris: bagiBaris(s.isi, 38, 4) }));
+  const tinggiKotak = (n: number) => 40 + n * 19 + 8;
+
+  const tata: Array<{ tahap: string; baris: string[]; y: number; t: number }> = [];
+  for (const s of isi) {
+    const sebelum = tata[tata.length - 1];
+    const y = sebelum ? sebelum.y + sebelum.t + JARAK : 8;
+    tata.push({ ...s, y, t: tinggiKotak(s.baris.length) });
+  }
+  const akhir = tata[tata.length - 1];
+  const total = akhir ? akhir.y + akhir.t + 8 : 16;
+
+  return (
+    <div className="al-bagan al-bagan-alur al-bagan-tegak">
+      <svg viewBox={`0 0 380 ${total}`} role="img"
+        aria-label="Bagan alur pikir penelitian, dari fenomena sampai temuan yang diharapkan">
+        <defs>
+          <marker id="at-ujung" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" className="kb-isi" />
+          </marker>
+        </defs>
+        {tata.map((s, i) => (
+          <g key={s.tahap}>
+            <rect x="8" y={s.y} width="364" height={s.t} rx="10" className="kb-kotak" />
+            <text x="22" y={s.y + 26} className="ap-tahap">{s.tahap.toUpperCase()}</text>
+            {s.baris.map((b, j) => (
+              <text key={b + j} x="22" y={s.y + 48 + j * 19} className="ap-isi">{b}</text>
+            ))}
+            {i < tata.length - 1 && (
+              <path d={`M190 ${s.y + s.t} L190 ${s.y + s.t + JARAK - 4}`}
+                className="kb-panah" markerEnd="url(#at-ujung)" />
+            )}
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
 export function BaganAlurPikir({ alur }: { alur: AlurPikir }) {
+  return (
+    <>
+      <BaganAlurPikirLebar alur={alur} />
+      <BaganAlurPikirTegak alur={alur} />
+    </>
+  );
+}
+
+function BaganAlurPikirLebar({ alur }: { alur: AlurPikir }) {
   const TINGGI = 96;
   const JARAK = 22;
   const total = alur.simpul.length * TINGGI + (alur.simpul.length - 1) * JARAK + 16;
 
   return (
-    <div className="al-bagan al-bagan-alur">
+    <div className="al-bagan al-bagan-alur al-bagan-lebar">
       <svg viewBox={`0 0 720 ${total}`} role="img"
         aria-label="Bagan alur pikir penelitian, dari fenomena sampai temuan yang diharapkan">
         <defs>
@@ -256,7 +418,7 @@ export function BaganAlurPikir({ alur }: { alur: AlurPikir }) {
         </defs>
         {alur.simpul.map((s, i) => {
           const y = 8 + i * (TINGGI + JARAK);
-          const baris = bagiBaris(s.isi, 58, 2);
+          const baris = bagiBaris(s.isi, 64, 2);
           return (
             <g key={s.tahap}>
               <rect x="8" y={y} width="704" height={TINGGI} rx="10" className="kb-kotak" />

@@ -14,7 +14,10 @@ import { Bagian, Butir, Catatan, LaporanCetak, TombolCetak } from "./laporan";
 import { BaganAlurPikir, BaganKerangka, ContohGrafik } from "./grafik";
 import { susunAlurPikir, susunKerangka } from "@/lib/kerangka";
 import { GRAFIK_NAMA, usulkanVisual } from "@/lib/visual";
-import { MINIMAL_KATA, contohSiap, hitungKataCerita, tafsirkan, type Bacaan } from "@/lib/tafsir-cerita";
+import {
+  CONTOH_IDE, MINIMAL_KATA, empatJalur, hitungKataCerita, tafsirkan,
+  type Bacaan, type JalurAlternatif,
+} from "@/lib/tafsir-cerita";
 
 const KOSONG: Masukan = {
   variabelX: "", variabelX2: "", variabelZ: "", variabelY: "", objek: "", lokasi: "",
@@ -40,6 +43,10 @@ export function PanelJudul({
   // sudah terbuka: layarnya sama persis sebelum dan sesudah ditekan.
   const [menyusun, setMenyusun] = useState(false);
   const [bacaan, setBacaan] = useState<Bacaan | null>(null);
+  const [jalur, setJalur] = useState<JalurAlternatif[]>([]);
+  /** Judul dari kartu yang barusan dipilih, supaya kepala hasilnya sama
+   *  dengan judul yang ditekan. Kosong berarti pakai urutan pertama. */
+  const [judulPilihan, setJudulPilihan] = useState("");
   const jamRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasilRef = useRef<HTMLDivElement | null>(null);
 
@@ -64,6 +71,8 @@ export function PanelJudul({
   function bacakan(cerita: string) {
     const hasilBaca = tafsirkan(cerita, prodiDari(project?.prodi ?? ""));
     setBacaan(hasilBaca);
+    setJalur(empatJalur(hasilBaca));
+    setJudulPilihan("");
     const baru = { ...draf, ...hasilBaca.masukan };
     setDraf(baru);
     if (project) ubah({ rancangan: baru });
@@ -73,10 +82,15 @@ export function PanelJudul({
   const atur = (bagian: Partial<Masukan>) => {
     const baru = { ...draf, ...bagian };
     setDraf(baru);
+    // Judul pilihan itu milik kartu yang barusan ditekan. Begitu isian di
+    // bawahnya diubah sendiri, judul itu belum tentu terbit lagi, jadi
+    // pilihannya dilepas dan kepala hasilnya kembali ke judul urutan pertama.
+    setJudulPilihan("");
     if (project) ubah({ rancangan: baru });
   };
 
   const hasil = useMemo(() => rancang(draf), [draf]);
+  const judulUtama = hasil.judul.includes(judulPilihan) ? judulPilihan : hasil.judul[0];
   const visual = useMemo(() => usulkanVisual(hasil.jenis), [hasil.jenis]);
   // Kerangka berpikir hanya bermakna pada rancangan yang menguji hubungan
   // antarvariabel. Rancangan deskriptif dan kualitatif tidak memakainya.
@@ -111,6 +125,22 @@ export function PanelJudul({
       <KotakCerita onBacakan={bacakan} sibuk={menyusun} />
 
       {bacaan && <HasilBacaan bacaan={bacaan} />}
+
+      {jalur.length > 0 && (
+        <PilihJudul
+          jalur={jalur}
+          tujuanKini={draf.tujuan}
+          onPilih={(k) => {
+            setDraf(k.masukan);
+            // Judul yang tertulis di kartu belum tentu judul urutan pertama
+            // untuk rancangan itu. Kalau tidak diingat, mahasiswa menekan satu
+            // judul lalu mendapati kepala hasilnya berbunyi judul lain.
+            setJudulPilihan(k.judul);
+            if (project) ubah({ rancangan: k.masukan });
+            susun();
+          }}
+        />
+      )}
 
       <section className="al-card">
         <Kepala ikon={IKON.judul} judul="Perumus Judul dan Metode"
@@ -274,7 +304,7 @@ export function PanelJudul({
           <section className="al-card">
             <div className={`al-verdict ${hambat.length > 0 ? "periksa" : "wajar"}`}>
               <span className="al-verdict-mata">JUDUL YANG DISARANKAN</span>
-              <h3 className="al-verdict-judul">{hasil.judul[0]}</h3>
+              <h3 className="al-verdict-judul">{judulUtama}</h3>
               <p className="al-verdict-metode">
                 <span className="al-cap">{JENIS_UMUM[hasil.jenis]}</span>
                 {JENIS_KERJA[hasil.jenis]}
@@ -533,8 +563,6 @@ export function PanelJudul({
 function KotakCerita({
   onBacakan, sibuk,
 }: { onBacakan: (cerita: string) => void; sibuk: boolean }) {
-  // Dibacakan sekali, supaya judul di kartunya persis judul yang keluar nanti.
-  const contoh = useMemo(() => contohSiap(), []);
   const [cerita, setCerita] = useState("");
   const kata = hitungKataCerita(cerita);
   const cukup = kata >= MINIMAL_KATA;
@@ -561,20 +589,16 @@ function KotakCerita({
         </small>
       </label>
 
-      <h3 className="al-h4">Belum kepikiran judulnya? Pakai salah satu dari empat ini</h3>
+      <h3 className="al-h4">Belum kepikiran? Pakai salah satu contoh ini</h3>
       <p className="al-note">
-        Keempatnya berangkat dari cerita yang sama-sama masuk akal, dan metodenya jadi berbeda-beda karena bentuk
-        pertanyaannya berbeda. Menekannya mengisi kotak cerita di atas dengan cerita yang menghasilkan judul itu.
+        Menekannya mengisi kotak cerita di atas. Judul dan metodenya baru muncul sesudah ceritanya dibacakan.
       </p>
       <div className="al-tiles al-tiles-contoh">
-        {contoh.map((c) => (
+        {CONTOH_IDE.map((c) => (
           <button key={c.id} type="button" className={`al-tile al-tile-contoh ${c.jalur}`}
             disabled={sibuk} onClick={() => setCerita(c.cerita)}>
-            <b>{c.judul}</b>
-            <span className="al-tile-metode">
-              <span className="al-jalur">{c.metode}</span>
-              <small>{c.kerja}</small>
-            </span>
+            <b>{c.label}</b>
+            <span className="al-jalur">{c.jalur}</span>
           </button>
         ))}
       </div>
@@ -637,6 +661,51 @@ function HasilBacaan({ bacaan }: { bacaan: Bacaan }) {
         Semua ini <b>dugaan yang dibaca dari kalimatmu sendiri</b>, bukan karangan mesin. Kalau ada yang meleset,
         betulkan langsung pada isian di bawah, dan rancangannya ikut berubah seketika.
       </p>
+    </section>
+  );
+}
+
+/* ==========================================================================
+   EMPAT JUDUL DARI SATU CERITA
+   Satu topik hampir selalu bisa diteliti lebih dari satu cara, dan itu yang
+   paling sering tidak diketahui mahasiswa yang bingung. Menekan salah satu
+   judul mengisikan rancangannya ke formulir di bawah, jadi pilihannya bukan
+   sekadar pajangan.
+   ========================================================================== */
+
+function PilihJudul({
+  jalur, tujuanKini, onPilih,
+}: {
+  jalur: JalurAlternatif[];
+  tujuanKini: Masukan["tujuan"];
+  onPilih: (k: JalurAlternatif) => void;
+}) {
+  return (
+    <section className="al-card">
+      <h3 className="al-h4">Empat judul dari ceritamu</h3>
+      <p className="al-note">
+        Satu topik bisa diteliti lebih dari satu cara. Yang menentukan metodenya adalah bentuk pertanyaan yang
+        Anda pilih, bukan selera. Tekan salah satunya untuk memakai rancangan itu; isian di bawah ikut menyesuaikan.
+        Bagian dalam kurung siku adalah isian yang Anda lengkapi sendiri.
+      </p>
+      <div className="al-judul-baris">
+        {jalur.map((k) => (
+          <button
+            key={k.id}
+            type="button"
+            className={`al-judul-kartu ${k.jalur} ${k.masukan.tujuan === tujuanKini ? "on" : ""}`}
+            aria-pressed={k.masukan.tujuan === tujuanKini}
+            onClick={() => onPilih(k)}
+          >
+            {k.pas && <span className="al-pas">paling sesuai ceritamu</span>}
+            <b>{k.judul}</b>
+            <span className="al-tile-metode">
+              <span className="al-jalur">{k.metode}</span>
+              <small>{k.kerja}</small>
+            </span>
+          </button>
+        ))}
+      </div>
     </section>
   );
 }
