@@ -2357,6 +2357,10 @@ a.al-mini:hover { color: var(--al-ink); }
 .kb-isi { fill: var(--al-ink); }
 .kb-lat { fill: var(--al-surface); }
 .kb-h { fill: var(--al-accent-dark); font-size: 12px; font-weight: 800; text-anchor: middle; }
+/* Bagan alur pikir: rantai tahap untuk rancangan yang tidak menguji variabel. */
+.al-bagan-alur svg { min-width: 420px; }
+.ap-tahap { fill: var(--al-accent-dark); font-size: 11px; font-weight: 800; letter-spacing: .09em; }
+.ap-isi { fill: var(--al-ink); font-size: 13.5px; font-weight: 600; }
 
 /* --- Usulan visualisasi --- */
 .al-visual { display: grid; grid-template-columns: 1fr; gap: 10px; }
@@ -2456,10 +2460,23 @@ a.al-mini:hover { color: var(--al-ink); }
   color: var(--al-muted); font-size: 12px; line-height: 1.65; }
 .al-sangkal b { color: var(--al-ink); }
 
+/* --- Kotak cerita pada Perumus Judul ---
+   Pintu masuk bagi mahasiswa yang belum tahu istilah metodologi. Dibedakan
+   dari kartu lain lewat bilah aksen di tepi kiri, supaya terbaca sebagai
+   tempat memulai, bukan sekadar satu kartu di antara kartu lain. */
+.al-cerita { border-left: 3px solid var(--al-accent); }
+.al-cerita textarea { min-height: 150px; }
+
+/* Potongan kalimat mahasiswa yang menjadi dasar sebuah tafsiran. */
+.al-bukti { margin: 8px 0 0; padding-left: 11px; border-left: 2px solid var(--al-line-tegas);
+  color: var(--al-muted); font-size: 12px; line-height: 1.65; font-style: italic; }
+
+.al-list-rapat .al-item { padding: 12px 14px; }
+
 /* --- Bilah kemajuan pembacaan berkas naskah ---
    Word dan PDF dibongkar di pekerja latar, dan skripsi 250 halaman memang
    makan waktu beberapa detik. Tanpa tanda apa pun, jeda itu terbaca sebagai
-   halaman yang macet — jadi yang ditampilkan bukan sekadar pemutar berputar,
+   halaman yang macet, jadi yang ditampilkan bukan sekadar pemutar berputar,
    melainkan halaman keberapa yang sedang dibaca, berikut tombol batalnya. */
 .al-muat { margin-top: 14px; padding: 13px 15px; border: 1px solid var(--al-line);
   border-radius: 12px; background: var(--al-bg-lembut); }
@@ -2822,6 +2839,89 @@ a.al-mini:hover { color: var(--al-ink); }
 
 /* --- Isi --- */
 .cw-body { max-width: 1080px; margin: 0 auto; padding: 26px 16px 60px; display: flex; flex-direction: column; gap: 30px; }
+
+/* --- Etalase hidup: cerita masuk, metode keluar ---
+   Satu-satunya bagian halaman kunci yang benar-benar bekerja. Karena itu ia
+   diletakkan paling atas dan dibuat paling menonjol: menjelaskan bahwa
+   Cakrawala bisa menemukan metode dari sebuah cerita tidak pernah
+   semeyakinkan menunjukkannya pada cerita pengunjung sendiri. */
+.cw-coba { border: 1px solid rgba(245,197,66,.34); border-radius: 18px; padding: 22px;
+  background:
+    radial-gradient(60rem 24rem at 10% -30%, rgba(77,126,247,.20), transparent 62%),
+    linear-gradient(150deg, rgba(245,197,66,.09), rgba(139,92,246,.07));
+  display: flex; flex-direction: column; gap: 18px; }
+.cw-coba-kepala h2 { margin-top: 5px; font-size: clamp(20px, 4.4vw, 27px); }
+.cw-coba-sub { margin-top: 8px; color: var(--cw-muted); font-size: 13.5px; line-height: 1.75; max-width: 62ch; }
+
+.cw-coba-kotak { border: 1px solid var(--cw-line); border-radius: 14px; padding: 16px;
+  background: rgba(8,15,34,.62); display: flex; flex-direction: column; gap: 10px; }
+.cw-coba-kotak label { color: var(--cw-ink); font-size: 12px; font-weight: 800; letter-spacing: .02em; }
+.cw-coba-kotak textarea { width: 100%; resize: vertical; min-height: 132px;
+  border: 1px solid var(--cw-line); border-radius: 11px; padding: 12px 13px;
+  background: rgba(255,255,255,.05); color: var(--cw-ink);
+  font: inherit; font-size: 14px; line-height: 1.7; }
+.cw-coba-kotak textarea:focus { outline: none; border-color: rgba(245,197,66,.55);
+  box-shadow: 0 0 0 3px rgba(245,197,66,.16); }
+.cw-coba-baris { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.cw-coba-hitung { color: var(--cw-muted); font-size: 12px; flex: 1 1 8rem; }
+.cw-link { border: 0; background: none; padding: 0; cursor: pointer;
+  color: #a9bde2; font: inherit; font-size: 12.5px; font-weight: 700; text-decoration: underline; }
+.cw-link:hover { color: #fff; }
+.cw-coba-aman { color: var(--cw-muted); font-size: 11.5px; line-height: 1.6; }
+.cw-coba-aman b { color: var(--cw-ink); }
+
+.cw-hasil { display: flex; flex-direction: column; gap: 14px; }
+.cw-hasil-tipis { border: 1px solid rgba(245,197,66,.30); border-radius: 12px; padding: 12px 14px;
+  background: rgba(245,197,66,.09); color: #f7d98a; font-size: 12.5px; line-height: 1.7; }
+.cw-hasil-buka { border: 1px solid rgba(110,231,168,.30); border-radius: 14px; padding: 18px;
+  background: rgba(34,197,94,.09); display: flex; flex-direction: column; gap: 10px; }
+.cw-hasil-tanda { color: #6ee7a8; font-size: 10.5px; font-weight: 800; letter-spacing: .16em; }
+.cw-hasil-buka h3 { font-size: clamp(17px, 3.6vw, 22px); }
+.cw-hasil-baca { color: var(--cw-ink); font-size: 14px; line-height: 1.75; }
+.cw-hasil-paradigma { color: var(--cw-muted); font-size: 12.5px; line-height: 1.7; }
+.cw-hasil-duo { display: grid; gap: 12px; grid-template-columns: 1fr; margin-top: 4px; }
+@media (min-width: 720px) { .cw-hasil-duo { grid-template-columns: 1fr 1fr; } }
+.cw-hasil-duo > div { border: 1px solid var(--cw-line); border-radius: 11px; padding: 12px 13px;
+  background: rgba(8,15,34,.5); }
+.cw-hasil-duo b { display: block; color: var(--cw-emas); font-size: 10.5px; font-weight: 800;
+  letter-spacing: .13em; margin-bottom: 6px; }
+.cw-hasil-duo p { color: var(--cw-ink); font-size: 13.5px; line-height: 1.65; }
+.cw-hasil-hambat { border: 1px solid rgba(245,197,66,.32); border-radius: 11px; padding: 11px 13px;
+  background: rgba(245,197,66,.10); color: #f7d98a; font-size: 12.5px; line-height: 1.65; }
+
+/* Lapis terkunci: bagannya memang sudah jadi, hanya belum boleh dilihat. */
+.cw-kunci-lapis { position: relative; border: 1px solid var(--cw-line); border-radius: 14px;
+  overflow: hidden; background: rgba(8,15,34,.55); }
+/* Cukup buram untuk tidak terbaca, cukup jelas untuk terlihat bahwa bagannya
+   memang sudah jadi. Terlalu pekat, dan yang tampak hanya kotak gelap kosong. */
+.cw-buram { filter: blur(5px); opacity: .85; pointer-events: none; user-select: none;
+  padding: 18px; max-height: 400px; overflow: hidden; }
+/* Bagan dan contoh grafiknya diletakkan berdampingan: yang perlu terlihat bukan
+   salah satunya, melainkan bahwa keduanya memang sudah jadi. */
+.cw-buram-isi { display: grid; gap: 16px 20px; grid-template-columns: 1fr; }
+.cw-buram-isi h4 { margin: 0 0 10px; color: var(--cw-ink); font-size: 14px; }
+.cw-buram .al-visual { display: grid; gap: 10px; grid-template-columns: 1fr; }
+.cw-buram .al-bagan svg { min-width: 0; }
+@media (min-width: 820px) { .cw-buram-isi { grid-template-columns: 1.25fr 1fr; align-items: start; } }
+.cw-buram h4 { margin: 0 0 10px; color: var(--cw-ink); font-size: 14px; }
+.cw-buram h4 + * + h4 { margin-top: 18px; }
+/* Bagan meminjam token warna dari .al; latar dan tinggi minimumnya dimatikan
+   supaya ia menyatu dengan kartu di halaman kunci. */
+.cw .al { min-height: 0; background: transparent; }
+
+.cw-kunci-tirai { position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 22px;
+  background: linear-gradient(180deg, rgba(7,13,28,.18) 0%, rgba(7,13,28,.62) 42%, rgba(7,13,28,.84) 100%); }
+.cw-kunci-tirai b { color: #fff; font-size: clamp(15px, 3.4vw, 19px);
+  text-shadow: 0 2px 14px rgba(3,8,20,.95), 0 0 4px rgba(3,8,20,.9); }
+.cw-kunci-tirai p { color: #cdd9f2; font-size: 13px; line-height: 1.7; max-width: 54ch;
+  text-shadow: 0 2px 12px rgba(3,8,20,.95), 0 0 4px rgba(3,8,20,.9); }
+.cw-gembok-kecil { align-self: center; font-size: 10.5px; padding: 5px 11px; }
+.cw-gembok-kecil svg { width: 14px; height: 14px; }
+@media (max-width: 560px) {
+  .cw-buram { max-height: 320px; }
+  .cw-kunci-tirai p { font-size: 12px; }
+}
 
 .cw-langkah { border: 1px solid var(--cw-line); border-radius: 18px; padding: 20px;
   background: linear-gradient(150deg, rgba(77,126,247,.12), rgba(139,92,246,.08)); }

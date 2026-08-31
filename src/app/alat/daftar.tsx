@@ -7,7 +7,7 @@ import { useState } from "react";
  *
  * Periksa Bahasa pada skripsi utuh dapat menghasilkan beberapa ribu temuan.
  * Digambar sekaligus, tiap temuan menjadi lima elemen, dan halaman berhenti
- * menanggapi selama peramban menyusunnya — padahal tidak ada yang membaca
+ * menanggapi selama peramban menyusunnya, padahal tidak ada yang membaca
  * temuan ke-1.400 sebelum membereskan yang pertama.
  *
  * Yang dipakai bukan penggulung maya: urutannya penting, hasilnya harus dapat
@@ -17,7 +17,7 @@ import { useState } from "react";
  */
 export function useSebagian<T>(daftar: T[], langkah = 150) {
   // Batasnya disimpan bersama daftar yang berlaku baginya. Dengan begitu
-  // daftar baru — hasil pemeriksaan ulang atau ganti saringan — otomatis
+  // daftar baru (hasil pemeriksaan ulang atau ganti saringan) otomatis
   // kembali ke potongan pertama, tanpa perlu effect yang menyetel ulang.
   const [simpanan, setSimpanan] = useState<{ untuk: T[] | null; batas: number }>({
     untuk: null,

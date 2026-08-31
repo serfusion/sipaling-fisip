@@ -11,9 +11,10 @@ import {
 import type { Project } from "@/lib/project";
 import type { Tab } from "./panel-beranda";
 import { Bagian, Butir, Catatan, LaporanCetak, TombolCetak } from "./laporan";
-import { BaganKerangka, ContohGrafik } from "./grafik";
-import { susunKerangka } from "@/lib/kerangka";
+import { BaganAlurPikir, BaganKerangka, ContohGrafik } from "./grafik";
+import { susunAlurPikir, susunKerangka } from "@/lib/kerangka";
 import { GRAFIK_NAMA, usulkanVisual } from "@/lib/visual";
+import { CONTOH_CERITA, MINIMAL_KATA, hitungKataCerita, tafsirkan, type Bacaan } from "@/lib/tafsir-cerita";
 
 const KOSONG: Masukan = {
   variabelX: "", variabelX2: "", variabelZ: "", variabelY: "", objek: "", lokasi: "",
@@ -38,6 +39,7 @@ export function PanelJudul({
   // terlihat, tombolnya terasa tidak menghasilkan apa-apa ketika hasilnya
   // sudah terbuka: layarnya sama persis sebelum dan sesudah ditekan.
   const [menyusun, setMenyusun] = useState(false);
+  const [bacaan, setBacaan] = useState<Bacaan | null>(null);
   const jamRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasilRef = useRef<HTMLDivElement | null>(null);
 
@@ -58,6 +60,16 @@ export function PanelJudul({
     }, 650);
   }
 
+  /** Baca cerita mahasiswa, isikan ke formulir, lalu langsung susun. */
+  function bacakan(cerita: string) {
+    const hasilBaca = tafsirkan(cerita, prodiDari(project?.prodi ?? ""));
+    setBacaan(hasilBaca);
+    const baru = { ...draf, ...hasilBaca.masukan };
+    setDraf(baru);
+    if (project) ubah({ rancangan: baru });
+    susun();
+  }
+
   const atur = (bagian: Partial<Masukan>) => {
     const baru = { ...draf, ...bagian };
     setDraf(baru);
@@ -71,6 +83,12 @@ export function PanelJudul({
   const kerangka = useMemo(
     () => (draf.tujuan === "pengaruh" || draf.tujuan === "hubungan" ? susunKerangka(draf) : null),
     [draf],
+  );
+  // Rancangan yang tidak menguji variabel tetap wajib punya kerangka
+  // berpikir; bentuknya saja yang berbeda.
+  const alur = useMemo(
+    () => (draf.tujuan === "pengaruh" || draf.tujuan === "hubungan" ? null : susunAlurPikir(draf, hasil.jenis, hasil.teori)),
+    [draf, hasil.jenis, hasil.teori],
   );
   const anjuran = slovin(draf.jumlahPopulasi);
   const kuan = kuantitatif(hasil.jenis);
@@ -90,6 +108,10 @@ export function PanelJudul({
 
   return (
     <>
+      <KotakCerita onBacakan={bacakan} sibuk={menyusun} />
+
+      {bacaan && <HasilBacaan bacaan={bacaan} />}
+
       <section className="al-card">
         <Kepala ikon={IKON.judul} judul="Perumus Judul dan Metode"
           sub="Sebutkan yang ingin Anda teliti, lalu lihat metode mana yang dapat menjawabnya" />
@@ -332,6 +354,18 @@ export function PanelJudul({
             </section>
           )}
 
+          {alur && (
+            <section className="al-card">
+              <h3 className="al-h4">Kerangka berpikir</h3>
+              <p className="al-note">{alur.catatan}</p>
+              <BaganAlurPikir alur={alur} />
+              <p className="al-tail">
+                Salin bagan ini ke BAB II. Tiap tahapnya harus terbaca lagi di bab metode; kalau tidak, penguji
+                akan menanyakan dari mana fokus penelitian Anda datang.
+              </p>
+            </section>
+          )}
+
           <section className="al-card">
             <h3 className="al-h4">Visualisasi yang sesuai</h3>
             <p className="al-note">
@@ -479,5 +513,103 @@ export function PanelJudul({
 
       <SumberAcuan kunci="judul" />
     </>
+  );
+}
+
+
+/* ==========================================================================
+   KOTAK CERITA
+   Pintu masuk bagi yang belum tahu variabel bebas dan variabel terikatnya.
+   Yang diminta hanya satu: ceritakan apa adanya. Isian tujuh langkah di
+   bawahnya diisikan dari cerita itu, lalu boleh dibetulkan sendiri.
+   ========================================================================== */
+
+function KotakCerita({
+  onBacakan, sibuk,
+}: { onBacakan: (cerita: string) => void; sibuk: boolean }) {
+  const [cerita, setCerita] = useState("");
+  const kata = hitungKataCerita(cerita);
+  const cukup = kata >= MINIMAL_KATA;
+
+  return (
+    <section className="al-card al-cerita">
+      <Kepala ikon={IKON.judul} judul="Ceritakan skripsi atau jurnal yang kamu pikirkan"
+        sub="Tulis apa adanya, sepanjang yang kamu mau. Biar Cakrawala yang menerjemahkannya jadi metode" />
+      <p className="al-note">
+        Tidak perlu tahu istilah metodologi lebih dulu. Tulis saja apa yang mengganggu pikiranmu, siapa yang mau
+        kamu teliti, dan di mana. <b>Ceritanya tidak dikirim ke mana pun</b>, dibaca di perangkat ini saja.
+      </p>
+
+      <label className="al-field">
+        <span>Ceritamu</span>
+        <textarea
+          value={cerita}
+          onChange={(e) => setCerita(e.target.value)}
+          rows={7}
+          placeholder={"Aku pengen neliti soal…\n\nCeritakan bebas: apa yang kamu lihat, kenapa menurutmu itu penting, siapa yang mau kamu teliti, dan di mana."}
+        />
+        <small>
+          {kata} kata{cukup ? " · sudah cukup untuk dibaca" : ` · tulis minimal ${MINIMAL_KATA} kata supaya bisa dibaca`}
+        </small>
+      </label>
+
+      <div className="al-linkrow">
+        <button type="button" className="al-link" onClick={() => setCerita(CONTOH_CERITA)}>Isi dengan contoh</button>
+        {cerita && <button type="button" className="al-link" onClick={() => setCerita("")}>Kosongkan</button>}
+      </div>
+
+      <button type="button" className="al-btn" disabled={!cukup || sibuk} onClick={() => onBacakan(cerita)}>
+        {sibuk ? (
+          <><span className="al-putar" aria-hidden="true" /> Membaca ceritamu…</>
+        ) : (
+          <><Ic d={IKON.centang} /> Bacakan dan susunkan rancangannya</>
+        )}
+      </button>
+    </section>
+  );
+}
+
+const KELAS_YAKIN: Record<string, string> = { kuat: "ok", sedang: "warn", terka: "abu" };
+const LABEL_YAKIN: Record<string, string> = {
+  kuat: "tertulis jelas",
+  sedang: "disimpulkan",
+  terka: "belum disebut, ini dugaan",
+};
+
+/** Apa yang terbaca dari cerita, beserta asalnya di kalimat mahasiswa. */
+function HasilBacaan({ bacaan }: { bacaan: Bacaan }) {
+  return (
+    <section className="al-card">
+      <h3 className="al-h4">Yang saya tangkap dari ceritamu</h3>
+      <div className={`al-verdict ${bacaan.cukup ? "wajar" : "periksa"}`}>
+        <b>{bacaan.cukup ? "Ceritanya sudah bisa dijadikan rancangan" : "Ceritanya masih terlalu ringkas"}</b>
+        <p>{bacaan.ringkas}</p>
+      </div>
+
+      <ul className="al-list al-list-rapat">
+        {bacaan.temuan.map((t) => (
+          <li key={t.bidang} className={`al-item ${KELAS_YAKIN[t.yakin] ?? "abu"}`}>
+            <div className="al-item-atas">
+              <span className="al-tag">{t.bidang}</span>
+              <span className="al-num">{LABEL_YAKIN[t.yakin]}</span>
+            </div>
+            <p className="al-kutip"><b>{t.nilai}</b></p>
+            {t.bukti && <p className="al-bukti">Dari kalimatmu: &ldquo;{t.bukti}&rdquo;</p>}
+          </li>
+        ))}
+      </ul>
+
+      {bacaan.pertanyaan.length > 0 && (
+        <>
+          <h3 className="al-h4">Yang belum ketemu di ceritamu</h3>
+          <ol className="al-steps">{bacaan.pertanyaan.map((q) => <li key={q}>{q}</li>)}</ol>
+        </>
+      )}
+
+      <p className="al-tail">
+        Semua ini <b>dugaan yang dibaca dari kalimatmu sendiri</b>, bukan karangan mesin. Kalau ada yang meleset,
+        betulkan langsung pada isian di bawah, dan rancangannya ikut berubah seketika.
+      </p>
+    </section>
   );
 }

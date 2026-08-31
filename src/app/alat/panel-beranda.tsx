@@ -348,7 +348,7 @@ function KotakNaskah({
 
       <p className="al-tail">
         Word (.docx) sampai {MAKS_MB.docx} MB, PDF sampai {MAKS_MB.pdf} MB, teks polos sampai {MAKS_MB.teks} MB.
-        Berkasnya dibuka di perangkat Anda sendiri — tidak diunggah ke server mana pun. PDF hasil pindaian atau
+        Berkasnya dibuka di perangkat Anda sendiri, tidak diunggah ke server mana pun. PDF hasil pindaian atau
         foto tidak bisa dibaca karena tidak punya lapisan teks; untuk itu unggah berkas Word aslinya. Word versi
         lama (.doc) perlu disimpan ulang sebagai .docx lebih dulu.
       </p>

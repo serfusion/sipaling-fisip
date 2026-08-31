@@ -13,6 +13,11 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Ic, IKON } from "./ikon";
 import Animasi from "../animasi";
+import { BaganAlurPikir, BaganKerangka, ContohGrafik } from "./grafik";
+import { susunAlurPikir, susunKerangka, type AlurPikir, type Kerangka } from "@/lib/kerangka";
+import { JENIS_LABEL, rancang, type Rancangan } from "@/lib/metodologi";
+import { usulkanVisual, type Usul } from "@/lib/visual";
+import { CONTOH_CERITA, MINIMAL_KATA, hitungKataCerita, tafsirkan, type Bacaan } from "@/lib/tafsir-cerita";
 
 const KONTAK = "@superfaldev";
 
@@ -290,6 +295,187 @@ function Mock({ jenis }: { jenis: string }) {
   );
 }
 
+
+/* ==========================================================================
+   ETALASE HIDUP: CERITA MASUK, METODE KELUAR
+
+   Bagian ini satu-satunya di halaman kunci yang benar-benar bekerja, bukan
+   gambaran tampilan. Alasannya sederhana: menjelaskan bahwa Cakrawala bisa
+   menemukan metode dari sebuah cerita tidak pernah semeyakinkan menunjukkan
+   ia melakukannya pada cerita pengunjung sendiri.
+
+   Yang dibuka: metodenya, paradigmanya, satu usulan judul, dan rumusan
+   masalahnya. Yang diburamkan: kerangka berpikir, visualisasi yang sesuai,
+   dan daftar ketidakcocokan judul-metode.
+
+   Buram di sini penanda, bukan gembok. Gembok yang sebenarnya ada di server
+   (page.tsx) dan menjaga kesembilan alatnya; yang diburamkan di halaman ini
+   hanyalah bagan yang disusun dari cerita pengunjung itu sendiri.
+   ========================================================================== */
+
+type HasilCoba = {
+  bacaan: Bacaan;
+  rancangan: Rancangan;
+  kerangka: Kerangka | null;
+  alur: AlurPikir | null;
+  visual: Usul[];
+};
+
+function EtalaseCoba() {
+  const [cerita, setCerita] = useState("");
+  const [sibuk, setSibuk] = useState(false);
+  const [hasil, setHasil] = useState<HasilCoba | null>(null);
+
+  const kata = hitungKataCerita(cerita);
+  const cukup = kata >= MINIMAL_KATA;
+
+  function carikan() {
+    if (!cukup || sibuk) return;
+    setSibuk(true);
+    setHasil(null);
+    // Perhitungannya seketika. Jeda pendek ini semata supaya perpindahan dari
+    // "menekan tombol" ke "hasil muncul" terbaca sebagai satu kejadian.
+    window.setTimeout(() => {
+      const bacaan = tafsirkan(cerita);
+      const rancangan = rancang(bacaan.masukan);
+      const pakaiVariabel = bacaan.masukan.tujuan === "pengaruh" || bacaan.masukan.tujuan === "hubungan";
+      setHasil({
+        bacaan,
+        rancangan,
+        kerangka: pakaiVariabel ? susunKerangka(bacaan.masukan) : null,
+        alur: pakaiVariabel ? null : susunAlurPikir(bacaan.masukan, rancangan.jenis, rancangan.teori),
+        visual: usulkanVisual(rancangan.jenis),
+      });
+      setSibuk(false);
+    }, 700);
+  }
+
+  return (
+    <section id="coba" className="cw-coba" aria-label="Coba temukan metode penelitianmu">
+      <div className="cw-coba-kepala">
+        <p className="cw-eyebrow">COBA DULU, TANPA KODE AKSES</p>
+        <h2>Ceritakan skripsi atau jurnal yang kamu pikirkan</h2>
+        <p className="cw-coba-sub">
+          Nggak perlu tahu istilah metodologi. Tulis apa adanya: apa yang kamu lihat, siapa yang mau kamu
+          teliti, di mana. Lalu Cakrawala menunjukkan metode mana yang bisa menjawabnya.
+        </p>
+      </div>
+
+      <div className="cw-coba-kotak">
+        <label htmlFor="cw-cerita">Ceritamu</label>
+        <textarea
+          id="cw-cerita"
+          rows={6}
+          value={cerita}
+          onChange={(e) => setCerita(e.target.value)}
+          placeholder="Aku pengen neliti soal…"
+        />
+        <div className="cw-coba-baris">
+          <span className="cw-coba-hitung">
+            {kata} kata{cukup ? "" : ` · minimal ${MINIMAL_KATA} kata`}
+          </span>
+          <button type="button" className="cw-link" onClick={() => setCerita(CONTOH_CERITA)}>
+            Isi dengan contoh
+          </button>
+          <button type="button" className="cw-btn cw-btn-utama" onClick={carikan} disabled={!cukup || sibuk}>
+            {sibuk ? "Membaca ceritamu…" : "Carikan metodenya"}
+          </button>
+        </div>
+        <p className="cw-coba-aman">
+          Ceritamu dibaca di perangkat ini juga dan <b>tidak dikirim ke server mana pun</b>.
+        </p>
+      </div>
+
+      {hasil && <HasilCobaTampil hasil={hasil} />}
+    </section>
+  );
+}
+
+function HasilCobaTampil({ hasil }: { hasil: HasilCoba }) {
+  const { bacaan, rancangan, kerangka, alur, visual } = hasil;
+  const hambat = rancangan.peringatan.filter((p) => p.berat === "hambat").length;
+
+  return (
+    <div className="cw-hasil">
+      {!bacaan.cukup && (
+        <p className="cw-hasil-tipis">
+          Ceritanya masih terlalu ringkas untuk dibaca dengan yakin. Yang di bawah ini dugaan sementara.
+          Tambahkan siapa yang mau kamu teliti dan di mana, lalu coba lagi.
+        </p>
+      )}
+
+      <div className="cw-hasil-buka">
+        <span className="cw-hasil-tanda">{bacaan.cukup ? "METODE YANG COCOK" : "DUGAAN SEMENTARA"}</span>
+        <h3>{JENIS_LABEL[rancangan.jenis]}</h3>
+        <p className="cw-hasil-baca">{bacaan.ringkas}</p>
+        <p className="cw-hasil-paradigma">{rancangan.paradigma}</p>
+
+        <div className="cw-hasil-duo">
+          <div>
+            <b>Usulan judul</b>
+            <p>{rancangan.judul[0]}</p>
+          </div>
+          <div>
+            <b>Rumusan masalah</b>
+            <p>{rancangan.rumusan[0]}</p>
+          </div>
+        </div>
+
+        {hambat > 0 && (
+          <p className="cw-hasil-hambat">
+            ⚠ Ada <b>{hambat}</b> hal pada rencanamu yang biasanya bikin pembimbing menyuruh ulang. Rinciannya
+            beserta jalan keluarnya ada di dalam Cakrawala.
+          </p>
+        )}
+      </div>
+
+      <div className="cw-kunci-lapis">
+        <div className="cw-buram" aria-hidden="true">
+          {/* Pembungkus .al hanya untuk meminjam token warna bagannya; latar
+              dan tinggi minimumnya dimatikan lewat .cw .al di berkas gaya. */}
+          <div className="al cw-buram-isi">
+            <div>
+              <h4>Kerangka berpikir</h4>
+              {kerangka ? <BaganKerangka kerangka={kerangka} /> : alur ? <BaganAlurPikir alur={alur} /> : null}
+            </div>
+            <div>
+              <h4>Visualisasi yang sesuai</h4>
+              <div className="al-visual">
+                {visual.slice(0, 3).map((v) => (
+                  <div key={v.nama} className={`al-visual-kartu ${v.utama ? "utama" : ""}`}>
+                    <ContohGrafik jenis={v.grafik} />
+                    <div className="al-visual-teks">
+                      <b>{v.nama}</b>
+                      <p>{v.untuk}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="cw-kunci-tirai">
+          <span className="cw-gembok cw-gembok-kecil">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="4" y="10" width="16" height="10" rx="2" />
+              <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+            </svg>
+            TERKUNCI
+          </span>
+          <b>Kerangka berpikirmu sudah jadi, tinggal dilihat</b>
+          <p>
+            Bagan kerangka berpikir dan {visual.length} bentuk visualisasi yang sesuai untuk metode ini sudah
+            tersusun dari ceritamu barusan, lengkap dengan apa yang diletakkan di tiap sumbunya. Buka dengan kode
+            akses untuk melihatnya, mengubahnya, dan mencetaknya.
+          </p>
+          <a className="cw-btn cw-btn-terang" href="#kode">Buka dengan kode akses →</a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PratinjauCakrawala() {
   const [kode, setKode] = useState("");
   const [galat, setGalat] = useState("");
@@ -363,7 +549,7 @@ export default function PratinjauCakrawala() {
           </ul>
           <div className="cw-hero-aksi">
             <a className="cw-btn cw-btn-utama" href="#kode">Punya kode? Buka sekarang</a>
-            <a className="cw-btn" href="#etalase">Lihat isinya dulu</a>
+            <a className="cw-btn" href="#coba">Coba dulu, gratis</a>
           </div>
           <div className="cw-sorot">
             {SOROTAN.map((item) => (
@@ -380,6 +566,8 @@ export default function PratinjauCakrawala() {
       </header>
 
       <main className="cw-body">
+        <EtalaseCoba />
+
         <section className="cw-langkah" aria-label="Cara memakai Cakrawala">
           <div className="cw-langkah-kepala">
             <div>

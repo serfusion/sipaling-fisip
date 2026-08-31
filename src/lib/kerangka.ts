@@ -9,7 +9,7 @@
 // langsung tiap variabel bebas lebih dulu, lalu variabel antara, lalu
 // pengaruh tidak langsung, dan terakhir pengaruh serentak.
 
-import type { Masukan } from "./metodologi";
+import type { Jenis, Masukan } from "./metodologi";
 
 export type Jalur = {
   kode: string;
@@ -114,4 +114,97 @@ export function namaKotak(kotak: Kotak[], id: string) {
 /** Penanda variabel seperti yang lazim ditulis pada bagan skripsi. */
 export function tanda(id: string) {
   return { X1: "X1", X2: "X2", Z: "Z", Y: "Y" }[id] ?? id;
+}
+
+// ---------------------------------------------------------------------------
+// ALUR PIKIR UNTUK RANCANGAN YANG TIDAK MENGUJI VARIABEL
+// ---------------------------------------------------------------------------
+//
+// Bagan kotak-dan-panah di atas hanya sah bila ada variabel yang diuji
+// pengaruh atau hubungannya. Penelitian kualitatif, deskriptif, analisis isi,
+// dan evaluasi tetap wajib punya kerangka berpikir, hanya bentuknya berbeda:
+// bukan jalur antarvariabel, melainkan alur penalaran dari fenomena sampai
+// temuan yang diharapkan.
+//
+// Memaksakan bagan variabel pada rancangan kualitatif adalah kekeliruan yang
+// sering terjadi, dan penguji langsung menanyakannya: "mana variabel bebas
+// Anda?", padahal penelitiannya memang tidak punya.
+
+export type Simpul = {
+  /** Nama tahap pada bagan. */
+  tahap: string;
+  isi: string;
+};
+
+export type AlurPikir = {
+  simpul: Simpul[];
+  catatan: string;
+};
+
+const HARAPAN: Record<Jenis, string> = {
+  "kuantitatif-eksplanatif": "Besar dan arah pengaruh, beserta taraf signifikansinya",
+  "kuantitatif-korelasional": "Kekuatan dan arah hubungan antarvariabel",
+  "kuantitatif-komparatif": "Ada tidaknya perbedaan yang bermakna antar kelompok",
+  "kuantitatif-deskriptif": "Peta keadaan per indikator, bukan satu angka tunggal",
+  "kualitatif-deskriptif": "Tema yang berulang beserta kutipan pendukungnya",
+  fenomenologi: "Esensi pengalaman yang dihidupi para informan",
+  "studi-kasus": "Pola yang menjelaskan kasus, dijodohkan dengan teori",
+  "analisis-isi": "Kecenderungan kategori beserta angka kemunculannya",
+  "analisis-wacana": "Cara teks membingkai persoalan, ditunjukkan dari potongannya",
+  "evaluasi-program": "Capaian dibanding tolok ukur resmi, dan penyebab selisihnya",
+};
+
+const CARA: Record<Jenis, string> = {
+  "kuantitatif-eksplanatif": "Kuesioner diuji lebih dulu, lalu regresi",
+  "kuantitatif-korelasional": "Kuesioner, lalu uji korelasi",
+  "kuantitatif-komparatif": "Kuesioner pada tiap kelompok, lalu uji beda",
+  "kuantitatif-deskriptif": "Kuesioner, lalu distribusi frekuensi",
+  "kualitatif-deskriptif": "Wawancara dan dokumen, lalu pengodean tematik",
+  fenomenologi: "Wawancara mendalam, lalu reduksi dan horizonalisasi",
+  "studi-kasus": "Wawancara, dokumen, observasi, lalu analisis tematik",
+  "analisis-isi": "Lembar koding dan koder kedua, lalu uji reliabilitas",
+  "analisis-wacana": "Perangkat analisis yang dipilih tegas, tataran demi tataran",
+  "evaluasi-program": "Dokumen resmi dan wawancara, dibandingkan dengan tolok ukur",
+};
+
+/**
+ * Susun alur penalaran penelitian, dari fenomena sampai temuan yang
+ * diharapkan.
+ *
+ * Isinya diambil dari masukan yang sama dengan yang dipakai merancang metode,
+ * sehingga bagan ini tidak mungkin bercerita lain daripada bab metodenya.
+ */
+export function susunAlurPikir(m: Masukan, jenis: Jenis, teori: string[]): AlurPikir {
+  const X = bersih(m.variabelX, "gagasan yang diteliti");
+  const Y = (m.variabelY ?? "").trim();
+  const siapa = (m.objek ?? "").trim();
+  const tempat = (m.lokasi ?? "").trim();
+
+  const fenomena = [X, siapa ? `pada ${siapa}` : "", tempat ? `di ${tempat}` : ""]
+    .filter(Boolean)
+    .join(" ");
+
+  const fokus =
+    jenis === "analisis-isi" || jenis === "analisis-wacana"
+      ? `Apa yang terkandung dalam ${Y || "teks yang dipilih"} ketika membicarakan ${X}`
+      : jenis === "evaluasi-program"
+        ? `Sejauh mana ${X} mencapai sasaran yang ditetapkan`
+        : jenis === "fenomenologi"
+          ? `Bagaimana ${siapa || "informan"} memaknai pengalaman ${X}`
+          : Y
+            ? `Bagaimana ${X} bertaut dengan ${Y}`
+            : `Bagaimana ${X} berlangsung sebenarnya`;
+
+  return {
+    simpul: [
+      { tahap: "Fenomena", isi: fenomena },
+      { tahap: "Teori dan konsep", isi: teori.slice(0, 2).join(" · ") || "Belum ditetapkan" },
+      { tahap: "Fokus penelitian", isi: fokus },
+      { tahap: "Cara memeriksa", isi: CARA[jenis] },
+      { tahap: "Temuan yang diharapkan", isi: HARAPAN[jenis] },
+    ],
+    catatan:
+      "Rancangan ini tidak menguji hubungan antarvariabel, jadi kerangka berpikirnya berbentuk alur " +
+      "penalaran, bukan kotak X dan Y. Memaksakan bagan variabel di sini justru akan ditanyakan penguji.",
+  };
 }

@@ -28,8 +28,8 @@ type Simpanan<K extends NamaTugas> = {
  * dikerjakan. Sekarang panel muncul seketika, hasilnya menyusul, dan ada
  * keterangan "sedang memeriksa" selama itu.
  *
- * `muatan` harus stabil antar-render — bungkus dengan useMemo di pemanggil —
- * karena perubahan rujukannya yang memicu pemeriksaan ulang. Kirim null bila
+ * `muatan` harus stabil antar-render, jadi bungkus dengan useMemo di pemanggil:
+ * perubahan rujukannya itulah yang memicu pemeriksaan ulang. Kirim null bila
  * memang belum ada yang perlu diperiksa.
  */
 export function useAnalisis<K extends NamaTugas>(

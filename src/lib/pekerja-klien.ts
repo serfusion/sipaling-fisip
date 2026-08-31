@@ -8,9 +8,9 @@
 //
 // Ada jalur cadangan yang sengaja dipertahankan: bila peramban tidak
 // mengenal Web Worker, atau berkas pekerjanya gagal dimuat, perhitungan
-// dikerjakan di utas utama. Layar akan tersendat sebentar — tetapi
-// tersendat sebentar jauh lebih baik daripada alatnya tidak jalan sama
-// sekali di perangkat itu.
+// dikerjakan di utas utama. Layar akan tersendat sebentar, tetapi tersendat
+// sebentar jauh lebih baik daripada alatnya tidak jalan sama sekali di
+// perangkat itu.
 
 import {
   MAKS_MB,
@@ -117,7 +117,7 @@ function lewatPekerja<K extends NamaTugas>(
         // hangat untuk permintaan berikutnya.
         //
         // Tugas lain yang kebetulan sedang menumpang pekerja yang sama ikut
-        // terhenti, jadi mereka diberi tahu apa adanya — bukan sebagai
+        // terhenti, jadi mereka diberi tahu apa adanya, bukan sebagai
         // "dibatalkan", karena bukan mereka yang dibatalkan pengguna.
         if (nama === "berkas") {
           bubarkan(new Error("Pemeriksaan terhenti karena pembacaan berkas dibatalkan. Coba jalankan lagi."));
@@ -211,7 +211,7 @@ export async function jalankanTugas<K extends NamaTugas>(
  * Urutannya sengaja: jenis dan ukuran diperiksa dari delapan byte pertama,
  * sebelum apa pun dimuat ke memori. Berkas 40 MB yang salah pilih karena itu
  * tidak pernah sempat dibaca, apalagi diurai. Berkas yang lolos diserahkan ke
- * pekerja latar apa adanya — yang berpindah antar-utas hanya rujukannya,
+ * pekerja latar apa adanya: yang berpindah antar-utas hanya rujukannya,
  * bukan salinan isinya.
  */
 export async function bacaNaskah(

@@ -24,7 +24,7 @@ import { JENIS_LABEL, type Project } from "@/lib/project";
  * LAPORAN HANYA DISUSUN SAAT AKAN DICETAK. Sebelumnya ia selalu ada di
  * halaman, hanya disembunyikan dengan display:none. Pada naskah satu bab itu
  * tidak terasa. Pada skripsi utuh, Periksa Bahasa dapat menghasilkan ribuan
- * temuan, dan tiap temuan menjadi beberapa elemen — puluhan ribu elemen
+ * temuan, dan tiap temuan menjadi beberapa elemen: puluhan ribu elemen
  * tersembunyi yang tidak pernah dilihat siapa pun, tetapi tetap harus disusun,
  * ditata, dan disimpan peramban. Di situlah halaman mulai terasa berat dan
  * ponsel kehabisan memori. Sekarang tidak ada satu pun elemen laporan yang

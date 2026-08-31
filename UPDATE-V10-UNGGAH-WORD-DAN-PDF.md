@@ -1,4 +1,4 @@
-# UPDATE v10 — Cakrawala membaca Word dan PDF, tanpa halaman macet
+# UPDATE v10: Cakrawala membaca Word dan PDF, tanpa halaman macet
 
 Tidak ada SQL yang perlu dijalankan dan tidak ada variabel environment baru.
 Yang bertambah hanya satu paket npm (`pdfjs-dist`); `npm install` sudah
@@ -38,8 +38,8 @@ Tombolnya sekarang berbunyi **"Muat dari Word, PDF, atau teks"**.
 | PDF | 40 MB | lapisan teksnya dibaca halaman demi halaman |
 | Teks `.txt`, `.md` | 5 MB | dibaca apa adanya |
 
-Batas panjang naskah dinaikkan dari 400 ribu menjadi **1 juta huruf** —
-sekitar 150 ribu kata, jauh di atas skripsi mana pun berikut lampirannya.
+Batas panjang naskah dinaikkan dari 400 ribu menjadi **1 juta huruf**, kira-kira
+150 ribu kata, jauh di atas skripsi mana pun berikut lampirannya.
 
 **Naskah tetap tidak dikirim ke mana pun.** Pembongkaran berkas terjadi di
 peramban mahasiswa sendiri. Tidak ada satu pun permintaan jaringan dalam
@@ -57,7 +57,7 @@ Yang dikerjakan pada teks hasil PDF sebelum masuk ke kotak naskah:
 
 ### 2. Penolakan yang memberi tahu langkah berikutnya
 
-Jenis berkas dikenali dari byte pertamanya, bukan dari akhiran namanya —
+Jenis berkas dikenali dari byte pertamanya, bukan dari akhiran namanya, sebab
 pemilih berkas di ponsel kerap mengabaikan akhiran. Yang tidak dapat dibaca
 ditolak beserta jalan keluarnya:
 
@@ -75,8 +75,8 @@ ditolak beserta jalan keluarnya:
 ### 3. Semua pekerjaan berat pindah ke pekerja latar
 
 Inilah sebab utama halaman terasa macet, dan sekarang sudah tidak lagi.
-Pembacaan berkas **dan** empat pemeriksaan terberat dipindahkan ke Web Worker
-— utas terpisah yang tidak menggambar apa pun:
+Pembacaan berkas **dan** lima pemeriksaan terberat dipindahkan ke Web Worker,
+yaitu utas terpisah yang tidak menggambar apa pun:
 
 - pembacaan Word dan PDF,
 - Periksa Bahasa (menyisir naskah sekali untuk tiap pola ejaan),
@@ -143,30 +143,30 @@ Jeda antar-bingkai di bawah 50 ms berarti halaman tidak pernah terasa macet.
 
 Baru:
 
-- `src/lib/ekstrak-naskah.ts` — pengambilan teks dari Word, PDF, dan teks
+- `src/lib/ekstrak-naskah.ts`: pengambilan teks dari Word, PDF, dan teks
   polos, berikut perapiannya.
-- `src/lib/pekerja-naskah.ts` — pekerja latar; semua pekerjaan berat Cakrawala
+- `src/lib/pekerja-naskah.ts`: pekerja latar; semua pekerjaan berat Cakrawala
   dijalankan di sini.
-- `src/lib/pekerja-klien.ts` — sisi utas utama: menyalakan pekerja, mengirim
+- `src/lib/pekerja-klien.ts`: sisi utas utama, menyalakan pekerja, mengirim
   tugas, menangani pembatalan, dan jalur cadangan bila pekerja tidak tersedia.
-- `src/lib/pekerja-pesan.ts` — bentuk pesan antara keduanya.
-- `src/app/alat/use-analisis.ts` — penghubung React ke pekerja latar.
-- `src/app/alat/daftar.tsx` — penampil daftar panjang secara bertahap.
-- `src/types/pdfjs.d.ts` — satu pernyataan tipe untuk berkas pekerja pdf.js.
+- `src/lib/pekerja-pesan.ts`: bentuk pesan antara keduanya.
+- `src/app/alat/use-analisis.ts`: penghubung React ke pekerja latar.
+- `src/app/alat/daftar.tsx`: penampil daftar panjang secara bertahap.
+- `src/types/pdfjs.d.ts`: satu pernyataan tipe untuk berkas pekerja pdf.js.
 
 Diubah:
 
-- `src/lib/berkas.ts` — pengenal jenis berkas, batas ukuran per jenis, dan
+- `src/lib/berkas.ts`: pengenal jenis berkas, batas ukuran per jenis, dan
   alasan penolakan.
-- `src/app/alat/panel-beranda.tsx` — tombol unggah, bilah kemajuan, tombol
+- `src/app/alat/panel-beranda.tsx`: tombol unggah, bilah kemajuan, tombol
   batal, dan keterangan hasil.
-- `src/app/alat/laporan.tsx` — laporan disusun hanya saat akan dicetak.
-- `src/app/alat/alat-app.tsx` — pembungkus keadaan cetak.
-- `src/app/alat/panel-periksa.tsx`, `panel-naskah.tsx`, `panel-kemiripan.tsx` —
+- `src/app/alat/laporan.tsx`: laporan disusun hanya saat akan dicetak.
+- `src/app/alat/alat-app.tsx`: pembungkus keadaan cetak.
+- `src/app/alat/panel-periksa.tsx`, `panel-naskah.tsx`, `panel-kemiripan.tsx`:
   pemeriksaan pindah ke pekerja latar, daftar ditampilkan bertahap.
-- `src/app/globals.css` — gaya bilah kemajuan dan baris "tampilkan lebih
+- `src/app/globals.css`: gaya bilah kemajuan dan baris "tampilkan lebih
   banyak", mengikuti token warna yang sudah ada (ikut mode malam dan terang).
-- `package.json` — tambahan `pdfjs-dist`.
+- `package.json`: tambahan `pdfjs-dist`.
 
 ## Yang tidak berubah
 

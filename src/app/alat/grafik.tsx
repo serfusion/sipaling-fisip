@@ -1,6 +1,6 @@
 "use client";
 
-import type { Kerangka } from "@/lib/kerangka";
+import type { AlurPikir, Kerangka } from "@/lib/kerangka";
 import { tanda } from "@/lib/kerangka";
 import type { JenisGrafik } from "@/lib/visual";
 
@@ -230,5 +230,48 @@ export function ContohGrafik({ jenis }: { jenis: JenisGrafik }) {
       )}
       {isi()}
     </svg>
+  );
+}
+
+/* ==========================================================================
+   BAGAN ALUR PIKIR
+   Untuk rancangan yang tidak menguji variabel. Bentuknya rantai tahap, bukan
+   kotak X dan Y, karena penelitian kualitatif memang tidak punya keduanya.
+   ========================================================================== */
+
+export function BaganAlurPikir({ alur }: { alur: AlurPikir }) {
+  const TINGGI = 96;
+  const JARAK = 22;
+  const total = alur.simpul.length * TINGGI + (alur.simpul.length - 1) * JARAK + 16;
+
+  return (
+    <div className="al-bagan al-bagan-alur">
+      <svg viewBox={`0 0 720 ${total}`} role="img"
+        aria-label="Bagan alur pikir penelitian, dari fenomena sampai temuan yang diharapkan">
+        <defs>
+          <marker id="ap-ujung" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" className="kb-isi" />
+          </marker>
+        </defs>
+        {alur.simpul.map((s, i) => {
+          const y = 8 + i * (TINGGI + JARAK);
+          const baris = bagiBaris(s.isi, 58, 2);
+          return (
+            <g key={s.tahap}>
+              <rect x="8" y={y} width="704" height={TINGGI} rx="10" className="kb-kotak" />
+              <text x="30" y={y + 30} className="ap-tahap">{s.tahap.toUpperCase()}</text>
+              {baris.map((b, j) => (
+                <text key={b + j} x="30" y={y + 58 + j * 20} className="ap-isi">{b}</text>
+              ))}
+              {i < alur.simpul.length - 1 && (
+                <path d={`M360 ${y + TINGGI} L360 ${y + TINGGI + JARAK - 4}`}
+                  className="kb-panah" markerEnd="url(#ap-ujung)" />
+              )}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
   );
 }
