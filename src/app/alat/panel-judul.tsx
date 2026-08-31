@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Ic, IKON, Kepala, Rinci, SumberAcuan } from "./ikon";
 import { PerluProject } from "./panel-naskah";
+import Tangga, { Lanjutan } from "./tangga";
 import {
   DATA_PILIHAN, JENIS_KERJA, JENIS_LABEL, JENIS_UMUM, PENDEKATAN_LABEL, PRODI_METODE,
   KESULITAN, TUJUAN_PILIHAN, UNIT_PILIHAN, kuantitatif, rancang, slovin,
@@ -15,7 +16,8 @@ import { BaganAlurPikir, BaganKerangka, ContohGrafik } from "./grafik";
 import { susunAlurPikir, susunKerangka } from "@/lib/kerangka";
 import { GRAFIK_NAMA, usulkanVisual } from "@/lib/visual";
 import {
-  MINIMAL_KATA, contohProdi, empatJalur, hitungKataCerita, tafsirkan,
+  MINIMAL_KATA, contohProdi, empatJalur, hitungKataCerita, hitungTahapSiap,
+  tafsirkan, tahapCerita,
   type Bacaan, type JalurAlternatif,
 } from "@/lib/tafsir-cerita";
 
@@ -52,6 +54,10 @@ export function PanelJudul({
   /** Judul dari kartu yang barusan dipilih, supaya kepala hasilnya sama
    *  dengan judul yang ditekan. Kosong berarti pakai urutan pertama. */
   const [judulPilihan, setJudulPilihan] = useState("");
+  /** Cerita yang sedang dipakai, disimpan di sini supaya tambahan dari kotak
+   *  lanjutan dapat disambung ke belakangnya, bukan menggantikannya. */
+  const [ceritaPakai, setCeritaPakai] = useState("");
+  const [lanjut, setLanjut] = useState("");
   /** Prodi yang dipakai membaca cerita. Diambil dari project bila sudah ada,
    *  dan dapat diganti sendiri di kotak cerita. */
   const [prodi, setProdi] = useState<Prodi>(m.prodi === "lain" ? prodiDari(project?.prodi ?? "") : m.prodi);
@@ -132,7 +138,7 @@ export function PanelJudul({
   return (
     <>
       <KotakCerita
-        onBacakan={bacakan}
+        onBacakan={(teks) => { setCeritaPakai(teks); bacakan(teks); }}
         sibuk={menyusun}
         prodi={prodi}
         onProdi={(p) => {
@@ -144,6 +150,28 @@ export function PanelJudul({
       />
 
       {bacaan && <HasilBacaan bacaan={bacaan} />}
+
+      {bacaan && (
+        <section className="al-card">
+          <Lanjutan
+            pertanyaan={bacaan.pertanyaan}
+            nilai={lanjut}
+            onNilai={setLanjut}
+            sibuk={menyusun}
+            onKirim={() => {
+              const tambahan = lanjut.trim();
+              if (!tambahan) return;
+              // Disambung ke ceritanya yang lama, bukan menggantikannya:
+              // kalimat tambahan biasanya hanya satu keping yang kurang, dan
+              // membacanya sendirian menghapus semua yang sudah terbaca.
+              const gabungan = `${ceritaPakai.trim()} ${tambahan}`.trim();
+              setCeritaPakai(gabungan);
+              setLanjut("");
+              bacakan(gabungan);
+            }}
+          />
+        </section>
+      )}
 
       <PilihMetode
         prodi={prodi}
@@ -641,6 +669,14 @@ function KotakCerita({
   const kata = hitungKataCerita(cerita);
   const cukup = kata >= MINIMAL_KATA;
 
+  // Tangga penyusunan menyala sambil diketik. Rancangannya belum ada di sini,
+  // jadi lima tahap terakhirnya memang masih gelap — dan itu dijelaskan
+  // sendiri oleh keterangan di bawah deretannya.
+  const tahap = useMemo(
+    () => (cerita.trim() ? tahapCerita(tafsirkan(cerita, prodi)) : null),
+    [cerita, prodi],
+  );
+
   return (
     <section className="al-card al-cerita">
       <Kepala ikon={IKON.judul} judul="Ceritakan skripsi atau jurnal yang kamu pikirkan"
@@ -677,6 +713,8 @@ function KotakCerita({
           {kata} kata{cukup ? " · sudah cukup untuk dibaca" : ` · tulis minimal ${MINIMAL_KATA} kata supaya bisa dibaca`}
         </small>
       </label>
+
+      {tahap && <Tangga tahap={tahap} siap={hitungTahapSiap(tahap)} />}
 
       <h3 className="al-h4">Belum kepikiran? Pakai salah satu contoh ini</h3>
       <p className="al-note">

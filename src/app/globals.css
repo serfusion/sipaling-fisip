@@ -3586,3 +3586,60 @@ a.al-mini:hover { color: var(--al-ink); }
 .qt-pasti { display: inline-flex; align-items: center; gap: 6px; }
 .qt-pasti b { color: #b91c1c; font-size: 10.5px; }
 .btn-mini { padding: 5px 9px; font-size: 10.5px; }
+
+
+/* --- Tangga penyusunan: fenomena sampai judul --- */
+.tangga { margin-top: 12px; padding: 12px 13px; border: 1px solid var(--cw-line, #dbe3f0);
+  border-radius: 13px; background: rgba(255, 255, 255, .03); }
+.tangga-kepala { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
+  gap: 6px 12px; margin-bottom: 9px; }
+.tangga-kepala b { font-size: 11.5px; font-weight: 800; letter-spacing: .02em; }
+.tangga-kepala span { font-size: 10.5px; font-weight: 700; opacity: .72; }
+.tangga-baris { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.tangga-butir { display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+  padding: 6px 11px; border-radius: 999px; border: 1px solid transparent;
+  font-size: 11px; font-weight: 700; transition: background .18s ease, border-color .18s ease; }
+.tangga-tanda { flex: 0 0 auto; font-size: 11px; font-weight: 900; }
+.tangga-label { flex: 0 0 auto; }
+/* Isi yang terbaca ikut ditulis, dipotong bila panjang: melihat kata sendiri
+   muncul di sebelah tahapnya jauh lebih meyakinkan daripada centang saja. */
+.tangga-isi { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 13rem; font-weight: 600; opacity: .82; }
+.tangga-isi::before { content: "· "; }
+
+/* Terisi: hijau berlatar cerah, dengan centang. */
+.tangga-butir.isi { background: #dcfce7; border-color: #86b98a; color: #14532d; }
+.tangga-butir.isi .tangga-tanda { color: #16a34a; }
+/* Belum terbaca dari cerita — masih bisa diisi mahasiswa sendiri. */
+.tangga-butir.kosong { background: rgba(148, 163, 184, .16); border-color: rgba(148, 163, 184, .35);
+  color: #64748b; }
+/* Baru terisi setelah rancangannya disusun; bukan kekurangan mahasiswa. */
+.tangga-butir.nanti { background: transparent; border-style: dashed;
+  border-color: rgba(148, 163, 184, .45); color: #94a3b8; }
+.tangga-catatan { margin: 9px 0 0; font-size: 10.5px; line-height: 1.6; opacity: .72; }
+
+/* Di dalam Cakrawala yang berlatar gelap, warnanya diangkat supaya terbaca. */
+.al .tangga { border-color: var(--al-line, rgba(255,255,255,.12)); }
+.al .tangga-butir.isi { background: rgba(34, 197, 94, .17); border-color: rgba(34, 197, 94, .5); color: #b8f0ce; }
+.al .tangga-butir.isi .tangga-tanda { color: #4ade80; }
+.al .tangga-butir.kosong { background: rgba(148, 163, 184, .12); color: #a9b6cd; }
+
+/* --- Kotak lanjutan sesudah hasil --- */
+.lanjut { margin-top: 14px; padding: 15px 16px; border: 1px solid var(--cw-line, #dbe3f0);
+  border-radius: 14px; background: rgba(255, 255, 255, .03); }
+.lanjut-tanya { display: block; font-size: 13.5px; font-weight: 800; }
+.lanjut-sub { margin: 5px 0 11px; font-size: 12px; line-height: 1.65; opacity: .8; }
+.lanjut-usul { margin-bottom: 11px; }
+.lanjut-usul > span { display: block; margin-bottom: 6px; font-size: 10.5px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .06em; opacity: .6; }
+.lanjut-chip { display: flex; flex-wrap: wrap; gap: 6px; }
+.lanjut-chip button { padding: 6px 11px; border: 1px dashed rgba(148, 163, 184, .6); border-radius: 999px;
+  background: transparent; color: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+.lanjut-chip button:hover:not(:disabled) { border-style: solid; border-color: #2563eb; color: #2563eb; }
+.lanjut textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--cw-line, #dbe3f0);
+  border-radius: 11px; background: rgba(255, 255, 255, .04); color: inherit;
+  font: inherit; font-size: 12.5px; line-height: 1.6; resize: vertical; }
+.lanjut-btn { margin-top: 10px; padding: 10px 16px; border: 0; border-radius: 999px;
+  background: #1d4ed8; color: #fff; font-size: 12.5px; font-weight: 800; cursor: pointer; }
+.lanjut-btn:hover:not(:disabled) { background: #1e40af; }
+.lanjut-btn:disabled { opacity: .55; cursor: not-allowed; }

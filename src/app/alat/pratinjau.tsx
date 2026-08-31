@@ -9,15 +9,17 @@
 // sehingga halaman ini tidak dapat dilewati lewat alat pengembang.
 // ============================================================
 
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Ic, IKON } from "./ikon";
 import Animasi from "../animasi";
+import Tangga, { Lanjutan } from "./tangga";
 import { BaganAlurPikir, BaganKerangka, ContohGrafik } from "./grafik";
 import { susunAlurPikir, susunKerangka } from "@/lib/kerangka";
 import { usulkanVisual } from "@/lib/visual";
 import {
-  MINIMAL_KATA, contohProdi, empatJalur, hitungKataCerita, tafsirkan,
+  MINIMAL_KATA, contohProdi, empatJalur, hitungKataCerita, hitungTahapSiap,
+  tafsirkan, tahapCerita,
   type Bacaan, type JalurAlternatif,
 } from "@/lib/tafsir-cerita";
 import { PENDEKATAN_LABEL } from "@/lib/metodologi";
@@ -327,6 +329,17 @@ type HasilCoba = {
   jalur: JalurAlternatif[];
 };
 
+/**
+ * Rancangan yang paling sesuai ceritanya, dipakai melengkapi lima tahap
+ * terakhir pada tangga. Sebelum tombolnya ditekan hasilnya belum ada, dan
+ * kelima tahap itu memang seharusnya masih gelap.
+ */
+function rancanganTerpilih(hasil: HasilCoba | null) {
+  if (!hasil) return null;
+  const pas = hasil.jalur.find((j) => j.pas) ?? hasil.jalur[0];
+  return pas?.rancangan ?? null;
+}
+
 const PRODI_PILIHAN: Array<{ id: ProdiBerdaftar; nama: string; ket: string }> = [
   { id: "komunikasi", nama: "Ilmu Komunikasi", ket: "Pengaruh, analisis isi, framing, semiotika" },
   { id: "pemerintahan", nama: "Ilmu Pemerintahan", ket: "Pengaruh, efektivitas, implementasi kebijakan" },
@@ -352,9 +365,19 @@ function EtalaseCoba() {
   const [cerita, setCerita] = useState("");
   const [sibuk, setSibuk] = useState(false);
   const [hasil, setHasil] = useState<HasilCoba | null>(null);
+  const [lanjut, setLanjut] = useState("");
 
   const kata = hitungKataCerita(cerita);
   const cukup = kata >= MINIMAL_KATA;
+
+  // Tangga penyusunan dihitung ulang tiap ketukan papan tik. Membacanya murni
+  // penelusuran pola pada teks pendek, jadi cukup murah untuk dijalankan
+  // seketika; useMemo di sini menahan perhitungan ulang ketika yang berubah
+  // hanya bagian lain dari tampilan.
+  const tahap = useMemo(
+    () => (prodi && cerita.trim() ? tahapCerita(tafsirkan(cerita, prodi), rancanganTerpilih(hasil)) : null),
+    [cerita, prodi, hasil],
+  );
 
   function carikan(teks = cerita, pakai = prodi) {
     if (sibuk || !pakai || hitungKataCerita(teks) < MINIMAL_KATA) return;
@@ -373,6 +396,23 @@ function EtalaseCoba() {
     setProdi(id);
     setHasil(null);
     setCerita("");
+    setLanjut("");
+  }
+
+  /**
+   * Sambung tambahan mahasiswa ke ceritanya yang lama, lalu susun ulang.
+   *
+   * Digabung, bukan diganti: kalimat baru sering hanya berisi satu keping
+   * yang kurang ("di Kota Tangerang"), dan membacanya sendirian akan
+   * menghapus seluruh yang sudah terbaca sebelumnya.
+   */
+  function gabungkan() {
+    const tambahan = lanjut.trim();
+    if (!tambahan || !prodi) return;
+    const gabungan = `${cerita.trim()} ${tambahan}`.trim();
+    setCerita(gabungan);
+    setLanjut("");
+    carikan(gabungan, prodi);
   }
 
   return (
@@ -424,6 +464,9 @@ function EtalaseCoba() {
                 {sibuk ? "Membaca ceritamu…" : "Carikan metodenya"}
               </button>
             </div>
+            {tahap && (
+              <Tangga tahap={tahap} siap={hitungTahapSiap(tahap)} />
+            )}
             <p className="cw-coba-aman">
               Ceritamu dibaca di perangkat ini juga dan <b>tidak dikirim ke server mana pun</b>.
             </p>
@@ -452,7 +495,18 @@ function EtalaseCoba() {
         </>
       )}
 
-      {hasil && <HasilCobaTampil hasil={hasil} />}
+      {hasil && (
+        <>
+          <HasilCobaTampil hasil={hasil} />
+          <Lanjutan
+            pertanyaan={hasil.bacaan.pertanyaan}
+            nilai={lanjut}
+            onNilai={setLanjut}
+            onKirim={gabungkan}
+            sibuk={sibuk}
+          />
+        </>
+      )}
     </section>
   );
 }

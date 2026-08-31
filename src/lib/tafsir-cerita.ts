@@ -56,7 +56,17 @@ export type Bacaan = {
   orang: string;
 };
 
-export const MINIMAL_KATA = 12;
+/**
+ * Batas kata sebelum ceritanya mau dibaca.
+ *
+ * Sengaja rendah. "Saya mau neliti fenomena TikTok" hanya lima kata, dan itu
+ * memang bentuk paling jujur dari mahasiswa yang belum tahu mau meneliti apa —
+ * menolaknya sampai ia menulis dua belas kata berarti menutup pintu tepat pada
+ * orang yang paling butuh dibukakan. Bacaan dari cerita sependek itu lemah,
+ * dan kelemahannya dinyatakan terbuka lewat penanda "belum disebut, ini
+ * dugaan" pada tiap temuan serta peringatan di atas hasilnya.
+ */
+export const MINIMAL_KATA = 5;
 
 export type Jalur = "kuantitatif" | "kualitatif";
 
@@ -1391,4 +1401,113 @@ function susunRingkas(m: Masukan, tujuan: Tujuan): string {
   };
 
   return `Yang kamu cari adalah ${inti[tujuan]}${siapa}${tempat}, dan datanya diambil lewat ${cara}.`;
+}
+
+
+// ---------------------------------------------------------------------------
+// TANGGA PENYUSUNAN: dari fenomena sampai judul
+// ---------------------------------------------------------------------------
+//
+// Mahasiswa yang bingung tidak kekurangan penjelasan; ia kekurangan gambaran
+// tentang sudah sampai mana dirinya. Dua belas tahap di bawah adalah urutan
+// yang sama yang ditanyakan dosen pembimbing pada pertemuan pertama, dan
+// ditampilkan sebagai deretan yang menyala satu per satu sambil ia mengetik.
+//
+// Lima tahap terakhir tidak mungkin terbaca dari cerita: pendekatan, metode,
+// teori, sampling, dan judul baru ada setelah rancangannya disusun. Tahap itu
+// ditandai "susulan" supaya antarmuka dapat menjelaskan kenapa ia masih
+// gelap, bukan membiarkannya terlihat seperti kegagalan mahasiswa.
+
+export type TahapId =
+  | "fenomena" | "masalah" | "tujuan" | "objek" | "subjek" | "lokasi"
+  | "pendekatan" | "metode" | "teori" | "data" | "sampling" | "judul";
+
+export type Tahap = {
+  id: TahapId;
+  label: string;
+  /** Isi yang terbaca. Kosong berarti tahap ini belum terisi. */
+  isi: string;
+  siap: boolean;
+  /** Baru dapat terisi setelah rancangannya disusun, bukan dari ceritanya. */
+  susulan: boolean;
+};
+
+const URUT_TAHAP: Array<{ id: TahapId; label: string; susulan: boolean }> = [
+  { id: "fenomena", label: "Fenomena", susulan: false },
+  { id: "masalah", label: "Masalah", susulan: false },
+  { id: "tujuan", label: "Tujuan", susulan: false },
+  { id: "objek", label: "Objek", susulan: false },
+  { id: "subjek", label: "Subjek", susulan: false },
+  { id: "lokasi", label: "Lokasi", susulan: false },
+  { id: "pendekatan", label: "Pendekatan", susulan: true },
+  { id: "metode", label: "Metode", susulan: true },
+  { id: "teori", label: "Teori", susulan: true },
+  { id: "data", label: "Data", susulan: false },
+  { id: "sampling", label: "Sampling/Informan", susulan: true },
+  { id: "judul", label: "Judul", susulan: true },
+];
+
+/** Temuan dengan nama bidang tertentu, bila memang terbaca dan bukan terkaan. */
+function terbaca(bacaan: Bacaan, bidang: string) {
+  const t = bacaan.temuan.find((x) => x.bidang === bidang);
+  return t && t.yakin !== "terka" ? t.nilai : "";
+}
+
+/**
+ * Susun tangga penyusunan dari bacaan cerita, dan bila rancangannya sudah ada,
+ * lengkapi lima tahap terakhirnya.
+ *
+ * Fungsi murni: tidak menyentuh apa pun di luar masukannya, sehingga dapat
+ * dipanggil ulang tiap ketukan papan tik tanpa efek samping.
+ */
+export function tahapCerita(bacaan: Bacaan, rancangan?: Rancangan | null): Tahap[] {
+  const m = bacaan.masukan;
+
+  // Fenomena adalah hal yang sedang terjadi dan menarik perhatian. Pada
+  // rancangan berbahan teks, wadah teksnyalah yang berperan begitu.
+  const fenomena = bacaan.media || bacaan.lembaga || m.variabelX || m.variabelY || "";
+  const tujuanTerbaca = terbaca(bacaan, "Yang ingin diketahui");
+  const objek = m.tujuan === "isi" ? (bacaan.media || m.variabelY) : (m.variabelY || m.variabelX);
+  const subjek = m.objek || bacaan.orang || "";
+
+  // Masalah bukan bidang tersendiri di ceritanya: ia lahir begitu ada
+  // fenomena DAN sudah jelas apa yang ingin diketahui darinya. Karena itu
+  // tahap ini menyala dari keduanya, bukan dari satu kata kunci.
+  const adaMasalah = Boolean(fenomena && tujuanTerbaca);
+  // LABEL_TUJUAN berbentuk penjelasan ("Pengaruh, apakah A memengaruhi B")
+  // karena di daftar temuan memang perlu dijelaskan. Pada tangga ia hanya
+  // sebuah label pendek, jadi keterangan sesudah komanya dibuang.
+  const tujuanPendek = tujuanTerbaca.split(",")[0].trim();
+  const masalah = adaMasalah
+    ? (rancangan?.rumusan[0] ?? `${tujuanPendek} ${fenomena}`)
+    : "";
+
+  const model = rancangan?.model.find((k) => k.anjuran) ?? rancangan?.model[0];
+  const isi: Record<TahapId, string> = {
+    fenomena,
+    masalah,
+    tujuan: tujuanPendek,
+    objek: objek || "",
+    subjek,
+    lokasi: m.lokasi || "",
+    pendekatan: rancangan ? (rancangan.pendekatan === "kuantitatif" ? "Kuantitatif" : "Kualitatif") : "",
+    metode: rancangan?.metodePola ?? "",
+    teori: model?.nama ?? "",
+    data: m.data.map((d) => LABEL_DATA[d]).join(", "),
+    sampling: rancangan?.sampling[0]?.nama ?? "",
+    judul: rancangan?.judul[0] ?? "",
+  };
+
+  return URUT_TAHAP.map((t) => ({
+    id: t.id,
+    label: t.label,
+    isi: isi[t.id],
+    siap: isi[t.id].trim().length > 0,
+    susulan: t.susulan,
+  }));
+}
+
+/** Berapa tahap yang sudah terisi, untuk ditulis sebagai "7 dari 12". */
+export function hitungTahapSiap(tahap: Tahap[]) {
+  return tahap.filter((t) => t.siap).length;
 }
