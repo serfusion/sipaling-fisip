@@ -2359,6 +2359,18 @@ a.al-mini:hover { color: var(--al-ink); }
 .kb-h { fill: var(--al-accent-dark); font-size: 12px; font-weight: 800; text-anchor: middle; }
 /* Bagan alur pikir: rantai tahap untuk rancangan yang tidak menguji variabel. */
 .al-bagan-alur svg { min-width: 420px; }
+
+/* Empat lapis rancangan, versi di dalam alat. */
+.al-lapis { display: grid; gap: 8px; grid-template-columns: 1fr; margin-top: 12px; }
+@media (min-width: 720px) { .al-lapis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.al-lapis > div { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--al-line);
+  background: var(--al-surface); }
+.al-lapis span { display: block; color: var(--al-muted); font-size: 9.5px; font-weight: 800;
+  letter-spacing: .12em; text-transform: uppercase; }
+.al-lapis b { display: block; margin-top: 4px; color: var(--al-ink); font-size: 12.5px; line-height: 1.5; }
+
+.al-bintang { color: var(--al-accent); font-size: 10px; letter-spacing: .06em; }
+.al-bintang i { color: var(--al-line); font-style: normal; }
 /* Satu bagan digambar dua kali, mendatar dan menurun; yang dipakai dipilih di
    sini menurut lebar layar. Di bawah 720 piksel, bagan mendatar tidak muat
    tanpa memotong kotak akibatnya. */
@@ -2967,6 +2979,39 @@ a.al-mini:hover { color: var(--al-ink); }
 .cw-contoh-kartu.kuantitatif small { color: #9fb9ff; }
 .cw-contoh-kartu.kualitatif { border-top-color: var(--cw-emas); }
 .cw-contoh-kartu.kualitatif small { color: var(--cw-emas); }
+
+/* --- Pertanyaan prodi ---
+   Ditaruh sebelum kotak cerita karena daftar rancangan kedua prodi memang
+   berbeda; menjawabnya lebih dulu menghemat satu putaran salah jawab. */
+.cw-prodi { border: 1px solid var(--cw-line); border-radius: 14px; padding: 16px 18px;
+  background: rgba(8,15,34,.55); }
+.cw-prodi-tanya { color: var(--cw-muted); font-size: 13px; line-height: 1.7; }
+.cw-prodi-tanya b { color: var(--cw-ink); }
+.cw-prodi-baris { display: grid; gap: 10px; grid-template-columns: 1fr; margin-top: 12px; }
+@media (min-width: 620px) { .cw-prodi-baris { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.cw-prodi-kartu { display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+  text-align: left; cursor: pointer; padding: 13px 15px; border-radius: 12px;
+  border: 1px solid var(--cw-line); background: rgba(7,13,28,.6); color: var(--cw-ink);
+  font: inherit; transition: .14s; }
+.cw-prodi-kartu:hover { background: rgba(255,255,255,.06); }
+.cw-prodi-kartu.on { border-color: var(--cw-biru); background: rgba(77,126,247,.14);
+  box-shadow: 0 0 0 1px var(--cw-biru) inset; }
+.cw-prodi-kartu b { font-size: 14.5px; font-weight: 700; }
+.cw-prodi-kartu small { color: var(--cw-muted); font-size: 11.5px; line-height: 1.5; }
+
+/* --- Empat lapis: pendekatan, metode, model, teknik analisis ---
+   Dipisah supaya keempatnya berhenti tertukar. "Pengaruh" bukan metode dan
+   "framing" bukan pendekatan. */
+.cw-lapis { display: grid; gap: 8px; grid-template-columns: 1fr; margin-top: 4px; }
+@media (min-width: 720px) { .cw-lapis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.cw-lapis > div { padding: 11px 13px; border-radius: 11px; border: 1px solid var(--cw-line);
+  background: rgba(7,13,28,.55); }
+.cw-lapis span { display: block; color: var(--cw-emas); font-size: 9.5px; font-weight: 800;
+  letter-spacing: .13em; }
+.cw-lapis p { margin-top: 5px; color: var(--cw-ink); font-size: 12.5px; line-height: 1.5; font-weight: 600; }
+
+.cw-bintang { color: var(--cw-emas); font-size: 10px; letter-spacing: .06em; }
+.cw-bintang i { color: var(--cw-line); font-style: normal; }
 
 /* --- Empat judul hasil ---
    Inilah kejutannya: satu cerita keluar menjadi empat judul dengan empat

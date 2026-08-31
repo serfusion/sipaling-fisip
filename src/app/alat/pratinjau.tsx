@@ -17,9 +17,12 @@ import { BaganAlurPikir, BaganKerangka, ContohGrafik } from "./grafik";
 import { susunAlurPikir, susunKerangka } from "@/lib/kerangka";
 import { usulkanVisual } from "@/lib/visual";
 import {
-  CONTOH_IDE, MINIMAL_KATA, empatJalur, hitungKataCerita, tafsirkan,
+  MINIMAL_KATA, contohProdi, empatJalur, hitungKataCerita, tafsirkan,
   type Bacaan, type JalurAlternatif,
 } from "@/lib/tafsir-cerita";
+import { PENDEKATAN_LABEL } from "@/lib/metodologi";
+
+type ProdiBerdaftar = "komunikasi" | "pemerintahan";
 
 const KONTAK = "@superfaldev";
 
@@ -324,7 +327,28 @@ type HasilCoba = {
   jalur: JalurAlternatif[];
 };
 
+const PRODI_PILIHAN: Array<{ id: ProdiBerdaftar; nama: string; ket: string }> = [
+  { id: "komunikasi", nama: "Ilmu Komunikasi", ket: "Pengaruh, analisis isi, framing, semiotika" },
+  { id: "pemerintahan", nama: "Ilmu Pemerintahan", ket: "Pengaruh, efektivitas, implementasi kebijakan" },
+];
+
+/** Bintang kesulitan. Bukan penilaian mutu, melainkan berat pengerjaannya. */
+function Bintang({ nilai }: { nilai: 1 | 2 | 3 }) {
+  return (
+    <span className="cw-bintang" title={`Berat pengerjaan ${nilai} dari 3`} aria-label={`Berat pengerjaan ${nilai} dari 3`}>
+      {"★".repeat(nilai)}
+      <i>{"★".repeat(3 - nilai)}</i>
+    </span>
+  );
+}
+
 function EtalaseCoba() {
+  // Prodi ditanyakan lebih dulu, dan itu bukan basa-basi. Daftar rancangan
+  // kedua prodi memang berbeda: analisis framing dan semiotika tidak ada di
+  // skripsi pemerintahan, implementasi kebijakan dan tata kelola tidak ada di
+  // skripsi komunikasi. Menjawab tanpa tahu prodinya berarti separuh
+  // pengunjung selalu diberi daftar yang salah.
+  const [prodi, setProdi] = useState<ProdiBerdaftar | null>(null);
   const [cerita, setCerita] = useState("");
   const [sibuk, setSibuk] = useState(false);
   const [hasil, setHasil] = useState<HasilCoba | null>(null);
@@ -332,17 +356,23 @@ function EtalaseCoba() {
   const kata = hitungKataCerita(cerita);
   const cukup = kata >= MINIMAL_KATA;
 
-  function carikan(teks = cerita) {
-    if (sibuk || hitungKataCerita(teks) < MINIMAL_KATA) return;
+  function carikan(teks = cerita, pakai = prodi) {
+    if (sibuk || !pakai || hitungKataCerita(teks) < MINIMAL_KATA) return;
     setSibuk(true);
     setHasil(null);
     // Perhitungannya seketika. Jeda pendek ini semata supaya perpindahan dari
     // "menekan tombol" ke "hasil muncul" terbaca sebagai satu kejadian.
     window.setTimeout(() => {
-      const bacaan = tafsirkan(teks);
+      const bacaan = tafsirkan(teks, pakai);
       setHasil({ bacaan, jalur: empatJalur(bacaan) });
       setSibuk(false);
     }, 700);
+  }
+
+  function gantiProdi(id: ProdiBerdaftar) {
+    setProdi(id);
+    setHasil(null);
+    setCerita("");
   }
 
   return (
@@ -356,47 +386,71 @@ function EtalaseCoba() {
         </p>
       </div>
 
-      <div className="cw-coba-kotak">
-        <label htmlFor="cw-cerita">Ceritamu</label>
-        <textarea
-          id="cw-cerita"
-          rows={6}
-          value={cerita}
-          onChange={(e) => setCerita(e.target.value)}
-          placeholder="Aku pengen neliti soal…"
-        />
-        <div className="cw-coba-baris">
-          <span className="cw-coba-hitung">
-            {kata} kata{cukup ? "" : ` · minimal ${MINIMAL_KATA} kata`}
-          </span>
-          <button type="button" className="cw-btn cw-btn-utama" onClick={() => carikan()} disabled={!cukup || sibuk}>
-            {sibuk ? "Membaca ceritamu…" : "Carikan metodenya"}
-          </button>
-        </div>
-        <p className="cw-coba-aman">
-          Ceritamu dibaca di perangkat ini juga dan <b>tidak dikirim ke server mana pun</b>.
-        </p>
-      </div>
-
-      <div className="cw-contoh">
-        <p className="cw-contoh-judul">
-          Belum kepikiran? Tekan salah satu contoh ini, lalu lihat sendiri hasilnya.
-        </p>
-        <div className="cw-contoh-baris">
-          {CONTOH_IDE.map((c) => (
+      <div className="cw-prodi">
+        <p className="cw-prodi-tanya"><b>Kamu dari prodi apa?</b> Daftar metodenya berbeda, jadi ini ditanyakan lebih dulu.</p>
+        <div className="cw-prodi-baris">
+          {PRODI_PILIHAN.map((p) => (
             <button
-              key={c.id}
+              key={p.id}
               type="button"
-              className={`cw-contoh-kartu ${c.jalur}`}
+              className={`cw-prodi-kartu ${prodi === p.id ? "on" : ""}`}
+              aria-pressed={prodi === p.id}
               disabled={sibuk}
-              onClick={() => { setCerita(c.cerita); carikan(c.cerita); }}
+              onClick={() => gantiProdi(p.id)}
             >
-              <b>{c.label}</b>
-              <small>{c.jalur}</small>
+              <b>{p.nama}</b>
+              <small>{p.ket}</small>
             </button>
           ))}
         </div>
       </div>
+
+      {prodi && (
+        <>
+          <div className="cw-coba-kotak">
+            <label htmlFor="cw-cerita">Ceritamu</label>
+            <textarea
+              id="cw-cerita"
+              rows={6}
+              value={cerita}
+              onChange={(e) => setCerita(e.target.value)}
+              placeholder="Aku pengen neliti soal…"
+            />
+            <div className="cw-coba-baris">
+              <span className="cw-coba-hitung">
+                {kata} kata{cukup ? "" : ` · minimal ${MINIMAL_KATA} kata`}
+              </span>
+              <button type="button" className="cw-btn cw-btn-utama" onClick={() => carikan()} disabled={!cukup || sibuk}>
+                {sibuk ? "Membaca ceritamu…" : "Carikan metodenya"}
+              </button>
+            </div>
+            <p className="cw-coba-aman">
+              Ceritamu dibaca di perangkat ini juga dan <b>tidak dikirim ke server mana pun</b>.
+            </p>
+          </div>
+
+          <div className="cw-contoh">
+            <p className="cw-contoh-judul">
+              Belum kepikiran? Tekan salah satu contoh {PRODI_PILIHAN.find((p) => p.id === prodi)?.nama} ini,
+              lalu lihat sendiri hasilnya.
+            </p>
+            <div className="cw-contoh-baris">
+              {contohProdi(prodi).map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={`cw-contoh-kartu ${c.jalur}`}
+                  disabled={sibuk}
+                  onClick={() => { setCerita(c.cerita); carikan(c.cerita, prodi); }}
+                >
+                  <b>{c.label}</b>
+                  <small>{c.jalur}</small>
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       {hasil && <HasilCobaTampil hasil={hasil} />}
     </section>
@@ -418,6 +472,7 @@ function HasilCobaTampil({ hasil }: { hasil: HasilCoba }) {
   const alur = pakaiVariabel ? null : susunAlurPikir(j.masukan, rancangan.jenis, rancangan.teori);
   const visual = usulkanVisual(rancangan.jenis);
   const hambat = rancangan.peringatan.filter((p) => p.berat === "hambat").length;
+  const modelAnjuran = rancangan.model.find((k) => k.anjuran) ?? rancangan.model[0];
 
   return (
     <div className="cw-hasil">
@@ -446,6 +501,7 @@ function HasilCobaTampil({ hasil }: { hasil: HasilCoba }) {
               <span className="cw-judul-kaki">
                 <span className="cw-judul-metode">{k.metode}</span>
                 <small>{k.kerja}</small>
+                <Bintang nilai={k.kesulitan} />
               </span>
             </button>
           ))}
@@ -453,8 +509,22 @@ function HasilCobaTampil({ hasil }: { hasil: HasilCoba }) {
 
         <p className="cw-judul-catatan">
           Satu topik memang bisa diteliti lebih dari satu cara. Yang menentukan metodenya adalah bentuk
-          pertanyaan yang kamu pilih, bukan selera. Bagian dalam kurung siku isian yang kamu lengkapi sendiri.
+          pertanyaan yang kamu pilih, bukan selera. Bagian dalam kurung siku isian yang kamu lengkapi sendiri,
+          dan bintangnya berat pengerjaan, bukan nilai bagus atau jelek.
         </p>
+
+        {/* Empat lapis yang paling sering tertukar. "Pengaruh" bukan metode,
+            "framing" bukan pendekatan, dan menulis keduanya di baris yang sama
+            di bab tiga adalah salah satu sebab naskah dipulangkan. */}
+        <div className="cw-lapis">
+          <div><span>PENDEKATAN</span><p>{PENDEKATAN_LABEL[rancangan.pendekatan]}</p></div>
+          <div><span>METODE</span><p>{rancangan.metodePola}</p></div>
+          <div>
+            <span>MODEL ATAU TEORI</span>
+            <p>{modelAnjuran ? modelAnjuran.nama : "Tidak ada lapis model; yang dipilih teori yang menjelaskan variabelnya"}</p>
+          </div>
+          <div><span>TEKNIK ANALISIS</span><p>{rancangan.analisis[0]?.nama ?? "-"}</p></div>
+        </div>
 
         <div className="cw-hasil-duo">
           <div>
@@ -521,7 +591,9 @@ function HasilCobaTampil({ hasil }: { hasil: HasilCoba }) {
             <p>
               {kerangka
                 ? `Hipotesis bernomor, teknik sampling, uji statistik yang harus dipakai, dan ${visual.length} bentuk visualisasi berikut isi tiap sumbunya`
-                : `Dua tahap berikutnya pada bagan ini, teknik sampling, cara menjaga keabsahan data, dan ${visual.length} bentuk visualisasi berikut isi tiap sumbunya`}{" "}
+                : rancangan.model.length > 0
+                  ? `Perbandingan ${rancangan.model.length} model ${rancangan.metodePola.toLowerCase()} beserta bentuk tabel temuannya, teknik sampling, cara menjaga keabsahan data, dan ${visual.length} bentuk visualisasi berikut isi tiap sumbunya`
+                  : `Dua tahap berikutnya pada bagan ini, teknik sampling, cara menjaga keabsahan data, dan ${visual.length} bentuk visualisasi berikut isi tiap sumbunya`}{" "}
               ada di dalam Cakrawala, siap diubah dan dicetak.
             </p>
             <a className="cw-btn cw-btn-terang" href="#kode">Masuk dengan kode akses →</a>

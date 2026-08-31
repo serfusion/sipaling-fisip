@@ -21,8 +21,11 @@
 // Yang keluar dari sini tetap dugaan, dan mahasiswa dapat membetulkannya
 // lewat formulir yang sama seperti sebelumnya.
 
-import { JENIS_KERJA, JENIS_LABEL, JENIS_UMUM, rancang } from "./metodologi";
-import type { Rancangan } from "./metodologi";
+import {
+  JENIS_KERJA, JENIS_LABEL, JENIS_UMUM, KESULITAN, METODE_POLA, PENDEKATAN,
+  PRODI_LABEL, URUT_MUDAH, metodeProdi, prodiBerdaftar, rancang,
+} from "./metodologi";
+import type { Jenis, Pendekatan, Rancangan } from "./metodologi";
 import type { Data, Masukan, Prodi, Tujuan, Unit } from "./metodologi";
 
 export type Yakin = "kuat" | "sedang" | "terka";
@@ -66,67 +69,113 @@ export type ContohIde = {
 };
 
 /**
- * Empat contoh cerita, satu untuk tiap rancangan yang paling sering dipakai
- * di FISIP.
+ * Empat contoh cerita untuk tiap prodi.
  *
- * Gunanya bukan sekadar mengisi kotak. Mahasiswa yang bingung biasanya juga
- * belum tahu bahwa pilihannya memang ada dua jalur, dan bahwa jalur itu
- * ditentukan oleh bentuk pertanyaannya, bukan oleh selera. Dengan menekan
- * keempatnya bergantian, perbedaan itu terlihat sendiri: pertanyaan yang
- * sama-sama masuk akal menghasilkan metode yang sama sekali berbeda.
+ * Isinya mengikuti empat rancangan yang paling sering selesai di prodi
+ * tersebut, berurutan dari yang paling ringan. Ilmu Komunikasi berangkat dari
+ * pengaruh, analisis isi, analisis framing, dan semiotika; Ilmu Pemerintahan
+ * dari pengaruh, efektivitas program, implementasi kebijakan, dan peran
+ * pemerintah. Daftarnya memang tidak sama, dan itu justru yang membuat
+ * pertanyaan prodi di awal ada gunanya.
  *
  * Tiap cerita ditulis seperti mahasiswa bercerita, bukan seperti proposal.
- * Yang tertera pada tombolnya hanya nama pendek jalurnya; judulnya sengaja
+ * Yang tertera pada tombolnya hanya nama pendek rancangannya; judulnya sengaja
  * tidak dibocorkan lebih dulu, karena kejutannya justru terletak pada empat
  * judul yang keluar sesudah tombolnya ditekan.
  */
-export const CONTOH_IDE: ContohIde[] = [
-  {
-    id: "pengaruh",
-    label: "Pengaruh",
-    jalur: "kuantitatif",
-    cerita:
-      "Aku mau meneliti karyawan di PT Sinar Mandiri Serang. Aku menduga bahwa lingkungan " +
-      "kerja dan kompensasi berpengaruh terhadap kepuasan karyawan, tapi lewat komitmen " +
-      "organisasional dulu. Jadi komitmen organisasional sebagai variabel intervening. " +
-      "Rencananya sebar kuesioner, populasinya sekitar 180 karyawan, target responden " +
-      "125 orang.",
-  },
-  {
-    id: "isi",
-    label: "Analisis Isi",
-    jalur: "kuantitatif",
-    cerita:
-      "Saya mau melakukan analisis isi pemberitaan banjir di Kompas.com selama Januari " +
-      "sampai Maret 2025. Yang ingin saya tahu, framing apa yang paling sering dipakai " +
-      "dan kategori mana yang paling mendominasi. Beritanya saya kumpulkan sebagai " +
-      "dokumen supaya bisa dikoding ulang.",
-  },
-  {
-    id: "fenomenologi",
-    label: "Fenomenologi",
-    jalur: "kualitatif",
-    cerita:
-      "Untuk skripsi Ilmu Komunikasi, saya tertarik meneliti pengalaman ibu rumah " +
-      "tangga yang berjualan online di " +
-      "Kota Serang. Bagaimana mereka memaknai pekerjaan itu, dan kenapa mereka bertahan " +
-      "walaupun untungnya kecil. Rencananya wawancara mendalam dengan sekitar tujuh " +
-      "informan sampai keterangannya tidak ada yang baru lagi.",
-  },
-  {
-    id: "studi-kasus",
-    label: "Studi Kasus",
-    jalur: "kualitatif",
-    cerita:
-      "Saya ingin meneliti bagaimana strategi humas Dinas Komunikasi dan Informatika " +
-      "Kota Serang dalam mengelola akun resminya. Bagaimana proses penyusunan kontennya " +
-      "dijalankan, siapa yang memutuskan, dan apa saja hambatannya. Rencananya wawancara " +
-      "kepala bidang dan stafnya, observasi kegiatan, serta mengumpulkan dokumen laporan.",
-  },
-];
+export const CONTOH_IDE: Record<"komunikasi" | "pemerintahan", ContohIde[]> = {
+  komunikasi: [
+    {
+      id: "pengaruh",
+      label: "Pengaruh",
+      jalur: "kuantitatif",
+      cerita:
+        "Aku mau meneliti mahasiswa Ilmu Komunikasi di Universitas Serang Raya. Aku menduga " +
+        "bahwa intensitas menonton TikTok dan terpaan konten kreator berpengaruh terhadap " +
+        "perilaku komunikasi interpersonal, tapi lewat literasi media digital dulu. Jadi " +
+        "literasi media digital sebagai variabel intervening. Rencananya sebar kuesioner, " +
+        "populasinya sekitar 600 mahasiswa, target responden 240 orang.",
+    },
+    {
+      id: "isi",
+      label: "Analisis Isi",
+      jalur: "kualitatif",
+      cerita:
+        "Saya mau melakukan analisis isi pesan persuasif pada konten Instagram selama Januari " +
+        "sampai Maret 2025. Yang ingin saya tahu, kategori pesan mana yang paling sering " +
+        "muncul dan bagaimana kecenderungannya. Kontennya saya kumpulkan sebagai dokumen " +
+        "supaya bisa dikoding ulang oleh koder kedua.",
+    },
+    {
+      id: "framing",
+      label: "Analisis Framing",
+      jalur: "kualitatif",
+      cerita:
+        "Saya ingin meneliti bagaimana media online membingkai pemberitaan kebijakan kenaikan " +
+        "tarif parkir di Kota Serang. Rencananya pakai analisis framing, membandingkan bingkai " +
+        "yang dipakai dua media online selama Februari sampai April 2025. Beritanya saya " +
+        "kumpulkan sebagai dokumen.",
+    },
+    {
+      id: "semiotika",
+      label: "Semiotika",
+      jalur: "kualitatif",
+      cerita:
+        "Saya tertarik membaca representasi perempuan dalam film Marlina si Pembunuh dalam " +
+        "Empat Babak. Rencananya pakai analisis semiotika untuk membaca tanda pada adegan " +
+        "dan dialognya, sampai ke makna yang terbangun di baliknya. Bahannya potongan " +
+        "adegan film itu sendiri, saya simpan sebagai dokumen.",
+    },
+  ],
+  pemerintahan: [
+    {
+      id: "pengaruh",
+      label: "Pengaruh",
+      jalur: "kuantitatif",
+      cerita:
+        "Aku mau meneliti masyarakat di Kantor Kecamatan Serang. Aku menduga bahwa kualitas " +
+        "pelayanan publik dan kompetensi aparatur berpengaruh terhadap kepuasan masyarakat, " +
+        "tapi lewat kepercayaan masyarakat dulu. Jadi kepercayaan masyarakat sebagai variabel " +
+        "intervening. Rencananya sebar kuesioner, populasinya sekitar 900 warga, target " +
+        "responden 280 orang.",
+    },
+    {
+      id: "efektivitas",
+      label: "Efektivitas",
+      jalur: "kuantitatif",
+      cerita:
+        "Saya ingin menilai efektivitas program pelayanan administrasi kependudukan di Dinas " +
+        "Kependudukan dan Pencatatan Sipil Kota Serang. Sejauh mana program itu mencapai " +
+        "sasaran yang ditetapkan, dan apa yang menghambatnya. Rencananya sebar kuesioner ke " +
+        "warga yang pernah mengurus dokumen, ditambah laporan resmi dinasnya.",
+    },
+    {
+      id: "implementasi",
+      label: "Implementasi Kebijakan",
+      jalur: "kualitatif",
+      cerita:
+        "Saya ingin meneliti implementasi kebijakan penanganan sampah di Kota Serang. " +
+        "Bagaimana kebijakan itu dijalankan di lapangan, siapa saja pelaksananya, dan apa " +
+        "saja hambatannya. Rencananya wawancara pejabat Dinas Lingkungan Hidup dan petugas " +
+        "kebersihan, serta mengumpulkan dokumen peraturannya.",
+    },
+    {
+      id: "peran",
+      label: "Peran Pemerintah",
+      jalur: "kualitatif",
+      cerita:
+        "Saya ingin meneliti peran pemerintah desa dalam pemberdayaan masyarakat lewat " +
+        "program BUMDes di Desa Sukajaya. Bagaimana peran itu dijalankan dan apa yang " +
+        "menghambatnya. Rencananya wawancara kepala desa, pengurus BUMDes, dan warga " +
+        "penerima manfaat, ditambah dokumen laporan desa.",
+    },
+  ],
+};
 
-/** Contoh bawaan, dipakai tombol "Isi dengan contoh" di dalam Cakrawala. */
-export const CONTOH_CERITA = CONTOH_IDE[0].cerita;
+/** Contoh bawaan untuk sebuah prodi. */
+export function contohProdi(prodi: Prodi): ContohIde[] {
+  return CONTOH_IDE[prodiBerdaftar(prodi)];
+}
 
 // ---------------------------------------------------------------------------
 // EMPAT JALUR DARI SATU CERITA
@@ -146,16 +195,19 @@ export const CONTOH_CERITA = CONTOH_IDE[0].cerita;
 // tiga kemungkinan lain.
 
 export type JalurAlternatif = {
-  id: string;
+  id: Jenis;
   label: string;
   jalur: Jalur;
   judul: string;
   metode: string;
   metodeResmi: string;
+  metodePola: string;
+  pendekatan: Pendekatan;
+  kesulitan: 1 | 2 | 3;
   kerja: string;
   masukan: Masukan;
   rancangan: Rancangan;
-  /** Jalur ini yang paling sesuai dengan cerita aslinya. */
+  /** Rancangan ini yang paling sesuai dengan cerita aslinya. */
   pas: boolean;
 };
 
@@ -168,106 +220,140 @@ function slot(nama: string) {
 /**
  * Topik tanpa embel-embel medianya.
  *
- * "terpaan konten berita di TikTok" adalah nama variabel yang benar untuk
+ * "intensitas menonton TikTok" adalah nama variabel yang benar untuk
  * penelitian pengaruh, tetapi untuk analisis isi yang diteliti bukan
- * terpaannya melainkan kontennya, dan medianya pindah menjadi tempat teks itu
+ * menontonnya melainkan isinya, dan medianya pindah menjadi tempat teks itu
  * berada. Tanpa pembersihan ini, judul analisis isinya berbunyi "Analisis Isi
- * Terpaan Konten Berita di TikTok dalam TikTok".
+ * Intensitas Menonton TikTok dalam TikTok".
+ *
+ * Bila yang tersisa sesudah medianya dibuang ternyata kosong, itu bukan
+ * kegagalan melainkan keterangan: ceritanya memang belum menyebut isi apa
+ * yang mau dihitung. Yang dikembalikan kemudian isian, bukan tebakan.
  */
 function topikInti(x: string, media: string) {
   let t = x;
   if (media) {
-    t = t.replace(new RegExp(`\\s*\\b(?:di|pada|dalam|lewat|melalui)\\s+${media.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b.*$`, "i"), "");
+    const lolos = media.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    t = t.replace(new RegExp(`\\s*\\b(?:di|pada|dalam|lewat|melalui)\\s+${lolos}\\b.*$`, "i"), "");
+    t = t.replace(new RegExp(`\\s*\\b${lolos}\\b\\s*`, "gi"), " ");
   }
-  t = t.replace(/^(?:terpaan|intensitas|frekuensi|penggunaan|pemakaian|tingkat)\s+/i, "");
-  return t.trim() || x;
+  // Kata pembuka yang mengubah nama gagasan menjadi nama ukuran dibuang
+  // berulang: "intensitas penggunaan TikTok" harus tinggal "TikTok", bukan
+  // "penggunaan TikTok".
+  let sebelum = "";
+  while (sebelum !== t) {
+    sebelum = t;
+    t = t.replace(/^(?:terpaan|intensitas|frekuensi|penggunaan|pemakaian|menonton|tingkat|kualitas)\s+/i, "");
+  }
+  return t.replace(/\s+/g, " ").trim();
 }
 
+/**
+ * Satu cerita, empat rancangan.
+ *
+ * Yang ditawarkan bukan empat rancangan sembarang, melainkan empat yang
+ * paling sering diselesaikan mahasiswa di prodi itu, berurutan dari yang
+ * paling ringan. Rancangan yang memang paling sesuai ceritanya sendiri selalu
+ * ikut, walaupun ia berada di luar empat besar, dan ia yang ditandai.
+ *
+ * Yang berubah antar rancangan hanya bentuk pertanyaannya; topik, orang, dan
+ * tempatnya tetap milik mahasiswa.
+ */
 export function empatJalur(b: Bacaan): JalurAlternatif[] {
   const m = b.masukan;
   const media = b.media;
-  const inti = topikInti(m.variabelX, media);
-  const asal = m.tujuan;
+  const prodi = prodiBerdaftar(m.prodi);
+  const asli = rancang(m).jenis;
 
+  const inti = topikInti(m.variabelX, media);
   // Variabel terikat hanya sah bila ia memang sesuatu yang bisa berubah pada
   // diri responden. Nama media bukan variabel terikat, dan begitu pula
-  // pekerjaan yang tertangkap dari cerita berbentuk proses: pada "bagaimana
-  // humas mengelola akun resminya", yang terbaca sebagai Y adalah kegiatannya,
-  // bukan akibat yang bisa diukur. Memakainya melahirkan judul yang tidak
-  // berbunyi, "Pengaruh Humas terhadap Mengelola Akun Resminya", jadi di jalur
-  // pengaruh bagian itu dikembalikan menjadi isian.
-  const yTerbaca = asal === "pengaruh" || asal === "hubungan" || asal === "perbedaan" ? m.variabelY : "";
+  // pekerjaan yang tertangkap dari cerita berbentuk proses.
+  const yTerbaca = m.tujuan === "pengaruh" || m.tujuan === "hubungan" || m.tujuan === "perbedaan" ? m.variabelY : "";
   const terikat = yTerbaca && yTerbaca !== media ? yTerbaca : slot("yang dipengaruhi");
+  const orang = b.orang || m.objek;
+  const lembaga = b.lembaga || m.objek;
 
-  const buat = (
-    id: string,
-    label: string,
-    jalur: Jalur,
-    urutJudul: number,
-    ubah: Partial<Masukan>,
-  ): JalurAlternatif => {
-    // Jalur yang memang sesuai ceritanya dipakai apa adanya, tanpa dicor
+  /** Isian tiap rancangan. Yang tidak disebut ceritanya ditulis terbuka. */
+  function cetak(jenis: Jenis): Partial<Masukan> {
+    const teks = { unit: "teks" as Unit, data: ["dokumen"] as Data[], variabelX2: "", variabelZ: "" };
+    const lapangan = { unit: "organisasi" as Unit, data: ["wawancara", "dokumen"] as Data[], variabelX2: "", variabelZ: "" };
+    switch (jenis) {
+      case "kuantitatif-eksplanatif":
+        return { tujuan: "pengaruh", unit: "individu", data: ["kuesioner"], variabelY: terikat, objek: orang || slot("respondennya") };
+      case "kuantitatif-korelasional":
+        return { tujuan: "hubungan", unit: "individu", data: ["kuesioner"], variabelY: terikat, objek: orang || slot("respondennya") };
+      case "kuantitatif-deskriptif":
+        return { tujuan: "gambaran", unit: "individu", data: ["kuesioner"], variabelX: inti || m.variabelX, variabelX2: "", variabelZ: "", objek: orang || slot("respondennya") };
+      case "uses-gratifications":
+        return { tujuan: "hubungan", unit: "individu", data: ["kuesioner"], variabelX: media || inti || m.variabelX, variabelX2: "", variabelZ: "", variabelY: yTerbaca || slot("kebutuhan yang dipenuhi"), objek: orang || slot("respondennya") };
+      case "efektivitas-program":
+        return { tujuan: "evaluasi", unit: "kebijakan", data: ["kuesioner", "dokumen"], variabelX: inti || m.variabelX, variabelX2: "", variabelZ: "", variabelY: yTerbaca || slot("sasaran programnya"), objek: orang || slot("penerima manfaatnya") };
+      case "analisis-isi":
+        return { ...teks, tujuan: "isi", variabelX: inti || slot("isi yang dihitung"), variabelY: media || slot("medianya"), lokasi: media ? "" : m.lokasi };
+      case "analisis-framing":
+        return { ...teks, tujuan: "isi", variabelX: inti || slot("peristiwa yang diberitakan"), variabelY: media || slot("medianya"), lokasi: "" };
+      case "semiotika":
+        return { ...teks, tujuan: "makna", variabelX: inti || slot("yang direpresentasikan"), variabelY: media || slot("film atau iklannya"), lokasi: "" };
+      case "analisis-kebijakan":
+        return { ...teks, unit: "kebijakan", data: ["dokumen", "wawancara"], tujuan: "isi", variabelX: inti || slot("kebijakannya"), variabelY: yTerbaca || slot("bidang yang diatur") };
+      case "fenomenologi":
+        return { tujuan: "makna", unit: "individu", data: ["wawancara"], variabelX: inti || m.variabelX, variabelX2: "", variabelZ: "", objek: orang || slot("informannya") };
+      case "studi-kasus":
+        return { tujuan: "proses", unit: "organisasi", data: ["wawancara", "dokumen", "observasi"], variabelX: inti || m.variabelX, variabelX2: "", variabelZ: "", variabelY: yTerbaca, objek: lembaga || slot("lembaganya") };
+      case "implementasi-kebijakan":
+        return { ...lapangan, unit: "kebijakan", tujuan: "proses", variabelX: inti || slot("kebijakannya"), variabelY: yTerbaca || slot("bidang yang diatur"), objek: lembaga || slot("lembaga pelaksananya") };
+      case "peran-pemerintah":
+        return { ...lapangan, tujuan: "proses", variabelX: inti || m.variabelX, variabelY: yTerbaca, objek: lembaga || slot("lembaga pemerintahnya") };
+      case "governance":
+        return { ...lapangan, tujuan: "gambaran", variabelX: inti || m.variabelX, objek: lembaga || slot("lembaganya") };
+      case "strategi-pemerintah":
+        return { ...lapangan, tujuan: "proses", variabelX: inti || m.variabelX, variabelY: yTerbaca || slot("sasarannya"), objek: lembaga || slot("lembaganya") };
+      case "strategi-komunikasi":
+        return { ...lapangan, tujuan: "proses", variabelX: inti || m.variabelX, variabelY: yTerbaca || slot("sasarannya"), objek: lembaga || slot("lembaganya") };
+      default:
+        return { tujuan: "gambaran", unit: "individu", data: ["wawancara"], variabelX: inti || m.variabelX, variabelX2: "", variabelZ: "", objek: orang || slot("informannya") };
+    }
+  }
+
+  function buat(jenis: Jenis): JalurAlternatif {
+    // Rancangan yang memang sesuai ceritanya dipakai apa adanya, tanpa dicor
     // ulang. Hasil bacaan aslinya selalu lebih rapi daripada hasil
     // penyesuaian, karena ia tidak perlu menambal apa pun.
-    const pas = asal === (ubah.tujuan ?? m.tujuan);
-    const masukan: Masukan = pas ? m : { ...m, ...ubah };
-    // Nama tempat yang sama dengan nama yang diteliti hanya akan tercetak dua
-    // kali di judul yang sama.
-    if (masukan.objek && masukan.objek === masukan.lokasi) masukan.lokasi = "";
+    const pas = jenis === asli;
+    const masukan: Masukan = pas ? { ...m, metode: jenis } : { ...m, ...cetak(jenis), metode: jenis };
+    // Nama tempat yang sudah termuat pada nama yang diteliti hanya akan
+    // tercetak dua kali di judul yang sama.
+    const o = masukan.objek.toLowerCase();
+    const l = masukan.lokasi.toLowerCase();
+    if (o && l && (o === l || o.includes(l) || l.includes(o))) masukan.lokasi = "";
     const rancangan = rancang(masukan);
+    // Judul cadangan dipakai bila judul pertama masih memuat nama pengganti
+    // bawaan, yang berarti ceritanya belum menyebut bagian itu.
+    const judul =
+      rancangan.judul.find((j) => !/variabel (terikat|bebas)|objek penelitian/i.test(j)) ?? rancangan.judul[0];
     return {
-      id,
-      label,
-      jalur,
-      judul: rancangan.judul[pas ? 0 : urutJudul] ?? rancangan.judul[0],
-      metode: JENIS_UMUM[rancangan.jenis],
-      metodeResmi: JENIS_LABEL[rancangan.jenis],
-      kerja: JENIS_KERJA[rancangan.jenis],
+      id: jenis,
+      label: JENIS_UMUM[jenis],
+      jalur: PENDEKATAN[jenis],
+      judul,
+      metode: JENIS_UMUM[jenis],
+      metodeResmi: JENIS_LABEL[jenis],
+      metodePola: METODE_POLA[jenis],
+      pendekatan: PENDEKATAN[jenis],
+      kesulitan: KESULITAN[jenis],
+      kerja: JENIS_KERJA[jenis],
       masukan,
       rancangan,
       pas,
     };
-  };
+  }
 
-  return [
-    buat("pengaruh", "Pengaruh", "kuantitatif", 0, {
-      tujuan: "pengaruh",
-      unit: "individu",
-      data: ["kuesioner"],
-      variabelY: terikat,
-      objek: b.orang || m.objek || slot("respondennya"),
-    }),
-    buat("isi", "Analisis Isi", "kuantitatif", 0, {
-      tujuan: "isi",
-      unit: "teks",
-      data: ["dokumen"],
-      variabelX: inti,
-      variabelX2: "",
-      variabelZ: "",
-      variabelY: media || slot("medianya"),
-      // Korpus berita daring tidak berada di sebuah tempat, jadi keterangan
-      // lokasi hanya membuat judulnya keliru.
-      lokasi: media ? "" : m.lokasi,
-    }),
-    buat("fenomenologi", "Fenomenologi", "kualitatif", 1, {
-      tujuan: "makna",
-      unit: "individu",
-      data: ["wawancara"],
-      variabelX: inti,
-      variabelX2: "",
-      variabelZ: "",
-      objek: b.orang || m.objek || slot("informannya"),
-    }),
-    buat("studi-kasus", "Studi Kasus", "kualitatif", 1, {
-      tujuan: "proses",
-      unit: "organisasi",
-      data: ["wawancara", "dokumen", "observasi"],
-      variabelX: inti,
-      variabelX2: "",
-      variabelZ: "",
-      objek: b.lembaga || b.orang || m.objek || slot("lembaganya"),
-    }),
-  ];
+  const empat = URUT_MUDAH[prodi].slice(0, 4);
+  // Rancangan yang paling sesuai ceritanya sendiri wajib ikut. Bila ia berada
+  // di luar empat besar, yang paling berat di antara keempatnya yang mundur.
+  const daftar = empat.includes(asli) ? empat : [...empat.slice(0, 3), asli];
+  return daftar.map(buat);
 }
 
 // ---------------------------------------------------------------------------
@@ -302,7 +388,7 @@ function rapikanFrasa(mentah: string | undefined, maksKata = 8): string {
   // Potong pada tanda baca atau kata sambung yang mengakhiri gagasan.
   // Titik dan koma di antara angka ("Kompas.com", "1.200") bukan tanda
   // pemenggal kalimat, jadi tidak boleh memotong frasa di situ.
-  f = f.split(/[;:!?]|[.,](?=\s|$)|\bkarena\b|\bsehingga\b|\bsedangkan\b|\btapi\b|\btetapi\b/i)[0].trim();
+  f = f.split(/[;:!?]|[.,](?=\s|$)|\bkarena\b|\bsehingga\b|\bsedangkan\b|\btapi\b|\btetapi\b|\blewat\b|\bmelalui\b/i)[0].trim();
 
   // Kata pengantar yang terakhir menandai awal gagasannya. Dipakai serakah
   // dengan sengaja: pada "Aku pengen tahu apakah terpaan konten berita…",
@@ -867,9 +953,11 @@ const KATA_ORANG =
   "asn|pns|aparatur|guru|dosen|perawat|staf|pemilih pemula|pemilih|konstituen|pelanggan|" +
   "konsumen|pengguna|followers|pengikut|anggota|kader|santri|alumni";
 
+// Batas kata di kiri wajib. Tanpa itu "administrasi kependudukan" terbaca
+// sebagai populasi bernama "pendudukan".
 const POLA_OBJEK: RegExp[] = [
-  new RegExp(`(?:pada|terhadap|di kalangan|kepada|buat|untuk)\\s+((?:${KATA_ORANG})[\\w\\s]{0,40}?)${HENTI}`, "i"),
-  new RegExp(`((?:${KATA_ORANG})[\\w\\s]{0,40}?)${HENTI}`, "i"),
+  new RegExp(`(?:pada|terhadap|di kalangan|kepada|buat|untuk)\\s+\\b((?:${KATA_ORANG})[\\w\\s]{0,40}?)${HENTI}`, "i"),
+  new RegExp(`\\b((?:${KATA_ORANG})[\\w\\s]{0,40}?)${HENTI}`, "i"),
 ];
 
 /** Nama tempat sungguhan diawali penanda ini, sehingga "di TikTok" tidak
@@ -941,7 +1029,8 @@ const NAMA_MEDIA = [
   "Kompas.com", "Detik.com", "Tribunnews", "CNN Indonesia", "Liputan6", "Tempo.co",
   "TikTok", "Instagram", "Twitter", "Facebook", "YouTube", "WhatsApp", "Threads",
   "Kompas", "Detik", "Tribun", "Tempo", "Antara", "Shopee", "Tokopedia",
-  "media sosial", "portal berita", "surat kabar", "koran", "televisi", "radio",
+  "media sosial", "media online", "media daring", "media massa", "media cetak",
+  "portal berita", "surat kabar", "koran", "televisi", "radio",
 ];
 
 function bacaMedia(t: string): string {
@@ -959,7 +1048,10 @@ function bacaLokasi(t: string): Cocok | null {
   for (const p of POLA_LOKASI) {
     for (const m of t.matchAll(new RegExp(p.source, p.flags.includes("g") ? p.flags : `${p.flags}g`))) {
       if (typeof m.index !== "number") continue;
-      const nilai = rapikanFrasa(m[1], 6);
+      // Delapan kata, bukan enam: nama dinas di Indonesia memang panjang, dan
+      // "Dinas Kependudukan dan Pencatatan Sipil Kota Serang" terpotong
+      // menjadi "… Kota" pada batas yang lebih pendek.
+      const nilai = rapikanFrasa(m[1], 8);
       if (nilai.length < 3) continue;
       if (BUKAN_TEMPAT.has(nilai.toLowerCase())) continue;
       return { nilai, bukti: kalimatSekitar(t, m.index), posisi: m.index };
@@ -1029,11 +1121,54 @@ const KATA_PRODI: Record<Exclude<Prodi, "lain">, RegExp> = {
 };
 
 function bacaProdi(t: string, bawaan: Prodi): Prodi {
+  // Prodi yang dipilih sendiri di layar selalu menang. Kata "media" muncul di
+  // banyak cerita pemerintahan dan kata "pelayanan publik" muncul di banyak
+  // cerita komunikasi, jadi menebak dari isi cerita hanya sah ketika
+  // mahasiswanya memang belum menyatakan prodinya.
+  if (bawaan !== "lain") return bawaan;
   const k = KATA_PRODI.komunikasi.test(t);
   const p = KATA_PRODI.pemerintahan.test(t);
   if (k && !p) return "komunikasi";
   if (p && !k) return "pemerintahan";
   return bawaan;
+}
+
+/**
+ * Metode yang mahasiswanya sebut sendiri.
+ *
+ * Sebagian mahasiswa sudah tahu nama metodenya sebelum tahu variabelnya:
+ * "aku mau pakai analisis framing" atau "rencananya semiotika Barthes".
+ * Menyimpulkan ulang dari tujuan dan unit analisis pada cerita seperti itu
+ * justru menimpa keterangan yang paling pasti di seluruh ceritanya.
+ *
+ * Yang dikenali hanya metode yang memang ditawarkan di prodinya. Cerita
+ * pemerintahan yang menyebut "framing" tidak diarahkan ke analisis framing,
+ * karena rancangan itu tidak ada di daftar prodinya.
+ */
+const POLA_METODE: Array<{ jenis: Jenis; pola: RegExp }> = [
+  { jenis: "analisis-framing", pola: /\b(?:analisis\s+)?framing\b|\bmembingkai\b|\bentman\b|\bpan\s+dan\s+kosicki\b|\bgamson\b/i },
+  { jenis: "semiotika", pola: /\bsemiotik\w*\b|\bbarthes\b|\bpeirce\b|\bsaussure\b|\bdenotasi\b|\bkonotasi\b|\brepresentasi\b/i },
+  { jenis: "analisis-isi", pola: /\banalisis\s+isi\b|\bkoding\b|\bkoder\b|\bcontent\s+analysis\b/i },
+  { jenis: "uses-gratifications", pola: /\buses\s+and\s+gratification\w*\b|\bmotif\b.{0,40}\bkepuasan\b|\bgratifikasi\b/i },
+  { jenis: "implementasi-kebijakan", pola: /\bimplementasi\b.{0,30}\b(?:kebijakan|perda|peraturan|program)\b|\bedward\s*iii\b|\bvan\s+meter\b|\bgrindle\b/i },
+  { jenis: "efektivitas-program", pola: /\befekti[fv]itas\b/i },
+  { jenis: "analisis-kebijakan", pola: /\banalisis\s+kebijakan\b|\bwilliam\s+dunn\b/i },
+  { jenis: "governance", pola: /\btata\s+kelola\b|\bgood\s+governance\b|\bgovernance\b/i },
+  { jenis: "peran-pemerintah", pola: /\bperan\b.{0,40}\b(?:pemerintah|desa|kelurahan|kecamatan|dinas|lurah|camat)\b/i },
+  { jenis: "fenomenologi", pola: /\bfenomenolog\w*\b|\bschutz\b|\bhusserl\b|\bmoustakas\b/i },
+  { jenis: "studi-kasus", pola: /\bstudi\s+kasus\b|\bcase\s+study\b|\brobert\s+yin\b/i },
+  { jenis: "strategi-komunikasi", pola: /\bstrategi\s+komunikasi\b|\bstrategi\s+humas\b/i },
+  { jenis: "strategi-pemerintah", pola: /\bstrategi\s+pemerintah\b|\bstrategi\s+dinas\b|\banalisis\s+swot\b/i },
+];
+
+function bacaMetode(t: string, prodi: Prodi): Cocok & { jenis: Jenis } | null {
+  for (const { jenis, pola } of POLA_METODE) {
+    if (!metodeProdi(jenis, prodi)) continue;
+    const m = t.match(pola);
+    if (!m || typeof m.index !== "number") continue;
+    return { jenis, nilai: JENIS_UMUM[jenis], bukti: kalimatSekitar(t, m.index), posisi: m.index };
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -1097,12 +1232,19 @@ export function tafsirkan(cerita: string, prodiBawaan: Prodi = "lain"): Bacaan {
   const lokasi = bacaLokasi(t);
   const bilangan = bacaAngka(t);
   const prodi = bacaProdi(t, prodiBawaan);
+  const metode = bacaMetode(t, prodi);
+
+  // Pada rancangan berbahan teks, yang menempati tempat variabel terikat
+  // adalah wadah teksnya. Tanpa penegasan ini, "membingkai pemberitaan …
+  // di Kota Serang" membuat nama kota terbaca sebagai medianya.
+  const media = bacaMedia(t);
+  const wadahTeks = unit.unit === "teks" && media && !variabel.y.toLowerCase().includes(media.toLowerCase());
 
   const masukan: Masukan = {
     variabelX: variabel.x,
     variabelX2: variabel.x2,
     variabelZ: variabel.z,
-    variabelY: variabel.y,
+    variabelY: wadahTeks ? media : variabel.y,
     objek: objek?.nilai ?? "",
     lokasi: lokasi?.nilai ?? "",
     tujuan: tujuan.tujuan,
@@ -1111,12 +1253,17 @@ export function tafsirkan(cerita: string, prodiBawaan: Prodi = "lain"): Bacaan {
     jumlahPopulasi: bilangan.populasi,
     perkiraanSampel: bilangan.sampel,
     prodi,
+    metode: metode?.jenis,
   };
 
   const temuan: Temuan[] = [
+    { bidang: "Prodi", nilai: PRODI_LABEL[prodi], bukti: null, yakin: prodiBawaan === "lain" ? "terka" : "kuat" },
     { bidang: "Yang ingin diketahui", nilai: LABEL_TUJUAN[tujuan.tujuan], bukti: tujuan.bukti, yakin: tujuan.yakin },
     { bidang: "Yang diteliti", nilai: LABEL_UNIT[unit.unit], bukti: unit.bukti, yakin: unit.yakin },
   ];
+  if (metode) {
+    temuan.push({ bidang: "Metode yang kamu sebut", nilai: metode.nilai, bukti: metode.bukti, yakin: "kuat" });
+  }
 
   if (variabel.x) {
     temuan.push({
@@ -1219,7 +1366,7 @@ export function tafsirkan(cerita: string, prodiBawaan: Prodi = "lain"): Bacaan {
     ringkas,
     cukup,
     jumlahKata,
-    media: bacaMedia(t),
+    media,
     lembaga: bacaLembaga(t)?.nilai ?? "",
     orang: bacaOrang(t)?.nilai ?? "",
   };

@@ -150,8 +150,16 @@ const HARAPAN: Record<Jenis, string> = {
   fenomenologi: "Esensi pengalaman yang dihidupi para informan",
   "studi-kasus": "Pola yang menjelaskan kasus, dijodohkan dengan teori",
   "analisis-isi": "Kecenderungan kategori beserta angka kemunculannya",
-  "analisis-wacana": "Cara teks membingkai persoalan, ditunjukkan dari potongannya",
-  "evaluasi-program": "Capaian dibanding tolok ukur resmi, dan penyebab selisihnya",
+  "analisis-framing": "Bingkai yang dipakai tiap media, ditunjukkan dari potongan beritanya",
+  semiotika: "Makna di balik tanda, ditunjukkan dari potongan yang dianalisis",
+  "uses-gratifications": "Motif mana yang paling kuat mendorong penggunaannya",
+  "efektivitas-program": "Capaian dibanding tolok ukur resmi, dan penyebab selisihnya",
+  "strategi-komunikasi": "Tahap strategi yang dijalankan beserta hambatannya",
+  "implementasi-kebijakan": "Aspek mana yang membuat kebijakannya berjalan atau tersendat",
+  "peran-pemerintah": "Peran yang benar-benar dijalankan, dan yang belum",
+  "analisis-kebijakan": "Persoalan pada isi kebijakan dan pada pelaksanaannya",
+  governance: "Prinsip tata kelola yang sudah dan belum berjalan",
+  "strategi-pemerintah": "Strategi yang ditempuh beserta hambatan pelaksanaannya",
 };
 
 const CARA: Record<Jenis, string> = {
@@ -163,8 +171,16 @@ const CARA: Record<Jenis, string> = {
   fenomenologi: "Wawancara mendalam, lalu reduksi dan horizonalisasi",
   "studi-kasus": "Wawancara, dokumen, observasi, lalu analisis tematik",
   "analisis-isi": "Lembar koding dan koder kedua, lalu uji reliabilitas",
-  "analisis-wacana": "Perangkat analisis yang dipilih tegas, tataran demi tataran",
-  "evaluasi-program": "Dokumen resmi dan wawancara, dibandingkan dengan tolok ukur",
+  "analisis-framing": "Berita dibedah dengan perangkat framing model yang dipilih",
+  semiotika: "Potongan tanda dibaca pada tiap tataran model yang dipilih",
+  "uses-gratifications": "Kuesioner motif, lalu peringkat tiap motif",
+  "efektivitas-program": "Kuesioner indikator efektivitas, lalu skor per indikator",
+  "strategi-komunikasi": "Wawancara dan dokumen, ditata menurut tahap model strategi",
+  "implementasi-kebijakan": "Wawancara pelaksana dan dokumen, ditata per aspek model",
+  "peran-pemerintah": "Wawancara pemerintah dan masyarakat, ditata per peran",
+  "analisis-kebijakan": "Naskah kebijakan ditelaah, lalu diperiksa silang dengan pelaksananya",
+  governance: "Wawancara dan dokumen, dinilai per prinsip tata kelola",
+  "strategi-pemerintah": "Wawancara dan dokumen, ditata menurut tahap penyusunan strategi",
 };
 
 /**
@@ -202,13 +218,25 @@ export function susunAlurPikir(m: Masukan, jenis: Jenis, teori: string[]): AlurP
   if (belumDisebut(tempat)) fenomena.push(`di ${tempat}`);
 
   const fokus =
-    jenis === "analisis-isi" || jenis === "analisis-wacana"
+    jenis === "analisis-isi"
       ? `Apa yang terkandung dalam ${Y || "teks yang dipilih"} ketika membicarakan ${X}`
-      : jenis === "evaluasi-program"
+      : jenis === "analisis-framing"
+        ? `Bagaimana ${Y || "media yang dipilih"} membingkai ${X}`
+        : jenis === "semiotika"
+          ? `Makna apa yang terbangun di balik tanda tentang ${X} dalam ${Y || "teks yang dipilih"}`
+      : jenis === "efektivitas-program"
         ? `Sejauh mana ${X} mencapai sasaran yang ditetapkan`
+      : jenis === "implementasi-kebijakan"
+        ? `Aspek mana yang membuat ${X} berjalan atau tersendat di lapangan`
+      : jenis === "peran-pemerintah"
+        ? `Peran apa yang benar-benar dijalankan ${siapa || "pemerintah"} dalam ${X}`
+      : jenis === "analisis-kebijakan"
+        ? `Persoalan apa yang terkandung dalam ${X} dan dalam pelaksanaannya`
+      : jenis === "governance"
+        ? `Prinsip tata kelola mana yang sudah dan belum berjalan dalam ${X}`
         : jenis === "fenomenologi"
           ? `Bagaimana ${siapa || "informan"} memaknai pengalaman ${X}`
-          : jenis === "studi-kasus"
+          : jenis === "studi-kasus" || jenis === "strategi-komunikasi" || jenis === "strategi-pemerintah"
             // Pada cerita berbentuk proses, Y berisi kegiatannya, bukan
             // akibatnya. "Bagaimana A bertaut dengan mengelola akun resminya"
             // tidak berbunyi; yang ditanyakan studi kasus memang bagaimana
