@@ -5,11 +5,13 @@ import { Ic, IKON, Kepala, Rinci, SumberAcuan } from "./ikon";
 import { PerluProject } from "./panel-naskah";
 import {
   MAKS_KATA_PARAFRASE, PARAFRASE_LABEL, TEMUAN_LABEL,
-  bandingkanSumber, periksaSitasi, ujiParafrase,
+  ujiParafrase,
   type PutusanParafrase,
 } from "@/lib/kemiripan";
 import type { Project } from "@/lib/project";
 import { Bagian, Butir, Catatan, LaporanCetak, TombolCetak } from "./laporan";
+import { LebihBanyak, useSebagian } from "./daftar";
+import { useAnalisis } from "./use-analisis";
 
 const KELAS_PUTUSAN: Record<PutusanParafrase, string> = {
   salin: "bad", "tukar-sinonim": "bad", "parafrase-lemah": "warn", "parafrase-baik": "ok",
@@ -80,15 +82,28 @@ function SisiNaskah({ project }: { project: Project }) {
     () => project.bab.map((b) => `${b.judul}\n${b.isi}`).join("\n\n"),
     [project.bab],
   );
-  const temuan = useMemo(
-    () => (naskah.trim() ? periksaSitasi(naskah, project.daftarPustaka) : []),
+  const muatan = useMemo(
+    () => (naskah.trim() ? { naskah, daftarPustaka: project.daftarPustaka } : null),
     [naskah, project.daftarPustaka],
   );
+  const { hasil, sibuk } = useAnalisis("sitasi", muatan);
+  const temuan = useMemo(() => hasil ?? [], [hasil]);
+  const { tampil, sisa, lagi, semua } = useSebagian(temuan);
 
   if (!naskah.trim()) {
     return (
       <section className="al-card">
-        <p className="al-galat">Naskah project ini masih kosong. Buka Beranda dan tempelkan naskah Anda dulu.</p>
+        <p className="al-galat">Naskah project ini masih kosong. Buka Beranda dan unggah naskah Anda dulu.</p>
+      </section>
+    );
+  }
+
+  if (sibuk && !hasil) {
+    return (
+      <section className="al-card">
+        <p className="al-note" style={{ margin: 0 }} role="status" aria-live="polite">
+          Mencocokkan sitasi dengan daftar pustaka…
+        </p>
       </section>
     );
   }
@@ -122,16 +137,19 @@ function SisiNaskah({ project }: { project: Project }) {
           hanya kelengkapan sitasi dan porsi kutipan, bukan kemiripan dengan karya orang lain.
         </p>
       ) : (
-        <ul className="al-list">
-          {temuan.map((t, i) => (
-            <li key={`${t.jenis}-${i}`} className={`al-item ${KELAS_BERAT[t.berat] ?? "abu"}`}>
-              <div className="al-item-atas"><span className="al-tag">{TEMUAN_LABEL[t.jenis]}</span></div>
-              <p className="al-kutip">{t.kutipan}</p>
-              <p>{t.pesan}</p>
-              {t.saran && <p className="al-fix">{t.saran}</p>}
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="al-list">
+            {tampil.map((t, i) => (
+              <li key={`${t.jenis}-${i}`} className={`al-item ${KELAS_BERAT[t.berat] ?? "abu"}`}>
+                <div className="al-item-atas"><span className="al-tag">{TEMUAN_LABEL[t.jenis]}</span></div>
+                <p className="al-kutip">{t.kutipan}</p>
+                <p>{t.pesan}</p>
+                {t.saran && <p className="al-fix">{t.saran}</p>}
+              </li>
+            ))}
+          </ul>
+          <LebihBanyak sisa={sisa} lagi={lagi} semua={semua} />
+        </>
       )}
 
       <p className="al-tail">Bereskan sitasi dulu sebelum memikirkan angka kemiripan.</p>
@@ -208,10 +226,14 @@ function SisiSumber({
     () => project.bab.map((b) => `${b.judul}\n${b.isi}`).join("\n\n"),
     [project.bab],
   );
-  const hasil = useMemo(
-    () => (naskah.trim() ? bandingkanSumber(naskah, project.sumberBanding) : null),
+  // Pembandingan menyusun sidik jari delapan kata untuk seluruh naskah dan
+  // seluruh sumber, lalu mencocokkannya. Pada skripsi utuh itu pekerjaan
+  // beberapa detik, jadi tempatnya di pekerja latar.
+  const muatan = useMemo(
+    () => (naskah.trim() ? { naskah, sumber: project.sumberBanding } : null),
     [naskah, project.sumberBanding],
   );
+  const { hasil, sibuk } = useAnalisis("kemiripan", muatan);
 
   function tambah() {
     if (!teks.trim()) return;
@@ -259,6 +281,14 @@ function SisiSumber({
           <Ic d={IKON.tambah} /> Tambahkan sumber ini
         </button>
       </section>
+
+      {sibuk && !hasil && project.sumberBanding.length > 0 && (
+        <section className="al-card">
+          <p className="al-note" style={{ margin: 0 }} role="status" aria-live="polite">
+            Membandingkan naskah dengan sumber…
+          </p>
+        </section>
+      )}
 
       {hasil && project.sumberBanding.length > 0 && (
         <section className="al-card">

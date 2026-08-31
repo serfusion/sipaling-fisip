@@ -4,16 +4,25 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Ic, IKON, Kepala, Rinci, SumberAcuan } from "./ikon";
 import { PerluProject } from "./panel-naskah";
 import {
-  DATA_PILIHAN, JENIS_LABEL, TUJUAN_PILIHAN, UNIT_PILIHAN,
-  kuantitatif, rancang, slovin,
-  type Data, type Masukan, type Prodi, type Tujuan, type Unit,
+  DATA_PILIHAN, JENIS_KERJA, JENIS_LABEL, JENIS_UMUM, PENDEKATAN_LABEL, PRODI_METODE,
+  KESULITAN, TUJUAN_PILIHAN, UNIT_PILIHAN, kuantitatif, rancang, slovin,
+  type Data, type Jenis, type Masukan, type Prodi, type Tujuan, type Unit,
 } from "@/lib/metodologi";
 import type { Project } from "@/lib/project";
 import type { Tab } from "./panel-beranda";
 import { Bagian, Butir, Catatan, LaporanCetak, TombolCetak } from "./laporan";
-import { BaganKerangka, ContohGrafik } from "./grafik";
-import { susunKerangka } from "@/lib/kerangka";
+import { BaganAlurPikir, BaganKerangka, ContohGrafik } from "./grafik";
+import { susunAlurPikir, susunKerangka } from "@/lib/kerangka";
 import { GRAFIK_NAMA, usulkanVisual } from "@/lib/visual";
+import {
+  MINIMAL_KATA, contohProdi, empatJalur, hitungKataCerita, tafsirkan,
+  type Bacaan, type JalurAlternatif,
+} from "@/lib/tafsir-cerita";
+
+const PRODI_PILIHAN: Array<{ id: Prodi; nama: string; ket: string }> = [
+  { id: "komunikasi", nama: "Ilmu Komunikasi", ket: "Pengaruh, analisis isi, framing, semiotika" },
+  { id: "pemerintahan", nama: "Ilmu Pemerintahan", ket: "Pengaruh, efektivitas, implementasi kebijakan" },
+];
 
 const KOSONG: Masukan = {
   variabelX: "", variabelX2: "", variabelZ: "", variabelY: "", objek: "", lokasi: "",
@@ -38,6 +47,14 @@ export function PanelJudul({
   // terlihat, tombolnya terasa tidak menghasilkan apa-apa ketika hasilnya
   // sudah terbuka: layarnya sama persis sebelum dan sesudah ditekan.
   const [menyusun, setMenyusun] = useState(false);
+  const [bacaan, setBacaan] = useState<Bacaan | null>(null);
+  const [jalur, setJalur] = useState<JalurAlternatif[]>([]);
+  /** Judul dari kartu yang barusan dipilih, supaya kepala hasilnya sama
+   *  dengan judul yang ditekan. Kosong berarti pakai urutan pertama. */
+  const [judulPilihan, setJudulPilihan] = useState("");
+  /** Prodi yang dipakai membaca cerita. Diambil dari project bila sudah ada,
+   *  dan dapat diganti sendiri di kotak cerita. */
+  const [prodi, setProdi] = useState<Prodi>(m.prodi === "lain" ? prodiDari(project?.prodi ?? "") : m.prodi);
   const jamRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasilRef = useRef<HTMLDivElement | null>(null);
 
@@ -58,19 +75,43 @@ export function PanelJudul({
     }, 650);
   }
 
+  /** Baca cerita mahasiswa, isikan ke formulir, lalu langsung susun. */
+  function bacakan(cerita: string) {
+    const hasilBaca = tafsirkan(cerita, prodi);
+    setBacaan(hasilBaca);
+    setJalur(empatJalur(hasilBaca));
+    setJudulPilihan("");
+    const baru = { ...draf, ...hasilBaca.masukan };
+    setDraf(baru);
+    if (project) ubah({ rancangan: baru });
+    susun();
+  }
+
   const atur = (bagian: Partial<Masukan>) => {
     const baru = { ...draf, ...bagian };
     setDraf(baru);
+    // Judul pilihan itu milik kartu yang barusan ditekan. Begitu isian di
+    // bawahnya diubah sendiri, judul itu belum tentu terbit lagi, jadi
+    // pilihannya dilepas dan kepala hasilnya kembali ke judul urutan pertama.
+    setJudulPilihan("");
     if (project) ubah({ rancangan: baru });
   };
 
   const hasil = useMemo(() => rancang(draf), [draf]);
+  const judulUtama = hasil.judul.includes(judulPilihan) ? judulPilihan : hasil.judul[0];
+  const modelAnjuran = hasil.model.find((k) => k.anjuran) ?? hasil.model[0];
   const visual = useMemo(() => usulkanVisual(hasil.jenis), [hasil.jenis]);
   // Kerangka berpikir hanya bermakna pada rancangan yang menguji hubungan
   // antarvariabel. Rancangan deskriptif dan kualitatif tidak memakainya.
   const kerangka = useMemo(
     () => (draf.tujuan === "pengaruh" || draf.tujuan === "hubungan" ? susunKerangka(draf) : null),
     [draf],
+  );
+  // Rancangan yang tidak menguji variabel tetap wajib punya kerangka
+  // berpikir; bentuknya saja yang berbeda.
+  const alur = useMemo(
+    () => (draf.tujuan === "pengaruh" || draf.tujuan === "hubungan" ? null : susunAlurPikir(draf, hasil.jenis, hasil.teori)),
+    [draf, hasil.jenis, hasil.teori],
   );
   const anjuran = slovin(draf.jumlahPopulasi);
   const kuan = kuantitatif(hasil.jenis);
@@ -90,6 +131,42 @@ export function PanelJudul({
 
   return (
     <>
+      <KotakCerita
+        onBacakan={bacakan}
+        sibuk={menyusun}
+        prodi={prodi}
+        onProdi={(p) => {
+          setProdi(p);
+          setJalur([]);
+          setBacaan(null);
+          atur({ prodi: p, metode: undefined });
+        }}
+      />
+
+      {bacaan && <HasilBacaan bacaan={bacaan} />}
+
+      <PilihMetode
+        prodi={prodi}
+        kini={hasil.jenis}
+        onPilih={(k) => { atur({ metode: k }); setJudulPilihan(""); susun(); }}
+      />
+
+      {jalur.length > 0 && (
+        <PilihJudul
+          jalur={jalur}
+          tujuanKini={draf.tujuan}
+          onPilih={(k) => {
+            setDraf(k.masukan);
+            // Judul yang tertulis di kartu belum tentu judul urutan pertama
+            // untuk rancangan itu. Kalau tidak diingat, mahasiswa menekan satu
+            // judul lalu mendapati kepala hasilnya berbunyi judul lain.
+            setJudulPilihan(k.judul);
+            if (project) ubah({ rancangan: k.masukan });
+            susun();
+          }}
+        />
+      )}
+
       <section className="al-card">
         <Kepala ikon={IKON.judul} judul="Perumus Judul dan Metode"
           sub="Sebutkan yang ingin Anda teliti, lalu lihat metode mana yang dapat menjawabnya" />
@@ -251,12 +328,30 @@ export function PanelJudul({
 
           <section className="al-card">
             <div className={`al-verdict ${hambat.length > 0 ? "periksa" : "wajar"}`}>
-              <h3>{JENIS_LABEL[hasil.jenis]}</h3>
+              <span className="al-verdict-mata">JUDUL YANG DISARANKAN</span>
+              <h3 className="al-verdict-judul">{judulUtama}</h3>
+              <p className="al-verdict-metode">
+                <span className="al-cap">{JENIS_UMUM[hasil.jenis]}</span>
+                {JENIS_KERJA[hasil.jenis]}
+                <em>nama resminya di bab metode: {JENIS_LABEL[hasil.jenis].toLowerCase()}</em>
+              </p>
+              {/* Empat lapis yang paling sering tertukar. "Pengaruh" bukan
+                  metode dan "framing" bukan pendekatan; menulis keduanya di
+                  baris yang sama di bab tiga adalah sebab naskah dipulangkan. */}
+              <div className="al-lapis">
+                <div><span>Pendekatan</span><b>{PENDEKATAN_LABEL[hasil.pendekatan]}</b></div>
+                <div><span>Metode</span><b>{hasil.metodePola}</b></div>
+                <div>
+                  <span>Model atau teori</span>
+                  <b>{modelAnjuran ? modelAnjuran.nama : "Tidak ada lapis model pada rancangan survei"}</b>
+                </div>
+                <div><span>Teknik analisis</span><b>{hasil.analisis[0]?.nama ?? "-"}</b></div>
+              </div>
               <b>{hambat.length > 0 ? "Rancangan ini belum utuh" : "Pilihan Anda saling menopang"}</b>
               <p>{hasil.paradigma}</p>
             </div>
 
-            <h3 className="al-h4">Usulan judul</h3>
+            <h3 className="al-h4">Pilihan judul</h3>
             <ul className="al-list">
               {hasil.judul.map((j) => (
                 <li key={j} className="al-item ok">
@@ -283,6 +378,31 @@ export function PanelJudul({
               <ol className="al-steps">{hasil.tujuanTulis.map((t) => <li key={t}>{t}</li>)}</ol>
               <h3 className="al-h4">Teori yang lazim dipakai</h3>
               <ul className="al-plain">{hasil.teori.map((t) => <li key={t}>{t}</li>)}</ul>
+
+              {/* Lapis ketiga, dan sebab paling sering revisi pada rancangan
+                  yang memakainya: naskah menulis "analisis framing" tanpa
+                  pernah menyatakan framing model siapa. Ketiganya sah; yang
+                  membedakan berapa banyak tabel yang harus dibuat. */}
+              {hasil.model.length > 0 && (
+                <>
+                  <h3 className="al-h4">Model atau teori di dalam metodenya, pilih satu</h3>
+                  <p className="al-note">
+                    Sebut satu di bab metode, jangan mencampur tanpa alasan. Tabel temuanmu mengikuti model
+                    yang dipilih.
+                  </p>
+                  <ul className="al-list">
+                    {hasil.model.map((k) => (
+                      <li key={k.nama} className={`al-item ${k.anjuran ? "ok" : "abu"}`}>
+                        <div className="al-item-atas">
+                          <span className="al-tag">{k.anjuran ? "Paling ringkas untuk S1" : "Pilihan lain"}</span>
+                        </div>
+                        <p className="al-kutip"><b>{k.nama}</b></p>
+                        <p>{k.catatan}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
             </section>
 
             <section className="al-card">
@@ -328,6 +448,18 @@ export function PanelJudul({
               <p className="al-tail">
                 Uji pengaruh tidak langsung menuntut uji mediasi, misalnya uji Sobel atau bootstrapping, bukan
                 sekadar regresi berganda biasa.
+              </p>
+            </section>
+          )}
+
+          {alur && (
+            <section className="al-card">
+              <h3 className="al-h4">Kerangka berpikir</h3>
+              <p className="al-note">{alur.catatan}</p>
+              <BaganAlurPikir alur={alur} />
+              <p className="al-tail">
+                Salin bagan ini ke BAB II. Tiap tahapnya harus terbaca lagi di bab metode; kalau tidak, penguji
+                akan menanyakan dari mana fokus penelitian Anda datang.
               </p>
             </section>
           )}
@@ -449,6 +581,13 @@ export function PanelJudul({
 
               <Bagian>Teori yang lazim dipakai</Bagian>
               <ul>{hasil.teori.map((th) => <li key={th}>{th}</li>)}</ul>
+              <Bagian>Pendekatan, metode, model, dan teknik analisis</Bagian>
+              <ul>
+                <li>Pendekatan: {PENDEKATAN_LABEL[hasil.pendekatan]}</li>
+                <li>Metode: {hasil.metodePola}</li>
+                <li>Model atau teori: {hasil.model.map((k) => k.nama).join("; ") || "tidak ada lapis model pada rancangan survei"}</li>
+                <li>Teknik analisis: {hasil.analisis.map((a) => a.nama).join("; ")}</li>
+              </ul>
 
               {periksa.length > 0 && (
                 <>
@@ -479,5 +618,235 @@ export function PanelJudul({
 
       <SumberAcuan kunci="judul" />
     </>
+  );
+}
+
+
+/* ==========================================================================
+   KOTAK CERITA
+   Pintu masuk bagi yang belum tahu variabel bebas dan variabel terikatnya.
+   Yang diminta hanya satu: ceritakan apa adanya. Isian tujuh langkah di
+   bawahnya diisikan dari cerita itu, lalu boleh dibetulkan sendiri.
+   ========================================================================== */
+
+function KotakCerita({
+  onBacakan, sibuk, prodi, onProdi,
+}: {
+  onBacakan: (cerita: string) => void;
+  sibuk: boolean;
+  prodi: Prodi;
+  onProdi: (p: Prodi) => void;
+}) {
+  const [cerita, setCerita] = useState("");
+  const kata = hitungKataCerita(cerita);
+  const cukup = kata >= MINIMAL_KATA;
+
+  return (
+    <section className="al-card al-cerita">
+      <Kepala ikon={IKON.judul} judul="Ceritakan skripsi atau jurnal yang kamu pikirkan"
+        sub="Tulis apa adanya, sepanjang yang kamu mau. Biar Cakrawala yang menerjemahkannya jadi metode" />
+      <p className="al-note">
+        Tidak perlu tahu istilah metodologi lebih dulu. Tulis saja apa yang mengganggu pikiranmu, siapa yang mau
+        kamu teliti, dan di mana. <b>Ceritanya tidak dikirim ke mana pun</b>, dibaca di perangkat ini saja.
+      </p>
+
+      {/* Prodi menentukan daftar rancangan yang ditawarkan, bukan sekadar
+          pilihan teori. Karena itu ia ditanyakan sebelum ceritanya dibaca. */}
+      <h3 className="al-h4">Kamu dari prodi apa?</h3>
+      <p className="al-note">
+        Daftar metode kedua prodi memang berbeda, jadi jawaban ini menentukan rancangan mana yang ditawarkan.
+      </p>
+      <div className="al-tiles">
+        {PRODI_PILIHAN.map((p) => (
+          <button key={p.id} type="button" className={`al-tile ${prodi === p.id ? "on" : ""}`}
+            aria-pressed={prodi === p.id} disabled={sibuk} onClick={() => onProdi(p.id)}>
+            <b>{p.nama}</b><small>{p.ket}</small>
+          </button>
+        ))}
+      </div>
+
+      <label className="al-field">
+        <span>Ceritamu</span>
+        <textarea
+          value={cerita}
+          onChange={(e) => setCerita(e.target.value)}
+          rows={7}
+          placeholder={"Aku pengen neliti soal…\n\nCeritakan bebas: apa yang kamu lihat, kenapa menurutmu itu penting, siapa yang mau kamu teliti, dan di mana."}
+        />
+        <small>
+          {kata} kata{cukup ? " · sudah cukup untuk dibaca" : ` · tulis minimal ${MINIMAL_KATA} kata supaya bisa dibaca`}
+        </small>
+      </label>
+
+      <h3 className="al-h4">Belum kepikiran? Pakai salah satu contoh ini</h3>
+      <p className="al-note">
+        Menekannya mengisi kotak cerita di atas. Judul dan metodenya baru muncul sesudah ceritanya dibacakan.
+      </p>
+      <div className="al-tiles al-tiles-contoh">
+        {contohProdi(prodi).map((c) => (
+          <button key={c.id} type="button" className={`al-tile al-tile-contoh ${c.jalur}`}
+            disabled={sibuk} onClick={() => setCerita(c.cerita)}>
+            <b>{c.label}</b>
+            <span className="al-jalur">{c.jalur}</span>
+          </button>
+        ))}
+      </div>
+
+      {cerita && (
+        <div className="al-linkrow">
+          <button type="button" className="al-link" onClick={() => setCerita("")}>Kosongkan</button>
+        </div>
+      )}
+
+      <button type="button" className="al-btn" disabled={!cukup || sibuk} onClick={() => onBacakan(cerita)}>
+        {sibuk ? (
+          <><span className="al-putar" aria-hidden="true" /> Membaca ceritamu…</>
+        ) : (
+          <><Ic d={IKON.centang} /> Bacakan dan susunkan rancangannya</>
+        )}
+      </button>
+    </section>
+  );
+}
+
+const KELAS_YAKIN: Record<string, string> = { kuat: "ok", sedang: "warn", terka: "abu" };
+const LABEL_YAKIN: Record<string, string> = {
+  kuat: "tertulis jelas",
+  sedang: "disimpulkan",
+  terka: "belum disebut, ini dugaan",
+};
+
+/** Apa yang terbaca dari cerita, beserta asalnya di kalimat mahasiswa. */
+function HasilBacaan({ bacaan }: { bacaan: Bacaan }) {
+  return (
+    <section className="al-card">
+      <h3 className="al-h4">Yang saya tangkap dari ceritamu</h3>
+      <div className={`al-verdict ${bacaan.cukup ? "wajar" : "periksa"}`}>
+        <b>{bacaan.cukup ? "Ceritanya sudah bisa dijadikan rancangan" : "Ceritanya masih terlalu ringkas"}</b>
+        <p>{bacaan.ringkas}</p>
+      </div>
+
+      <ul className="al-list al-list-rapat">
+        {bacaan.temuan.map((t) => (
+          <li key={t.bidang} className={`al-item ${KELAS_YAKIN[t.yakin] ?? "abu"}`}>
+            <div className="al-item-atas">
+              <span className="al-tag">{t.bidang}</span>
+              <span className="al-num">{LABEL_YAKIN[t.yakin]}</span>
+            </div>
+            <p className="al-kutip"><b>{t.nilai}</b></p>
+            {t.bukti && <p className="al-bukti">Dari kalimatmu: &ldquo;{t.bukti}&rdquo;</p>}
+          </li>
+        ))}
+      </ul>
+
+      {bacaan.pertanyaan.length > 0 && (
+        <>
+          <h3 className="al-h4">Yang belum ketemu di ceritamu</h3>
+          <ol className="al-steps">{bacaan.pertanyaan.map((q) => <li key={q}>{q}</li>)}</ol>
+        </>
+      )}
+
+      <p className="al-tail">
+        Semua ini <b>dugaan yang dibaca dari kalimatmu sendiri</b>, bukan karangan mesin. Kalau ada yang meleset,
+        betulkan langsung pada isian di bawah, dan rancangannya ikut berubah seketika.
+      </p>
+    </section>
+  );
+}
+
+/* ==========================================================================
+   EMPAT JUDUL DARI SATU CERITA
+   Satu topik hampir selalu bisa diteliti lebih dari satu cara, dan itu yang
+   paling sering tidak diketahui mahasiswa yang bingung. Menekan salah satu
+   judul mengisikan rancangannya ke formulir di bawah, jadi pilihannya bukan
+   sekadar pajangan.
+   ========================================================================== */
+
+/** Bintang kesulitan. Bukan penilaian mutu, melainkan berat pengerjaannya:
+ *  berapa panjang bacaan teorinya dan berapa banyak tahap analisisnya. */
+function Bintang({ nilai }: { nilai: 1 | 2 | 3 }) {
+  return (
+    <span className="al-bintang" aria-label={`Berat pengerjaan ${nilai} dari 3`}>
+      {"\u2605".repeat(nilai)}
+      <i>{"\u2605".repeat(3 - nilai)}</i>
+    </span>
+  );
+}
+
+/**
+ * Daftar rancangan yang ditawarkan di prodi ini.
+ *
+ * Ditampilkan terpisah menurut pendekatannya, karena itulah lapis pertama
+ * yang harus ditetapkan sebelum apa pun. Mahasiswa yang sudah tahu mau
+ * memakai analisis framing tidak perlu memutar lewat cerita: ia menekan
+ * namanya, dan seluruh isian di bawahnya menyesuaikan.
+ */
+function PilihMetode({
+  prodi, kini, onPilih,
+}: { prodi: Prodi; kini: Jenis; onPilih: (jenis: Jenis) => void }) {
+  const daftar = PRODI_METODE[prodi === "pemerintahan" ? "pemerintahan" : "komunikasi"];
+  return (
+    <section className="al-card">
+      <Kepala ikon={IKON.judul} judul="Rancangan yang dipakai di prodimu"
+        sub="Bintangnya berat pengerjaan, bukan nilai bagus atau jelek" />
+      <p className="al-note">
+        Urutannya dari yang paling sering selesai. Menekan salah satunya memakai rancangan itu, dan seluruh
+        isian di bawah ikut menyesuaikan. Kalau belum yakin, biarkan saja: rancangannya disimpulkan dari
+        ceritamu.
+      </p>
+      {(["kuantitatif", "kualitatif"] as const).map((sisi) => (
+        <div key={sisi}>
+          <h3 className="al-h4">{PENDEKATAN_LABEL[sisi]}</h3>
+          <div className="al-tiles">
+            {daftar[sisi].map((j) => (
+              <button key={j} type="button" className={`al-tile ${kini === j ? "on" : ""}`}
+                aria-pressed={kini === j} onClick={() => onPilih(j)}>
+                <b>{JENIS_UMUM[j]}</b>
+                <small>{JENIS_KERJA[j]}</small>
+                <Bintang nilai={KESULITAN[j]} />
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function PilihJudul({
+  jalur, tujuanKini, onPilih,
+}: {
+  jalur: JalurAlternatif[];
+  tujuanKini: Masukan["tujuan"];
+  onPilih: (k: JalurAlternatif) => void;
+}) {
+  return (
+    <section className="al-card">
+      <h3 className="al-h4">Empat judul dari ceritamu</h3>
+      <p className="al-note">
+        Satu topik bisa diteliti lebih dari satu cara. Yang menentukan metodenya adalah bentuk pertanyaan yang
+        Anda pilih, bukan selera. Tekan salah satunya untuk memakai rancangan itu; isian di bawah ikut menyesuaikan.
+        Bagian dalam kurung siku adalah isian yang Anda lengkapi sendiri.
+      </p>
+      <div className="al-judul-baris">
+        {jalur.map((k) => (
+          <button
+            key={k.id}
+            type="button"
+            className={`al-judul-kartu ${k.jalur} ${k.masukan.tujuan === tujuanKini ? "on" : ""}`}
+            aria-pressed={k.masukan.tujuan === tujuanKini}
+            onClick={() => onPilih(k)}
+          >
+            {k.pas && <span className="al-pas">paling sesuai ceritamu</span>}
+            <b>{k.judul}</b>
+            <span className="al-tile-metode">
+              <span className="al-jalur">{k.metode}</span>
+              <small>{k.kerja}</small>
+              <Bintang nilai={k.kesulitan} />
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }

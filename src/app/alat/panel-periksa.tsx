@@ -2,17 +2,22 @@
 
 import { useMemo, useState } from "react";
 import { Ic, IKON, Kepala, Rinci, SumberAcuan } from "./ikon";
-import { periksaBahasa, BERAT_LABEL, type Berat } from "@/lib/bahasa-check";
+import { BERAT_LABEL, type Berat } from "@/lib/bahasa-check";
 import { METRIK_TIDAK_DIAKUI, PITA_LABEL, type Hasil, type Tingkat } from "@/lib/journal-radar";
 import { PUTUSAN_LABEL, type HasilRujukan, type Putusan, type RingkasanSitasi } from "@/lib/citation-check";
 import type { Project } from "@/lib/project";
 import { Bagian, Butir, Catatan, LaporanCetak, TombolCetak } from "./laporan";
+import { LebihBanyak, useSebagian } from "./daftar";
+import { useAnalisis } from "./use-analisis";
 
 const KELAS_PUTUSAN: Record<Putusan, string> = {
   terverifikasi: "ok", "beda-rincian": "warn", "tidak-ditemukan": "bad", "tak-dapat-diperiksa": "abu",
 };
 const KELAS_TINGKAT: Record<Tingkat, string> = { berat: "bad", sedang: "warn", ringan: "warn", positif: "ok" };
 const KELAS_BERAT: Record<Berat, string> = { salah: "bad", sebaiknya: "warn", gaya: "abu" };
+
+/** Banyaknya temuan per golongan yang ikut tercetak. */
+const MAKS_CETAK = 400;
 
 /* ========================= VERIFIKASI SITASI ========================= */
 
@@ -400,11 +405,17 @@ export function PanelBahasa({ project }: { project: Project | null }) {
   );
   const teks = project && pakaiProject && dariProject.trim() ? dariProject : lokal;
 
-  const hasil = useMemo(() => (teks.trim() ? periksaBahasa(teks) : null), [teks]);
-  const tampil = useMemo(() => {
+  // Pemeriksaan dikerjakan pekerja latar. Naskah skripsi utuh disisir ratusan
+  // kali di sini, sekali untuk tiap pola ejaan; di utas utama itu membekukan
+  // layar beberapa detik tiap kali alat ini dibuka.
+  const muatan = useMemo(() => (teks.trim() ? { teks } : null), [teks]);
+  const { hasil, sibuk, galat } = useAnalisis("bahasa", muatan);
+
+  const disaring = useMemo(() => {
     if (!hasil) return [];
     return saring === "semua" ? hasil.temuan : hasil.temuan.filter((t) => t.berat === saring);
   }, [hasil, saring]);
+  const { tampil, sisa, lagi, semua } = useSebagian(disaring);
 
   return (
     <>
@@ -440,6 +451,21 @@ export function PanelBahasa({ project }: { project: Project | null }) {
           </>
         )}
       </section>
+
+      {sibuk && (
+        <section className="al-card">
+          <p className="al-note" style={{ margin: 0 }} role="status" aria-live="polite">
+            Memeriksa naskah… Pada skripsi utuh ini memakan beberapa detik, dan halaman tetap dapat dipakai selama
+            itu.
+          </p>
+        </section>
+      )}
+
+      {galat && !sibuk && (
+        <section className="al-card">
+          <p className="al-galat" role="alert">{galat}</p>
+        </section>
+      )}
 
       {hasil && (
         <section className="al-card">
@@ -483,6 +509,7 @@ export function PanelBahasa({ project }: { project: Project | null }) {
               ))}
             </ul>
           )}
+          <LebihBanyak sisa={sisa} lagi={lagi} semua={semua} />
 
           <p className="al-tail">
             Mengikuti PUEBI dan KBBI. Kutipan langsung dilewati agar tidak salah ditandai.
@@ -503,16 +530,29 @@ export function PanelBahasa({ project }: { project: Project | null }) {
             {(["salah", "sebaiknya", "gaya"] as Berat[]).map((bt) => {
               const isi = hasil.temuan.filter((t) => t.berat === bt);
               if (isi.length === 0) return null;
+              // Dibatasi supaya laporan tetap dapat disusun dan dicetak. Naskah
+              // yang menghasilkan ribuan temuan akan mencetak ratusan halaman
+              // yang tidak akan dibaca siapa pun, dan menyusunnya lebih dulu
+              // membuat ponsel kehabisan memori.
+              const dicetak = isi.slice(0, MAKS_CETAK);
               return (
                 <div key={bt}>
                   <Bagian>{BERAT_LABEL[bt]} ({isi.length})</Bagian>
-                  {isi.map((t, i) => (
+                  {dicetak.map((t, i) => (
                     <Butir key={`${t.posisi}-${t.aturan}-${i}`} nada={KELAS_BERAT[t.berat] as "ok" | "warn" | "bad" | "abu"}
                       tanda={t.aturan} kutipan={t.kutipan}>
                       <p>{t.pesan}</p>
                       {t.saran && <p className="lap-fix">Ganti menjadi: {t.saran}</p>}
                     </Butir>
                   ))}
+                  {isi.length > dicetak.length && (
+                    <Butir nada="abu" tanda="Dipotong">
+                      <p>
+                        {(isi.length - dicetak.length).toLocaleString("id-ID")} temuan berikutnya tidak ikut dicetak.
+                        Betulkan dulu yang tercetak di sini, lalu jalankan pemeriksaan sekali lagi.
+                      </p>
+                    </Butir>
+                  )}
                 </div>
               );
             })}

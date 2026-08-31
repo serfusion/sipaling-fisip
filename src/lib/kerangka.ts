@@ -9,7 +9,7 @@
 // langsung tiap variabel bebas lebih dulu, lalu variabel antara, lalu
 // pengaruh tidak langsung, dan terakhir pengaruh serentak.
 
-import type { Masukan } from "./metodologi";
+import type { Jenis, Masukan } from "./metodologi";
 
 export type Jalur = {
   kode: string;
@@ -114,4 +114,148 @@ export function namaKotak(kotak: Kotak[], id: string) {
 /** Penanda variabel seperti yang lazim ditulis pada bagan skripsi. */
 export function tanda(id: string) {
   return { X1: "X1", X2: "X2", Z: "Z", Y: "Y" }[id] ?? id;
+}
+
+// ---------------------------------------------------------------------------
+// ALUR PIKIR UNTUK RANCANGAN YANG TIDAK MENGUJI VARIABEL
+// ---------------------------------------------------------------------------
+//
+// Bagan kotak-dan-panah di atas hanya sah bila ada variabel yang diuji
+// pengaruh atau hubungannya. Penelitian kualitatif, deskriptif, analisis isi,
+// dan evaluasi tetap wajib punya kerangka berpikir, hanya bentuknya berbeda:
+// bukan jalur antarvariabel, melainkan alur penalaran dari fenomena sampai
+// temuan yang diharapkan.
+//
+// Memaksakan bagan variabel pada rancangan kualitatif adalah kekeliruan yang
+// sering terjadi, dan penguji langsung menanyakannya: "mana variabel bebas
+// Anda?", padahal penelitiannya memang tidak punya.
+
+export type Simpul = {
+  /** Nama tahap pada bagan. */
+  tahap: string;
+  isi: string;
+};
+
+export type AlurPikir = {
+  simpul: Simpul[];
+  catatan: string;
+};
+
+const HARAPAN: Record<Jenis, string> = {
+  "kuantitatif-eksplanatif": "Besar dan arah pengaruh, beserta taraf signifikansinya",
+  "kuantitatif-korelasional": "Kekuatan dan arah hubungan antarvariabel",
+  "kuantitatif-komparatif": "Ada tidaknya perbedaan yang bermakna antar kelompok",
+  "kuantitatif-deskriptif": "Peta keadaan per indikator, bukan satu angka tunggal",
+  "kualitatif-deskriptif": "Tema yang berulang beserta kutipan pendukungnya",
+  fenomenologi: "Esensi pengalaman yang dihidupi para informan",
+  "studi-kasus": "Pola yang menjelaskan kasus, dijodohkan dengan teori",
+  "analisis-isi": "Kecenderungan kategori beserta angka kemunculannya",
+  "analisis-framing": "Bingkai yang dipakai tiap media, ditunjukkan dari potongan beritanya",
+  semiotika: "Makna di balik tanda, ditunjukkan dari potongan yang dianalisis",
+  "uses-gratifications": "Motif mana yang paling kuat mendorong penggunaannya",
+  "efektivitas-program": "Capaian dibanding tolok ukur resmi, dan penyebab selisihnya",
+  "strategi-komunikasi": "Tahap strategi yang dijalankan beserta hambatannya",
+  "implementasi-kebijakan": "Aspek mana yang membuat kebijakannya berjalan atau tersendat",
+  "peran-pemerintah": "Peran yang benar-benar dijalankan, dan yang belum",
+  "analisis-kebijakan": "Persoalan pada isi kebijakan dan pada pelaksanaannya",
+  governance: "Prinsip tata kelola yang sudah dan belum berjalan",
+  "strategi-pemerintah": "Strategi yang ditempuh beserta hambatan pelaksanaannya",
+};
+
+const CARA: Record<Jenis, string> = {
+  "kuantitatif-eksplanatif": "Kuesioner diuji lebih dulu, lalu regresi",
+  "kuantitatif-korelasional": "Kuesioner, lalu uji korelasi",
+  "kuantitatif-komparatif": "Kuesioner pada tiap kelompok, lalu uji beda",
+  "kuantitatif-deskriptif": "Kuesioner, lalu distribusi frekuensi",
+  "kualitatif-deskriptif": "Wawancara dan dokumen, lalu pengodean tematik",
+  fenomenologi: "Wawancara mendalam, lalu reduksi dan horizonalisasi",
+  "studi-kasus": "Wawancara, dokumen, observasi, lalu analisis tematik",
+  "analisis-isi": "Lembar koding dan koder kedua, lalu uji reliabilitas",
+  "analisis-framing": "Berita dibedah dengan perangkat framing model yang dipilih",
+  semiotika: "Potongan tanda dibaca pada tiap tataran model yang dipilih",
+  "uses-gratifications": "Kuesioner motif, lalu peringkat tiap motif",
+  "efektivitas-program": "Kuesioner indikator efektivitas, lalu skor per indikator",
+  "strategi-komunikasi": "Wawancara dan dokumen, ditata menurut tahap model strategi",
+  "implementasi-kebijakan": "Wawancara pelaksana dan dokumen, ditata per aspek model",
+  "peran-pemerintah": "Wawancara pemerintah dan masyarakat, ditata per peran",
+  "analisis-kebijakan": "Naskah kebijakan ditelaah, lalu diperiksa silang dengan pelaksananya",
+  governance: "Wawancara dan dokumen, dinilai per prinsip tata kelola",
+  "strategi-pemerintah": "Wawancara dan dokumen, ditata menurut tahap penyusunan strategi",
+};
+
+/**
+ * Susun alur penalaran penelitian, dari fenomena sampai temuan yang
+ * diharapkan.
+ *
+ * Isinya diambil dari masukan yang sama dengan yang dipakai merancang metode,
+ * sehingga bagan ini tidak mungkin bercerita lain daripada bab metodenya.
+ */
+/** Nama teori untuk kotak bagan.
+ *
+ *  Ketika program studinya belum terbaca, `bangunTeori` mengembalikan kalimat
+ *  anjuran, bukan nama teori. Kalimat itu benar sebagai saran tetapi janggal
+ *  dicetak di dalam kotak bagan, jadi diringkas menjadi penanda. */
+function namaTeori(teori: string[]) {
+  const utama = teori.slice(0, 2).filter((t) => !/dosen pembimbing/i.test(t));
+  return utama.join(" · ") || "Ditetapkan bersama dosen pembimbing";
+}
+
+export function susunAlurPikir(m: Masukan, jenis: Jenis, teori: string[]): AlurPikir {
+  const X = bersih(m.variabelX, "gagasan yang diteliti");
+  const Y = (m.variabelY ?? "").trim();
+  const siapa = (m.objek ?? "").trim();
+  const tempat = (m.lokasi ?? "").trim();
+
+  // Nama lembaga sering sudah menempel pada gagasannya sendiri: "humas Dinas
+  // Kominfo Kota Serang" sudah menyebut lembaganya. Menambahkan "pada Dinas
+  // Kominfo Kota Serang" di belakangnya hanya mencetak nama yang sama dua kali
+  // di dalam satu kotak.
+  const terpakai: string[] = [X];
+  const belumDisebut = (bagian: string) =>
+    bagian !== "" && !terpakai.some((t) => t.toLowerCase().includes(bagian.toLowerCase()));
+  const fenomena = [X];
+  if (belumDisebut(siapa)) { fenomena.push(`pada ${siapa}`); terpakai.push(siapa); }
+  if (belumDisebut(tempat)) fenomena.push(`di ${tempat}`);
+
+  const fokus =
+    jenis === "analisis-isi"
+      ? `Apa yang terkandung dalam ${Y || "teks yang dipilih"} ketika membicarakan ${X}`
+      : jenis === "analisis-framing"
+        ? `Bagaimana ${Y || "media yang dipilih"} membingkai ${X}`
+        : jenis === "semiotika"
+          ? `Makna apa yang terbangun di balik tanda tentang ${X} dalam ${Y || "teks yang dipilih"}`
+      : jenis === "efektivitas-program"
+        ? `Sejauh mana ${X} mencapai sasaran yang ditetapkan`
+      : jenis === "implementasi-kebijakan"
+        ? `Aspek mana yang membuat ${X} berjalan atau tersendat di lapangan`
+      : jenis === "peran-pemerintah"
+        ? `Peran apa yang benar-benar dijalankan ${siapa || "pemerintah"} dalam ${X}`
+      : jenis === "analisis-kebijakan"
+        ? `Persoalan apa yang terkandung dalam ${X} dan dalam pelaksanaannya`
+      : jenis === "governance"
+        ? `Prinsip tata kelola mana yang sudah dan belum berjalan dalam ${X}`
+        : jenis === "fenomenologi"
+          ? `Bagaimana ${siapa || "informan"} memaknai pengalaman ${X}`
+          : jenis === "studi-kasus" || jenis === "strategi-komunikasi" || jenis === "strategi-pemerintah"
+            // Pada cerita berbentuk proses, Y berisi kegiatannya, bukan
+            // akibatnya. "Bagaimana A bertaut dengan mengelola akun resminya"
+            // tidak berbunyi; yang ditanyakan studi kasus memang bagaimana
+            // kegiatan itu dijalankan.
+            ? `Bagaimana ${X} dijalankan${Y ? `, khususnya dalam ${Y}` : ""}`
+            : Y
+              ? `Bagaimana ${X} bertaut dengan ${Y}`
+              : `Bagaimana ${X} berlangsung sebenarnya`;
+
+  return {
+    simpul: [
+      { tahap: "Fenomena", isi: fenomena.join(" ") },
+      { tahap: "Teori dan konsep", isi: namaTeori(teori) },
+      { tahap: "Fokus penelitian", isi: fokus },
+      { tahap: "Cara memeriksa", isi: CARA[jenis] },
+      { tahap: "Temuan yang diharapkan", isi: HARAPAN[jenis] },
+    ],
+    catatan:
+      "Rancangan ini tidak menguji hubungan antarvariabel, jadi kerangka berpikirnya berbentuk alur " +
+      "penalaran, bukan kotak X dan Y. Memaksakan bagan variabel di sini justru akan ditanyakan penguji.",
+  };
 }
