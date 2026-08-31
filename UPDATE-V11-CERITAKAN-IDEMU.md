@@ -1,4 +1,4 @@
-# UPDATE v11 — Ceritakan idemu, Cakrawala yang memikirkan metodenya
+# UPDATE v11: Ceritakan idemu, Cakrawala yang memikirkan metodenya
 
 Tidak ada SQL yang perlu dijalankan, tidak ada paket baru, tidak ada variabel
 environment baru. Seluruh perubahan ada di kode aplikasi.
@@ -7,7 +7,7 @@ environment baru. Seluruh perubahan ada di kode aplikasi.
 
 ## Masalahnya
 
-Perumus Judul dan Metode sudah bekerja dengan baik — bagi yang sudah tahu
+Perumus Judul dan Metode sudah bekerja dengan baik bagi yang sudah tahu
 jawabannya. Ia bertanya: apa tujuan penelitianmu, apa unit analisismu, apa
 variabel bebas dan variabel terikatmu. Mahasiswa yang **belum tahu istilah
 itu** justru yang paling butuh, dan justru mereka yang berhenti di layar
@@ -23,7 +23,7 @@ Yang mereka punya bukan variabel. Yang mereka punya kalimat seperti:
 ### 1. Kotak cerita di Perumus Judul dan Metode
 
 Di paling atas alat itu sekarang ada satu kotak: **"Ceritakan skripsi atau
-jurnal yang kamu pikirkan"**. Tulis bebas, sepanjang yang mau — apa yang
+jurnal yang kamu pikirkan"**. Tulis bebas, sepanjang yang mau: apa yang
 dilihat, kenapa terasa penting, siapa yang mau diteliti, di mana.
 
 Sekali tombolnya ditekan, Cakrawala membaca cerita itu dan mengisi sendiri
@@ -50,14 +50,14 @@ Hasil pembacaan tidak muncul begitu saja. Tiap butir disertai **potongan
 kalimat mahasiswa sendiri** yang menjadi dasarnya, beserta tingkat
 keyakinannya:
 
-- **tertulis jelas** — memang ada di kalimatnya;
-- **disimpulkan** — tidak ditulis persis, tetapi mengikuti dari yang lain;
-- **belum disebut, ini dugaan** — diisi sementara supaya rancangannya bisa
+- **tertulis jelas**: memang ada di kalimatnya;
+- **disimpulkan**: tidak ditulis persis, tetapi mengikuti dari yang lain;
+- **belum disebut, ini dugaan**: diisi sementara supaya rancangannya bisa
   jalan, dan pantas diperiksa ulang.
 
 Yang tidak ketemu **tidak ditebak diam-diam**, melainkan ditanyakan: "Siapa
 yang akan Anda teliti?", "Penelitiannya di mana?". Pertanyaannya pun
-menyesuaikan rancangan — penelitian fenomenologi tidak ditanyai variabel
+menyesuaikan rancangan, dan penelitian fenomenologi tidak ditanyai variabel
 terikat, karena rancangan itu memang tidak punya.
 
 Semua isian tetap dapat dibetulkan sendiri lewat formulir di bawahnya, dan
@@ -72,14 +72,14 @@ kerangka berpikir tetap wajib ada di BAB II.
 Sekarang keduanya ada, dan bentuknya dibedakan sesuai rancangannya:
 
 - **Bagan variabel** (kotak X → Y, bernomor hipotesis) untuk rancangan yang
-  menguji pengaruh atau hubungan — seperti sebelumnya.
+  menguji pengaruh atau hubungan, seperti sebelumnya.
 - **Bagan alur pikir** (Fenomena → Teori dan konsep → Fokus penelitian → Cara
   memeriksa → Temuan yang diharapkan) untuk kualitatif, deskriptif, analisis
   isi, analisis wacana, dan evaluasi.
 
 Pembedaan ini bukan hiasan. Memaksakan bagan variabel pada penelitian
 kualitatif adalah kekeliruan yang langsung ditanyakan penguji: "mana variabel
-bebas Anda?" — padahal penelitiannya memang tidak punya.
+bebas Anda?", padahal penelitiannya memang tidak punya.
 
 Isi kedua bagan diambil dari masukan yang sama dengan yang dipakai menyusun
 bab metode, jadi bagan dan bab metode tidak mungkin bercerita lain.
@@ -100,7 +100,7 @@ hasilnya.
 
 **Yang diburamkan, dengan tirai bertuliskan "Terkunci":**
 
-- bagan kerangka berpikirnya — yang sudah tersusun dari cerita itu;
+- bagan kerangka berpikirnya, yang sudah tersusun dari cerita itu;
 - bentuk visualisasi yang sesuai untuk metode tersebut.
 
 Buramnya sengaja tidak pekat: yang perlu terlihat adalah bahwa bagannya
@@ -150,7 +150,7 @@ perangkat, dan siapa yang menanggung biayanya.
 
 Bagan yang diburamkan di halaman kunci **diburamkan lewat tampilan**, jadi
 pengunjung yang paham alat pengembang peramban dapat menghilangkan buramnya.
-Itu memang bukan pengaman, melainkan penanda — dan yang tersembunyi di situ
+Itu memang bukan pengaman, melainkan penanda, dan yang tersembunyi di situ
 adalah bagan yang disusun dari cerita pengunjung itu sendiri, bukan milik
 orang lain.
 
@@ -164,19 +164,19 @@ terkirim ke pengunjung yang belum punya kode.
 
 Baru:
 
-- `src/lib/tafsir-cerita.ts` — pembaca cerita: kamus isyarat, pola kalimat,
+- `src/lib/tafsir-cerita.ts`: pembaca cerita, kamus isyarat, pola kalimat,
   dan penyusun isian rancangan berikut pertanyaan untuk yang belum terbaca.
 
 Diubah:
 
-- `src/lib/kerangka.ts` — penyusun bagan alur pikir untuk rancangan yang tidak
+- `src/lib/kerangka.ts`: penyusun bagan alur pikir untuk rancangan yang tidak
   menguji variabel.
-- `src/app/alat/grafik.tsx` — `BaganAlurPikir`, bagan rantai tahap.
-- `src/app/alat/panel-judul.tsx` — kotak cerita, kartu hasil pembacaan, dan
+- `src/app/alat/grafik.tsx`: `BaganAlurPikir`, bagan rantai tahap.
+- `src/app/alat/panel-judul.tsx`: kotak cerita, kartu hasil pembacaan, dan
   bagan alur pikir untuk rancangan non-variabel.
-- `src/app/alat/pratinjau.tsx` — etalase hidup di halaman kunci berikut lapis
+- `src/app/alat/pratinjau.tsx`: etalase hidup di halaman kunci berikut lapis
   buramnya.
-- `src/app/globals.css` — gaya kotak cerita, kartu bukti, bagan alur pikir,
+- `src/app/globals.css`: gaya kotak cerita, kartu bukti, bagan alur pikir,
   dan lapis terkunci (mengikuti token warna yang sudah ada, ikut mode malam
   dan mode terang).
 

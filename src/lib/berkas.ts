@@ -3,7 +3,7 @@
 // Atribut accept pada kotak unggah hanyalah saran: pengguna tetap dapat
 // memilih berkas jenis apa pun, dan pada ponsel pemilih berkas kerap
 // mengabaikannya sama sekali. Karena itu jenis berkas ditentukan di sini,
-// dari tanda pengenal pada byte pertamanya — bukan dari namanya.
+// dari tanda pengenal pada byte pertamanya, bukan dari namanya.
 //
 // Yang dapat dibaca: Word (.docx), PDF, dan teks polos. Ketiganya diurai di
 // perangkat pengguna, di dalam pekerja latar, sehingga halaman tidak pernah
@@ -42,7 +42,7 @@ export const MAKS_MB: Record<JenisBerkas, number> = {
 
 /** Batas jumlah huruf yang dimuat ke kotak naskah.
  *
- *  Sejuta huruf kira-kira 150 ribu kata — jauh di atas skripsi mana pun,
+ *  Sejuta huruf kira-kira 150 ribu kata, jauh di atas skripsi mana pun,
  *  termasuk lampirannya. Batas ini bukan soal kemampuan mengurai, melainkan
  *  soal kotak teks di peramban: di atas angka ini mengetik di dalamnya mulai
  *  terasa berat pada ponsel kelas menengah. */
@@ -92,7 +92,7 @@ export function kenaliJenis(awal: Uint8Array, nama: string): JenisBerkas {
     if (t.awal.every((b, i) => awal[i] === b)) return t.jenis;
   }
 
-  // PK\x03\x04 — seluruh berkas Office modern dan OpenDocument adalah zip.
+  // PK\x03\x04: seluruh berkas Office modern dan OpenDocument adalah zip.
   if (awal[0] === 0x50 && awal[1] === 0x4b && awal[2] === 0x03 && awal[3] === 0x04) {
     for (const [pola, jenis] of AKHIRAN_ZIP) if (pola.test(nama)) return jenis;
     // Tanpa akhiran yang dikenali, dicoba sebagai .docx. Bila ternyata bukan,

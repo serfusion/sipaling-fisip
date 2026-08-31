@@ -4,7 +4,7 @@
 // Worker: seluruh isinya pekerjaan berat yang, bila dikerjakan di tempat
 // halaman digambar, membuat layar berhenti menanggapi selama beberapa detik.
 // Membuka skripsi 250 halaman berarti membongkar zip, mengurai XML, atau
-// menyusun ulang ratusan ribu potongan teks — semuanya sekaligus.
+// menyusun ulang ratusan ribu potongan teks, semuanya sekaligus.
 //
 // Dua pustaka dipakai, keduanya dimuat hanya saat benar-benar dibutuhkan:
 //
@@ -54,8 +54,8 @@ async function bacaDocx(data: ArrayBuffer, lapor: Kemajuan): Promise<HasilEkstra
   let nilai: string;
   try {
     // extractRawText, bukan convertToHtml: yang dibutuhkan kotak naskah hanya
-    // teksnya, dan tiap paragraf sudah jatuh pada barisnya sendiri — persis
-    // yang diperlukan pengurai bab untuk mengenali judul.
+    // teksnya, dan tiap paragraf sudah jatuh pada barisnya sendiri, persis
+    // seperti yang diperlukan pengurai bab untuk mengenali judul.
     const hasil = await mammoth.extractRawText({ arrayBuffer: data });
     nilai = hasil.value;
   } catch {
@@ -92,7 +92,7 @@ async function bacaPdf(data: ArrayBuffer, lapor: Kemajuan): Promise<HasilEkstrak
   // pdf.js biasanya menyalakan pekerjanya sendiri dari berkas terpisah yang
   // harus diunduh. Dengan penangan pesannya dipasang di sini, pdf.js memakai
   // jalur "pekerja semu": penguraian berjalan di utas tempat berkas ini
-  // dijalankan — yaitu pekerja kita sendiri, bukan utas utama. Tidak ada
+  // dijalankan, yaitu pekerja kita sendiri, bukan utas utama. Tidak ada
   // berkas tambahan yang diunduh, dan tidak ada aturan CSP yang dilanggar.
   (globalThis as { pdfjsWorker?: unknown }).pdfjsWorker = {
     WorkerMessageHandler: pekerjaPdf.WorkerMessageHandler,
@@ -167,7 +167,7 @@ async function bacaPdf(data: ArrayBuffer, lapor: Kemajuan): Promise<HasilEkstrak
     throw new GalatBerkas(
       `PDF ini tidak punya lapisan teks: ${jumlahHalaman} halamannya berupa gambar hasil pindaian atau foto, ` +
         "sehingga tidak ada huruf yang bisa diambil. Unggah berkas Word aslinya, atau PDF yang diekspor " +
-        "langsung dari Word — bukan hasil pindai.",
+        "langsung dari Word, bukan hasil pindai.",
     );
   }
 

@@ -537,7 +537,7 @@ function KotakCerita({
         sub="Tulis apa adanya, sepanjang yang kamu mau. Biar Cakrawala yang menerjemahkannya jadi metode" />
       <p className="al-note">
         Tidak perlu tahu istilah metodologi lebih dulu. Tulis saja apa yang mengganggu pikiranmu, siapa yang mau
-        kamu teliti, dan di mana. <b>Ceritanya tidak dikirim ke mana pun</b> — dibaca di perangkat ini saja.
+        kamu teliti, dan di mana. <b>Ceritanya tidak dikirim ke mana pun</b>, dibaca di perangkat ini saja.
       </p>
 
       <label className="al-field">
@@ -608,7 +608,7 @@ function HasilBacaan({ bacaan }: { bacaan: Bacaan }) {
 
       <p className="al-tail">
         Semua ini <b>dugaan yang dibaca dari kalimatmu sendiri</b>, bukan karangan mesin. Kalau ada yang meleset,
-        betulkan langsung pada isian di bawah — rancangannya ikut berubah seketika.
+        betulkan langsung pada isian di bawah, dan rancangannya ikut berubah seketika.
       </p>
     </section>
   );

@@ -3,7 +3,7 @@
 // Semua pekerjaan berat Cakrawala dikumpulkan di berkas ini, dan berkas ini
 // dijalankan pada utas terpisah. Alasannya satu: peramban menggambar halaman
 // dan menjalankan JavaScript pada utas yang sama. Selama satu perhitungan
-// panjang berjalan di sana, tidak ada yang bergerak — gulir mati, tombol
+// panjang berjalan di sana, tidak ada yang bergerak: gulir mati, tombol
 // tidak menanggapi, dan sebagian ponsel memunculkan tawaran menutup halaman.
 //
 // Naskah skripsi utuh berukuran ratusan ribu huruf. Memeriksa ejaannya

@@ -122,13 +122,13 @@ export function tanda(id: string) {
 //
 // Bagan kotak-dan-panah di atas hanya sah bila ada variabel yang diuji
 // pengaruh atau hubungannya. Penelitian kualitatif, deskriptif, analisis isi,
-// dan evaluasi tetap wajib punya kerangka berpikir — hanya bentuknya berbeda:
+// dan evaluasi tetap wajib punya kerangka berpikir, hanya bentuknya berbeda:
 // bukan jalur antarvariabel, melainkan alur penalaran dari fenomena sampai
 // temuan yang diharapkan.
 //
 // Memaksakan bagan variabel pada rancangan kualitatif adalah kekeliruan yang
 // sering terjadi, dan penguji langsung menanyakannya: "mana variabel bebas
-// Anda?" — padahal penelitiannya memang tidak punya.
+// Anda?", padahal penelitiannya memang tidak punya.
 
 export type Simpul = {
   /** Nama tahap pada bagan. */

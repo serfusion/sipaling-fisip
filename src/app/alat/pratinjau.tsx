@@ -356,8 +356,8 @@ function EtalaseCoba() {
         <p className="cw-eyebrow">COBA DULU, TANPA KODE AKSES</p>
         <h2>Ceritakan skripsi atau jurnal yang kamu pikirkan</h2>
         <p className="cw-coba-sub">
-          Nggak perlu tahu istilah metodologi. Tulis apa adanya — apa yang kamu lihat, siapa yang mau kamu
-          teliti, di mana — lalu Cakrawala menunjukkan metode mana yang bisa menjawabnya.
+          Nggak perlu tahu istilah metodologi. Tulis apa adanya: apa yang kamu lihat, siapa yang mau kamu
+          teliti, di mana. Lalu Cakrawala menunjukkan metode mana yang bisa menjawabnya.
         </p>
       </div>
 
@@ -399,8 +399,8 @@ function HasilCobaTampil({ hasil }: { hasil: HasilCoba }) {
     <div className="cw-hasil">
       {!bacaan.cukup && (
         <p className="cw-hasil-tipis">
-          Ceritanya masih terlalu ringkas untuk dibaca dengan yakin. Yang di bawah ini dugaan sementara —
-          tambahkan siapa yang mau kamu teliti dan di mana, lalu coba lagi.
+          Ceritanya masih terlalu ringkas untuk dibaca dengan yakin. Yang di bawah ini dugaan sementara.
+          Tambahkan siapa yang mau kamu teliti dan di mana, lalu coba lagi.
         </p>
       )}
 
@@ -466,7 +466,7 @@ function HasilCobaTampil({ hasil }: { hasil: HasilCoba }) {
           <b>Kerangka berpikirmu sudah jadi, tinggal dilihat</b>
           <p>
             Bagan kerangka berpikir dan {visual.length} bentuk visualisasi yang sesuai untuk metode ini sudah
-            tersusun dari ceritamu barusan — lengkap dengan apa yang diletakkan di tiap sumbunya. Buka dengan kode
+            tersusun dari ceritamu barusan, lengkap dengan apa yang diletakkan di tiap sumbunya. Buka dengan kode
             akses untuk melihatnya, mengubahnya, dan mencetaknya.
           </p>
           <a className="cw-btn cw-btn-terang" href="#kode">Buka dengan kode akses →</a>

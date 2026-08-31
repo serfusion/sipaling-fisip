@@ -2476,7 +2476,7 @@ a.al-mini:hover { color: var(--al-ink); }
 /* --- Bilah kemajuan pembacaan berkas naskah ---
    Word dan PDF dibongkar di pekerja latar, dan skripsi 250 halaman memang
    makan waktu beberapa detik. Tanpa tanda apa pun, jeda itu terbaca sebagai
-   halaman yang macet — jadi yang ditampilkan bukan sekadar pemutar berputar,
+   halaman yang macet, jadi yang ditampilkan bukan sekadar pemutar berputar,
    melainkan halaman keberapa yang sedang dibaca, berikut tombol batalnya. */
 .al-muat { margin-top: 14px; padding: 13px 15px; border: 1px solid var(--al-line);
   border-radius: 12px; background: var(--al-bg-lembut); }

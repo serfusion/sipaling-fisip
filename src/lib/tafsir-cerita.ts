@@ -598,7 +598,7 @@ const PENANDA_TEMPAT =
 
 const POLA_LOKASI: RegExp[] = [
   new RegExp(`\\bdi\\s+((?:${PENANDA_TEMPAT})[\\w\\s.'-]{2,50}?)${HENTI}`, "i"),
-  // "di Serang", "di Banten" — satu sampai tiga kata berhuruf kapital.
+  // "di Serang", "di Banten": satu sampai tiga kata berhuruf kapital.
   /\bdi\s+([A-Z][a-zA-Z'-]+(?:\s+[A-Z][a-zA-Z'-]+){0,2})\b/,
 ];
 
@@ -710,8 +710,8 @@ function bacaProdi(t: string, bawaan: Prodi): Prodi {
 // ---------------------------------------------------------------------------
 
 const LABEL_TUJUAN: Record<Tujuan, string> = {
-  pengaruh: "Pengaruh — apakah A memengaruhi B",
-  hubungan: "Hubungan — apakah A berkaitan dengan B",
+  pengaruh: "Pengaruh, apakah A memengaruhi B",
+  hubungan: "Hubungan, apakah A berkaitan dengan B",
   perbedaan: "Perbedaan antar kelompok",
   gambaran: "Gambaran keadaan",
   makna: "Makna dan pengalaman",
