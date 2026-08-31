@@ -84,28 +84,82 @@ bebas Anda?", padahal penelitiannya memang tidak punya.
 Isi kedua bagan diambil dari masukan yang sama dengan yang dipakai menyusun
 bab metode, jadi bagan dan bab metode tidak mungkin bercerita lain.
 
-### 4. Etalase yang benar-benar bekerja di halaman kunci
+### 4. Empat judul siap pilih, metodenya menyusul di bawahnya
+
+Yang dicari mahasiswa adalah judulnya. Metode penting, tetapi ia jawaban atas
+judul, bukan pintu masuknya. Karena itu empat contoh disajikan sebagai
+**empat judul**, dengan metodenya sebagai keterangan kecil di bawah masing-masing:
+
+| Judul contoh | Metode |
+| --- | --- |
+| Pengaruh Terpaan Konten Berita di TikTok terhadap Minat Baca Berita pada Mahasiswa Ilmu Komunikasi di Universitas Serang Raya | Kuantitatif, menguji pengaruh |
+| Analisis Isi Banjir dalam Kompas.com | Analisis Isi, menghitung isi teks |
+| Pengalaman Ibu Rumah Tangga dalam Berjualan Online di Kota Serang | Fenomenologi, menggali pengalaman |
+| Strategi Humas Dinas Komunikasi dan Informatika Kota Serang dalam Mengelola Akun Resminya | Studi Kasus, menelusuri satu kasus |
+
+Keempatnya berangkat dari cerita yang sama-sama masuk akal, dan metodenya jadi
+berbeda-beda karena bentuk pertanyaannya berbeda. Itu hal yang paling sulit
+dijelaskan dengan kata-kata dan paling mudah ditunjukkan.
+
+Judul pada kartunya **tidak diketik tangan**. Ia dihasilkan mesin yang sama
+dengan yang bekerja ketika kartunya ditekan, jadi judul yang terpampang tidak
+mungkin berbeda dari judul yang muncul sesudahnya. Berkas uji membandingkan
+keduanya, satu per satu.
+
+Kartunya diberi bilah warna di tepi atas, biru untuk kuantitatif dan emas
+untuk kualitatif, dan tersedia di dua tempat: halaman kunci dan Perumus Judul
+di dalam.
+
+### 5. Nama metode dalam bahasa ruang bimbingan
+
+"Kuantitatif eksplanatif (asosiatif kausal)" adalah nama yang benar, dan
+memang itu yang harus tertulis di bab metode. Tetapi ia bukan kalimat yang
+menenangkan mahasiswa yang baru bertanya.
+
+Yang tampil besar di layar sekarang **judulnya**, lalu nama metode yang
+dikenal sehari-hari, lalu satu frasa tentang apa yang dikerjakannya:
+
+> **KUANTITATIF** · menguji pengaruh · *nama resminya di bab metode:
+> kuantitatif eksplanatif (asosiatif kausal)*
+
+Nama resminya tetap disebut, hanya tidak lagi menjadi hal pertama yang dibaca,
+dan tetap dipakai apa adanya pada laporan cetak.
+
+Satu hal kecil ikut dibetulkan: nama yang huruf kapitalnya di tengah kini
+dipertahankan saat judul dikapitalisasi, sehingga tercetak "TikTok", bukan
+"Tiktok" yang langsung terbaca sebagai salah ketik.
+
+### 6. Etalase yang benar-benar bekerja di halaman kunci
 
 Halaman kunci Cakrawala selama ini berisi gambaran tampilan tiap menu.
 Sekarang di paling atasnya ada satu bagian yang **benar-benar bekerja**:
-pengunjung tanpa kode akses dapat menceritakan idenya dan langsung melihat
-hasilnya.
+pengunjung tanpa kode akses dapat menceritakan idenya, atau menekan salah satu
+contoh, lalu langsung melihat hasilnya.
 
-**Yang dibuka:**
+**Yang dibuka penuh:**
 
-- metode yang cocok beserta paradigmanya;
+- judul yang cocok, tercetak paling besar di kartunya;
+- metodenya beserta paradigmanya, di bawah judul;
 - cerita pengunjung dibacakan ulang dalam bahasa metode;
-- satu usulan judul dan satu rumusan masalah;
-- jumlah ketidakcocokan judul-metode yang ditemukan, bila ada.
+- satu pilihan judul lain dan satu rumusan masalah;
+- jumlah ketidakcocokan judul-metode yang ditemukan, bila ada;
+- **bagan kerangka berpikirnya**, terbaca utuh.
 
-**Yang diburamkan, dengan tirai bertuliskan "Terkunci":**
+**Yang memudar di bawahnya:**
 
-- bagan kerangka berpikirnya, yang sudah tersusun dari cerita itu;
-- bentuk visualisasi yang sesuai untuk metode tersebut.
+- bentuk visualisasi yang sesuai untuk metode tersebut;
+- pada rancangan kualitatif, dua tahap terakhir bagan alur pikir.
 
-Buramnya sengaja tidak pekat: yang perlu terlihat adalah bahwa bagannya
-**memang sudah jadi**, hanya belum boleh dibaca. Tombol di tirainya mengantar
-langsung ke kotak kode akses.
+Tidak ada gembok dan tidak ada tirai. Bagian bawahnya mengabur berangsur
+sampai habis di tepi, sehingga terbaca sebagai halaman yang masih berlanjut,
+bukan sebagai pintu yang ditutup. Bagan kerangka berpikirnya sendiri sengaja
+dibuka utuh, karena justru itu yang meyakinkan: bagan yang benar-benar jadi
+dari cerita yang baru saja diketik.
+
+Yang mengaburkan adalah `filter` biasa pada lapisan isinya, bukan
+`backdrop-filter`. Yang terakhir itu bergantung pada percepatan perangkat
+keras dan diam-diam tidak berfungsi di sebagian peramban dan ponsel, sehingga
+bagian yang seharusnya memudar akan tampil terang benderang.
 
 Ajakan di kepala halaman ikut diubah dari "Lihat isinya dulu" menjadi
 **"Coba dulu, gratis"**, karena sekarang memang ada yang bisa dicoba.
@@ -146,13 +200,13 @@ cukup satu fungsi `tafsirkan()` yang diganti. Yang perlu diputuskan lebih dulu
 bukan soal teknis, melainkan apakah cerita mahasiswa boleh dikirim keluar
 perangkat, dan siapa yang menanggung biayanya.
 
-## Catatan jujur: buram bukan gembok
+## Catatan jujur: memudar bukan mengunci
 
-Bagan yang diburamkan di halaman kunci **diburamkan lewat tampilan**, jadi
-pengunjung yang paham alat pengembang peramban dapat menghilangkan buramnya.
-Itu memang bukan pengaman, melainkan penanda, dan yang tersembunyi di situ
-adalah bagan yang disusun dari cerita pengunjung itu sendiri, bukan milik
-orang lain.
+Yang memudar di halaman kunci **memudar lewat tampilan**, jadi pengunjung yang
+paham alat pengembang peramban dapat menghilangkan kaburnya. Itu memang bukan
+pengaman, melainkan penanda bahwa halamannya masih berlanjut, dan yang ada di
+balik kabur itu pun bagan yang disusun dari cerita pengunjung itu sendiri,
+bukan milik orang lain.
 
 Gembok yang sebenarnya tidak berubah: kesembilan alat Cakrawala tetap dijaga
 di sisi server (`src/app/alat/page.tsx`), dan isinya tidak pernah ikut
@@ -165,7 +219,8 @@ terkirim ke pengunjung yang belum punya kode.
 Baru:
 
 - `src/lib/tafsir-cerita.ts`: pembaca cerita, kamus isyarat, pola kalimat,
-  dan penyusun isian rancangan berikut pertanyaan untuk yang belum terbaca.
+  penyusun isian rancangan berikut pertanyaan untuk yang belum terbaca, dan
+  empat contoh cerita siap pakai.
 
 Diubah:
 

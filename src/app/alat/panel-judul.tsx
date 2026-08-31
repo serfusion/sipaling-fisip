@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Ic, IKON, Kepala, Rinci, SumberAcuan } from "./ikon";
 import { PerluProject } from "./panel-naskah";
 import {
-  DATA_PILIHAN, JENIS_LABEL, TUJUAN_PILIHAN, UNIT_PILIHAN,
+  DATA_PILIHAN, JENIS_KERJA, JENIS_LABEL, JENIS_UMUM, TUJUAN_PILIHAN, UNIT_PILIHAN,
   kuantitatif, rancang, slovin,
   type Data, type Masukan, type Prodi, type Tujuan, type Unit,
 } from "@/lib/metodologi";
@@ -14,7 +14,7 @@ import { Bagian, Butir, Catatan, LaporanCetak, TombolCetak } from "./laporan";
 import { BaganAlurPikir, BaganKerangka, ContohGrafik } from "./grafik";
 import { susunAlurPikir, susunKerangka } from "@/lib/kerangka";
 import { GRAFIK_NAMA, usulkanVisual } from "@/lib/visual";
-import { CONTOH_CERITA, MINIMAL_KATA, hitungKataCerita, tafsirkan, type Bacaan } from "@/lib/tafsir-cerita";
+import { MINIMAL_KATA, contohSiap, hitungKataCerita, tafsirkan, type Bacaan } from "@/lib/tafsir-cerita";
 
 const KOSONG: Masukan = {
   variabelX: "", variabelX2: "", variabelZ: "", variabelY: "", objek: "", lokasi: "",
@@ -273,12 +273,18 @@ export function PanelJudul({
 
           <section className="al-card">
             <div className={`al-verdict ${hambat.length > 0 ? "periksa" : "wajar"}`}>
-              <h3>{JENIS_LABEL[hasil.jenis]}</h3>
+              <span className="al-verdict-mata">JUDUL YANG DISARANKAN</span>
+              <h3 className="al-verdict-judul">{hasil.judul[0]}</h3>
+              <p className="al-verdict-metode">
+                <span className="al-cap">{JENIS_UMUM[hasil.jenis]}</span>
+                {JENIS_KERJA[hasil.jenis]}
+                <em>nama resminya di bab metode: {JENIS_LABEL[hasil.jenis].toLowerCase()}</em>
+              </p>
               <b>{hambat.length > 0 ? "Rancangan ini belum utuh" : "Pilihan Anda saling menopang"}</b>
               <p>{hasil.paradigma}</p>
             </div>
 
-            <h3 className="al-h4">Usulan judul</h3>
+            <h3 className="al-h4">Pilihan judul</h3>
             <ul className="al-list">
               {hasil.judul.map((j) => (
                 <li key={j} className="al-item ok">
@@ -527,6 +533,8 @@ export function PanelJudul({
 function KotakCerita({
   onBacakan, sibuk,
 }: { onBacakan: (cerita: string) => void; sibuk: boolean }) {
+  // Dibacakan sekali, supaya judul di kartunya persis judul yang keluar nanti.
+  const contoh = useMemo(() => contohSiap(), []);
   const [cerita, setCerita] = useState("");
   const kata = hitungKataCerita(cerita);
   const cukup = kata >= MINIMAL_KATA;
@@ -553,10 +561,29 @@ function KotakCerita({
         </small>
       </label>
 
-      <div className="al-linkrow">
-        <button type="button" className="al-link" onClick={() => setCerita(CONTOH_CERITA)}>Isi dengan contoh</button>
-        {cerita && <button type="button" className="al-link" onClick={() => setCerita("")}>Kosongkan</button>}
+      <h3 className="al-h4">Belum kepikiran judulnya? Pakai salah satu dari empat ini</h3>
+      <p className="al-note">
+        Keempatnya berangkat dari cerita yang sama-sama masuk akal, dan metodenya jadi berbeda-beda karena bentuk
+        pertanyaannya berbeda. Menekannya mengisi kotak cerita di atas dengan cerita yang menghasilkan judul itu.
+      </p>
+      <div className="al-tiles al-tiles-contoh">
+        {contoh.map((c) => (
+          <button key={c.id} type="button" className={`al-tile al-tile-contoh ${c.jalur}`}
+            disabled={sibuk} onClick={() => setCerita(c.cerita)}>
+            <b>{c.judul}</b>
+            <span className="al-tile-metode">
+              <span className="al-jalur">{c.metode}</span>
+              <small>{c.kerja}</small>
+            </span>
+          </button>
+        ))}
       </div>
+
+      {cerita && (
+        <div className="al-linkrow">
+          <button type="button" className="al-link" onClick={() => setCerita("")}>Kosongkan</button>
+        </div>
+      )}
 
       <button type="button" className="al-btn" disabled={!cukup || sibuk} onClick={() => onBacakan(cerita)}>
         {sibuk ? (

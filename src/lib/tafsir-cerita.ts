@@ -21,6 +21,7 @@
 // Yang keluar dari sini tetap dugaan, dan mahasiswa dapat membetulkannya
 // lewat formulir yang sama seperti sebelumnya.
 
+import { JENIS_KERJA, JENIS_LABEL, JENIS_UMUM, rancang } from "./metodologi";
 import type { Data, Masukan, Prodi, Tujuan, Unit } from "./metodologi";
 
 export type Yakin = "kuat" | "sedang" | "terka";
@@ -47,13 +48,107 @@ export type Bacaan = {
 
 export const MINIMAL_KATA = 12;
 
-export const CONTOH_CERITA =
-  "Aku mau meneliti soal mahasiswa yang sekarang kebanyakan cari berita dari TikTok. " +
-  "Kayaknya makin sering mereka buka TikTok, makin turun minat baca berita di media " +
-  "resmi. Aku pengen tahu apakah terpaan konten berita di TikTok itu benar-benar " +
-  "berpengaruh terhadap minat baca berita pada mahasiswa Ilmu Komunikasi di " +
-  "Universitas Serang Raya. Rencananya sebar kuesioner, populasinya sekitar 600 " +
-  "mahasiswa, target responden 100 orang.";
+export type Jalur = "kuantitatif" | "kualitatif";
+
+export type ContohIde = {
+  id: string;
+  /** Nama pendek untuk penanda jalurnya. */
+  label: string;
+  jalur: Jalur;
+  cerita: string;
+};
+
+/** Contoh yang sudah dibacakan: judul dan metodenya diambil dari mesin yang
+ *  sama, bukan diketik ulang di sini. */
+export type ContohSiap = ContohIde & {
+  judul: string;
+  metode: string;
+  metodeResmi: string;
+  kerja: string;
+};
+
+/**
+ * Empat contoh cerita, satu untuk tiap rancangan yang paling sering dipakai
+ * di FISIP.
+ *
+ * Gunanya bukan sekadar mengisi kotak. Mahasiswa yang bingung biasanya juga
+ * belum tahu bahwa pilihannya memang ada dua jalur, dan bahwa jalur itu
+ * ditentukan oleh bentuk pertanyaannya, bukan oleh selera. Dengan menekan
+ * keempatnya bergantian, perbedaan itu terlihat sendiri: pertanyaan yang
+ * sama-sama masuk akal menghasilkan metode yang sama sekali berbeda.
+ *
+ * Tiap cerita ditulis seperti mahasiswa bercerita, bukan seperti proposal,
+ * dan memang menghasilkan metode yang tertulis di bawahnya.
+ */
+export const CONTOH_IDE: ContohIde[] = [
+  {
+    id: "pengaruh",
+    label: "Pengaruh",
+    jalur: "kuantitatif",
+    cerita:
+      "Aku mau meneliti soal mahasiswa yang sekarang kebanyakan cari berita dari TikTok. " +
+      "Kayaknya makin sering mereka buka TikTok, makin turun minat baca berita di media " +
+      "resmi. Aku pengen tahu apakah terpaan konten berita di TikTok itu benar-benar " +
+      "berpengaruh terhadap minat baca berita pada mahasiswa Ilmu Komunikasi di " +
+      "Universitas Serang Raya. Rencananya sebar kuesioner, populasinya sekitar 600 " +
+      "mahasiswa, target responden 100 orang.",
+  },
+  {
+    id: "isi",
+    label: "Analisis Isi",
+    jalur: "kuantitatif",
+    cerita:
+      "Saya mau melakukan analisis isi pemberitaan banjir di Kompas.com selama Januari " +
+      "sampai Maret 2025. Yang ingin saya tahu, framing apa yang paling sering dipakai " +
+      "dan kategori mana yang paling mendominasi. Beritanya saya kumpulkan sebagai " +
+      "dokumen supaya bisa dikoding ulang.",
+  },
+  {
+    id: "fenomenologi",
+    label: "Fenomenologi",
+    jalur: "kualitatif",
+    cerita:
+      "Untuk skripsi Ilmu Komunikasi, saya tertarik meneliti pengalaman ibu rumah " +
+      "tangga yang berjualan online di " +
+      "Kota Serang. Bagaimana mereka memaknai pekerjaan itu, dan kenapa mereka bertahan " +
+      "walaupun untungnya kecil. Rencananya wawancara mendalam dengan sekitar tujuh " +
+      "informan sampai keterangannya tidak ada yang baru lagi.",
+  },
+  {
+    id: "studi-kasus",
+    label: "Studi Kasus",
+    jalur: "kualitatif",
+    cerita:
+      "Saya ingin meneliti bagaimana strategi humas Dinas Komunikasi dan Informatika " +
+      "Kota Serang dalam mengelola akun resminya. Bagaimana proses penyusunan kontennya " +
+      "dijalankan, siapa yang memutuskan, dan apa saja hambatannya. Rencananya wawancara " +
+      "kepala bidang dan stafnya, observasi kegiatan, serta mengumpulkan dokumen laporan.",
+  },
+];
+
+/** Contoh bawaan, dipakai tombol "Isi dengan contoh" di dalam Cakrawala. */
+export const CONTOH_CERITA = CONTOH_IDE[0].cerita;
+
+/**
+ * Bacakan keempat contoh, lalu kembalikan judul dan metodenya.
+ *
+ * Judulnya sengaja tidak ditulis tangan di berkas ini. Ia dihasilkan mesin
+ * yang sama dengan yang dipakai saat contohnya ditekan, sehingga judul yang
+ * terpampang pada kartu tidak mungkin berbeda dari judul yang muncul
+ * sesudahnya. Perhitungannya sepersekian milidetik untuk keempatnya.
+ */
+export function contohSiap(): ContohSiap[] {
+  return CONTOH_IDE.map((c) => {
+    const rancangan = rancang(tafsirkan(c.cerita).masukan);
+    return {
+      ...c,
+      judul: rancangan.judul[0],
+      metode: JENIS_UMUM[rancangan.jenis],
+      metodeResmi: JENIS_LABEL[rancangan.jenis],
+      kerja: JENIS_KERJA[rancangan.jenis],
+    };
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Perkakas kecil
@@ -610,7 +705,23 @@ const BUKAN_TEMPAT = new Set(
     .split(" "),
 );
 
-function bacaObjek(t: string): Cocok | null {
+/** Nama lembaga yang lengkap, misalnya "Dinas Komunikasi dan Informatika Kota
+ *  Serang". Pada studi kasus, yang diteliti memang lembaganya, bukan orang
+ *  per orang yang kebetulan disebut sebagai calon narasumber. */
+const POLA_LEMBAGA = new RegExp(
+  "\\b((?:Dinas|Badan|Kantor|Balai|Sekretariat|Biro|Bagian|Kementerian|Kecamatan|" +
+    "Kelurahan|Desa|Puskesmas|RSUD|DPRD|KPU|Bawaslu|Universitas|Fakultas|Yayasan|" +
+    "Koperasi|Perusahaan)\\s+[A-Z][\\w.'-]*(?:\\s+(?:dan|[A-Z][\\w.'-]*)){0,5})",
+);
+
+function bacaObjek(t: string, unit: Unit): Cocok | null {
+  if (unit === "organisasi") {
+    const m = t.match(POLA_LEMBAGA);
+    if (m && typeof m.index === "number") {
+      const nilai = rapikanFrasa(m[1], 7);
+      if (nilai.length >= 4) return { nilai, bukti: kalimatSekitar(t, m.index), posisi: m.index };
+    }
+  }
   for (const p of POLA_OBJEK) {
     const m = t.match(p);
     if (m && typeof m.index === "number") {
@@ -762,7 +873,7 @@ export function tafsirkan(cerita: string, prodiBawaan: Prodi = "lain"): Bacaan {
   const unit = bacaUnit(t, tujuan.tujuan);
   const data = bacaData(t, tujuan.tujuan);
   const variabel = bacaVariabel(t, tujuan.tujuan);
-  const objek = bacaObjek(t);
+  const objek = bacaObjek(t, unit.unit);
   const lokasi = bacaLokasi(t);
   const bilangan = bacaAngka(t);
   const prodi = bacaProdi(t, prodiBawaan);
