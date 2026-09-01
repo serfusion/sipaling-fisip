@@ -102,6 +102,121 @@ type DataApi = {
   tren: { bulan: string; masuk: number; keluar: number }[];
 };
 
+// ============================================================
+// ANTREAN LURING
+//
+// Orang mencatat uang justru di tempat sinyalnya paling buruk: di dalam
+// pasar, di parkiran, di antrean kasir. Catatan yang gagal terkirim TIDAK
+// boleh hilang dan tidak boleh membuat pemiliknya mengetik ulang; ia
+// disimpan di perangkat dan dikirim sendiri begitu jaringannya kembali.
+// ============================================================
+
+const KUNCI_ANTREAN = "sipaling_uang_antrean";
+const pendengarAntrean = new Set<() => void>();
+let antreanSesi = "[]";
+
+type Antre = { id: string; pesan: string; waktu: number };
+
+function langgananAntrean(dengar: () => void) {
+  pendengarAntrean.add(dengar);
+  window.addEventListener("storage", dengar);
+  return () => {
+    pendengarAntrean.delete(dengar);
+    window.removeEventListener("storage", dengar);
+  };
+}
+
+function bacaAntreanMentah() {
+  try {
+    return localStorage.getItem(KUNCI_ANTREAN) || "[]";
+  } catch {
+    return antreanSesi;
+  }
+}
+
+const bacaAntreanServer = () => "[]";
+
+function tulisAntrean(daftar: Antre[]) {
+  const teks = JSON.stringify(daftar.slice(-200));
+  antreanSesi = teks;
+  try {
+    localStorage.setItem(KUNCI_ANTREAN, teks);
+  } catch {
+    // Antreannya tetap hidup selama halaman ini terbuka.
+  }
+  for (const dengar of pendengarAntrean) dengar();
+}
+
+function uraiAntrean(teks: string): Antre[] {
+  try {
+    const isi = JSON.parse(teks);
+    if (!Array.isArray(isi)) return [];
+    return isi.filter((a) => a && typeof a.pesan === "string");
+  } catch {
+    return [];
+  }
+}
+
+type HasilKirim = {
+  ok: boolean;
+  /** Gagal karena jaringan, bukan karena ditolak server. */
+  luring?: boolean;
+  isi?: {
+    tersimpan?: { arah: string; nominal: number; catatan: string; namaKategori: string; tanggal: string; pesan?: string[] }[];
+    gagal?: { baris: string; alasan: string }[];
+  };
+  galat?: string;
+};
+
+/** Mengirim satu pesan. Tidak menyentuh state, jadi aman dipanggil dari mana pun. */
+async function kirimPesan(kode: string, pesan: string): Promise<HasilKirim> {
+  try {
+    const jawab = await fetch("/api/uang/catat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kode, pesan }),
+    });
+    const isi = await jawab.json().catch(() => null);
+    if (!jawab.ok) return { ok: false, galat: isi?.message || "Catatan gagal disimpan." };
+    return { ok: true, isi };
+  } catch {
+    return {
+      ok: false,
+      luring: true,
+      galat: "Belum ada sinyal. Catatannya diantre dan dikirim sendiri begitu tersambung.",
+    };
+  }
+}
+
+/**
+ * Meminta buku milik langganan Cakrawala.
+ *
+ * Dipakai panel di dalam Cakrawala supaya pelanggannya tidak perlu mengurus
+ * kode buku sama sekali: ia membuka menunya, bukunya sudah ada.
+ */
+async function ambilBukuCakrawala(): Promise<{ kode?: string; galat?: string }> {
+  try {
+    const jawab = await fetch("/api/uang/buku/cakrawala", { method: "POST" });
+    const isi = await jawab.json().catch(() => null);
+    if (jawab.ok && isi?.success && isi?.buku?.kode) return { kode: String(isi.buku.kode) };
+    return { galat: isi?.message || "Buku belum dapat disiapkan." };
+  } catch {
+    return { galat: "Tidak dapat menghubungi server." };
+  }
+}
+
+/** Peristiwa pemasangan aplikasi, yang belum ada di pustaka tipe peramban. */
+type PeristiwaPasang = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: string }>;
+};
+
+// Nomor bot diisi lewat environment saat build. Kosong berarti tombolnya
+// diganti keterangan cara memasangnya, bukan tombol yang tidak menuju ke mana
+// pun.
+const NOMOR_WA = (process.env.NEXT_PUBLIC_UANG_WA || "").replace(/\D/g, "");
+const BOT_TELEGRAM = (process.env.NEXT_PUBLIC_UANG_TELEGRAM || "").replace(/^@/, "").trim();
+
 type HasilMuat = { data?: DataApi; galat?: string; kosongkan?: boolean };
 
 /**
@@ -129,6 +244,26 @@ async function ambilCatatan(kode: string, bulan: string): Promise<HasilMuat> {
   }
 }
 
+/**
+ * Pembungkus terluar layar ini.
+ *
+ * Di halaman /uang ia <main>, karena memang seluruh isi halamannya. Di dalam
+ * Cakrawala ia <div>: halaman itu sudah punya <main> sendiri, dan dua <main>
+ * bersarang membuat pembaca layar kehilangan penanda isi utama.
+ */
+function Bingkai({
+  dalam,
+  kelas,
+  children,
+}: {
+  dalam: boolean;
+  kelas: string;
+  children: React.ReactNode;
+}) {
+  if (dalam) return <div className={kelas}>{children}</div>;
+  return <main className={kelas}>{children}</main>;
+}
+
 const CONTOH = [
   "+honor guru 100k",
   "-beli nasi uduk 10k",
@@ -136,12 +271,16 @@ const CONTOH = [
   "-350rb listrik",
 ];
 
-export default function UangApp() {
+export default function UangApp({ dalam = false }: { dalam?: boolean }) {
   const kode = useSyncExternalStore(langgananKode, bacaKode, bacaKodeServer);
+  const antreanTeks = useSyncExternalStore(langgananAntrean, bacaAntreanMentah, bacaAntreanServer);
+  const antrean = useMemo(() => uraiAntrean(antreanTeks), [antreanTeks]);
   const [bulan, setBulan] = useState(() => bulanWib());
   const [data, setData] = useState<DataApi | null>(null);
   const [galat, setGalat] = useState("");
   const [kabar, setKabar] = useState<string[]>([]);
+  const [galatSiap, setGalatSiap] = useState("");
+  const [pasang, setPasang] = useState<PeristiwaPasang | null>(null);
 
   // Sedang memuat bila yang ada di layar bukan bulan yang diminta. Ia
   // turunan, bukan state tersendiri: satu state yang lupa dimatikan berarti
@@ -181,6 +320,96 @@ export default function UangApp() {
     };
   }, [kode, bulan, terapkan]);
 
+  // Pelanggan Cakrawala tidak pernah melihat gerbang kode: bukunya diminta
+  // sendiri begitu panelnya dibuka. Bila gagal (mis. kunci Cakrawala sedang
+  // dimatikan sehingga tidak ada yang menandai siapa pengunjungnya), layarnya
+  // jatuh kembali ke gerbang biasa beserta alasannya.
+  const perluSiapkan = dalam && kode === "";
+  useEffect(() => {
+    if (!perluSiapkan) return;
+    let hidup = true;
+    void ambilBukuCakrawala().then((hasil) => {
+      if (!hidup) return;
+      if (hasil.kode) tulisKode(hasil.kode);
+      else setGalatSiap(hasil.galat || "Buku belum dapat disiapkan.");
+    });
+    return () => {
+      hidup = false;
+    };
+  }, [perluSiapkan]);
+
+  /**
+   * Mengirim ulang catatan yang tertahan di antrean.
+   *
+   * Yang ditolak server (kalimatnya memang tidak terbaca) dibuang, bukan
+   * diulang selamanya. Yang gagal karena jaringan tetap di antrean.
+   */
+  const kirimAntrean = useCallback(async () => {
+    if (!kode || kode === BELUM_TAHU) return;
+    const daftar = uraiAntrean(bacaAntreanMentah());
+    if (daftar.length === 0) return;
+
+    const sisa: Antre[] = [];
+    let berhasil = 0;
+    for (const satu of daftar) {
+      const hasil = await kirimPesan(kode, satu.pesan);
+      if (hasil.ok) berhasil += 1;
+      else if (hasil.luring) sisa.push(satu);
+    }
+    tulisAntrean(sisa);
+    if (berhasil > 0) terapkan(await ambilCatatan(kode, bulan));
+  }, [kode, bulan, terapkan]);
+
+  // Menyegarkan sendiri. Inilah yang membuat catatan yang dikirim lewat
+  // WhatsApp muncul di layar ini tanpa disuruh: halaman yang sedang terbuka
+  // menanyakan bulannya lagi tiap dua puluh lima detik, dan hanya ketika ia
+  // memang sedang dilihat orang.
+  useEffect(() => {
+    if (!kode || kode === BELUM_TAHU) return;
+
+    const saatOnline = () => {
+      void kirimAntrean();
+    };
+    window.addEventListener("online", saatOnline);
+
+    const jam = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void ambilCatatan(kode, bulan).then(terapkan);
+      void kirimAntrean();
+    }, 25_000);
+
+    return () => {
+      window.removeEventListener("online", saatOnline);
+      window.clearInterval(jam);
+    };
+  }, [kode, bulan, terapkan, kirimAntrean]);
+
+  // Tawaran pemasangan aplikasi. Peramban memunculkannya sekali, dan bila
+  // tidak ditangkap di sini tawarannya hilang begitu saja.
+  useEffect(() => {
+    const tangkap = (peristiwa: Event) => {
+      peristiwa.preventDefault();
+      setPasang(peristiwa as PeristiwaPasang);
+    };
+    window.addEventListener("beforeinstallprompt", tangkap);
+    return () => window.removeEventListener("beforeinstallprompt", tangkap);
+  }, []);
+
+  // Pekerja latar hanya dipasang pada halaman /uang. Di dalam Cakrawala,
+  // halamannya bukan milik alat ini dan tidak boleh ikut disimpan.
+  useEffect(() => {
+    if (dalam || typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+    const daftarkan = () => {
+      navigator.serviceWorker.register("/uang-sw.js").catch(() => {
+        // Peramban yang menolak pekerja latar (mode penyamaran, setelan
+        // perusahaan) tetap dapat memakai halamannya seperti biasa.
+      });
+    };
+    if (document.readyState === "complete") daftarkan();
+    else window.addEventListener("load", daftarkan, { once: true });
+    return () => window.removeEventListener("load", daftarkan);
+  }, [dalam]);
+
   const simpanKode = useCallback((baru: string) => {
     tulisKode(baru);
     setBulan(bulanWib());
@@ -195,41 +424,46 @@ export default function UangApp() {
   async function kirim(pesan: string) {
     if (!kode) return { ok: false };
     setGalat("");
-    try {
-      const jawab = await fetch("/api/uang/catat", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ kode, pesan }),
-      });
-      const isi = await jawab.json();
-      if (!jawab.ok) {
-        setGalat(isi?.message || "Catatan gagal disimpan.");
+
+    const hasil = await kirimPesan(kode, pesan);
+
+    if (!hasil.ok) {
+      if (!hasil.luring) {
+        setGalat(hasil.galat || "Catatan gagal disimpan.");
         return { ok: false };
       }
-      const laporan: string[] = [];
-      for (const baris of isi.tersimpan ?? []) {
-        laporan.push(
-          `${baris.arah === "masuk" ? "Masuk" : "Keluar"} ${rupiah(baris.nominal)} - ${baris.catatan} (${baris.namaKategori})`,
-        );
-        for (const tambahan of baris.pesan ?? []) laporan.push(tambahan);
-      }
-      for (const gagal of isi.gagal ?? []) {
-        laporan.push(`Belum tercatat: ${gagal.baris ? `"${gagal.baris}" - ` : ""}${gagal.alasan}`);
-      }
-      setKabar(laporan);
-      if ((isi.tersimpan ?? []).length > 0) {
-        // Bulan catatan bisa berbeda dengan bulan yang sedang dilihat, mis.
-        // ketika menulis "27/8" pada awal September. Layar dipindahkan ke
-        // bulan itu supaya catatannya benar-benar terlihat, bukan hilang.
-        const bulanBaru = String(isi.tersimpan[0].tanggal || "").slice(0, 7);
-        if (bulanBaru && bulanBaru !== bulan) setBulan(bulanBaru);
-        else await muat(kode, bulan);
-      }
-      return { ok: (isi.tersimpan ?? []).length > 0 };
-    } catch {
-      setGalat("Tidak dapat menghubungi server. Catatannya belum tersimpan.");
-      return { ok: false };
+      // Jaringannya yang tidak ada, bukan catatannya yang salah. Ia dipegang
+      // di perangkat dan kotak tulisnya dikosongkan: menahannya di layar
+      // hanya membuat orang mengetik ulang hal yang sudah aman tersimpan.
+      const nomor = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      tulisAntrean([...uraiAntrean(bacaAntreanMentah()), { id: nomor, pesan, waktu: Date.now() }]);
+      setKabar([hasil.galat || "Catatannya diantre."]);
+      return { ok: true };
     }
+
+    const isi = hasil.isi ?? {};
+    const tersimpan = isi.tersimpan ?? [];
+    const laporan: string[] = [];
+    for (const baris of tersimpan) {
+      laporan.push(
+        `${baris.arah === "masuk" ? "Masuk" : "Keluar"} ${rupiah(baris.nominal)} - ${baris.catatan} (${baris.namaKategori})`,
+      );
+      for (const tambahan of baris.pesan ?? []) laporan.push(tambahan);
+    }
+    for (const gagal of isi.gagal ?? []) {
+      laporan.push(`Belum tercatat: ${gagal.baris ? `"${gagal.baris}" - ` : ""}${gagal.alasan}`);
+    }
+    setKabar(laporan);
+
+    if (tersimpan.length > 0) {
+      // Bulan catatan bisa berbeda dengan bulan yang sedang dilihat, mis.
+      // ketika menulis "27/8" pada awal September. Layar dipindahkan ke
+      // bulan itu supaya catatannya benar-benar terlihat, bukan hilang.
+      const bulanBaru = String(tersimpan[0].tanggal || "").slice(0, 7);
+      if (bulanBaru && bulanBaru !== bulan) setBulan(bulanBaru);
+      else await muat(kode, bulan);
+    }
+    return { ok: tersimpan.length > 0 };
   }
 
   async function hapus(id: number) {
@@ -250,23 +484,30 @@ export default function UangApp() {
     }
   }
 
-  if (kode === BELUM_TAHU) {
+  const kelas = dalam ? "ug-wrap ug-dalam" : "ug-wrap";
+
+  if (kode === BELUM_TAHU || (perluSiapkan && !galatSiap)) {
     return (
-      <main className="ug-wrap">
+      <Bingkai dalam={dalam} kelas={kelas}>
         <p className="ug-tunggu">Menyiapkan catatan...</p>
-      </main>
+      </Bingkai>
     );
   }
 
-  if (!kode) return <Gerbang onMasuk={simpanKode} />;
+  if (!kode) return <Gerbang onMasuk={simpanKode} dalam={dalam} catatan={galatSiap} />;
 
   return (
-    <main className="ug-wrap">
+    <Bingkai dalam={dalam} kelas={kelas}>
+      {pasang ? <TawaranPasang peristiwa={pasang} onTutup={() => setPasang(null)} /> : null}
+
       <Kepala
         nama={data?.buku.nama ?? "Buku kas"}
         bulan={bulan}
         onBulan={setBulan}
-        onKeluar={keluar}
+        // Di dalam Cakrawala bukunya melekat pada langganan, bukan pada
+        // perangkat. Tombol keluar di sana hanya akan membuang kode lalu
+        // memintanya kembali sedetik kemudian.
+        onKeluar={dalam ? null : keluar}
         memuat={memuat}
       />
 
@@ -280,6 +521,16 @@ export default function UangApp() {
 
       <Tulis onKirim={kirim} kabar={kabar} onTutupKabar={() => setKabar([])} />
 
+      {antrean.length > 0 ? (
+        <div className="ug-luring">
+          <b>{antrean.length} catatan menunggu sinyal.</b>
+          <span>Semuanya tersimpan di perangkat ini dan dikirim sendiri begitu tersambung.</span>
+          <button type="button" onClick={() => void kirimAntrean()}>
+            Coba kirim sekarang
+          </button>
+        </div>
+      ) : null}
+
       <Rincian ringkasan={data?.ringkasan} />
 
       <Daftar
@@ -290,8 +541,15 @@ export default function UangApp() {
         onHapus={hapus}
       />
 
-      <Sambungan kode={kode} nama={data?.buku.nama ?? ""} baris={data?.baris ?? []} bulan={bulan} />
-    </main>
+      <Sambungan
+        kode={kode}
+        nama={data?.buku.nama ?? ""}
+        baris={data?.baris ?? []}
+        bulan={bulan}
+        pasang={pasang}
+        onPasang={() => setPasang(null)}
+      />
+    </Bingkai>
   );
 }
 
@@ -299,7 +557,16 @@ export default function UangApp() {
 // GERBANG: buat buku baru, atau buka yang sudah ada
 // ============================================================
 
-function Gerbang({ onMasuk }: { onMasuk: (kode: string) => void }) {
+function Gerbang({
+  onMasuk,
+  dalam = false,
+  catatan = "",
+}: {
+  onMasuk: (kode: string) => void;
+  dalam?: boolean;
+  /** Alasan buku langganan tidak dapat disiapkan sendiri, bila ada. */
+  catatan?: string;
+}) {
   const [mode, setMode] = useState<"baru" | "buka">("baru");
   const [nama, setNama] = useState("");
   const [kode, setKode] = useState("");
@@ -347,9 +614,11 @@ function Gerbang({ onMasuk }: { onMasuk: (kode: string) => void }) {
     }
   }
 
+  const kelas = dalam ? "ug-wrap ug-dalam ug-gerbang" : "ug-wrap ug-gerbang";
+
   if (kodeBaru) {
     return (
-      <main className="ug-wrap ug-gerbang">
+      <Bingkai dalam={dalam} kelas={kelas}>
         <div className="ug-kartu ug-jadi">
           <h1>Bukunya siap</h1>
           <p>Simpan kode ini. Ia satu-satunya kunci buku Anda, dan tidak dapat dipulihkan.</p>
@@ -370,12 +639,12 @@ function Gerbang({ onMasuk }: { onMasuk: (kode: string) => void }) {
             Mulai mencatat
           </button>
         </div>
-      </main>
+      </Bingkai>
     );
   }
 
   return (
-    <main className="ug-wrap ug-gerbang">
+    <Bingkai dalam={dalam} kelas={kelas}>
       <header className="ug-hero">
         <span className="ug-lencana">Catatan Uang</span>
         <h1>Tulis satu pesan, uangnya tercatat sendiri</h1>
@@ -452,12 +721,56 @@ function Gerbang({ onMasuk }: { onMasuk: (kode: string) => void }) {
         )}
 
         {galat ? <p className="ug-galat">{galat}</p> : null}
+        {!galat && catatan ? <p className="ug-halus">{catatan}</p> : null}
       </div>
 
-      <p className="ug-balik">
-        <Link href="/">Kembali ke beranda portal</Link>
-      </p>
-    </main>
+      {dalam ? null : (
+        <p className="ug-balik">
+          <Link href="/">Kembali ke beranda portal</Link>
+        </p>
+      )}
+    </Bingkai>
+  );
+}
+
+// ============================================================
+// TAWARAN PEMASANGAN APLIKASI
+// ============================================================
+
+function TawaranPasang({
+  peristiwa,
+  onTutup,
+}: {
+  peristiwa: PeristiwaPasang;
+  onTutup: () => void;
+}) {
+  return (
+    <div className="ug-pasang">
+      <b>Pasang sebagai aplikasi</b>
+      <span>
+        Ada ikonnya sendiri di layar utama, terbuka tanpa peramban, dan tetap bisa mencatat
+        walaupun sinyalnya hilang.
+      </span>
+      <button
+        type="button"
+        onClick={async () => {
+          try {
+            await peristiwa.prompt();
+            await peristiwa.userChoice;
+          } catch {
+            // Tawaran yang sudah kedaluwarsa: tidak ada yang perlu dikabarkan.
+          }
+          // Peramban hanya memberi satu tawaran; sesudah dipakai ia dibuang
+          // apa pun jawabannya.
+          onTutup();
+        }}
+      >
+        Pasang
+      </button>
+      <button type="button" className="ug-pasang-tutup" onClick={onTutup}>
+        Nanti
+      </button>
+    </div>
   );
 }
 
@@ -475,7 +788,8 @@ function Kepala({
   nama: string;
   bulan: string;
   onBulan: (b: string) => void;
-  onKeluar: () => void;
+  /** null berarti buku ini tidak dapat ditinggalkan dari layar ini. */
+  onKeluar: (() => void) | null;
   memuat: boolean;
 }) {
   const bulanIni = bulanWib();
@@ -501,9 +815,11 @@ function Kepala({
       </div>
       <div className="ug-kepala-alat">
         {memuat ? <span className="ug-memuat">memuat...</span> : null}
-        <button type="button" className="ug-halus-tombol" onClick={onKeluar}>
-          Keluar
-        </button>
+        {onKeluar ? (
+          <button type="button" className="ug-halus-tombol" onClick={onKeluar}>
+            Keluar
+          </button>
+        ) : null}
       </div>
     </header>
   );
@@ -847,11 +1163,15 @@ function Sambungan({
   nama,
   baris,
   bulan,
+  pasang,
+  onPasang,
 }: {
   kode: string;
   nama: string;
   baris: BarisApi[];
   bulan: string;
+  pasang: PeristiwaPasang | null;
+  onPasang: () => void;
 }) {
   const [buka, setBuka] = useState(false);
   const [terlihat, setTerlihat] = useState(false);
@@ -902,13 +1222,72 @@ function Sambungan({
           </div>
 
           <div>
+            <b>Catat lewat WhatsApp</b>
+            <p className="ug-halus">
+              Sekali sambung, sesudah itu cukup kirim pesan biasa ke nomor botnya. Catatannya masuk
+              ke buku ini walaupun halaman ini tidak pernah dibuka lagi.
+            </p>
+            {NOMOR_WA ? (
+              <a
+                className="ug-wa"
+                href={`https://wa.me/${NOMOR_WA}?text=${encodeURIComponent(`daftar ${kode}`)}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Sambungkan WhatsApp sekarang
+              </a>
+            ) : (
+              <p className="ug-halus">
+                Nomor botnya belum dipasang di portal ini. Setelah dipasang, tombol sambung muncul di
+                sini. Sementara itu, kirim <code>daftar {terlihat ? kode : "KODE-BUKU-ANDA"}</code> ke
+                nomor botnya secara manual.
+              </p>
+            )}
+          </div>
+
+          <div>
             <b>Catat lewat Telegram</b>
             <p className="ug-halus">
-              Buka bot catatan portal, lalu kirim <code>/daftar {terlihat ? kode : "KODE-BUKU-ANDA"}</code>{" "}
-              sekali saja. Sesudah itu setiap pesan yang Anda kirim ke bot langsung masuk ke buku ini,
-              termasuk saat halaman ini tertutup.
+              Kirim <code>/daftar {terlihat ? kode : "KODE-BUKU-ANDA"}</code> sekali saja ke bot
+              catatan portal. Sesudah itu setiap pesan yang Anda kirim ke bot langsung masuk ke buku
+              ini.
             </p>
+            {BOT_TELEGRAM ? (
+              <a
+                className="ug-halus-tombol"
+                href={`https://t.me/${BOT_TELEGRAM}?text=${encodeURIComponent(`/daftar ${kode}`)}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Buka bot Telegram
+              </a>
+            ) : null}
           </div>
+
+          {pasang ? (
+            <div>
+              <b>Pasang sebagai aplikasi</b>
+              <p className="ug-halus">
+                Ikon sendiri di layar utama, terbuka tanpa peramban, dan tetap dapat mencatat ketika
+                sinyalnya hilang.
+              </p>
+              <button
+                type="button"
+                className="ug-halus-tombol"
+                onClick={async () => {
+                  try {
+                    await pasang.prompt();
+                    await pasang.userChoice;
+                  } catch {
+                    // Tawaran yang sudah kedaluwarsa.
+                  }
+                  onPasang();
+                }}
+              >
+                Pasang aplikasi
+              </button>
+            </div>
+          ) : null}
 
           <div>
             <b>Unduh catatan</b>

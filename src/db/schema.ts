@@ -283,6 +283,15 @@ export const moneyBooks = pgTable("money_books", {
   /** Kunci pemilik, mis. "K7M2-QX9P-3R". Selalu huruf kapital. */
   code: varchar("code", { length: 24 }).notNull().unique(),
   name: varchar("name", { length: 80 }).notNull(),
+  /**
+   * Penanda pemilik dari luar, untuk buku yang lahir dari langganan
+   * Cakrawala: sidik kode aksesnya, bukan kodenya sendiri.
+   *
+   * Gunanya satu hal: pelanggan yang membuka Cakrawala di ponsel dan di
+   * laptop mendapat buku yang SAMA tanpa perlu menyalin kode kedua. Kosong
+   * untuk buku yang dibuat sendiri lewat halaman /uang.
+   */
+  ownerKey: varchar("owner_key", { length: 80 }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   lastUsedAt: timestamp("last_used_at", { withTimezone: true }).notNull().defaultNow(),
 });

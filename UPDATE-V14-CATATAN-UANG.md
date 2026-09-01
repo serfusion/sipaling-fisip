@@ -213,6 +213,11 @@ uji-uang.ts                     105 periksa atas pengurai dan kodenya
 Yang diubah: `src/db/schema.ts` (tiga tabel), `src/app/globals.css` (kelas
 berawalan `.ug-`), dan satu tautan "Catatan Uang" di kepala halaman utama.
 
+> **Lanjutannya ada di UPDATE-V15-WHATSAPP-DAN-APLIKASI.md**: jalur WhatsApp,
+> pemasangan sebagai aplikasi beserta antrean luringnya, dan menu Catatan Uang
+> di dalam Cakrawala. Isi berkas ini tetap berlaku; yang berubah di sana hanya
+> bertambah.
+
 ## Menjalankan ujinya
 
 ```bash

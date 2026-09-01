@@ -12,6 +12,8 @@ import { uraiPesan, uraiBanyak, tanggalWib, bulanWib } from "./src/lib/uang/urai
 import { tebakArah, tebakKategori, kategoriDari, seragamkan } from "./src/lib/uang/kategori";
 import { bentukKode, buatKodeBuku, normalisasiKode, rapikanNamaBuku } from "./src/lib/uang/buku";
 import { rupiah, rupiahRingkas, labelBulan, labelHari, geserBulan } from "./src/lib/uang/format";
+import { bacaPerintah } from "./src/lib/uang/perintah";
+import { bacaMuatanGerbang, bacaMuatanMeta, nomorWa } from "./src/lib/uang/whatsapp";
 
 let lulus = 0;
 const gagal: string[] = [];
@@ -222,6 +224,92 @@ sama("geser bulan maju", geserBulan("2026-12", 1), "2027-01");
 // di Indonesia masuk ke tanggal kemarin.
 sama("tanggal WIB pagi hari", tanggalWib(new Date("2026-09-15T23:30:00Z")), "2026-09-16");
 sama("bulan WIB", bulanWib(new Date("2026-09-30T23:30:00Z")), "2026-10");
+
+console.log("\n=== PERINTAH vs CATATAN ===\n");
+
+// Inilah pemisah yang menjaga jalur WhatsApp tetap masuk akal. Di sana orang
+// tidak mengetik garis miring, jadi kata biasa harus dapat menjadi perintah
+// TANPA menelan kalimat yang sebenarnya catatan uang.
+sama("garis miring selalu perintah", bacaPerintah("/batal").nama, "batal");
+sama("kata tunggal juga perintah", bacaPerintah("batal").nama, "batal");
+sama("sebutan lain diseragamkan", bacaPerintah("ringkasan").nama, "ringkas");
+sama("halo dianggap minta bantuan", bacaPerintah("halo").nama, "bantuan");
+
+// "bantuan sosial 500k" adalah uang masuk, bukan permintaan bantuan.
+sama("kata perintah di kalimat panjang bukan perintah", bacaPerintah("bantuan sosial 500k").nama, null);
+sama("hapus di kalimat panjang bukan perintah", bacaPerintah("hapus tagihan wifi 300k").nama, null);
+
+// "daftar ulang 500k" adalah biaya kuliah. Yang membuat "daftar" menjadi
+// perintah bukan katanya, melainkan kode yang sah di belakangnya.
+sama("daftar tanpa kode dan berkalimat panjang", bacaPerintah("daftar ulang 500k").nama, null);
+sama("daftar bergaris miring tetap perintah", bacaPerintah("/daftar").nama, "daftar");
+sama("daftar bergaris miring tanpa kode", bacaPerintah("/daftar").kode, null);
+
+const kodeUji = bentukKode("7HQ4M2XB9KDT");
+sama("daftar dengan kode sah", bacaPerintah(`daftar ${kodeUji}`).nama, "daftar");
+sama("kodenya ikut terbaca", bacaPerintah(`daftar ${kodeUji}`).kode, kodeUji);
+sama("nama bot ikut dibuang", bacaPerintah(`/daftar@BukuKasBot ${kodeUji}`).kode, kodeUji);
+sama("catatan biasa bukan perintah", bacaPerintah("-beli nasi uduk 10k").nama, null);
+sama("perintah asing dikenali sebagai bergaris miring", bacaPerintah("/statistik").bergarisMiring, true);
+sama("perintah asing bukan perintah yang dikenal", bacaPerintah("/statistik").nama, null);
+
+console.log("\n=== NOMOR WHATSAPP ===\n");
+
+// Satu orang yang sama datang dengan tiga penulisan berbeda tergantung
+// gerbangnya. Kalau tidak diseragamkan, catatannya terbelah tiga.
+sama("nol di depan menjadi 62", nomorWa("08123456789"), "628123456789");
+sama("sudah berkode negara", nomorWa("628123456789"), "628123456789");
+sama("akhiran c.us dibuang", nomorWa("628123456789@c.us"), "628123456789");
+sama("tanda baca dibuang", nomorWa("+62 812-3456-789"), "628123456789");
+sama("tanpa nol dan tanpa kode negara", nomorWa("8123456789"), "628123456789");
+sama("kosong ditolak", nomorWa(""), null);
+sama("bukan nomor ditolak", nomorWa("halo"), null);
+
+console.log("\n=== MUATAN WHATSAPP ===\n");
+
+const muatanMeta = {
+  object: "whatsapp_business_account",
+  entry: [
+    {
+      changes: [
+        {
+          value: {
+            contacts: [{ profile: { name: "Eko" }, wa_id: "628123456789" }],
+            messages: [
+              { id: "wamid.1", from: "628123456789", type: "text", text: { body: "-beli nasi uduk 10k" } },
+            ],
+          },
+        },
+      ],
+    },
+  ],
+};
+const dariMeta = bacaMuatanMeta(muatanMeta);
+sama("nomor dari meta", dariMeta?.nomor, "628123456789");
+sama("teks dari meta", dariMeta?.teks, "-beli nasi uduk 10k");
+sama("nama dari meta", dariMeta?.label, "Eko");
+
+// Pemberitahuan "sudah dibaca" datang lewat jalur yang sama dan TIDAK boleh
+// dianggap pesan. Kalau dianggap, tiap centang biru menjadi catatan gagal.
+sama(
+  "pemberitahuan status diabaikan",
+  bacaMuatanMeta({ entry: [{ changes: [{ value: { statuses: [{ status: "read" }] } }] }] }),
+  null,
+);
+sama("gambar tanpa teks diabaikan", bacaMuatanMeta({
+  entry: [{ changes: [{ value: { messages: [{ id: "x", from: "628123456789", type: "image" }] } }] }],
+}), null);
+
+const dariGerbang = bacaMuatanGerbang({ sender: "08123456789", message: "+honor guru 100k", name: "Eko" });
+sama("nomor dari gerbang", dariGerbang?.nomor, "628123456789");
+sama("teks dari gerbang", dariGerbang?.teks, "+honor guru 100k");
+
+// Tiap gerbang menamai kolomnya sendiri-sendiri; yang lazim dipakai
+// diterima semuanya supaya berpindah gerbang tidak berarti menulis ulang.
+const namaLain = bacaMuatanGerbang({ pengirim: "628123456789", pesan: "-kopi 15k" });
+sama("nama kolom bahasa Indonesia diterima", namaLain?.teks, "-kopi 15k");
+sama("muatan kosong ditolak", bacaMuatanGerbang({}), null);
+sama("muatan tanpa pesan ditolak", bacaMuatanGerbang({ sender: "08123456789" }), null);
 
 console.log(`\n${lulus} periksa lulus`);
 if (gagal.length > 0) {

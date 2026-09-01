@@ -53,6 +53,47 @@ export async function buatBuku(nama: unknown): Promise<Buku> {
   throw new Error("Buku gagal dibuat.");
 }
 
+/**
+ * Buku milik satu penanda pemilik, dibuat bila belum ada.
+ *
+ * Dipakai pelanggan Cakrawala: penandanya sidik kode akses mereka, jadi
+ * membuka panelnya di ponsel dan di laptop selalu berakhir pada buku yang
+ * sama tanpa ada kode kedua yang perlu diingat.
+ *
+ * Aman dipanggil dua kali berbarengan. Yang menjaga bukan pemeriksaan di
+ * awal, melainkan indeks unik pada owner_key: bila penulisan kalah cepat,
+ * bukunya dibaca ulang dan yang sudah ada itulah yang dipakai.
+ */
+export async function bukuUntukPemilik(ownerKey: string, nama: string): Promise<Buku> {
+  const cari = async () => {
+    const baris = await db
+      .select()
+      .from(moneyBooks)
+      .where(eq(moneyBooks.ownerKey, ownerKey))
+      .limit(1);
+    return baris[0] ?? null;
+  };
+
+  const ada = await cari();
+  if (ada) return ada;
+
+  const name = rapikanNamaBuku(nama);
+  for (let percobaan = 0; percobaan < 5; percobaan += 1) {
+    try {
+      const baris = await db
+        .insert(moneyBooks)
+        .values({ code: buatKodeBuku(), name, ownerKey })
+        .returning();
+      return baris[0];
+    } catch (error) {
+      const lagi = await cari();
+      if (lagi) return lagi;
+      if (percobaan >= 4) throw error;
+    }
+  }
+  throw new Error("Buku gagal dibuat.");
+}
+
 export async function bukuDariKode(kode: string): Promise<Buku | null> {
   const baris = await db.select().from(moneyBooks).where(eq(moneyBooks.code, kode)).limit(1);
   return baris[0] ?? null;
