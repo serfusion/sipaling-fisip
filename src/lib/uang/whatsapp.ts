@@ -43,6 +43,48 @@ export function nomorWa(masukan: unknown): string | null {
   return nomor;
 }
 
+// ---------- BENTUK BADAN KIRIMAN ----------
+
+/**
+ * Membaca badan kiriman apa pun bentuknya.
+ *
+ * Meta selalu mengirim JSON, tetapi gerbang pihak ketiga tidak seragam: ada
+ * yang JSON, ada yang form biasa seperti kiriman formulir HTML. Menolak yang
+ * kedua berarti pemiliknya menatap 400 tanpa tahu sebabnya, padahal
+ * kirimannya sudah benar.
+ *
+ * Mengembalikan null bila badannya tidak terbaca sebagai keduanya.
+ */
+export function uraiBadan(jenis: string, mentah: string): Record<string, unknown> | null {
+  const teks = String(mentah || "");
+  if (!teks.trim()) return null;
+
+  const bentuk = String(jenis || "").toLowerCase();
+  const cobaJson = () => {
+    try {
+      const isi = JSON.parse(teks);
+      return isi && typeof isi === "object" ? (isi as Record<string, unknown>) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  if (bentuk.includes("application/json")) return cobaJson();
+
+  if (bentuk.includes("application/x-www-form-urlencoded")) {
+    return Object.fromEntries(new URLSearchParams(teks).entries());
+  }
+
+  // Tanpa keterangan jenis yang jelas: coba JSON dulu, lalu form. Urutannya
+  // penting, karena JSON yang sah tidak pernah terbaca sebagai form yang
+  // berarti, sedangkan sebaliknya bisa.
+  const json = cobaJson();
+  if (json) return json;
+
+  const form = Object.fromEntries(new URLSearchParams(teks).entries());
+  return Object.keys(form).length > 0 ? form : null;
+}
+
 // ---------- MUATAN ----------
 
 type MuatanMeta = {

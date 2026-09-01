@@ -13,7 +13,7 @@ import { tebakArah, tebakKategori, kategoriDari, seragamkan } from "./src/lib/ua
 import { bentukKode, buatKodeBuku, normalisasiKode, rapikanNamaBuku } from "./src/lib/uang/buku";
 import { rupiah, rupiahRingkas, labelBulan, labelHari, geserBulan } from "./src/lib/uang/format";
 import { bacaPerintah } from "./src/lib/uang/perintah";
-import { bacaMuatanGerbang, bacaMuatanMeta, nomorWa } from "./src/lib/uang/whatsapp";
+import { bacaMuatanGerbang, bacaMuatanMeta, nomorWa, uraiBadan } from "./src/lib/uang/whatsapp";
 
 let lulus = 0;
 const gagal: string[] = [];
@@ -299,6 +299,32 @@ sama(
 sama("gambar tanpa teks diabaikan", bacaMuatanMeta({
   entry: [{ changes: [{ value: { messages: [{ id: "x", from: "628123456789", type: "image" }] } }] }],
 }), null);
+
+// Gerbang murah tidak seragam bentuk kirimannya: ada yang JSON, ada yang
+// form biasa. Menolak yang kedua berarti pemiliknya menatap 400 tanpa tahu
+// sebabnya, padahal webhooknya sudah dipasang dengan benar.
+sama(
+  "badan JSON",
+  uraiBadan("application/json", '{"sender":"0812","message":"-kopi 15k"}')?.message,
+  "-kopi 15k",
+);
+sama(
+  "badan form biasa",
+  uraiBadan("application/x-www-form-urlencoded", "sender=0812&message=-kopi+15k")?.message,
+  "-kopi 15k",
+);
+sama(
+  "tanpa keterangan jenis, JSON tetap terbaca",
+  uraiBadan("", '{"sender":"0812","message":"-kopi 15k"}')?.message,
+  "-kopi 15k",
+);
+sama(
+  "tanpa keterangan jenis, form tetap terbaca",
+  uraiBadan("", "sender=0812&message=-kopi+15k")?.message,
+  "-kopi 15k",
+);
+sama("badan kosong ditolak", uraiBadan("application/json", ""), null);
+sama("badan rusak ditolak", uraiBadan("application/json", "{bukan json"), null);
 
 const dariGerbang = bacaMuatanGerbang({ sender: "08123456789", message: "+honor guru 100k", name: "Eko" });
 sama("nomor dari gerbang", dariGerbang?.nomor, "628123456789");

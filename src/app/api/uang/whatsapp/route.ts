@@ -29,6 +29,7 @@ import {
   bacaMuatanMeta,
   balasLewatGerbang,
   balasLewatMeta,
+  uraiBadan,
   type PesanWa,
 } from "@/lib/uang/whatsapp";
 
@@ -78,25 +79,40 @@ export async function POST(request: Request) {
     return Response.json({ success: false, message: "Tidak tersedia." }, { status: 404 });
   }
 
+  const jenis = request.headers.get("content-type") || "";
   let mentah = "";
-  try {
-    mentah = await request.text();
-  } catch {
-    return Response.json({ ok: true });
-  }
-  if (mentah.length > 64_000) {
-    return Response.json({ success: false, message: "Permintaan terlalu besar." }, { status: 413 });
+  let muatan: Record<string, unknown> | null = null;
+
+  if (jenis.toLowerCase().includes("multipart/form-data")) {
+    // Sebagian gerbang mengirim sebagai unggahan formulir. Badannya tidak
+    // dibaca sebagai teks karena tanda tangan Meta tidak pernah datang dalam
+    // bentuk ini, jadi tidak ada yang perlu dihitung ulang dari aslinya.
+    try {
+      const form = await request.formData();
+      muatan = Object.fromEntries(
+        [...form.entries()].map(([kunci, nilai]) => [kunci, typeof nilai === "string" ? nilai : ""]),
+      );
+    } catch {
+      return Response.json({ ok: true });
+    }
+  } else {
+    try {
+      mentah = await request.text();
+    } catch {
+      return Response.json({ ok: true });
+    }
+    if (mentah.length > 64_000) {
+      return Response.json({ success: false, message: "Permintaan terlalu besar." }, { status: 413 });
+    }
+    muatan = uraiBadan(jenis, mentah);
   }
 
-  let muatan: unknown;
-  try {
-    muatan = JSON.parse(mentah);
-  } catch {
-    return Response.json({ success: false, message: "Muatan bukan JSON." }, { status: 400 });
+  if (!muatan) {
+    return Response.json({ success: false, message: "Muatan tidak terbaca." }, { status: 400 });
   }
 
   // ---------- Siapa yang mengirim, dan apakah ia berhak ----------
-  const bentukMeta = typeof muatan === "object" && muatan !== null && "entry" in muatan;
+  const bentukMeta = "entry" in muatan;
   let pesan: PesanWa | null = null;
   let lewatMeta = false;
 
@@ -117,12 +133,31 @@ export async function POST(request: Request) {
     pesan = bacaMuatanMeta(muatan);
     lewatMeta = true;
   } else if (gerbang) {
-    const isi = (muatan ?? {}) as Record<string, unknown>;
+    // Kata sandinya boleh datang dari tiga tempat, dan itu memang disengaja.
+    // Kebanyakan gerbang WhatsApp murah TIDAK menyediakan tempat menambahkan
+    // header sendiri; yang selalu bisa hanyalah menempelkannya pada alamat
+    // webhooknya. Menuntut header berarti separuh gerbang tidak dapat dipakai
+    // sama sekali.
+    //
+    // Harganya jujur: kata sandi di dalam alamat ikut tercatat di log server
+    // dan log gerbangnya. Karena itu ia hanya membuka pencatatan uang, tidak
+    // pernah membuka bacaannya, dan buku yang dituju tetap ditentukan nomor
+    // pengirimnya, bukan oleh kata sandi ini.
+    let dariAlamat = "";
+    try {
+      const alamat = new URL(request.url);
+      dariAlamat = alamat.searchParams.get("secret") || alamat.searchParams.get("kunci") || "";
+    } catch {
+      dariAlamat = "";
+    }
+
     const kirim =
       request.headers.get("x-uang-secret") ||
       request.headers.get("x-webhook-secret") ||
-      (typeof isi.secret === "string" ? isi.secret : "") ||
-      (typeof isi.rahasia === "string" ? isi.rahasia : "");
+      dariAlamat ||
+      (typeof muatan.secret === "string" ? muatan.secret : "") ||
+      (typeof muatan.rahasia === "string" ? muatan.rahasia : "");
+
     if (!tandaCocok(kirim, gerbang)) {
       return Response.json({ success: false, message: "Tanda tangan tidak sah." }, { status: 401 });
     }

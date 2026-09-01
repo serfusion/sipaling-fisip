@@ -168,7 +168,9 @@ curl -X POST "https://alamat-portal-anda/api/uang/catat" \
 ```
 
 Kodenya boleh dipindah ke header `X-Kode-Buku` bila muatannya ingin berisi
-pesannya saja. Balasannya memuat apa yang tercatat beserta baris yang gagal
+pesannya saja. Jalur ini dilewatkan dari penjaga CSRF di `src/middleware.ts`
+justru supaya dapat dipanggil dari luar peramban; yang menjaganya adalah kode
+buku itu sendiri. Balasannya memuat apa yang tercatat beserta baris yang gagal
 dibaca, jadi otomasinya dapat meneruskan kabar itu ke pengirimnya.
 
 ---

@@ -147,15 +147,75 @@ Lebih cepat dipasang dan memakai nomor WhatsApp biasa.
    ```
 
 3. Di panel gerbangnya, arahkan webhook pesan masuk ke
-   `https://alamat-portal-anda/api/uang/whatsapp`, dan sertakan kata sandinya
-   pada header `X-Uang-Secret` atau pada kolom `secret` di badan kiriman.
+   `https://alamat-portal-anda/api/uang/whatsapp`, beserta kata sandinya.
 
-Muatan masuknya menerima nama kolom yang lazim dipakai
+**Kata sandinya boleh ditaruh di tiga tempat**, dan itu memang disengaja:
+kebanyakan gerbang murah tidak menyediakan tempat menambahkan header sendiri.
+Pilih mana pun yang tersedia di panel gerbang Anda.
+
+| Tempat | Bentuknya |
+| --- | --- |
+| Alamat webhook (paling gampang) | `.../api/uang/whatsapp?secret=KATA-SANDI` |
+| Header | `X-Uang-Secret: KATA-SANDI` |
+| Kolom di badan kiriman | `secret` atau `rahasia` |
+
+Harganya jujur: kata sandi di dalam alamat ikut tercatat di log server dan log
+gerbangnya. Karena itu ia hanya membuka pencatatan, tidak pernah membuka
+bacaan, dan buku yang dituju tetap ditentukan nomor pengirimnya, bukan oleh
+kata sandi itu.
+
+**Bentuk kirimannya bebas.** JSON, form biasa
+(`application/x-www-form-urlencoded`), maupun unggahan formulir
+(`multipart/form-data`) sama-sama terbaca, karena gerbang murah tidak seragam
+soal ini dan menolak salah satunya berarti Anda menatap 400 tanpa tahu
+sebabnya.
+
+Nama kolomnya juga menerima yang lazim dipakai
 (`sender`/`pengirim`/`from`/`phone` dan `message`/`pesan`/`text`/`body`), jadi
 berpindah gerbang tidak berarti mengubah kode. Balasannya dikirim dalam bentuk
 Fonnte (`POST {target, message}` dengan token pada header `Authorization`);
 gerbang yang bentuknya berbeda cukup diarahkan ke alamat penyesuainya sendiri
 lewat `WA_GATEWAY_KIRIM_URL`.
+
+### Menguji sebelum gerbangnya dipasang
+
+Jalur ini dapat diketuk sendiri, jadi Anda tidak perlu menunggu gerbangnya
+siap untuk tahu apakah pemasangannya sudah benar:
+
+```bash
+curl -i -X POST "https://alamat-portal-anda/api/uang/whatsapp?secret=KATA-SANDI" \
+  -H "content-type: application/json" \
+  -d '{"sender":"08123456789","message":"-uji coba 1k"}'
+```
+
+| Yang dijawab | Artinya |
+| --- | --- |
+| `200 {"ok":true}` | Sampai. Kalau nomor itu sudah didaftarkan, catatannya masuk |
+| `401` | Kata sandinya tidak cocok dengan `WA_GATEWAY_SECRET` |
+| `404` | `WA_GATEWAY_SECRET` belum terpasang, atau deploy-nya belum jalan |
+| `403` | Versi lama, sebelum perbaikan penjaga CSRF di bawah |
+
+### Penjaga CSRF dan webhook
+
+`src/middleware.ts` menolak setiap POST ke `/api/*` yang tidak berasal dari
+domain sendiri. Itu benar untuk jalur yang wewenangnya datang dari cookie,
+tetapi **webhook tidak pernah mengirim header Origin**: yang mengetuk bukan
+peramban, melainkan server Telegram, Meta, atau gerbangnya.
+
+Karena itu empat jalur dilewatkan dari pemeriksaan itu, dan hanya empat:
+
+```
+/api/cakrawala-webhook   tanda tangan HMAC gerbang pembayaran
+/api/uang/telegram       secret_token Telegram
+/api/uang/whatsapp       tanda tangan Meta atau kata sandi gerbang
+/api/uang/catat          kode buku di badan permintaan, dan itu bukan cookie
+```
+
+Keempatnya memeriksa kuncinya sendiri dan tidak satu pun mengambil wewenang
+dari cookie. Yang justru TIDAK dilewatkan: `/api/uang/buku/cakrawala` (membaca
+cookie akses Cakrawala) dan `/api/uang/catatan` (penghapus catatan). Pencocokan
+jalurnya persis, bukan sekadar awalan huruf, supaya `/api/uang/catatan` tidak
+ikut terbuka gara-gara berawalan sama dengan `/api/uang/catat`.
 
 ---
 
