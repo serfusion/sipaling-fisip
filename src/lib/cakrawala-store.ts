@@ -7,9 +7,11 @@ import { appSettings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import {
   CAKRAWALA_COOKIE,
+  CAKRAWALA_COOKIE_MAX_AGE,
   CAKRAWALA_KEY,
   DEFAULT_CAKRAWALA,
   kodeBerlaku,
+  kodeKedaluwarsa,
   parseCakrawala,
   rapikanKode,
   type CakrawalaState,
@@ -81,7 +83,21 @@ export async function verifyCakrawalaCode(input: string) {
     // ditolak hanya karena penghitungnya gagal disimpan.
     console.error("catat pemakaian kode cakrawala", error);
   }
-  return { ok: true as const, code: kode };
+  return { ok: true as const, code: kode, umurCookie: umurCookieKode(codes[index]) };
+}
+
+/**
+ * Berapa lama cookie pembuka boleh hidup untuk kode ini.
+ *
+ * Mengikuti masa berlaku kodenya, dipotong batas atas bawaan. Cookie yang
+ * hidup lebih lama daripada kodenya tidak menambah akses — gerbangnya tetap
+ * memeriksa kodenya — tetapi ia membuat pengguna dilempar keluar tanpa
+ * penjelasan di tengah jalan. Lebih jujur bila keduanya berakhir bersamaan.
+ */
+function umurCookieKode(kode: { expiresAt: string | null }) {
+  if (!kode.expiresAt) return CAKRAWALA_COOKIE_MAX_AGE;
+  const detik = Math.floor((new Date(kode.expiresAt).getTime() - Date.now()) / 1000);
+  return Math.max(60, Math.min(detik, CAKRAWALA_COOKIE_MAX_AGE));
 }
 
 /**
@@ -99,13 +115,18 @@ export async function cakrawalaAccess() {
   const jar = await cookies();
   const kode = rapikanKode(jar.get(CAKRAWALA_COOKIE)?.value);
   if (kode) {
-    // Cukup diperiksa masih aktif, BUKAN kuotanya. Batas pemakaian mengatur
+    // Kuotanya sengaja TIDAK diperiksa di sini. Batas pemakaian mengatur
     // berapa kali sebuah kode boleh ditukar menjadi akses; perangkat yang
     // sudah menukarnya tidak boleh ikut terlempar keluar begitu kuotanya
     // habis — kode sekali pakai justru dibuat untuk satu orang yang datang
-    // berkali-kali. Untuk menutup akses, kode dinonaktifkan atau dihapus.
+    // berkali-kali.
+    //
+    // Masa berlakunya LAIN SOAL, dan wajib diperiksa. Umur cookie tidak dapat
+    // dijadikan patokan: ia dipasang di perangkat pengguna, dan paket tiga
+    // hari yang cookie-nya masih hidup akan tetap membuka Cakrawala berminggu
+    // -minggu sesudah masanya habis. Inilah tempat masa berlaku ditegakkan.
     const found = state.codes.find((item) => item.code === kode);
-    if (found?.active) {
+    if (found?.active && !kodeKedaluwarsa(found)) {
       return { allowed: true as const, state, reason: "kode" as const };
     }
   }

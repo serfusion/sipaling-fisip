@@ -3659,3 +3659,117 @@ a.al-mini:hover { color: var(--al-ink); }
   background: #1d4ed8; color: #fff; font-size: 12.5px; font-weight: 800; cursor: pointer; }
 .lanjut-btn:hover:not(:disabled) { background: #1e40af; }
 .lanjut-btn:disabled { opacity: .55; cursor: not-allowed; }
+
+
+/* ======================================================================
+   BELI AKSES CAKRAWALA — halaman kunci
+   ====================================================================== */
+.beli { margin-top: 18px; padding: 22px; border: 1px solid var(--cw-line);
+  border-radius: 18px; background: linear-gradient(155deg, #101c3a 0%, #0a1226 100%); }
+.beli-kepala h2 { margin: 5px 0 0; font-size: clamp(19px, 4.2vw, 25px); color: var(--cw-ink); }
+.beli-sub { margin-top: 9px; max-width: 44rem; color: var(--cw-muted); font-size: 12.5px; line-height: 1.7; }
+
+.beli-paket { display: grid; gap: 11px; margin-top: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.beli-kartu { position: relative; display: flex; flex-direction: column; gap: 3px;
+  padding: 16px 15px; border: 1.5px solid var(--cw-line); border-radius: 14px;
+  background: rgba(8, 15, 34, .55); color: inherit; text-align: left; cursor: pointer;
+  transition: border-color .16s ease, background .16s ease, transform .16s ease; }
+.beli-kartu:hover { border-color: rgba(245, 197, 66, .55); transform: translateY(-2px); }
+.beli-kartu.on { border-color: var(--cw-emas); background: rgba(245, 197, 66, .09); }
+.beli-kartu.utama { border-color: rgba(245, 197, 66, .42); }
+.beli-tanda { position: absolute; top: -9px; left: 14px; padding: 3px 9px; border-radius: 999px;
+  background: var(--cw-emas); color: #2a1f00; font-size: 9.5px; font-weight: 900;
+  text-transform: uppercase; letter-spacing: .05em; }
+.beli-nama { font-size: 13px; font-weight: 800; color: var(--cw-ink); }
+.beli-harga { font-size: 26px; font-weight: 800; color: var(--cw-emas); line-height: 1.15; }
+.beli-hari { font-size: 11.5px; font-weight: 700; color: var(--cw-muted); }
+.beli-jelas { margin-top: 7px; font-size: 11.5px; line-height: 1.6; color: var(--cw-ink); opacity: .85; }
+.beli-untuk { margin-top: 3px; font-size: 11px; line-height: 1.6; color: var(--cw-muted); }
+
+.beli-isian { display: grid; gap: 10px; margin-top: 15px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.beli-isian label { display: grid; gap: 5px; }
+.beli-isian span { font-size: 10.5px; font-weight: 800; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--cw-muted); }
+.beli-isian input { padding: 10px 12px; border: 1px solid var(--cw-line); border-radius: 10px;
+  background: rgba(255, 255, 255, .04); color: var(--cw-ink); font: inherit; font-size: 12.5px; }
+.beli-isian input:focus { outline: none; border-color: var(--cw-emas); }
+.beli-lanjut { margin-top: 15px; width: 100%; }
+.beli-aman { margin-top: 11px; color: var(--cw-muted); font-size: 11px; line-height: 1.6; }
+
+/* --- Menunggu pembayaran --- */
+.beli-bayar { text-align: center; }
+.beli-bayar h2 { margin: 5px 0 16px; font-size: clamp(18px, 4vw, 23px); color: var(--cw-ink); }
+/* Latar QR SELALU putih, apa pun mode warnanya. QR gelap di atas latar gelap
+   tidak terbaca kamera mana pun. */
+.beli-qr { display: inline-block; padding: 12px; border-radius: 14px; background: #fff;
+  line-height: 0; box-shadow: 0 14px 34px -18px rgba(0, 0, 0, .8); }
+.beli-qr svg { width: min(260px, 72vw); height: auto; display: block; }
+
+.beli-nominal { margin-top: 16px; }
+.beli-nominal small { display: block; color: var(--cw-muted); font-size: 10.5px;
+  font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.beli-nominal button { display: inline-flex; align-items: baseline; gap: 9px; margin-top: 5px;
+  padding: 7px 14px; border: 1px dashed rgba(245, 197, 66, .5); border-radius: 999px;
+  background: transparent; cursor: pointer; }
+.beli-nominal button b { color: var(--cw-emas); font-size: 25px; font-weight: 800; }
+.beli-nominal button span { color: var(--cw-muted); font-size: 10.5px; font-weight: 700; }
+.beli-nominal p { margin: 9px auto 0; max-width: 34rem; color: var(--cw-muted);
+  font-size: 11.5px; line-height: 1.65; }
+
+.beli-tunggu { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding: 13px 15px;
+  border: 1px solid var(--cw-line); border-radius: 13px; background: rgba(255, 255, 255, .04);
+  text-align: left; }
+.beli-tunggu b { display: block; color: var(--cw-ink); font-size: 12.5px; }
+.beli-tunggu small { display: block; margin-top: 3px; color: var(--cw-muted);
+  font-size: 11px; line-height: 1.6; }
+.beli-putar { flex: 0 0 auto; width: 17px; height: 17px; border-radius: 50%;
+  border: 2px solid rgba(245, 197, 66, .25); border-top-color: var(--cw-emas);
+  animation: beli-putar 900ms linear infinite; }
+@keyframes beli-putar { to { transform: rotate(360deg); } }
+
+.beli-kaki { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 10px; margin-top: 15px; padding-top: 13px; border-top: 1px solid var(--cw-line);
+  color: var(--cw-muted); font-size: 11.5px; }
+.beli-kaki code { color: var(--cw-ink); font-size: 12px; }
+
+/* --- Kode sudah keluar --- */
+.beli-jadi { text-align: center; border-color: rgba(34, 197, 94, .45);
+  background: linear-gradient(155deg, #0d2418 0%, #0a1226 100%); }
+.beli-jadi h2 { margin: 5px 0 14px; color: var(--cw-ink); }
+.beli-kode { display: inline-flex; flex-direction: column; gap: 5px; padding: 15px 24px;
+  border: 1.5px dashed rgba(34, 197, 94, .6); border-radius: 14px;
+  background: rgba(34, 197, 94, .1); cursor: pointer; }
+.beli-kode b { color: #b8f0ce; font-size: clamp(19px, 5vw, 27px); font-weight: 800;
+  letter-spacing: .08em; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.beli-kode span { color: var(--cw-muted); font-size: 10.5px; font-weight: 700; }
+.beli-jadi-sub { margin: 14px auto 0; max-width: 36rem; color: var(--cw-muted);
+  font-size: 12px; line-height: 1.7; }
+
+.beli-lewat { text-align: center; border-color: rgba(245, 158, 11, .4); }
+.beli-lewat p { margin: 9px auto 15px; max-width: 38rem; color: var(--cw-muted);
+  font-size: 12.5px; line-height: 1.7; }
+
+/* ======================================================================
+   PANEL PESANAN — dashboard Super Admin
+   ====================================================================== */
+.psn-panel { margin-bottom: 16px; }
+.psn-kepala { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between;
+  gap: 10px; margin-bottom: 12px; }
+.psn-kepala b { display: block; color: var(--navy); font-size: 13.5px; }
+.psn-kepala span { display: block; margin-top: 4px; max-width: 44rem; color: var(--muted);
+  font-size: 11.5px; line-height: 1.6; }
+.psn-angka { display: grid; gap: 9px; margin-bottom: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+.psn-angka div { padding: 11px 13px; border: 1px solid var(--line); border-radius: 11px;
+  background: #f8fafc; }
+.psn-angka b { display: block; color: var(--navy); font-size: 19px; font-weight: 800; }
+.psn-angka span { display: block; color: var(--muted); font-size: 10.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em; }
+.psn-nama { display: block; margin-top: 2px; color: var(--muted); font-size: 10.5px; }
+.psn-sudah { color: #166534; font-size: 11px; font-weight: 800; }
+.psn-menunggu { color: #92400e; background: #fef3c7; }
+.psn-lunas { color: #166534; background: #dcfce7; }
+.psn-kedaluwarsa { color: #64748b; background: #e2e8f0; }
+.psn-batal { color: #991b1b; background: #fee2e2; }

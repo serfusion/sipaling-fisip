@@ -28,8 +28,19 @@ export type CakrawalaCode = {
   /** 0 berarti tanpa batas pemakaian. */
   maxUses: number;
   uses: number;
+  /**
+   * Kapan akses kode ini berakhir. null berarti tanpa batas waktu — itulah
+   * bentuk kode yang dibagikan sendiri oleh pemiliknya.
+   *
+   * Wajib ada sejak Cakrawala dijual per paket: paket Coba tiga hari dan paket
+   * Skripsi enam bulan tidak mungkin dibedakan kalau kodenya sama-sama berlaku
+   * selamanya sampai dimatikan dengan tangan.
+   */
+  expiresAt: string | null;
   createdAt: string;
   lastUsedAt: string | null;
+  /** Nomor pesanan yang menerbitkan kode ini, bila ia lahir dari pembelian. */
+  orderCode?: string | null;
 };
 
 export type CakrawalaState = {
@@ -45,8 +56,15 @@ export type CakrawalaState = {
 
 export const DEFAULT_CAKRAWALA: CakrawalaState = { locked: true, codes: [] };
 
-/** Batas jumlah kode yang boleh hidup bersamaan. */
-export const CAKRAWALA_MAX_CODES = 60;
+/**
+ * Batas jumlah kode yang boleh hidup bersamaan.
+ *
+ * Enam puluh cukup ketika kodenya dibagikan sendiri satu per satu. Setelah
+ * Cakrawala dijual, satu musim skripsi saja dapat melewatinya. Angkanya
+ * dinaikkan, dan kode yang sudah lewat masa berlakunya dibersihkan berkala
+ * supaya daftarnya tidak menggelembung tanpa guna.
+ */
+export const CAKRAWALA_MAX_CODES = 400;
 
 const LABEL_MAX = 80;
 
@@ -77,6 +95,13 @@ function bersihkanLabel(value: unknown) {
   return value.replace(/\s+/g, " ").trim().slice(0, LABEL_MAX);
 }
 
+/** Terima hanya tanggal yang benar-benar terbaca; sisanya "tanpa batas". */
+function waktuSah(nilai: unknown): string | null {
+  if (typeof nilai !== "string" || !nilai) return null;
+  const waktu = new Date(nilai);
+  return Number.isNaN(waktu.getTime()) ? null : waktu.toISOString();
+}
+
 function normalkanKode(input: unknown): CakrawalaCode | null {
   const raw = (typeof input === "object" && input ? input : {}) as Partial<CakrawalaCode>;
   const code = rapikanKode(raw.code);
@@ -89,8 +114,13 @@ function normalkanKode(input: unknown): CakrawalaCode | null {
     active: raw.active !== false,
     maxUses: Number.isInteger(maxUses) && maxUses > 0 ? Math.min(maxUses, 9999) : 0,
     uses: Number.isInteger(uses) && uses > 0 ? uses : 0,
+    // Nilai yang bukan tanggal terbaca sebagai "tanpa batas waktu", bukan
+    // sebagai "sudah lewat": kode lama yang tersimpan sebelum kolom ini ada
+    // memang tidak punya batas, dan tidak boleh ikut mati sendiri.
+    expiresAt: waktuSah(raw.expiresAt),
     createdAt: typeof raw.createdAt === "string" ? raw.createdAt : new Date().toISOString(),
     lastUsedAt: typeof raw.lastUsedAt === "string" ? raw.lastUsedAt : null,
+    orderCode: typeof raw.orderCode === "string" ? raw.orderCode.slice(0, 20) : null,
   };
 }
 
@@ -128,11 +158,27 @@ export function parseCakrawala(value: string | null | undefined): CakrawalaState
   }
 }
 
-/** Kode masih berlaku bila aktif dan kuota pemakaiannya belum habis. */
-export function kodeBerlaku(kode: CakrawalaCode) {
+/** Sudah lewat masa berlakunya? Kode tanpa batas waktu tidak pernah lewat. */
+export function kodeKedaluwarsa(kode: CakrawalaCode, sekarang: Date = new Date()) {
+  if (!kode.expiresAt) return false;
+  return new Date(kode.expiresAt).getTime() <= sekarang.getTime();
+}
+
+/** Kode masih berlaku bila aktif, belum lewat waktunya, dan kuotanya ada. */
+export function kodeBerlaku(kode: CakrawalaCode, sekarang: Date = new Date()) {
   if (!kode.active) return false;
+  if (kodeKedaluwarsa(kode, sekarang)) return false;
   if (kode.maxUses > 0 && kode.uses >= kode.maxUses) return false;
   return true;
+}
+
+/** Sisa masa berlaku untuk ditampilkan di panel Super Admin. */
+export function sisaMasa(kode: CakrawalaCode, sekarang: Date = new Date()) {
+  if (!kode.expiresAt) return "Tanpa batas waktu";
+  const selisih = new Date(kode.expiresAt).getTime() - sekarang.getTime();
+  if (selisih <= 0) return "Sudah lewat";
+  const hari = Math.ceil(selisih / (24 * 60 * 60_000));
+  return hari === 1 ? "Sisa 1 hari" : `Sisa ${hari} hari`;
 }
 
 /** Sisa pemakaian untuk ditampilkan di panel Super Admin. */

@@ -14,6 +14,7 @@ import Link from "next/link";
 import { Ic, IKON } from "./ikon";
 import Animasi from "../animasi";
 import Tangga, { Lanjutan } from "./tangga";
+import BeliAkses from "./beli";
 import { BaganAlurPikir, BaganKerangka, ContohGrafik } from "./grafik";
 import { susunAlurPikir, susunKerangka } from "@/lib/kerangka";
 import { usulkanVisual } from "@/lib/visual";
@@ -732,6 +733,7 @@ export default function PratinjauCakrawala() {
           <div className="cw-hero-aksi">
             <a className="cw-btn cw-btn-utama" href="#kode">Punya kode? Buka sekarang</a>
             <a className="cw-btn" href="#coba">Coba dulu, gratis</a>
+            <a className="cw-btn" href="#beli">Lihat harga</a>
           </div>
           <div className="cw-sorot">
             {SOROTAN.map((item) => (
@@ -844,17 +846,22 @@ export default function PratinjauCakrawala() {
           </form>
         </section>
 
+        {/* Menggantikan ajakan "hubungi saya". Kode akses sekarang keluar
+            sendiri sesudah pembayarannya masuk; menghubungi pengelola hanya
+            perlu ketika ada yang benar-benar tidak beres. */}
+        <BeliAkses onKode={(kodeBaru) => setKode(kodeBaru)} />
+
         <section className="cw-cta" aria-label="Hubungi pengembang">
           <div>
-            <p className="cw-eyebrow">BELUM PUNYA KODE AKSES?</p>
-            <h2>Mau coba Cakrawala?</h2>
+            <p className="cw-eyebrow">ADA YANG TIDAK BERES?</p>
+            <h2>Kirim pesan ke {KONTAK}</h2>
             <p>
-              Cakrawala tersedia dengan akses terbatas. Hubungi kami untuk mendapatkan informasi mengenai akses
-              dan paket yang tersedia.
+              Sudah membayar tetapi kodenya belum keluar, atau kodenya ditolak? Sebutkan nomor pesanan Anda,
+              dan pembayarannya kami telusuri.
             </p>
           </div>
           <button type="button" className="cw-btn cw-btn-terang" onClick={salinKontak}>
-            {tersalin ? "Tersalin ✓" : `${KONTAK} — Hubungi Saya`}
+            {tersalin ? "Tersalin ✓" : `Salin ${KONTAK}`}
           </button>
         </section>
 

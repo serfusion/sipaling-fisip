@@ -222,3 +222,42 @@ export const documentContributors = pgTable("document_contributors", {
   lecturerId: integer("lecturer_id").notNull().references(() => lecturers.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Pesanan akses Cakrawala.
+//
+// Tiap baris satu percobaan pembelian: paket yang dipilih, nominal unik yang
+// ditagihkan, dan — bila sudah lunas — kode akses yang diterbitkan untuknya.
+//
+// KENAPA TABEL SENDIRI, BUKAN JSON DI app_settings SEPERTI KODENYA:
+// Kode akses jumlahnya sedikit dan hanya berubah ketika pemiliknya mengubahnya.
+// Pesanan lahir dari orang lain, kapan saja, dan bisa berbarengan. Menyimpan
+// keduanya dalam satu baris JSON berarti dua pesanan yang datang bersamaan
+// saling menimpa, dan yang hilang adalah uang yang sudah dibayar.
+export const cakrawalaOrders = pgTable("cakrawala_orders", {
+  id: serial("id").primaryKey(),
+  /** Nomor pesanan yang dipegang mahasiswa, mis. "PSN-7HQ4M2". */
+  orderCode: varchar("order_code", { length: 20 }).notNull().unique(),
+  packageId: varchar("package_id", { length: 20 }).notNull(),
+  packageName: varchar("package_name", { length: 40 }).notNull(),
+  /** Harga paket sebelum penanda pesanan ditambahkan. */
+  basePrice: integer("base_price").notNull(),
+  /** Tiga angka di ekor nominal yang menandai pesanan ini. */
+  marker: integer("marker").notNull(),
+  /** Yang benar-benar ditagihkan: basePrice + marker. */
+  amount: integer("amount").notNull(),
+  /** Berapa hari akses berlaku setelah kodenya terbit. */
+  days: integer("days").notNull(),
+  maxDevices: integer("max_devices").notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("menunggu"),
+  /** Nama dan kontak bersifat opsional; pesanan tetap sah tanpa keduanya. */
+  buyerName: varchar("buyer_name", { length: 120 }),
+  buyerContact: varchar("buyer_contact", { length: 120 }),
+  /** Kode akses yang diterbitkan ketika pesanan ini lunas. */
+  accessCode: varchar("access_code", { length: 40 }),
+  /** Siapa yang menandai lunas: "panel" atau nama gerbang pembayarannya. */
+  paidVia: varchar("paid_via", { length: 40 }),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+  /** Sesudah ini nominalnya boleh dipakai pesanan lain. */
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

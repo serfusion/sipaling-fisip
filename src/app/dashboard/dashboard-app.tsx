@@ -86,6 +86,17 @@ type ArchiveRow = {
   createdAt: string;
 };
 
+type PesananBaris = {
+  orderCode: string;
+  packageName: string;
+  amount: number;
+  days: number;
+  status: "menunggu" | "lunas" | "kedaluwarsa" | "batal";
+  buyerName: string | null;
+  accessCode: string | null;
+  createdAt: string;
+};
+
 type AttendanceRow = {
   id: number;
   nim: string;
@@ -370,6 +381,11 @@ export default function DashboardApp({
   // Baris yang sedang menunggu penegasan hapus. Penghapusan tidak dapat
   // dibatalkan, jadi tidak pernah terjadi hanya dari satu ketukan.
   const [attHapus, setAttHapus] = useState<number | null>(null);
+  const [pesanan, setPesanan] = useState<PesananBaris[]>([]);
+  const [psnRingkas, setPsnRingkas] = useState<{ lunas: number; menunggu: number; rupiah: number } | null>(null);
+  const [psnSibuk, setPsnSibuk] = useState("");
+  const [psnPesan, setPsnPesan] = useState("");
+  const [psnGalat, setPsnGalat] = useState("");
   const attendanceLoadedRef = useRef(false);
   const [attForm, setAttForm] = useState({ nim: "", studentName: "", note: "" });
   const [attMessage, setAttMessage] = useState("");
@@ -455,6 +471,63 @@ export default function DashboardApp({
     return () => clearTimeout(timer);
   }, [profile, searchQ, periodMonth, periodYear, loadRequests]);
 
+  /** Baca ulang daftar kode; dipakai sesudah satu pesanan ditandai lunas. */
+  const muatCakrawala = useCallback(async () => {
+    try {
+      const balas = await fetch("/api/cakrawala-access", { cache: "no-store" });
+      const data = (await balas.json()) as { locked?: boolean; codes?: CakrawalaCode[] };
+      setCwLocked(data.locked !== false);
+      setCwCodes(data.codes || []);
+    } catch {
+      // Diabaikan: daftar kodenya pelengkap, pesanannya sudah lunas.
+    }
+  }, []);
+
+  const muatPesanan = useCallback(async () => {
+    setPsnGalat("");
+    try {
+      const balas = await fetch("/api/cakrawala-pesan", { cache: "no-store" });
+      const data = (await balas.json()) as {
+        success?: boolean; message?: string;
+        daftar?: PesananBaris[]; ringkasan?: { lunas: number; menunggu: number; rupiah: number };
+      };
+      if (!balas.ok || !data.success) throw new Error(data.message || "Pesanan tidak dapat dibaca.");
+      setPesanan(data.daftar ?? []);
+      setPsnRingkas(data.ringkasan ?? null);
+    } catch (alasan: unknown) {
+      setPsnGalat(alasan instanceof Error ? alasan.message : "Pesanan tidak dapat dibaca.");
+    }
+  }, []);
+
+  /**
+   * Tandai satu pesanan lunas. Kodenya terbit di server, bukan di sini —
+   * dan begitu terbit, halaman pembelinya yang sedang menunggu langsung
+   * menampilkannya sendiri pada tanyaan berikutnya.
+   */
+  async function tandaiLunas(nomor: string) {
+    setPsnSibuk(nomor);
+    setPsnPesan("");
+    setPsnGalat("");
+    try {
+      const balas = await fetch("/api/cakrawala-pesan", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pesanan: nomor }),
+      });
+      const data = (await balas.json()) as { success?: boolean; message?: string; pesan?: string };
+      if (!balas.ok || !data.success) throw new Error(data.message || "Pesanan gagal ditandai lunas.");
+      setPsnPesan(data.pesan || "Pesanan ditandai lunas.");
+      await muatPesanan();
+      // Daftar kodenya ikut disegarkan supaya kode yang barusan terbit
+      // langsung terlihat di bawah, bukan pada muat ulang berikutnya.
+      await muatCakrawala();
+    } catch (alasan: unknown) {
+      setPsnGalat(alasan instanceof Error ? alasan.message : "Pesanan gagal ditandai lunas.");
+    } finally {
+      setPsnSibuk("");
+    }
+  }
+
   useEffect(() => {
     if (!profile) return;
     if (view === "arsip" && !archivesLoadedRef.current && ARCHIVE_ROLES.includes(profile.role)) {
@@ -490,6 +563,10 @@ export default function DashboardApp({
         .catch(() => {});
     }
     if (view === "cakrawala" && profile.role === "super_admin") {
+      // Ditunda satu tick, sama seperti pemuat panel lain di sekitarnya:
+      // memanggilnya langsung di badan effect membuat setState di dalamnya
+      // berjalan sinkron dan memicu gambar bertingkat.
+      window.setTimeout(() => void muatPesanan(), 0);
       fetch("/api/cakrawala-access", { cache: "no-store" })
         .then((response) => response.json())
         .then((payload: { locked?: boolean; codes?: CakrawalaCode[] }) => {
@@ -509,7 +586,7 @@ export default function DashboardApp({
         })
         .catch(() => {});
     }
-  }, [view, profile]);
+  }, [view, profile, muatPesanan]);
 
   const allowedMenu = useMemo(
     () =>
@@ -1471,6 +1548,76 @@ export default function DashboardApp({
             <section>
               <p className="section-eyebrow">SUPER ADMIN</p>
               <h2 className="dsh-title">Kunci menu Cakrawala</h2>
+
+              {/* Pesanan ditaruh PALING ATAS. Inilah yang perlu ditengok tiap
+                  hari; daftar kode dan sakelar kuncinya jarang disentuh. */}
+              <div className="panel psn-panel">
+                <div className="psn-kepala">
+                  <div>
+                    <b>Pesanan akses</b>
+                    <span>
+                      Tekan &ldquo;Tandai lunas&rdquo; setelah pembayarannya terlihat di mutasi. Kodenya terbit
+                      sendiri dan langsung muncul di layar pembelinya — tanpa Anda perlu mengirim apa pun.
+                    </span>
+                  </div>
+                  <button type="button" className="btn btn-light btn-mini" onClick={() => void muatPesanan()}>
+                    ↻ Muat ulang
+                  </button>
+                </div>
+
+                {psnRingkas && (
+                  <div className="psn-angka">
+                    <div><b>{psnRingkas.menunggu}</b><span>menunggu</span></div>
+                    <div><b>{psnRingkas.lunas}</b><span>lunas</span></div>
+                    <div><b>{`Rp ${(psnRingkas.rupiah || 0).toLocaleString("id-ID")}`}</b><span>diterima</span></div>
+                  </div>
+                )}
+
+                {psnPesan && <div className="dsh-ok">{psnPesan}</div>}
+                {psnGalat && <div className="dsh-error">{psnGalat}</div>}
+
+                <div className="qtable-wrap">
+                  <table className="qt">
+                    <thead>
+                      <tr><th>Pesanan</th><th>Paket</th><th>Nominal</th><th>Status</th><th>Kode</th><th aria-label="Aksi" /></tr>
+                    </thead>
+                    <tbody>
+                      {pesanan.length === 0 ? (
+                        <tr><td colSpan={6}><div className="dempty">Belum ada pesanan masuk.</div></td></tr>
+                      ) : (
+                        pesanan.map((o) => (
+                          <tr key={o.orderCode}>
+                            <td>
+                              <code>{o.orderCode}</code>
+                              {o.buyerName && <small className="psn-nama">{o.buyerName}</small>}
+                            </td>
+                            <td>{o.packageName} · {o.days} hari</td>
+                            {/* Nominalnya yang dicocokkan dengan mutasi, jadi
+                                ditulis penuh dan mudah disalin mata. */}
+                            <td><b>Rp {o.amount.toLocaleString("id-ID")}</b></td>
+                            <td><span className={`pill psn-${o.status}`}>{o.status}</span></td>
+                            <td>{o.accessCode ? <code>{o.accessCode}</code> : "—"}</td>
+                            <td className="qt-aksi">
+                              {o.status === "menunggu" || o.status === "kedaluwarsa" ? (
+                                <button
+                                  type="button"
+                                  className="btn btn-primary btn-mini"
+                                  disabled={psnSibuk === o.orderCode}
+                                  onClick={() => void tandaiLunas(o.orderCode)}
+                                >
+                                  {psnSibuk === o.orderCode ? "…" : "Tandai lunas"}
+                                </button>
+                              ) : o.status === "lunas" ? (
+                                <span className="psn-sudah">✓ terbit</span>
+                              ) : "—"}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
               <div className="panel">
                 <div className="mtp-hero" data-on={cwLocked ? "1" : undefined}>

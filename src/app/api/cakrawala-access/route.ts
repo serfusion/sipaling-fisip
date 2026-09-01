@@ -46,7 +46,10 @@ export async function POST(request: Request) {
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
       path: "/",
-      maxAge: CAKRAWALA_COOKIE_MAX_AGE,
+      // Umurnya mengikuti masa berlaku kodenya, bukan selalu tiga puluh hari.
+      // Paket tiga hari yang cookie-nya hidup sebulan membuat penggunanya
+      // dilempar keluar tanpa penjelasan di tengah jalan.
+      maxAge: hasil.umurCookie ?? CAKRAWALA_COOKIE_MAX_AGE,
     });
     return Response.json({ success: true, message: "Kode diterima. Selamat datang di Cakrawala." });
   } catch (error: unknown) {
@@ -72,6 +75,7 @@ export async function PUT(request: Request) {
       locked?: boolean;
       label?: string;
       maxUses?: number;
+      hariBerlaku?: number;
       code?: string;
     };
     const state = await readCakrawalaState();
@@ -92,6 +96,13 @@ export async function PUT(request: Request) {
           { status: 400 },
         );
       }
+      // Masa berlaku boleh ditentukan sendiri; 0 atau kosong berarti tanpa
+      // batas waktu, seperti perilaku sebelum paket berbayar ada.
+      const hariBerlaku =
+        Number.isInteger(body.hariBerlaku) && Number(body.hariBerlaku) > 0
+          ? Math.min(Number(body.hariBerlaku), 3650)
+          : 0;
+
       // Diulang bila kebetulan tabrakan dengan kode yang sudah ada.
       let kode = buatKodeCakrawala();
       for (let attempt = 0; attempt < 5 && codes.some((item) => item.code === kode); attempt++) {
@@ -105,8 +116,15 @@ export async function PUT(request: Request) {
           active: true,
           maxUses: Number.isInteger(body.maxUses) && Number(body.maxUses) > 0 ? Number(body.maxUses) : 0,
           uses: 0,
+          // Kode yang dibuat sendiri dari panel tidak berbatas waktu. Yang
+          // berbatas hanya kode yang lahir dari pembelian paket, dan itu
+          // diterbitkan lewat jalur pesanan, bukan di sini.
+          expiresAt: hariBerlaku > 0
+            ? new Date(Date.now() + hariBerlaku * 24 * 60 * 60_000).toISOString()
+            : null,
           createdAt: new Date().toISOString(),
           lastUsedAt: null,
+          orderCode: null,
         },
         ...codes,
       ];
