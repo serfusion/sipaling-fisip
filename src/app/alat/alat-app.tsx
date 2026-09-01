@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import Link from "next/link";
-import { Ic, IKON } from "./ikon";
+import { Ic, IKON, IKON_UANG } from "./ikon";
 import { useProject } from "./use-project";
 import { PanelBeranda, type Tab } from "./panel-beranda";
 import { PanelStruktur, PanelInggris } from "./panel-naskah";
@@ -10,11 +10,14 @@ import { PanelJudul } from "./panel-judul";
 import { PanelReferensi } from "./panel-referensi";
 import { PanelKemiripan } from "./panel-kemiripan";
 import { PanelSitasi, PanelRadar, PanelBahasa } from "./panel-periksa";
+import { PanelUang } from "./panel-uang";
 import { JENIS_LABEL } from "@/lib/project";
 import { PenyediaCetak } from "./laporan";
 import Animasi from "../animasi";
 
-const MENU: Array<{ id: Tab; label: string; sub: string; ikon: string }> = [
+type Menu = { id: Tab; label: string; sub: string; ikon: string };
+
+const MENU: Menu[] = [
   { id: "beranda", label: "Project & Laporan", sub: "Beranda, naskah, dan laporan", ikon: IKON.beranda },
   { id: "judul", label: "Perumus Judul & Metode", sub: "Sebelum judul ditetapkan", ikon: IKON.judul },
   { id: "referensi", label: "Cari Referensi", sub: "Jurnal ilmiah yang sahih", ikon: IKON.referensi },
@@ -24,6 +27,16 @@ const MENU: Array<{ id: Tab; label: string; sub: string; ikon: string }> = [
   { id: "sitasi", label: "Verifikasi Sitasi", sub: "Cek referensi fiktif", ikon: IKON.sitasi },
   { id: "radar", label: "Radar Jurnal", sub: "Sebelum kirim naskah", ikon: IKON.radar },
   { id: "bahasa", label: "Periksa Bahasa", sub: "Ragam ilmiah Indonesia", ikon: IKON.bahasa },
+];
+
+// Kelompok kedua, dan hanya berisi satu alat sejauh ini.
+//
+// Ia SENGAJA dipisah dari sembilan alat di atas. Yang di atas bekerja pada
+// naskah tugas akhir; yang di sini pada uang pribadi pemiliknya. Menaruh
+// keduanya dalam satu daftar membuat orang menyangka catatan belanjanya ikut
+// menjadi bagian dari project skripsinya.
+const MENU_LAIN: Menu[] = [
+  { id: "uang", label: "Catatan Uang", sub: "Pemasukan dan pengeluaran bulanan", ikon: IKON_UANG },
 ];
 
 type Tema = "malam" | "terang";
@@ -173,6 +186,27 @@ export default function AlatApp() {
               </span>
             </button>
           ))}
+
+          {/* Pemisah yang terlihat di ponsel, tempat judul kelompok
+              disembunyikan supaya baris alatnya tetap dapat digulir. */}
+          <span className="al-side-pisah" aria-hidden="true" />
+          <p className="al-side-judul al-side-judul-lain">Di luar kuliah</p>
+          {MENU_LAIN.map((m, urutan) => (
+            <button
+              key={m.id}
+              type="button"
+              className={`al-nav al-nav-lain ${tab === m.id ? "on" : ""}`}
+              aria-current={tab === m.id ? "page" : undefined}
+              onClick={() => pilihTab(m.id)}
+              style={{ "--urutan": MENU.length + urutan } as CSSProperties}
+            >
+              <span className="al-nav-ic"><Ic d={m.ikon} /></span>
+              <span className="al-nav-teks">
+                <b>{m.label}</b>
+                <small className="al-nav-sub">{m.sub}</small>
+              </span>
+            </button>
+          ))}
         </nav>
 
         <main>
@@ -206,6 +240,7 @@ export default function AlatApp() {
             {tab === "sitasi" && <PanelSitasi project={p.aktif} ubah={p.ubah} />}
             {tab === "radar" && <PanelRadar project={p.aktif} ubah={p.ubah} />}
             {tab === "bahasa" && <PanelBahasa project={p.aktif} />}
+            {tab === "uang" && <PanelUang />}
           </div>
           </PenyediaCetak>
 

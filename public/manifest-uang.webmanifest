@@ -1,0 +1,35 @@
+{
+  "id": "/uang",
+  "name": "Catatan Uang",
+  "short_name": "Catatan Uang",
+  "description": "Catat pemasukan dan pengeluaran cukup dengan menulis satu pesan.",
+  "lang": "id",
+  "dir": "ltr",
+  "start_url": "/uang",
+  "scope": "/uang",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f6f8fc",
+  "theme_color": "#0a2a5e",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    {
+      "src": "/images/uang/ikon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/uang/ikon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/uang/ikon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import {
+  bigint,
   boolean,
   customType,
   integer,
@@ -259,5 +260,80 @@ export const cakrawalaOrders = pgTable("cakrawala_orders", {
   paidAt: timestamp("paid_at", { withTimezone: true }),
   /** Sesudah ini nominalnya boleh dipakai pesanan lain. */
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ============================================================
+// CATATAN UANG (v14)
+//
+// Pemasukan dan pengeluaran yang dicatat lewat pesan singkat. Tiga tabel:
+// bukunya, isinya, dan sambungan pesannya.
+// ============================================================
+
+// Satu buku kas milik satu orang. Kodenya yang menjadi kunci: tidak ada akun,
+// tidak ada kata sandi.
+//
+// KENAPA BUKAN AKUN SUPABASE: yang punya akun di portal ini hanya dosen dan
+// admin, sementara catatan uang adalah milik pribadi siapa saja yang
+// memakainya. Kode buku membuat orang tanpa akun tetap bisa mencatat, dan
+// membuat satu buku yang sama dapat dibuka dari ponsel, laptop, dan Telegram
+// tanpa perlu login di ketiganya.
+export const moneyBooks = pgTable("money_books", {
+  id: serial("id").primaryKey(),
+  /** Kunci pemilik, mis. "K7M2-QX9P-3R". Selalu huruf kapital. */
+  code: varchar("code", { length: 24 }).notNull().unique(),
+  name: varchar("name", { length: 80 }).notNull(),
+  /**
+   * Penanda pemilik dari luar, untuk buku yang lahir dari langganan
+   * Cakrawala: sidik kode aksesnya, bukan kodenya sendiri.
+   *
+   * Gunanya satu hal: pelanggan yang membuka Cakrawala di ponsel dan di
+   * laptop mendapat buku yang SAMA tanpa perlu menyalin kode kedua. Kosong
+   * untuk buku yang dibuat sendiri lewat halaman /uang.
+   */
+  ownerKey: varchar("owner_key", { length: 80 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const moneyEntries = pgTable("money_entries", {
+  id: serial("id").primaryKey(),
+  bookId: integer("book_id").notNull().references(() => moneyBooks.id, { onDelete: "cascade" }),
+  /** "masuk" atau "keluar". */
+  direction: varchar("direction", { length: 8 }).notNull(),
+  /**
+   * Rupiah bulat.
+   *
+   * bigint, bukan integer: batas integer PostgreSQL ada di 2,1 miliar, dan
+   * satu baris "jual tanah 3 miliar" sudah cukup untuk menabraknya.
+   */
+  amount: bigint("amount", { mode: "number" }).notNull(),
+  category: varchar("category", { length: 24 }).notNull(),
+  note: varchar("note", { length: 200 }).notNull(),
+  /**
+   * Tanggal kejadian menurut WIB, "YYYY-MM-DD".
+   *
+   * Disimpan sebagai teks, bukan timestamp, supaya "pengeluaran bulan
+   * September" tidak pernah bergeser gara-gara server berjalan di UTC.
+   */
+  entryDate: varchar("entry_date", { length: 10 }).notNull(),
+  /** Dari mana catatannya datang: "web", "telegram", "api". */
+  source: varchar("source", { length: 20 }).notNull().default("web"),
+  /** Pesan aslinya, disimpan apa adanya untuk ditelusuri bila salah baca. */
+  rawText: varchar("raw_text", { length: 400 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Sambungan pesan: satu percakapan Telegram (atau kanal lain nanti) yang
+// sudah ditautkan ke sebuah buku. Tanpa baris ini, pesan yang masuk tidak
+// tahu harus dicatat ke buku siapa.
+export const moneyChannels = pgTable("money_channels", {
+  id: serial("id").primaryKey(),
+  bookId: integer("book_id").notNull().references(() => moneyBooks.id, { onDelete: "cascade" }),
+  /** "telegram". Disediakan sebagai kolom supaya kanal lain tinggal menyusul. */
+  kind: varchar("kind", { length: 20 }).notNull(),
+  /** Id percakapan di kanal tersebut. */
+  externalId: varchar("external_id", { length: 64 }).notNull(),
+  label: varchar("label", { length: 120 }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
