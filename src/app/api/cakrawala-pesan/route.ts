@@ -100,7 +100,12 @@ export async function POST(request: Request) {
         hari: paket.hari,
         expiresAt: pesan.expiresAt.toISOString(),
         menit: MENIT_BAYAR,
-        qris: qr.qris,
+        // Rentetan QRIS mentahnya SENGAJA tidak ikut dikirim. Peramban hanya
+        // butuh gambarnya, dan mengirim rentetannya berarti keterangan
+        // merchant tersedia untuk disalin-tempel dari alat pengembang oleh
+        // siapa pun yang membuka halaman beli. Membaca ulang QR dari gambar
+        // memang tetap mungkin, tetapi itu pekerjaan yang jauh berbeda
+        // daripada menyorot teks.
         svg,
       },
     }, { status: 201 });
