@@ -986,6 +986,13 @@ export default function SipalingApp() {
               >
                 <span className="hero-kilau">Cakrawala</span>
               </a>
+              <a
+                className="hero-button"
+                href="/uang"
+                title="Catat pemasukan dan pengeluaran cukup dengan mengirim pesan"
+              >
+                <span>Rp</span> Catatan Uang
+              </a>
               <a className={sessionRole ? "hero-button hero-button-logged" : "hero-button"} href="/dashboard">
                 {sessionRole ? `● Dashboard ${DASH_ROLE_LABEL[sessionRole] || "Admin"}` : "Login Dosen/Admin"}
               </a>
