@@ -24,6 +24,8 @@ import {
   ambilPesanan, klaimPesanan, lunaskanPesanan, mutasiUntukNominal,
 } from "@/lib/pesanan-store";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
+import { kabarkanPemilik } from "@/lib/kabar-pemilik";
+import { rupiah } from "@/lib/paket-cakrawala";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -77,6 +79,27 @@ export async function POST(request: Request) {
       }
       return Response.json({ success: false, message: "Klaim belum dapat dicatat. Coba lagi." }, { status: 500 });
     }
+
+    // Kabar ke ponsel pemilik, bukan cuma ke panel yang harus dibuka sendiri.
+    //
+    // Inilah yang membedakan "menunggu satu menit" dari "menunggu sampai
+    // pemiliknya kebetulan membuka dashboard". Satu balasan di Telegram sudah
+    // cukup menerbitkan kodenya; perintahnya ikut ditulis di pesannya supaya
+    // tidak perlu diingat.
+    void kabarkanPemilik(
+      [
+        "💰 KLAIM PEMBAYARAN",
+        "",
+        `Pesanan : ${pesanan.orderCode}`,
+        `Paket   : ${pesanan.packageName} · ${pesanan.days} hari`,
+        `Nominal : ${rupiah(pesanan.amount)}`,
+        ...(pesanan.buyerName ? [`Nama    : ${pesanan.buyerName}`] : []),
+        ...(pesanan.buyerContact ? [`WA      : ${pesanan.buyerContact}`] : []),
+        "",
+        "Cek mutasi DANA. Kalau nominalnya cocok, balas pesan ini:",
+        `lunas ${pesanan.orderCode}`,
+      ].join("\n"),
+    );
 
     return Response.json({
       success: true,

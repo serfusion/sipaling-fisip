@@ -200,6 +200,51 @@ async function main() {
   sama("sepuluh-duanya masih hidup", hidup[0]?.n, 10);
 
   await bersihkan();
+
+  console.log("\n=== PERINTAH LEWAT PESAN ===\n");
+
+  const { bacaPerintahPesanan, layaniPerintahPesanan } = await import("./src/lib/perintah-pesanan");
+
+  // Perintah ditulis TANPA garis miring: orang tidak mengetik "/" di aplikasi
+  // pesan, dan menuntutnya berarti perintahnya tidak pernah dipakai.
+  sama("lunas dikenali", bacaPerintahPesanan("lunas PSN-ABC123")?.jenis, "lunas");
+  sama("huruf besar-kecil tidak masalah", bacaPerintahPesanan("LUNAS psn-abc123")?.jenis, "lunas");
+  sama("terbitkan sama dengan lunas", bacaPerintahPesanan("terbitkan PSN-ABC123")?.jenis, "lunas");
+  sama("cek dikenali", bacaPerintahPesanan("cek PSN-ABC123")?.jenis, "cek");
+  // Nomor yang ditempel sendirian adalah yang paling sering dilakukan orang.
+  sama("nomor sendirian dibaca sebagai cek", bacaPerintahPesanan("PSN-ABC123")?.jenis, "cek");
+  sama("lunas tanpa nomor meminta bantuan", bacaPerintahPesanan("lunas")?.jenis, "bantuan");
+
+  // Pesan biasa TIDAK boleh tertelan menjadi perintah — chat yang sama juga
+  // dipakai mencatat uang, dan "-beli nasi 10k" bukan perintah pesanan.
+  sama("catatan uang tidak tertelan", bacaPerintahPesanan("-beli nasi uduk 10k"), null);
+  sama("kalimat biasa tidak tertelan", bacaPerintahPesanan("halo apa kabar"), null);
+  sama("ringkas tidak tertelan", bacaPerintahPesanan("ringkas"), null);
+  sama("kosong tidak tertelan", bacaPerintahPesanan("   "), null);
+
+  const delapan = await pesananBaru(bab);
+  const cekDulu = await layaniPerintahPesanan({ jenis: "cek", nomor: delapan.orderCode });
+  benar("cek menyebut nominalnya", cekDulu.includes(delapan.amount.toLocaleString("id-ID")), cekDulu);
+  benar("cek menyebut statusnya menunggu", cekDulu.includes("menunggu"));
+
+  const terbitPesan = await layaniPerintahPesanan({ jenis: "lunas", nomor: delapan.orderCode });
+  benar("lunas menerbitkan kode", terbitPesan.includes("CKRW-"), terbitPesan);
+  const sesudahLunas = await ambilPesanan(delapan.orderCode);
+  sama("pesanannya benar-benar lunas", sesudahLunas?.status, "lunas");
+  benar("kodenya tersimpan di pesanannya", Boolean(sesudahLunas?.accessCode));
+
+  // Perintah yang sama dikirim dua kali tidak boleh menerbitkan kode kedua.
+  const ulangPerintah = await layaniPerintahPesanan({ jenis: "lunas", nomor: delapan.orderCode });
+  benar("perintah kedua mengembalikan kode yang sama",
+    ulangPerintah.includes(sesudahLunas?.accessCode ?? "x"), ulangPerintah);
+  const kodeSesudah = (await ambilPesanan(delapan.orderCode))?.accessCode;
+  sama("kodenya tidak berubah", kodeSesudah, sesudahLunas?.accessCode);
+
+  sama("pesanan yang tidak ada dijawab jelas",
+    await layaniPerintahPesanan({ jenis: "lunas", nomor: "PSN-TIDAKADA" }),
+    "Pesanan PSN-TIDAKADA tidak ditemukan.");
+
+  await bersihkan();
 }
 
 main()
