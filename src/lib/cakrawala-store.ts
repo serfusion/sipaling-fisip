@@ -10,6 +10,7 @@ import {
   CAKRAWALA_COOKIE_MAX_AGE,
   CAKRAWALA_KEY,
   DEFAULT_CAKRAWALA,
+  hariKode,
   kodeBerlaku,
   kodeKedaluwarsa,
   parseCakrawala,
@@ -17,6 +18,7 @@ import {
   type CakrawalaState,
 } from "@/lib/cakrawala";
 import { getCurrentProfile } from "@/lib/supabase-server";
+import { AKUN_COOKIE, akunAktif, akunDariToken, samarkanWa, tandaiDipakai } from "@/lib/akun-cakrawala";
 
 /**
  * Membaca status kunci Cakrawala.
@@ -83,7 +85,14 @@ export async function verifyCakrawalaCode(input: string) {
     // ditolak hanya karena penghitungnya gagal disimpan.
     console.error("catat pemakaian kode cakrawala", error);
   }
-  return { ok: true as const, code: kode, umurCookie: umurCookieKode(codes[index]) };
+  return {
+    ok: true as const,
+    code: kode,
+    umurCookie: umurCookieKode(codes[index]),
+    // Lama langganan yang dibawa kode ini, supaya pemanggilnya tidak perlu
+    // membaca ulang seluruh daftar kode hanya untuk satu angka.
+    hari: hariKode(codes[index]),
+  };
 }
 
 /**
@@ -108,11 +117,46 @@ function umurCookieKode(kode: { expiresAt: string | null }) {
  * merekalah yang memegang kuncinya, jadi tidak masuk akal bila terkunci di
  * luar oleh pengaturannya sendiri.
  */
+/**
+ * Langganan yang sudah berakhir, milik pengunjung yang cookie-nya masih ada.
+ *
+ * Dipakai halaman pratinjau untuk menyapa orangnya dengan namanya dan
+ * mengingatkan kapan langganannya habis, bukan menyodorkan halaman jualan yang
+ * sama seperti kepada orang yang belum pernah membeli apa-apa.
+ */
+export type LanggananHabis = { nomor: string; nama: string | null; sampai: string };
+
 export async function cakrawalaAccess() {
   const state = await readCakrawalaState();
-  if (!state.locked) return { allowed: true as const, state, reason: "terbuka" as const };
+  if (!state.locked) return { allowed: true as const, state, reason: "terbuka" as const, habis: null };
 
   const jar = await cookies();
+  let habis: LanggananHabis | null = null;
+
+  // Jalan masuk utama sejak langganan menempel pada nomor WhatsApp: kunci sesi
+  // akun. Ia diperiksa LEBIH DULU daripada cookie kode, karena masa berlaku
+  // yang sebenarnya ada pada akunnya — perpanjangan menambah hari di sana,
+  // bukan pada kodenya yang sudah telanjur ditukar.
+  const token = jar.get(AKUN_COOKIE)?.value ?? "";
+  if (token) {
+    try {
+      const akun = await akunDariToken(token);
+      if (akun && akunAktif(akun)) {
+        void tandaiDipakai(akun.id);
+        return { allowed: true as const, state, reason: "akun" as const, habis: null };
+      }
+      // Cookie-nya masih hidup karena tenggang, langganannya tidak. Orangnya
+      // dikenali, jadi pratinjaunya boleh menyebut kapan masanya berakhir.
+      if (akun) {
+        habis = { nomor: samarkanWa(akun.whatsapp), nama: akun.name, sampai: akun.expiresAt.toISOString() };
+      }
+    } catch (error) {
+      // Basis data bermasalah bukan alasan membuka pintu. Pemegang cookie kode
+      // lama masih dapat lewat jalur di bawah; sisanya melihat pratinjau.
+      console.error("baca akun cakrawala", error);
+    }
+  }
+
   const kode = rapikanKode(jar.get(CAKRAWALA_COOKIE)?.value);
   if (kode) {
     // Kuotanya sengaja TIDAK diperiksa di sini. Batas pemakaian mengatur
@@ -127,14 +171,14 @@ export async function cakrawalaAccess() {
     // -minggu sesudah masanya habis. Inilah tempat masa berlaku ditegakkan.
     const found = state.codes.find((item) => item.code === kode);
     if (found?.active && !kodeKedaluwarsa(found)) {
-      return { allowed: true as const, state, reason: "kode" as const };
+      return { allowed: true as const, state, reason: "kode" as const, habis: null };
     }
   }
 
   const profile = await getCurrentProfile();
   if (profile?.role === "super_admin") {
-    return { allowed: true as const, state, reason: "super_admin" as const };
+    return { allowed: true as const, state, reason: "super_admin" as const, habis: null };
   }
 
-  return { allowed: false as const, state, reason: "terkunci" as const };
+  return { allowed: false as const, state, reason: "terkunci" as const, habis };
 }

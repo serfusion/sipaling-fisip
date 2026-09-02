@@ -659,8 +659,13 @@ function HasilCobaTampil({ hasil }: { hasil: HasilCoba }) {
   );
 }
 
-export default function PratinjauCakrawala() {
+/** Keterangan langganan yang baru saja berakhir; null untuk pengunjung baru. */
+type Habis = { nomor: string; nama: string | null; sampai: string } | null;
+
+export default function PratinjauCakrawala({ habis = null }: { habis?: Habis }) {
   const [kode, setKode] = useState("");
+  const [wa, setWa] = useState("");
+  const [nama, setNama] = useState("");
   const [galat, setGalat] = useState("");
   const [sibuk, setSibuk] = useState(false);
   const [tersalin, setTersalin] = useState(false);
@@ -673,12 +678,17 @@ export default function PratinjauCakrawala() {
       setGalat("Kode akses belum diisi.");
       return;
     }
+    const nomor = wa.trim();
+    if (!nomor) {
+      setGalat("Nomor WhatsApp belum diisi. Nomor inilah yang menyimpan langgananmu.");
+      return;
+    }
     setSibuk(true);
     try {
       const response = await fetch("/api/cakrawala-access", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: isi }),
+        body: JSON.stringify({ code: isi, whatsapp: nomor, nama: nama.trim() }),
       });
       const payload = (await response.json()) as { success?: boolean; message?: string };
       if (!response.ok || !payload.success) {
@@ -812,23 +822,75 @@ export default function PratinjauCakrawala() {
 
         <section id="kode" className="cw-kunci" aria-label="Buka dengan kode akses">
           <div className="cw-kunci-copy">
-            <p className="cw-eyebrow">SUDAH PUNYA KODE AKSES?</p>
-            <h2>Langsung masuk ke Cakrawala</h2>
-            <p>Masukkan kode akses yang kamu punya untuk mulai menggunakan Cakrawala.</p>
+            {habis ? (
+              <>
+                <p className="cw-eyebrow">LANGGANANMU SUDAH HABIS</p>
+                <h2>Selamat datang kembali{habis.nama ? `, ${habis.nama}` : ""}</h2>
+                <p className="cw-habis">
+                  Akses untuk nomor <b>{habis.nomor}</b> berakhir pada{" "}
+                  <b>
+                    {new Date(habis.sampai).toLocaleDateString("id-ID", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </b>
+                  . Perpanjang dengan mengirim pesan ke {KONTAK} — nomormu sudah terdaftar, jadi
+                  harinya langsung ditambahkan ke akun yang sama. Semua project dan catatanmu masih
+                  utuh di sana.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="cw-eyebrow">SUDAH PUNYA KODE AKSES?</p>
+                <h2>Langsung masuk ke Cakrawala</h2>
+                <p>
+                  Masukkan kode akses dan nomor WhatsApp kamu. Langganannya disimpan di nomor itu,
+                  jadi ganti HP atau buka di laptop tetap bisa masuk tanpa beli lagi.
+                </p>
+              </>
+            )}
           </div>
           <form className="cw-kunci-form" onSubmit={bukaKunci}>
             <label htmlFor="cakrawala-code">Kode Akses</label>
+            <input
+              id="cakrawala-code"
+              name="code"
+              type="text"
+              inputMode="text"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="CKRW-XXXX-XXXX"
+              value={kode}
+              onChange={(event) => setKode(event.target.value.toUpperCase())}
+              disabled={sibuk}
+            />
+
+            <label htmlFor="cakrawala-wa">Nomor WhatsApp</label>
+            <input
+              id="cakrawala-wa"
+              name="whatsapp"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              placeholder="0812xxxxxxxx"
+              value={wa}
+              onChange={(event) => setWa(event.target.value)}
+              disabled={sibuk}
+            />
+
+            <label htmlFor="cakrawala-nama">
+              Nama <span className="cw-kunci-ops">(boleh dikosongkan)</span>
+            </label>
             <div className="cw-kunci-baris">
               <input
-                id="cakrawala-code"
-                name="code"
+                id="cakrawala-nama"
+                name="nama"
                 type="text"
-                inputMode="text"
-                autoComplete="off"
-                spellCheck={false}
-                placeholder="CKRW-XXXX-XXXX"
-                value={kode}
-                onChange={(event) => setKode(event.target.value.toUpperCase())}
+                autoComplete="name"
+                placeholder="Nama panggilan"
+                value={nama}
+                onChange={(event) => setNama(event.target.value)}
                 disabled={sibuk}
               />
               <button type="submit" className="cw-btn cw-btn-utama" disabled={sibuk}>
@@ -837,11 +899,17 @@ export default function PratinjauCakrawala() {
             </div>
             {galat && <p className="cw-galat" role="alert">{galat}</p>}
             <p className="cw-kunci-catatan">
-              Setelah kode berhasil digunakan, akses akan tersimpan di perangkat selama 30 hari.
+              Nomor WhatsApp didaftarkan <b>sekali</b> saat kode ditukar, lalu kode itu terkunci pada
+              nomor tersebut. Tidak ada OTP dan tidak ada kata sandi — cukup kode dan nomor yang sama.
             </p>
             <p className="cw-kunci-catatan">
-              <b>Catatan:</b> jangan bagikan kode aksesmu kepada orang lain. Kode dapat dinonaktifkan
-              sewaktu-waktu.
+              Kalau langganan habis, cukup kirim pesan ke {KONTAK} untuk perpanjang. Nomornya sudah
+              terdaftar, jadi kode barunya langsung menambah hari di akun yang sama — web dan
+              aplikasi sekaligus.
+            </p>
+            <p className="cw-kunci-catatan">
+              <b>Catatan:</b> jangan bagikan kode aksesmu kepada orang lain. Satu kode hanya dapat
+              ditukar satu nomor, dan kode dapat dinonaktifkan sewaktu-waktu.
             </p>
           </form>
         </section>
@@ -849,7 +917,16 @@ export default function PratinjauCakrawala() {
         {/* Menggantikan ajakan "hubungi saya". Kode akses sekarang keluar
             sendiri sesudah pembayarannya masuk; menghubungi pengelola hanya
             perlu ketika ada yang benar-benar tidak beres. */}
-        <BeliAkses onKode={(kodeBaru) => setKode(kodeBaru)} />
+        <BeliAkses
+          onAkses={(kodeBaru, nomorBaru) => {
+            setKode(kodeBaru);
+            // Nomor yang dipakai memesan langsung dibawa ke kotak kode. Kode
+            // terkunci pada nomor yang menukarkannya, jadi mengetiknya ulang
+            // hanya menambah satu peluang salah ketik yang mengunci akses ke
+            // nomor yang salah — dan itu tidak dapat dibatalkan sendiri.
+            if (nomorBaru.trim()) setWa(nomorBaru.trim());
+          }}
+        />
 
         <section className="cw-cta" aria-label="Hubungi pengembang">
           <div>

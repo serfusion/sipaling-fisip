@@ -11,6 +11,18 @@ import {
   type CakrawalaCode,
 } from "@/lib/cakrawala";
 import { readCakrawalaState, verifyCakrawalaCode, writeCakrawalaState } from "@/lib/cakrawala-store";
+import {
+  AKUN_COOKIE,
+  akunAktif,
+  akunDariToken,
+  akunDariWa,
+  pemilikKode,
+  rapikanWa,
+  samarkanWa,
+  tukarkanKode,
+  umurCookieAkun,
+  type Akun,
+} from "@/lib/akun-cakrawala";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,42 +32,164 @@ export const dynamic = "force-dynamic";
 // yang meminta adalah Super Admin.
 export async function GET() {
   const state = await readCakrawalaState();
+  const langganan = await langgananSaya();
   const profile = await getCurrentProfile();
   if (profile?.role === "super_admin") {
-    return Response.json({ success: true, locked: state.locked, codes: state.codes });
+    return Response.json({ success: true, locked: state.locked, codes: state.codes, langganan });
   }
-  return Response.json({ success: true, locked: state.locked });
+  return Response.json({ success: true, locked: state.locked, langganan });
+}
+
+/**
+ * Langganan milik pengunjung ini, bila cookie sesinya masih membawa akun.
+ *
+ * Nomornya disamarkan sebelum keluar. Yang meminta memang pemiliknya, tetapi
+ * jawaban ini juga terbaca oleh apa pun yang kebetulan membaca layar atau
+ * lalu lintas jaringannya — dan nomor WhatsApp utuh tidak perlu ada di sana.
+ */
+async function langgananSaya() {
+  try {
+    const jar = await cookies();
+    const token = jar.get(AKUN_COOKIE)?.value ?? "";
+    if (!token) return null;
+    const akun = await akunDariToken(token);
+    if (!akun) return null;
+    return {
+      nomor: samarkanWa(akun.whatsapp),
+      nama: akun.name,
+      sampai: akun.expiresAt.toISOString(),
+      aktif: akunAktif(akun),
+    };
+  } catch (error) {
+    // Ketiadaan keterangan langganan tidak boleh menggagalkan pembacaan kunci.
+    console.error("baca langganan cakrawala", error);
+    return null;
+  }
 }
 
 // Membuka kunci dengan kode. Terbuka untuk umum, karena memang inilah pintu
 // masuknya — dibatasi lajunya supaya kode tidak dapat ditebak beruntun.
+//
+// Sejak langganan menempel pada NOMOR WHATSAPP, pintu ini melakukan dua hal
+// sekaligus: memeriksa kodenya, dan mendaftarkan nomor yang menukarkannya.
+// Nomor itulah yang membuat perpanjangan punya tempat menempel, dan yang
+// membuat aplikasi nanti mengenali pelanggan yang sama dengan web.
 export async function POST(request: Request) {
   const limit = rateLimit({ request, name: "cakrawala-unlock", limit: 10, windowMs: 10 * 60_000 });
   if (!limit.ok) return tooManyRequests(limit.retryAfter);
 
   try {
-    const body = (await request.json()) as { code?: string };
-    const hasil = await verifyCakrawalaCode(rapikanKode(body.code));
+    const body = (await request.json()) as { code?: string; whatsapp?: string; nama?: string };
+    const kode = rapikanKode(body.code);
+    if (!kode) {
+      return Response.json({ success: false, message: "Kode akses belum diisi." }, { status: 400 });
+    }
+
+    const wa = rapikanWa(body.whatsapp);
+    if (!wa) {
+      return Response.json(
+        {
+          success: false,
+          message: "Nomor WhatsApp belum benar. Tulis seperti 0812xxxxxxx atau 62812xxxxxxx.",
+        },
+        { status: 400 },
+      );
+    }
+    const nama = String(body.nama ?? "").trim().slice(0, 120) || undefined;
+
+    // Penguncian kode diperiksa LEBIH DULU, sebelum verifyCakrawalaCode
+    // memotong kuota pemakaiannya. Orang yang menebak kode milik orang lain
+    // tidak boleh menghabiskan jatah perangkat pemiliknya hanya dengan mencoba.
+    const pemilik = await pemilikKode(kode);
+
+    if (pemilik && pemilik !== wa) {
+      return Response.json(
+        {
+          success: false,
+          message:
+            "Kode ini sudah terdaftar pada nomor WhatsApp lain. Satu kode hanya untuk satu nomor.",
+        },
+        { status: 400 },
+      );
+    }
+
+    // Nomor yang sama masuk lagi — ponsel baru, peramban baru, atau cookie
+    // yang terhapus. Sesinya dikembalikan tanpa menambah hari dan tanpa
+    // memotong kuota: harinya sudah diberikan pada penukaran yang pertama.
+    if (pemilik === wa) {
+      const akun = await akunDariWa(wa);
+      if (!akun) {
+        return Response.json(
+          { success: false, message: "Akun untuk kode ini tidak ditemukan. Hubungi pengelola." },
+          { status: 400 },
+        );
+      }
+      if (!akunAktif(akun)) {
+        return Response.json(
+          {
+            success: false,
+            message: "Langganan pada nomor ini sudah berakhir. Perpanjang dulu untuk masuk lagi.",
+          },
+          { status: 400 },
+        );
+      }
+      await pasangSesi(akun, kode);
+      return Response.json({
+        success: true,
+        message: "Selamat datang kembali di Cakrawala.",
+        sampai: akun.expiresAt.toISOString(),
+        baru: false,
+      });
+    }
+
+    // Penukaran pertama. Baru di sini kodenya diperiksa dan kuotanya dipotong.
+    const hasil = await verifyCakrawalaCode(kode);
     if (!hasil.ok) {
       return Response.json({ success: false, message: hasil.message }, { status: 400 });
     }
 
-    const jar = await cookies();
-    jar.set(CAKRAWALA_COOKIE, hasil.code, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      // Umurnya mengikuti masa berlaku kodenya, bukan selalu tiga puluh hari.
-      // Paket tiga hari yang cookie-nya hidup sebulan membuat penggunanya
-      // dilempar keluar tanpa penjelasan di tengah jalan.
-      maxAge: hasil.umurCookie ?? CAKRAWALA_COOKIE_MAX_AGE,
+    const tukar = await tukarkanKode(hasil.code, wa, hasil.hari, nama);
+    if (!tukar.ok) {
+      return Response.json({ success: false, message: tukar.pesan }, { status: 400 });
+    }
+
+    await pasangSesi(tukar.akun, hasil.code, hasil.umurCookie);
+    return Response.json({
+      success: true,
+      message: "Kode diterima. Selamat datang di Cakrawala.",
+      sampai: tukar.sampai.toISOString(),
+      baru: tukar.baru,
     });
-    return Response.json({ success: true, message: "Kode diterima. Selamat datang di Cakrawala." });
   } catch (error: unknown) {
     console.error("buka kunci cakrawala", error);
     return Response.json({ success: false, message: "Kode belum dapat diperiksa. Coba lagi." }, { status: 500 });
   }
+}
+
+/**
+ * Pasang cookie sesi akun, dan cookie kode lama di sampingnya.
+ *
+ * Keduanya dipasang dengan sengaja. Kunci akun adalah jalan masuk yang
+ * sebenarnya, tetapi cookie kode masih dipakai buku kas Catatan Uang untuk
+ * mengenali pemiliknya; menghapusnya sekarang akan memutus orang dari
+ * catatannya sendiri.
+ */
+async function pasangSesi(akun: Akun, kode: string, umurKode?: number) {
+  const jar = await cookies();
+  const aman = {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+  };
+  jar.set(AKUN_COOKIE, akun.token, { ...aman, maxAge: umurCookieAkun(akun) });
+  jar.set(CAKRAWALA_COOKIE, kode, {
+    ...aman,
+    // Umurnya mengikuti masa berlaku kodenya, bukan selalu tiga puluh hari.
+    // Paket tiga hari yang cookie-nya hidup sebulan membuat penggunanya
+    // dilempar keluar tanpa penjelasan di tengah jalan.
+    maxAge: umurKode ?? CAKRAWALA_COOKIE_MAX_AGE,
+  });
 }
 
 // HANYA SUPER ADMIN. Menyalakan/mematikan kunci, membuat kode, dan

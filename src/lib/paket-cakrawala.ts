@@ -15,7 +15,15 @@ export type Paket = {
   harga: number;
   /** Berapa hari akses berlaku sejak kodenya ditukar. */
   hari: number;
-  /** Berapa perangkat boleh menukar kode yang sama. */
+  /**
+   * Berapa perangkat yang dibayangkan untuk paket ini.
+   *
+   * Sejak langganan menempel pada nomor WhatsApp, angka ini TIDAK lagi
+   * membatasi apa pun: yang mengunci adalah tabel penukaran — satu kode satu
+   * nomor — dan sesudah itu pemiliknya boleh masuk dari mana saja. Angkanya
+   * tetap dicatat pada baris pesanan sebagai keterangan paket yang dibeli,
+   * dan sengaja tidak pernah dijanjikan di halaman penjualan.
+   */
   maksPerangkat: number;
   jelas: string;
   untuk: string;

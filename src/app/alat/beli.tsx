@@ -14,6 +14,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PAKET, rupiah, sisaWaktu, type PaketId } from "@/lib/paket-cakrawala";
+import { rapikanWa } from "@/lib/nomor-wa";
 
 type Pesanan = {
   orderCode: string;
@@ -29,7 +30,7 @@ type Pesanan = {
 const JEDA_TANYA_MS = 4000;
 const KUNCI_SIMPAN = "cakrawala-pesanan";
 
-export default function BeliAkses({ onKode }: { onKode: (kode: string) => void }) {
+export default function BeliAkses({ onAkses }: { onAkses: (kode: string, whatsapp: string) => void }) {
   const [pilih, setPilih] = useState<PaketId | null>(null);
   const [nama, setNama] = useState("");
   const [kontak, setKontak] = useState("");
@@ -121,11 +122,19 @@ export default function BeliAkses({ onKode }: { onKode: (kode: string) => void }
   const sisa = pesanan ? sisaWaktu(new Date(pesanan.expiresAt)) : "";
 
   useEffect(() => {
-    if (status === "lunas" && kode) onKode(kode);
-  }, [status, kode, onKode]);
+    if (status === "lunas" && kode) onAkses(kode, kontak);
+  }, [status, kode, kontak, onAkses]);
 
   async function pesan() {
     if (!pilih || sibuk) return;
+    // Nomor WhatsApp diminta DI SINI, sebelum uangnya berpindah, bukan sesudah
+    // kodenya terbit. Nomor itulah yang menyimpan langganannya; meminta
+    // belakangan berarti ada jeda ketika seseorang sudah membayar tetapi
+    // belum punya tempat untuk menyimpan apa yang ia beli.
+    if (!rapikanWa(kontak)) {
+      setGalat("Nomor WhatsApp belum benar. Tulis seperti 0812xxxxxxxx — nomor inilah yang menyimpan langgananmu.");
+      return;
+    }
     setSibuk(true);
     setGalat("");
     try {
@@ -183,8 +192,9 @@ export default function BeliAkses({ onKode }: { onKode: (kode: string) => void }
           <span>{tersalin === "kode" ? "Tersalin ✓" : "Ketuk untuk menyalin"}</span>
         </button>
         <p className="beli-jadi-sub">
-          Masukkan kode ini pada kotak <b>Kode Akses</b> di bawah, lalu Cakrawala terbuka. Simpan
-          kodenya — ia dapat dipakai lagi bila Anda berganti perangkat.
+          Masukkan kode ini pada kotak <b>Kode Akses</b> di bawah bersama nomor WhatsApp Anda, lalu
+          Cakrawala terbuka. Simpan kodenya — dengan nomor yang sama, ia dapat dipakai lagi kapan
+          pun Anda berganti HP atau membuka di laptop.
         </p>
       </section>
     );
@@ -283,8 +293,19 @@ export default function BeliAkses({ onKode }: { onKode: (kode: string) => void }
           <input value={nama} onChange={(e) => setNama(e.target.value)} placeholder="Buat catatan pesanan Anda" />
         </label>
         <label>
-          <span>WhatsApp (boleh dikosongkan)</span>
-          <input value={kontak} onChange={(e) => setKontak(e.target.value)} placeholder="Kalau ada yang perlu ditanyakan" />
+          <span>Nomor WhatsApp</span>
+          <input
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            value={kontak}
+            onChange={(e) => setKontak(e.target.value)}
+            placeholder="0812xxxxxxxx"
+          />
+          <small className="beli-bantu">
+            Langgananmu disimpan di nomor ini. Ganti HP atau buka di laptop tetap bisa masuk, dan
+            perpanjangan nanti cukup lewat WhatsApp.
+          </small>
         </label>
       </div>
 

@@ -96,13 +96,38 @@ function GembokTerbuka() {
 const IKON_BULAN = "M20 13.5A8.2 8.2 0 0 1 10.5 4a8.5 8.5 0 1 0 9.5 9.5z";
 const IKON_MATAHARI = "M12 6.5A5.5 5.5 0 1 0 17.5 12 5.5 5.5 0 0 0 12 6.5zM12 1.5v2M12 20.5v2M3.9 3.9l1.5 1.5M18.6 18.6l1.5 1.5M1.5 12h2M20.5 12h2M3.9 20.1l1.5-1.5M18.6 5.4l1.5-1.5";
 
+/** Keterangan langganan yang ditampilkan di kepala halaman. */
+type Masa = { nomor: string; sampai: string; aktif: boolean } | null;
+
 export default function AlatApp() {
   const [tab, setTab] = useState<Tab>("beranda");
+  const [masa, setMasa] = useState<Masa>(null);
   const tema = useSyncExternalStore(langgananTema, bacaTema, temaBawaan);
   const kerjaRef = useRef<HTMLDivElement | null>(null);
   const sisiRef = useRef<HTMLElement | null>(null);
   const p = useProject();
   const { aktif, jumlahKata } = p;
+
+  // Sisa langganan dibaca sekali saat halaman terbuka.
+  //
+  // Ia tidak menjaga apa pun — gerbangnya ada di server dan sudah dilewati
+  // sebelum layar ini digambar. Gunanya satu: memberi tahu pemiliknya kapan
+  // masanya habis SEBELUM ia kehilangan akses di tengah mengerjakan bab,
+  // karena itulah yang membuat orang memperpanjang tepat waktu.
+  useEffect(() => {
+    let hidup = true;
+    fetch("/api/cakrawala-access", { cache: "no-store" })
+      .then((jawab) => jawab.json())
+      .then((isi: { langganan?: Masa }) => {
+        if (hidup && isi.langganan) setMasa(isi.langganan);
+      })
+      .catch(() => {
+        // Kepala halaman tanpa keterangan masa masih berguna sepenuhnya.
+      });
+    return () => {
+      hidup = false;
+    };
+  }, []);
 
   // Di ponsel daftar alat adalah baris yang digulir menyamping. Alat yang
   // dipilih dari tempat lain (ubin "Lanjutkan ke", misalnya) bisa berada di
@@ -148,10 +173,13 @@ export default function AlatApp() {
             </button>
           </div>
 
-          <span className="al-buka">
-            <GembokTerbuka />
-            AKSES TERBUKA
-          </span>
+          <div className="al-tanda">
+            <span className="al-buka">
+              <GembokTerbuka />
+              AKSES TERBUKA
+            </span>
+            {masa?.aktif && <SisaLangganan masa={masa} />}
+          </div>
           <h1>Cakrawala</h1>
           <p className="al-lead">Be Your Self, Kamu adalah Pencipta Masa Depanmu Sendiri</p>
 
@@ -270,5 +298,29 @@ export default function AlatApp() {
         <Link href="/">Kembali ke portal →</Link>
       </footer>
     </div>
+  );
+}
+
+/**
+ * Sisa langganan, ditulis dalam hari.
+ *
+ * Dibulatkan ke ATAS: sisa dua belas jam adalah "1 hari lagi", bukan nol.
+ * Angka nol pada layar orang yang aksesnya masih hidup membuatnya menyangka
+ * sudah terkunci dan berhenti bekerja hari itu juga.
+ */
+function sisaHari(sampai: string) {
+  const selisih = new Date(sampai).getTime() - Date.now();
+  return Math.max(1, Math.ceil(selisih / (24 * 60 * 60_000)));
+}
+
+function SisaLangganan({ masa }: { masa: NonNullable<Masa> }) {
+  const hari = sisaHari(masa.sampai);
+  const dekat = hari <= 7;
+  return (
+    <span className={`al-masa${dekat ? " al-masa-dekat" : ""}`} title={`Nomor ${masa.nomor}`}>
+      {dekat ? "⚠ " : ""}
+      Langganan {hari === 1 ? "tinggal 1 hari" : `${hari} hari lagi`}
+      {dekat && <small>Perpanjang lewat WhatsApp, nomormu sudah terdaftar</small>}
+    </span>
   );
 }
