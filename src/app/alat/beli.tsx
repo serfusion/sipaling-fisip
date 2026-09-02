@@ -133,6 +133,11 @@ export default function BeliAkses({ onAkses }: { onAkses: (kode: string, whatsap
   // Diam saja selama sisa waktunya berjalan adalah cara tercepat membuat
   // orang yang sudah membayar merasa uangnya hilang.
   const lama = tik >= 120;
+  // Berapa lama sudah menunggu sejak klaim. Jam pengulangnya disetel ulang
+  // ketika pesanannya berubah — dan perubahan terakhirnya memang klaim itu —
+  // jadi tik menghitung dari sana. Angka yang bergerak memberi tahu bahwa
+  // halamannya masih bekerja; layar yang diam terbaca seperti rusak.
+  const menitTunggu = Math.floor(tik / 60);
 
   useEffect(() => {
     if (status === "lunas" && kode) onAkses(kode, kontak);
@@ -273,10 +278,13 @@ export default function BeliAkses({ onAkses }: { onAkses: (kode: string, whatsap
           <div className="beli-tunggu beli-diperiksa">
             <span className="beli-putar" aria-hidden="true" />
             <div>
-              <b>Pembayaranmu sedang diperiksa</b>
+              <b>
+                Pembayaranmu sedang diperiksa
+                {menitTunggu > 0 && ` · ${menitTunggu} menit`}
+              </b>
               <small>
                 Pesananmu sudah ditahan supaya nominalnya tidak dipakai orang lain, dan pengelola
-                sudah melihatnya di urutan paling atas. Begitu pembayarannya tercatat, kode akses
+                sudah dikabari langsung ke ponselnya. Begitu pembayarannya dipastikan, kode akses
                 muncul sendiri di halaman ini — boleh ditinggal, halamannya tetap memeriksa.
               </small>
             </div>

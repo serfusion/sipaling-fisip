@@ -17,6 +17,8 @@
 // ============================================================
 import { layaniPesan } from "@/lib/uang/percakapan";
 import { pernahDikerjakan, tandaCocok } from "@/lib/uang/pesan-masuk";
+import { chatPemilik } from "@/lib/kabar-pemilik";
+import { bacaPerintahPesanan, layaniPerintahPesanan } from "@/lib/perintah-pesanan";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -80,6 +82,26 @@ export async function POST(request: Request) {
 
   const chat = String(chatId);
   const label = pesan?.chat?.title || pesan?.from?.first_name || pesan?.from?.username || "Telegram";
+
+  // PERINTAH PESANAN CAKRAWALA — didahulukan atas catatan uang.
+  //
+  // Hanya dari chat pemiliknya. Bot Telegram dapat diajak bicara siapa saja
+  // yang tahu namanya, dan "lunas PSN-XXXXXX" dari orang asing berarti kode
+  // akses yang diberikan gratis. Chat lain tidak diberi tahu bahwa perintah
+  // ini ada; pesannya diteruskan ke jalur catatan uang seperti biasa.
+  const pemilik = chatPemilik();
+  if (pemilik && chat === pemilik) {
+    const perintah = bacaPerintahPesanan(teks);
+    if (perintah) {
+      try {
+        await balas(token, chat, await layaniPerintahPesanan(perintah));
+      } catch (error) {
+        console.error("perintah pesanan telegram", error);
+        await balas(token, chat, "Perintahnya belum dapat dikerjakan. Coba lagi sebentar.");
+      }
+      return Response.json({ ok: true });
+    }
+  }
 
   try {
     const jawab = await layaniPesan({ kanal: "telegram", externalId: chat, teks, label });
