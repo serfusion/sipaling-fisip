@@ -1,24 +1,11 @@
 import { db } from "@/db";
 import { notifications } from "@/db/schema";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
-import { getCurrentProfile, type SessionProfile } from "@/lib/supabase-server";
+import { getCurrentProfile } from "@/lib/supabase-server";
+import { audienceFilter } from "@/lib/notifikasi-audiens";
 import { explainServerError } from "@/lib/api-errors";
 
 export const dynamic = "force-dynamic";
-
-// Role admin yang ikut memantau notifikasi program studi.
-const PRODI_WATCHERS = ["super_admin", "admin", "admin_prodi"];
-
-function audienceFilter(profile: SessionProfile) {
-  if (profile.role === "dosen") {
-    // Dosen hanya melihat notifikasi yang ditujukan kepada dirinya.
-    return profile.lecturerId === null ? null : eq(notifications.lecturerId, profile.lecturerId);
-  }
-  if (PRODI_WATCHERS.includes(profile.role)) {
-    return and(isNull(notifications.lecturerId), eq(notifications.audienceRole, "admin_prodi"));
-  }
-  return and(isNull(notifications.lecturerId), eq(notifications.audienceRole, profile.role));
-}
 
 export async function GET() {
   try {

@@ -1144,7 +1144,16 @@ export default function DashboardApp({
               // Notifikasi pengajuan judul membuka panel yang relevan.
               if (refCode.startsWith("SIPALING-PRODI-JUDUL-")) {
                 openView(profile.role === "dosen" ? "bimbingan" : "judul");
+                return;
               }
+              // Sisanya bernomor tiket. Menekan pesannya membawa langsung ke
+              // tiketnya, bukan ke daftar yang masih harus dicari sendiri —
+              // notifikasi yang tidak mengantar ke mana-mana sama saja dengan
+              // tidak ada.
+              setSearchDraft(refCode);
+              setSearchQ(refCode);
+              setChip("Semua");
+              openView(profile.role === "dosen" ? "bimbingan" : "antrean");
             }}
           />
           <div className="me" ref={meRef}>

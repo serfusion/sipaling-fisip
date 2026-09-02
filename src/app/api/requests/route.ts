@@ -18,6 +18,7 @@ import {
 import { kolomDriveSiap } from "@/lib/kolom-drive";
 import { getCurrentProfile, serviceTypeForProfile } from "@/lib/supabase-server";
 import { explainServerError } from "@/lib/api-errors";
+import { audienceUntukLayanan, pushNotifications } from "@/lib/notify";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { blockedByMaintenance } from "@/lib/maintenance-gate";
 
@@ -361,6 +362,40 @@ export async function POST(request: Request) {
       } catch (error) {
         console.error("auto attendance", error); // tidak menggagalkan pengajuan
       }
+    }
+
+    // Bunyikan loncengnya.
+    //
+    // Sebelum ini HANYA pengajuan judul yang membuat notifikasi, sehingga
+    // admin perpustakaan dan PDDIKTI melihat lonceng yang selamanya diam
+    // walaupun antreannya penuh — dan menyimpulkan loncengnya rusak.
+    //
+    // Absensi sengaja tidak ikut: ia langsung berstatus Selesai dan tidak
+    // menunggu dikerjakan siapa pun. Notifikasi untuk hal yang tidak menuntut
+    // tindakan hanya membuat orang berhenti membaca notifikasi.
+    if (requestId && !absensi) {
+      const berkasnya = jalurBagian.length > 0 ? `${jalurBagian.length} berkas` : file ? "1 berkas" : "tanpa lampiran";
+      await pushNotifications([
+        {
+          audienceRole: audienceUntukLayanan(serviceType),
+          kind: "pengajuan-baru",
+          title: `Pengajuan baru · ${serviceNeed}`,
+          body: `${studentName} (${nim}) mengirim ${serviceType} — ${serviceNeed}, ${berkasnya}.`,
+          refCode: finalTicket,
+        },
+        // Dosen tujuan diberi tahu langsung, bukan menunggu ia membuka daftar.
+        ...(lecturerId
+          ? [
+              {
+                lecturerId,
+                kind: "pengajuan-baru",
+                title: `Berkas masuk · ${studentName}`,
+                body: `${studentName} (${nim}) mengirim ${serviceNeed}. Judul: ${title}`,
+                refCode: finalTicket,
+              },
+            ]
+          : []),
+      ]);
     }
 
     return Response.json({ success: true, ticket: finalTicket }, { status: 201 });
