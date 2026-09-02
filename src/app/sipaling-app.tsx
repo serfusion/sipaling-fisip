@@ -16,6 +16,12 @@ import {
   periksaBerkasBagian,
   batasBagianMb,
 } from "@/lib/bukti-penyerahan";
+import {
+  bentukUnggah,
+  jumlahBerkas,
+  periksaBerkasTunggal,
+  type BentukUnggah,
+} from "@/lib/bentuk-unggah";
 import { LecturerPicker, type LecturerOption } from "./lecturer-picker";
 import TitleProposalForm from "./title-proposal-form";
 import Animasi from "./animasi";
@@ -587,6 +593,15 @@ export default function SipalingApp() {
   const [revisionMessage, setRevisionMessage] = useState<React.ReactNode>(null);
   const [revisionError, setRevisionError] = useState("");
   const [isUploadingRevision, setIsUploadingRevision] = useState(false);
+  // Formulir revisi tidak lagi menebak: ia menanyakan tiketnya lebih dulu,
+  // lalu menampilkan persis berkas yang layanan itu minta — empat PDF untuk
+  // penyerahan perpustakaan, satu DOCX untuk tugas akhir, dan seterusnya.
+  const [revTicket, setRevTicket] = useState("");
+  const [revNim, setRevNim] = useState("");
+  const [revBentuk, setRevBentuk] = useState<BentukUnggah | null>(null);
+  const [revLayanan, setRevLayanan] = useState<{ serviceType: string; serviceNeed: string; status: string } | null>(null);
+  const [revMencari, setRevMencari] = useState(false);
+  const [revBagian, setRevBagian] = useState<Record<string, File | null>>({});
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
   const [selectedNeed, setSelectedNeed] = useState<string>(serviceCatalog[serviceType].needs[0]);
   const [attendanceInfo, setAttendanceInfo] = useState<{ nextVisit: number; date: string; time: string } | null>(null);
@@ -918,17 +933,95 @@ export default function SipalingApp() {
     }
   }
 
+  /**
+   * Siapkan formulir revisi untuk satu tiket.
+   *
+   * Dipanggil dua arah: dari tombol "Cek tiket" di tab revisi, dan dari
+   * halaman Cek Status ketika mahasiswa menekan "unggah berkas terbaru".
+   * Yang kedua tidak perlu bertanya ke server lagi — datanya sudah di tangan.
+   */
+  function siapkanRevisi(data: { ticket: string; nim: string; serviceType: string; serviceNeed: string; status: string }) {
+    setRevTicket(data.ticket);
+    setRevNim(data.nim);
+    setRevLayanan({ serviceType: data.serviceType, serviceNeed: data.serviceNeed, status: data.status });
+    setRevBentuk(bentukUnggah(data.serviceType, data.serviceNeed, true));
+    setRevBagian({});
+    setRevFileInfo("");
+    setRevisionError("");
+    setRevisionMessage(null);
+  }
+
+  async function cariTiketRevisi() {
+    const ticket = revTicket.trim();
+    const nim = revNim.trim();
+    if (!ticket || !nim) {
+      setRevisionError("Nomor tiket dan NIM wajib diisi.");
+      return;
+    }
+    setRevMencari(true);
+    setRevisionError("");
+    setRevisionMessage(null);
+    try {
+      const data = await readApi<{ data: StatusRecord }>(
+        await fetch("/api/status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ticket, nim }),
+        }),
+      );
+      siapkanRevisi({
+        ticket: data.data.ticket,
+        nim: data.data.nim,
+        serviceType: data.data.serviceType,
+        serviceNeed: data.data.serviceNeed,
+        status: data.data.status,
+      });
+    } catch (error: unknown) {
+      setRevBentuk(null);
+      setRevLayanan(null);
+      setRevisionError(error instanceof Error ? error.message : "Tiket tidak dapat diperiksa.");
+    } finally {
+      setRevMencari(false);
+    }
+  }
+
   async function submitRevision(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setRevisionMessage(null);
     setRevisionError("");
     const form = event.currentTarget;
-    const formData = new FormData(form);
-    const fileValue = formData.get("file");
-    const file = fileValue instanceof File && fileValue.name ? fileValue : null;
-    if (!isAcceptedFile(file, "required-docx")) {
-      setRevisionError("File revisi wajib berformat .DOCX dan berukuran maksimal 10 MB.");
+    const bentuk = revBentuk;
+    if (!bentuk) {
+      setRevisionError("Periksa nomor tiket dulu supaya berkas yang diminta sesuai layanannya.");
       return;
+    }
+
+    const formData = new FormData();
+    formData.set("ticket", revTicket.trim());
+    formData.set("nim", revNim.trim());
+    const catatan = (form.elements.namedItem("note") as HTMLTextAreaElement | null)?.value ?? "";
+    formData.set("note", catatan);
+
+    if (bentuk.jenis === "bagian") {
+      // Diperiksa di peramban lebih dulu supaya mahasiswa tahu berkas mana
+      // yang bermasalah sebelum menunggu empat unggahan selesai.
+      for (const bagian of bentuk.bagian) {
+        const berkas = revBagian[bagian.id] ?? null;
+        const cek = periksaBerkasBagian(bagian.id, berkas);
+        if (!cek.ok) {
+          setRevisionError(cek.pesan);
+          return;
+        }
+        formData.set(`bagian_${bagian.id}`, berkas as File);
+      }
+    } else if (bentuk.jenis === "tunggal") {
+      const isi = (form.elements.namedItem(bentuk.nama) as HTMLInputElement | null)?.files?.[0] ?? null;
+      const cek = periksaBerkasTunggal(bentuk, isi);
+      if (!cek.ok) {
+        setRevisionError(cek.pesan);
+        return;
+      }
+      if (isi) formData.set(bentuk.nama, isi);
     }
 
     setIsUploadingRevision(true);
@@ -945,6 +1038,7 @@ export default function SipalingApp() {
       );
       form.reset();
       setRevFileInfo("");
+      setRevBagian({});
     } catch (error: unknown) {
       setRevisionError(error instanceof Error ? error.message : "Revisi gagal dikirim.");
     } finally {
@@ -1453,7 +1547,27 @@ export default function SipalingApp() {
                     </div>
                   )}
                   <div className="report-notes"><div><small>Catatan Dosen</small><p>{statusData.lecturerNote || "Belum ada catatan dosen."}</p></div><div><small>Catatan Admin</small><p>{statusData.adminNote || "Belum ada catatan admin."}</p></div></div>
-                  {statusData.status === "Revisi" && <button type="button" className="text-action" onClick={() => selectTab("revisi")}>Status revisi: unggah berkas terbaru →</button>}
+                  {statusData.status === "Revisi" && (
+                    <button
+                      type="button"
+                      className="text-action"
+                      onClick={() => {
+                        // Datanya sudah di tangan, jadi tab revisi tidak perlu
+                        // bertanya ulang ke server — dan mahasiswa tidak perlu
+                        // mengetik ulang nomor tiket yang barusan ia tempel.
+                        siapkanRevisi({
+                          ticket: statusData.ticket,
+                          nim: statusData.nim,
+                          serviceType: statusData.serviceType,
+                          serviceNeed: statusData.serviceNeed,
+                          status: statusData.status,
+                        });
+                        selectTab("revisi");
+                      }}
+                    >
+                      Status revisi: unggah {jumlahBerkas(bentukUnggah(statusData.serviceType, statusData.serviceNeed, true))} berkas terbaru →
+                    </button>
+                  )}
                 </div>
               )}
             </article>
@@ -1461,13 +1575,157 @@ export default function SipalingApp() {
 
           {activeTab === "revisi" && (
             <article className="card page-panel">
-              <div className="section-heading"><div><p className="section-eyebrow">PEMBARUAN BERKAS</p><h2>Upload Revisi Skripsi</h2><p className="section-subtitle">Upload revisi hanya dapat dilakukan ketika status layanan adalah <strong>Revisi</strong>.</p></div></div>
+              <div className="section-heading">
+                <div>
+                  <p className="section-eyebrow">PEMBARUAN BERKAS</p>
+                  <h2>Upload Revisi</h2>
+                  <p className="section-subtitle">
+                    Masukkan nomor tiket dan NIM dulu. Berkas yang diminta menyesuaikan layanannya —
+                    penyerahan skripsi ke perpustakaan meminta empat berkas, sama seperti waktu
+                    mengajukan. Upload revisi hanya dapat dilakukan ketika status layanan adalah{" "}
+                    <strong>Revisi</strong>.
+                  </p>
+                </div>
+              </div>
+
               <form className="form-grid" onSubmit={submitRevision}>
-                <div className="field-group"><label htmlFor="revisionTicket">Nomor Tiket <em>*</em></label><input id="revisionTicket" name="ticket" type="text" placeholder="Masukkan nomor tiket" required /></div>
-                <div className="field-group"><label htmlFor="revisionNim">NIM <em>*</em></label><input id="revisionNim" name="nim" type="text" inputMode="numeric" placeholder="Nomor induk mahasiswa" required /></div>
-                <div className="field-group field-full"><label htmlFor="revisionNote">Catatan Revisi Mahasiswa</label><textarea id="revisionNote" name="note" placeholder="Contoh: Revisi BAB II sudah diperbaiki sesuai arahan dosen." /></div>
-                <div className="field-group field-full upload-box"><label htmlFor="revisionFile">Upload File Revisi .DOCX <em>*</em></label><PilihBerkas id="revisionFile" name="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required terpilih={revFileInfo} onPilih={(berkas) => setRevFileInfo(keteranganBerkas(berkas))} catatan="File wajib .DOCX, maksimal 10 MB." /></div>
-                <div className="form-actions field-full"><button type="submit" className="button button-primary" disabled={isUploadingRevision}>{isUploadingRevision ? "Mengunggah..." : "Kirim Revisi"}<span>→</span></button></div>
+                <div className="field-group">
+                  <label htmlFor="revisionTicket">Nomor Tiket <em>*</em></label>
+                  <input
+                    id="revisionTicket"
+                    type="text"
+                    placeholder="Masukkan nomor tiket"
+                    value={revTicket}
+                    onChange={(event) => {
+                      setRevTicket(event.target.value);
+                      // Tiket berganti berarti bentuk berkasnya belum tentu
+                      // sama. Menahannya di layar hanya mengundang mahasiswa
+                      // mengunggah empat PDF untuk tiket yang meminta satu DOCX.
+                      setRevBentuk(null);
+                      setRevLayanan(null);
+                    }}
+                    required
+                  />
+                </div>
+                <div className="field-group">
+                  <label htmlFor="revisionNim">NIM <em>*</em></label>
+                  <input
+                    id="revisionNim"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Nomor induk mahasiswa"
+                    value={revNim}
+                    onChange={(event) => {
+                      setRevNim(event.target.value);
+                      setRevBentuk(null);
+                      setRevLayanan(null);
+                    }}
+                    required
+                  />
+                </div>
+
+                {!revBentuk && (
+                  <div className="form-actions field-full">
+                    <button
+                      type="button"
+                      className="button button-primary"
+                      disabled={revMencari}
+                      onClick={() => void cariTiketRevisi()}
+                    >
+                      {revMencari ? "Memeriksa..." : "Cek tiket"}<span>→</span>
+                    </button>
+                  </div>
+                )}
+
+                {revBentuk && revLayanan && (
+                  <>
+                    <div className="field-group field-full rev-tiket">
+                      <b>{revLayanan.serviceType}</b>
+                      <span>{revLayanan.serviceNeed}</span>
+                      <span className={`rev-status ${revLayanan.status === "Revisi" ? "" : "rev-status-beda"}`}>
+                        Status saat ini: {revLayanan.status}
+                        {revLayanan.status !== "Revisi" && " — upload revisi belum dibuka untuk tiket ini."}
+                      </span>
+                      <small>
+                        {jumlahBerkas(revBentuk) > 1
+                          ? `Layanan ini meminta ${jumlahBerkas(revBentuk)} berkas. Semuanya akan menggantikan berkas sebelumnya pada tiket yang sama.`
+                          : "Berkas yang diunggah akan menggantikan berkas sebelumnya pada tiket yang sama."}
+                      </small>
+                    </div>
+
+                    <div className="field-group field-full">
+                      <label htmlFor="revisionNote">Catatan Revisi Mahasiswa</label>
+                      <textarea
+                        id="revisionNote"
+                        name="note"
+                        placeholder="Contoh: Revisi BAB II sudah diperbaiki sesuai arahan dosen."
+                      />
+                    </div>
+
+                    {revBentuk.jenis === "bagian" ? (
+                      <div className="field-group field-full serah-box">
+                        <div className="requirements-title"><span>!</span> {revBentuk.jumlah} berkas, semuanya wajib</div>
+                        {revBentuk.bagian.map((bagian) => {
+                          const berkas = revBagian[bagian.id] ?? null;
+                          const lewatBatas = berkas ? berkas.size > batasBagianMb(bagian.id) * 1024 * 1024 : false;
+                          return (
+                            <div className="serah-slot" key={bagian.id}>
+                              <label htmlFor={`rev_bagian_${bagian.id}`}>{bagian.label} <em>*</em></label>
+                              <PilihBerkas
+                                id={`rev_bagian_${bagian.id}`}
+                                accept="application/pdf,.pdf"
+                                terpilih={keteranganBerkas(berkas)}
+                                onPilih={(dipilih) =>
+                                  setRevBagian((kini) => ({ ...kini, [bagian.id]: dipilih }))
+                                }
+                              />
+                              <p className={`helper ${lewatBatas ? "helper-error" : ""}`}>
+                                {lewatBatas
+                                  ? `Melebihi batas ${batasBagianMb(bagian.id)} MB. Simpan ulang sebagai PDF teks.`
+                                  : bagian.keterangan}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : revBentuk.jenis === "tunggal" ? (
+                      <div className="field-group field-full upload-box">
+                        <label htmlFor="revisionFile">{revBentuk.label} <em>*</em></label>
+                        <PilihBerkas
+                          id="revisionFile"
+                          name={revBentuk.nama}
+                          accept={revBentuk.accept}
+                          required={revBentuk.wajib}
+                          terpilih={revFileInfo}
+                          onPilih={(berkas) => setRevFileInfo(keteranganBerkas(berkas))}
+                          catatan={revBentuk.catatan}
+                        />
+                      </div>
+                    ) : null}
+
+                    <div className="form-actions field-full">
+                      <button
+                        type="submit"
+                        className="button button-primary"
+                        disabled={isUploadingRevision || revLayanan.status !== "Revisi"}
+                      >
+                        {isUploadingRevision ? "Mengunggah..." : "Kirim Revisi"}<span>→</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="button"
+                        onClick={() => {
+                          setRevBentuk(null);
+                          setRevLayanan(null);
+                          setRevBagian({});
+                          setRevFileInfo("");
+                        }}
+                      >
+                        Ganti tiket
+                      </button>
+                    </div>
+                  </>
+                )}
               </form>
               {revisionError && <ErrorNotice message={revisionError} />}
               {revisionMessage && <SuccessNotice>{revisionMessage}</SuccessNotice>}

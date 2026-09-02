@@ -79,6 +79,13 @@ export const revisionUploads = pgTable("revision_uploads", {
   requestId: integer("request_id").notNull().references(() => serviceRequests.id, { onDelete: "cascade" }),
   nim: varchar("nim", { length: 32 }).notNull(),
   revisionNumber: integer("revision_number").notNull(),
+  /**
+   * Bagian mana yang diganti, untuk layanan yang mengunggah beberapa berkas
+   * sekaligus, mis. "cover" | "isi" | "pustaka" | "full". Kosong untuk
+   * layanan berkas tunggal.
+   */
+  part: varchar("part", { length: 40 }),
+  label: varchar("label", { length: 160 }),
   note: text("note"),
   fileName: varchar("file_name", { length: 255 }).notNull(),
   fileMime: varchar("file_mime", { length: 160 }).notNull(),
