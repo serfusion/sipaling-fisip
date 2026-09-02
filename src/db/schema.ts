@@ -337,3 +337,48 @@ export const moneyChannels = pgTable("money_channels", {
   label: varchar("label", { length: 120 }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Akun langganan Cakrawala, dikenali dari nomor WhatsApp.
+//
+// Langganan menempel pada AKUN, bukan pada perangkat. Sebelum tabel ini ada,
+// akses hanya berupa cookie berisi kode: ganti ponsel berarti kehilangan
+// akses, aplikasi tidak dapat berbagi langganan dengan web, dan perpanjangan
+// tidak punya apa pun untuk ditempeli.
+//
+// TIDAK ADA KATA SANDI, dan itu disengaja. Nomor didaftarkan sekali ketika
+// kode ditukar, lalu terkunci pada kode itu. Yang dapat menyamar hanyalah
+// orang yang tahu KODE AKSES milik temannya — dan orang itu memang sudah bisa
+// masuk tanpa perlu tahu nomornya, jadi tidak ada yang bertambah bocor.
+export const cakrawalaAccounts = pgTable("cakrawala_accounts", {
+  id: serial("id").primaryKey(),
+  /** Selalu bentuk 62xxx, hasil nomorWa(). */
+  whatsapp: varchar("whatsapp", { length: 24 }).notNull().unique(),
+  name: varchar("name", { length: 120 }),
+  /** Kapan langganannya berakhir. Perpanjangan menambah dari sini. */
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  /** Kunci sesi yang disimpan pada cookie. Acak, bukan turunan nomornya. */
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  /** Kode terakhir yang ditukarkan, untuk penelusuran. */
+  lastCode: varchar("last_code", { length: 40 }),
+  /** Berapa kali akun ini menukarkan kode; perpanjangan ikut terhitung. */
+  redeemCount: integer("redeem_count").notNull().default(1),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+});
+
+// Kode mana ditukar oleh nomor mana.
+//
+// Inilah yang mengunci sebuah kode pada satu nomor: sekali ditukar, kode itu
+// tidak dapat dipakai nomor lain. Disimpan sebagai barisnya sendiri, bukan
+// sebagai kolom pada kodenya, karena kode hidup di dalam satu baris JSON yang
+// ditulis ulang seluruhnya setiap kali berubah — penguncian yang penting
+// tidak boleh bergantung pada tulisan seperti itu.
+export const cakrawalaRedemptions = pgTable("cakrawala_redemptions", {
+  id: serial("id").primaryKey(),
+  code: varchar("code", { length: 40 }).notNull().unique(),
+  accountId: integer("account_id").notNull().references(() => cakrawalaAccounts.id, { onDelete: "cascade" }),
+  whatsapp: varchar("whatsapp", { length: 24 }).notNull(),
+  /** Berapa hari yang ditambahkan kode ini ke langganannya. */
+  days: integer("days").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

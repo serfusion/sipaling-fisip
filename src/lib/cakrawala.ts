@@ -41,6 +41,15 @@ export type CakrawalaCode = {
   lastUsedAt: string | null;
   /** Nomor pesanan yang menerbitkan kode ini, bila ia lahir dari pembelian. */
   orderCode?: string | null;
+  /**
+   * Berapa HARI yang ditambahkan kode ini ke langganan penukarnya.
+   *
+   * Berbeda dari expiresAt yang menyatakan kapan KODENYA hangus bila tidak
+   * ditukar. Yang dibutuhkan perpanjangan adalah lamanya, bukan tanggalnya:
+   * menukar paket tiga puluh hari sepekan sebelum langganan lama berakhir
+   * harus menambah tiga puluh hari, bukan memotongnya menjadi tujuh.
+   */
+  hari?: number | null;
 };
 
 export type CakrawalaState = {
@@ -118,6 +127,7 @@ function normalkanKode(input: unknown): CakrawalaCode | null {
     // sebagai "sudah lewat": kode lama yang tersimpan sebelum kolom ini ada
     // memang tidak punya batas, dan tidak boleh ikut mati sendiri.
     expiresAt: waktuSah(raw.expiresAt),
+    hari: Number.isInteger(raw.hari) && Number(raw.hari) > 0 ? Math.min(Number(raw.hari), 3650) : null,
     createdAt: typeof raw.createdAt === "string" ? raw.createdAt : new Date().toISOString(),
     lastUsedAt: typeof raw.lastUsedAt === "string" ? raw.lastUsedAt : null,
     orderCode: typeof raw.orderCode === "string" ? raw.orderCode.slice(0, 20) : null,
@@ -156,6 +166,24 @@ export function parseCakrawala(value: string | null | undefined): CakrawalaState
   } catch {
     return DEFAULT_CAKRAWALA;
   }
+}
+
+/**
+ * Berapa hari langganan yang diberikan kode ini.
+ *
+ * Diambil dari kolom hari bila ada. Kode lama yang terbit sebelum kolom itu
+ * ada tidak punya angkanya, jadi lamanya disimpulkan dari jarak pembuatan ke
+ * masa berlakunya — dan kode tanpa batas waktu diberi setahun, bukan tanpa
+ * batas: langganan yang tidak pernah berakhir bukan langganan.
+ */
+export function hariKode(kode: CakrawalaCode) {
+  if (kode.hari && kode.hari > 0) return kode.hari;
+  if (kode.expiresAt) {
+    const selisih = new Date(kode.expiresAt).getTime() - new Date(kode.createdAt).getTime();
+    const hari = Math.round(selisih / (24 * 60 * 60_000));
+    if (hari > 0) return Math.min(hari, 3650);
+  }
+  return 365;
 }
 
 /** Sudah lewat masa berlakunya? Kode tanpa batas waktu tidak pernah lewat. */

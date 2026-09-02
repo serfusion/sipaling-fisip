@@ -23,7 +23,7 @@ export default async function Page() {
   // CSS atau state React, seluruh isi Cakrawala tetap ikut terkirim ke
   // pengunjung dan tinggal dibuka lewat alat pengembang.
   const akses = await cakrawalaAccess();
-  if (!akses.allowed) return <PratinjauCakrawala />;
+  if (!akses.allowed) return <PratinjauCakrawala habis={akses.habis} />;
   return (
     <>
       <script dangerouslySetInnerHTML={{ __html: SKRIP_TEMA }} />

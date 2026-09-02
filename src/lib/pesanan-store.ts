@@ -193,9 +193,19 @@ export async function lunaskanPesanan(
     code: kode,
     label: `${pesanan.packageName} · ${pesanan.orderCode}${pesanan.buyerName ? ` · ${pesanan.buyerName}` : ""}`,
     active: true,
-    maxUses: pesanan.maxDevices,
+    // TANPA batas pemakaian, dan itu berubah sejak langganan menempel pada
+    // nomor WhatsApp. Yang mengunci sekarang tabel penukaran — satu kode
+    // hanya dapat ditukar satu nomor, selamanya — bukan penghitung ini.
+    //
+    // Membiarkannya berisi jumlah perangkat justru berbahaya: bila pembuatan
+    // akunnya gagal setelah kodenya telanjur terhitung terpakai, pembeli
+    // paket satu perangkat terkunci di luar oleh kodenya sendiri, dan ia
+    // sudah membayar. Penghitung yang tidak menjaga apa-apa tidak boleh
+    // punya kuasa sebesar itu.
+    maxUses: 0,
     uses: 0,
     expiresAt: batasAkses(paket, sekarang).toISOString(),
+    hari: paket.hari,
     createdAt: sekarang.toISOString(),
     lastUsedAt: null,
     orderCode: pesanan.orderCode,

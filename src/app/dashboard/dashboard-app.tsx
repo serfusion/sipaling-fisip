@@ -97,6 +97,30 @@ type PesananBaris = {
   createdAt: string;
 };
 
+/**
+ * Berapa hari lagi langganan ini berakhir, dibulatkan ke atas.
+ *
+ * Dibulatkan ke ATAS dengan sengaja: sisa dua belas jam adalah "sisa 1 hari",
+ * bukan nol. Pelanggan yang aksesnya masih hidup tidak boleh terbaca sudah
+ * habis di panel, karena itulah yang memicu tagihan yang tidak perlu.
+ */
+function sisaHari(sampai: string) {
+  const selisih = new Date(sampai).getTime() - Date.now();
+  return selisih <= 0 ? 0 : Math.ceil(selisih / (24 * 60 * 60_000));
+}
+
+/** Satu pelanggan Cakrawala, dilihat dari panel Super Admin. */
+type LanggananBaris = {
+  id: number;
+  whatsapp: string;
+  nama: string | null;
+  sampai: string;
+  kodeTerakhir: string | null;
+  jumlahTukar: number;
+  dibuat: string;
+  terakhirDipakai: string | null;
+};
+
 type AttendanceRow = {
   id: number;
   nim: string;
@@ -410,6 +434,15 @@ export default function DashboardApp({
   const [cwDraft, setCwDraft] = useState({ label: "", maxUses: "" });
   const [cwCopied, setCwCopied] = useState("");
 
+  // Langganan: daftar pelanggan beserta tombol perpanjangannya. Inilah yang
+  // dipakai ketika ada yang memperpanjang lewat WhatsApp.
+  const [lgDaftar, setLgDaftar] = useState<LanggananBaris[]>([]);
+  const [lgAktif, setLgAktif] = useState(0);
+  const [lgSibuk, setLgSibuk] = useState("");
+  const [lgPesan, setLgPesan] = useState("");
+  const [lgGalat, setLgGalat] = useState("");
+  const [lgDraft, setLgDraft] = useState({ whatsapp: "", hari: "30", nama: "" });
+
   async function deleteRequest(ticket: string) {
     if (!window.confirm(`Hapus permanen tiket ${ticket}? Lampiran dan riwayat revisinya ikut terhapus dan tidak dapat dikembalikan.`)) return;
     setDeleting(true);
@@ -483,6 +516,25 @@ export default function DashboardApp({
     }
   }, []);
 
+  const muatLangganan = useCallback(async () => {
+    setLgGalat("");
+    try {
+      const balas = await fetch("/api/cakrawala-langganan", { cache: "no-store" });
+      const data = (await balas.json()) as {
+        success?: boolean; message?: string; aktif?: number; akun?: LanggananBaris[];
+      };
+      if (!balas.ok || !data.success) throw new Error(data.message || "Daftar langganan tidak terbaca.");
+      setLgDaftar(data.akun ?? []);
+      setLgAktif(data.aktif ?? 0);
+    } catch (alasan: unknown) {
+      setLgGalat(alasan instanceof Error ? alasan.message : "Daftar langganan tidak terbaca.");
+    }
+    // setLgGalat ikut didaftarkan bukan karena ia dapat berubah — pengubah
+    // useState selalu tetap — melainkan karena React Compiler menyimpulkannya
+    // sebagai kebergantungan di sini dan menolak memoisasi yang tidak
+    // menyebutkannya. Menghapusnya membuat lint gagal, bukan membuatnya rapi.
+  }, [setLgGalat]);
+
   const muatPesanan = useCallback(async () => {
     setPsnGalat("");
     try {
@@ -528,6 +580,39 @@ export default function DashboardApp({
     }
   }
 
+  /**
+   * Menambah hari atau menghentikan satu langganan.
+   *
+   * Nomornya dikirim apa adanya; server yang meluruskannya. Yang dibaca di
+   * WhatsApp bisa "0812…" sedangkan yang tersimpan "62812…", dan menyamakan
+   * keduanya dengan tangan hanya menambah salah ketik.
+   */
+  async function ubahLangganan(aksi: "perpanjang" | "hentikan", whatsapp: string, hari?: number, nama?: string) {
+    if (aksi === "hentikan" && !window.confirm(`Hentikan langganan ${whatsapp} sekarang juga?`)) return;
+    setLgSibuk(whatsapp);
+    setLgPesan("");
+    setLgGalat("");
+    try {
+      const balas = await fetch("/api/cakrawala-langganan", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aksi, whatsapp, hari, nama }),
+      });
+      const data = (await balas.json()) as { success?: boolean; message?: string; sampai?: string };
+      if (!balas.ok || !data.success) throw new Error(data.message || "Langganan belum dapat diubah.");
+      setLgPesan(
+        aksi === "hentikan"
+          ? "Langganan dihentikan."
+          : `Langganan diperpanjang sampai ${data.sampai ? new Date(data.sampai).toLocaleDateString("id-ID") : "—"}.`,
+      );
+      await muatLangganan();
+    } catch (alasan: unknown) {
+      setLgGalat(alasan instanceof Error ? alasan.message : "Langganan belum dapat diubah.");
+    } finally {
+      setLgSibuk("");
+    }
+  }
+
   useEffect(() => {
     if (!profile) return;
     if (view === "arsip" && !archivesLoadedRef.current && ARCHIVE_ROLES.includes(profile.role)) {
@@ -567,6 +652,7 @@ export default function DashboardApp({
       // memanggilnya langsung di badan effect membuat setState di dalamnya
       // berjalan sinkron dan memicu gambar bertingkat.
       window.setTimeout(() => void muatPesanan(), 0);
+      window.setTimeout(() => void muatLangganan(), 0);
       fetch("/api/cakrawala-access", { cache: "no-store" })
         .then((response) => response.json())
         .then((payload: { locked?: boolean; codes?: CakrawalaCode[] }) => {
@@ -586,7 +672,7 @@ export default function DashboardApp({
         })
         .catch(() => {});
     }
-  }, [view, profile, muatPesanan]);
+  }, [view, profile, muatPesanan, muatLangganan]);
 
   const allowedMenu = useMemo(
     () =>
@@ -1613,6 +1699,134 @@ export default function DashboardApp({
                             </td>
                           </tr>
                         ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Langganan berdiri di antara pesanan dan daftar kode karena
+                  di sinilah keduanya bertemu: pesanan menerbitkan kode, kode
+                  menjadi langganan pada sebuah nomor, dan perpanjangan lewat
+                  WhatsApp tidak menyentuh kode sama sekali — ia menambah hari
+                  di baris ini, dan web serta aplikasi ikut memanjang. */}
+              <div className="panel psn-panel">
+                <div className="psn-kepala">
+                  <div>
+                    <b>Langganan pelanggan</b>
+                    <span>
+                      Langganan menempel pada nomor WhatsApp, bukan pada perangkat. Ada yang
+                      memperpanjang lewat WhatsApp? Ketik nomornya di bawah, tambahkan harinya, dan
+                      akun itu langsung hidup lagi di web maupun aplikasi tanpa kode baru.
+                    </span>
+                  </div>
+                  <button type="button" className="btn btn-light btn-mini" onClick={() => void muatLangganan()}>
+                    ↻ Muat ulang
+                  </button>
+                </div>
+
+                <div className="psn-angka">
+                  <div><b>{lgAktif}</b><span>masih aktif</span></div>
+                  <div><b>{lgDaftar.length}</b><span>pernah berlangganan</span></div>
+                  <div><b>{lgDaftar.filter((a) => sisaHari(a.sampai) > 0 && sisaHari(a.sampai) <= 7).length}</b><span>habis ≤ 7 hari</span></div>
+                </div>
+
+                <form
+                  className="lg-form"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    const hari = Number(lgDraft.hari);
+                    if (!lgDraft.whatsapp.trim()) {
+                      setLgGalat("Nomor WhatsApp belum diisi.");
+                      return;
+                    }
+                    if (!Number.isInteger(hari) || hari < 1) {
+                      setLgGalat("Jumlah hari belum benar.");
+                      return;
+                    }
+                    void ubahLangganan("perpanjang", lgDraft.whatsapp.trim(), hari, lgDraft.nama.trim() || undefined);
+                  }}
+                >
+                  <label>
+                    <span>Nomor WhatsApp</span>
+                    <input
+                      type="tel"
+                      inputMode="tel"
+                      placeholder="0812xxxxxxxx"
+                      value={lgDraft.whatsapp}
+                      onChange={(event) => setLgDraft((d) => ({ ...d, whatsapp: event.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    <span>Tambah hari</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={3650}
+                      value={lgDraft.hari}
+                      onChange={(event) => setLgDraft((d) => ({ ...d, hari: event.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    <span>Nama (opsional)</span>
+                    <input
+                      type="text"
+                      placeholder="Nama pelanggan"
+                      value={lgDraft.nama}
+                      onChange={(event) => setLgDraft((d) => ({ ...d, nama: event.target.value }))}
+                    />
+                  </label>
+                  <button type="submit" className="btn btn-primary btn-mini" disabled={Boolean(lgSibuk)}>
+                    {lgSibuk ? "…" : "Perpanjang"}
+                  </button>
+                </form>
+
+                {lgPesan && <div className="dsh-ok">{lgPesan}</div>}
+                {lgGalat && <div className="dsh-error">{lgGalat}</div>}
+
+                <div className="qtable-wrap">
+                  <table className="qt">
+                    <thead>
+                      <tr><th>WhatsApp</th><th>Nama</th><th>Berlaku sampai</th><th>Kode terakhir</th><th aria-label="Aksi" /></tr>
+                    </thead>
+                    <tbody>
+                      {lgDaftar.length === 0 ? (
+                        <tr><td colSpan={5}><div className="dempty">Belum ada yang menukarkan kode dengan nomor WhatsApp.</div></td></tr>
+                      ) : (
+                        lgDaftar.map((a) => {
+                          const sisa = sisaHari(a.sampai);
+                          return (
+                            <tr key={a.id}>
+                              <td><code>{a.whatsapp}</code></td>
+                              <td>{a.nama || "—"}</td>
+                              <td>
+                                {new Date(a.sampai).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                                <small className={`lg-sisa${sisa <= 0 ? " lg-habis" : sisa <= 7 ? " lg-dekat" : ""}`}>
+                                  {sisa <= 0 ? "sudah habis" : sisa === 1 ? "sisa 1 hari" : `sisa ${sisa} hari`}
+                                </small>
+                              </td>
+                              <td>{a.kodeTerakhir ? <code>{a.kodeTerakhir}</code> : "—"}</td>
+                              <td className="qt-aksi">
+                                <button
+                                  type="button"
+                                  className="btn btn-light btn-mini"
+                                  disabled={lgSibuk === a.whatsapp}
+                                  onClick={() => void ubahLangganan("perpanjang", a.whatsapp, 30)}
+                                >
+                                  +30 hari
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-danger btn-mini"
+                                  disabled={lgSibuk === a.whatsapp || sisa <= 0}
+                                  onClick={() => void ubahLangganan("hentikan", a.whatsapp)}
+                                >
+                                  Hentikan
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>

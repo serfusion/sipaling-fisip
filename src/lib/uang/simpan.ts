@@ -64,18 +64,46 @@ export async function buatBuku(nama: unknown): Promise<Buku> {
  * awal, melainkan indeks unik pada owner_key: bila penulisan kalah cepat,
  * bukunya dibaca ulang dan yang sudah ada itulah yang dipakai.
  */
-export async function bukuUntukPemilik(ownerKey: string, nama: string): Promise<Buku> {
-  const cari = async () => {
+export async function bukuUntukPemilik(
+  ownerKey: string,
+  nama: string,
+  warisan?: string,
+): Promise<Buku> {
+  const cari = async (kunci: string) => {
     const baris = await db
       .select()
       .from(moneyBooks)
-      .where(eq(moneyBooks.ownerKey, ownerKey))
+      .where(eq(moneyBooks.ownerKey, kunci))
       .limit(1);
     return baris[0] ?? null;
   };
 
-  const ada = await cari();
+  const ada = await cari(ownerKey);
   if (ada) return ada;
+
+  // Penanda pemiliknya berganti — dulu sidik kode akses, sekarang sidik nomor
+  // WhatsApp pelanggannya. Bukunya ikut pindah, tidak ditinggalkan: kode akses
+  // berganti setiap kali langganan diperpanjang, dan catatan belanja setahun
+  // tidak boleh hilang hanya karena kodenya diperbarui.
+  if (warisan && warisan !== ownerKey) {
+    try {
+      const lama = await cari(warisan);
+      if (lama) {
+        const pindah = await db
+          .update(moneyBooks)
+          .set({ ownerKey })
+          .where(eq(moneyBooks.id, lama.id))
+          .returning();
+        if (pindah[0]) return pindah[0];
+      }
+    } catch (error) {
+      // Gagal pindah bukan alasan menolak pemiliknya masuk; yang terjadi
+      // paling buruk adalah buku baru yang kosong, dan buku lamanya masih ada.
+      console.error("pindahkan pemilik buku", error);
+      const ulang = await cari(ownerKey);
+      if (ulang) return ulang;
+    }
+  }
 
   const name = rapikanNamaBuku(nama);
   for (let percobaan = 0; percobaan < 5; percobaan += 1) {
@@ -86,7 +114,7 @@ export async function bukuUntukPemilik(ownerKey: string, nama: string): Promise<
         .returning();
       return baris[0];
     } catch (error) {
-      const lagi = await cari();
+      const lagi = await cari(ownerKey);
       if (lagi) return lagi;
       if (percobaan >= 4) throw error;
     }

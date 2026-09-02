@@ -2634,6 +2634,19 @@ a.al-mini:hover { color: var(--al-ink); }
   font-size: 10.5px; font-weight: 800; letter-spacing: .14em;
 }
 .al-buka svg { width: 14px; height: 14px; overflow: visible; }
+
+/* Lencana gembok dan sisa langganan berdiri berdampingan, membungkus ke baris
+   berikutnya di ponsel supaya keduanya tetap terbaca penuh. */
+.al-tanda { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.al-masa { display: inline-flex; flex-direction: column; gap: 2px;
+  padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(148, 197, 255, .32);
+  background: rgba(77, 126, 247, .14); color: #c3d2ef;
+  font-size: 10.5px; font-weight: 800; letter-spacing: .06em; }
+.al-masa small { color: #93a9d4; font-size: 9.5px; font-weight: 600; letter-spacing: .02em; }
+/* Seminggu terakhir diberi warna peringatan, bukan warna bahaya: aksesnya
+   masih hidup penuh, yang berubah hanya sisa waktunya. */
+.al-masa-dekat { border-color: rgba(245, 197, 66, .45); background: rgba(245, 197, 66, .12); color: #f5c542; }
+.al-masa-dekat small { color: #e2c98a; }
 /* Kaitnya terangkat sekali saat halaman dibuka, lalu berhenti terbuka. */
 .al-kait { transform-box: fill-box; transform-origin: 88% 100%;
   animation: al-lepas 1s .35s cubic-bezier(.34, 1.4, .5, 1) 1 both; }
@@ -2670,11 +2683,11 @@ a.al-mini:hover { color: var(--al-ink); }
 @media (min-width: 1100px) { .al-anim-buku { right: 4%; width: 124px; height: 124px; } }
 
 /* Isi kepala halaman naik satu per satu, bukan muncul serentak. */
-.al-top-baris, .al-buka, .al-top h1, .al-lead, .al-aktif {
+.al-top-baris, .al-tanda, .al-top h1, .al-lead, .al-aktif {
   animation: al-naik .55s cubic-bezier(.2, .7, .3, 1) both;
 }
 .al-top-baris { animation-delay: .02s; }
-.al-buka      { animation-delay: .10s; }
+.al-tanda     { animation-delay: .10s; }
 .al-top h1    { animation-delay: .16s; }
 .al-lead      { animation-delay: .22s; }
 .al-aktif     { animation-delay: .28s; }
@@ -3233,15 +3246,26 @@ a.al-mini:hover { color: var(--al-ink); }
 .cw-kunci-copy h2 { margin: 4px 0 8px; font-size: clamp(19px, 4vw, 25px); }
 .cw-kunci-copy p { color: var(--cw-muted); font-size: 12.5px; line-height: 1.7; }
 .cw-kunci-form label { display: block; margin-bottom: 7px; color: #cfe0ff; font-size: 11.5px; font-weight: 800; }
+.cw-kunci-form label + input { margin-bottom: 12px; }
+.cw-kunci-ops { color: var(--cw-muted); font-weight: 700; letter-spacing: 0; text-transform: none; }
 .cw-kunci-baris { display: flex; flex-wrap: wrap; gap: 9px; }
-.cw-kunci-baris input { flex: 1 1 12rem; min-width: 0; padding: 12px 14px; border-radius: 11px;
+.cw-kunci-form input { display: block; width: 100%; flex: 1 1 12rem; min-width: 0; padding: 12px 14px; border-radius: 11px;
   border: 1px solid var(--cw-line); background: rgba(7,13,28,.8); color: var(--cw-ink);
   font-size: 14px; font-weight: 800; letter-spacing: .1em; }
-.cw-kunci-baris input::placeholder { color: #5c6f97; letter-spacing: .08em; font-weight: 700; }
-.cw-kunci-baris input:focus { outline: none; border-color: var(--cw-emas); box-shadow: 0 0 0 3px rgba(245,197,66,.2); }
+/* Nama dan nomor ditulis apa adanya. Jarak antarhuruf yang melebar cocok
+   untuk kode akses, tetapi membuat nama orang terbaca seperti sandi. */
+.cw-kunci-form input[type="tel"], .cw-kunci-form input#cakrawala-nama { letter-spacing: .02em; }
+.cw-kunci-form input::placeholder { color: #5c6f97; letter-spacing: .08em; font-weight: 700; }
+.cw-kunci-form input:focus { outline: none; border-color: var(--cw-emas); box-shadow: 0 0 0 3px rgba(245,197,66,.2); }
+.cw-kunci-baris input { margin-bottom: 0; }
 .cw-galat { margin-top: 10px; padding: 9px 12px; border-radius: 10px; border: 1px solid rgba(248,113,113,.4);
   background: rgba(248,113,113,.12); color: #fca5a5; font-size: 12px; line-height: 1.55; }
 .cw-kunci-catatan { margin-top: 10px; color: var(--cw-muted); font-size: 11.5px; line-height: 1.6; }
+/* Sapaan untuk yang langganannya baru habis: dibedakan dari salinan biasa
+   supaya tanggal berakhirnya terbaca lebih dulu daripada apa pun di sekitarnya. */
+.cw-habis { padding: 11px 13px; border-radius: 11px; border: 1px solid rgba(245,197,66,.35);
+  background: rgba(245,197,66,.08); }
+.cw-habis b { color: var(--cw-emas); }
 
 /* --- Ajakan menghubungi --- */
 .cw-cta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px;
@@ -3695,6 +3719,8 @@ a.al-mini:hover { color: var(--al-ink); }
 .beli-isian input { padding: 10px 12px; border: 1px solid var(--cw-line); border-radius: 10px;
   background: rgba(255, 255, 255, .04); color: var(--cw-ink); font: inherit; font-size: 12.5px; }
 .beli-isian input:focus { outline: none; border-color: var(--cw-emas); }
+.beli-bantu { color: var(--cw-muted); font-size: 10.5px; line-height: 1.55;
+  text-transform: none; letter-spacing: 0; font-weight: 500; }
 .beli-lanjut { margin-top: 15px; width: 100%; }
 .beli-aman { margin-top: 11px; color: var(--cw-muted); font-size: 11px; line-height: 1.6; }
 
@@ -3773,6 +3799,22 @@ a.al-mini:hover { color: var(--al-ink); }
 .psn-lunas { color: #166534; background: #dcfce7; }
 .psn-kedaluwarsa { color: #64748b; background: #e2e8f0; }
 .psn-batal { color: #991b1b; background: #fee2e2; }
+
+/* --- Langganan Cakrawala (panel Super Admin) --- */
+.lg-form { display: grid; gap: 9px; margin-bottom: 12px; padding: 12px;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--canvas);
+  grid-template-columns: 1fr; align-items: end; }
+@media (min-width: 720px) { .lg-form { grid-template-columns: 1.2fr .7fr 1.2fr auto; } }
+.lg-form label { display: grid; gap: 5px; min-width: 0; }
+.lg-form label span { color: var(--muted); font-size: 10.5px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .05em; }
+.lg-form input { width: 100%; min-width: 0; padding: 9px 11px; border: 1px solid var(--line);
+  border-radius: 9px; background: var(--white); color: var(--ink); font-size: 13px; font-weight: 700; }
+.lg-form input:focus { outline: none; border-color: var(--navy); box-shadow: 0 0 0 3px rgba(30,58,95,.12); }
+.lg-form button { height: 36px; }
+.lg-sisa { display: block; margin-top: 2px; color: var(--muted); font-size: 10.5px; font-weight: 700; }
+.lg-dekat { color: #92400e; }
+.lg-habis { color: #991b1b; }
 
 /* ======================================================================
    CATATAN UANG - halaman /uang dan panel Catatan Uang di dalam Cakrawala
