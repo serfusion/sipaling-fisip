@@ -22,7 +22,7 @@ export function PanelUang() {
     <section className="al-card">
       <Kepala
         ikon={IKON_UANG}
-        judul="Catatan Uang"
+        judul="Catatan Uang Bulanan"
         sub="Tulis satu pesan, pemasukan dan pengeluaran bulanan tercatat sendiri"
       />
 

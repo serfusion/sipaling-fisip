@@ -4084,7 +4084,12 @@ a.al-mini:hover { color: var(--al-ink); }
 .al-side-pisah { flex: 0 0 auto; align-self: stretch; width: 1px; margin: 6px 3px;
   background: var(--al-line-tegas); }
 @media (min-width: 920px) { .al-side-pisah { display: none; } }
-.al-side-judul-lain { margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--al-line); }
+.al-side-judul-lain { margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--al-line);
+  color: var(--al-accent); }
+/* Baris keterangan di bawah "Free VIP Tools". Tanpa ini namanya terbaca
+   bertentangan: gratis tetapi VIP. Yang dimaksud gratis BAGI pemegang kode. */
+.al-side-judul-lain small { display: block; margin-top: 3px; color: var(--al-muted);
+  font-size: 9.5px; font-weight: 700; letter-spacing: .04em; text-transform: none; }
 .al-nav-lain .al-nav-ic { color: var(--al-ok); }
 .al-nav-lain.on { background: var(--al-ok-bg); border-color: var(--al-ok-line); color: var(--al-ok); }
 .al-nav-lain.on .al-nav-sub { color: var(--al-ok); }

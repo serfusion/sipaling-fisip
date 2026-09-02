@@ -29,14 +29,20 @@ const MENU: Menu[] = [
   { id: "bahasa", label: "Periksa Bahasa", sub: "Ragam ilmiah Indonesia", ikon: IKON.bahasa },
 ];
 
-// Kelompok kedua, dan hanya berisi satu alat sejauh ini.
+// FREE VIP TOOLS — wadah alat bonus, dan memang dibuat untuk bertambah.
 //
-// Ia SENGAJA dipisah dari sembilan alat di atas. Yang di atas bekerja pada
-// naskah tugas akhir; yang di sini pada uang pribadi pemiliknya. Menaruh
-// keduanya dalam satu daftar membuat orang menyangka catatan belanjanya ikut
-// menjadi bagian dari project skripsinya.
-const MENU_LAIN: Menu[] = [
-  { id: "uang", label: "Catatan Uang", sub: "Pemasukan dan pengeluaran bulanan", ikon: IKON_UANG },
+// SENGAJA dipisah dari alat di atas. Yang di atas bekerja pada naskah tugas
+// akhir; yang di sini pada hidup pemiliknya di luar itu. Menaruh keduanya
+// dalam satu daftar membuat orang menyangka catatan belanjanya ikut menjadi
+// bagian dari project skripsinya.
+//
+// "Free" di sini berarti gratis BAGI pemegang kode, bukan gratis untuk umum —
+// itulah yang dijelaskan baris keterangan di bawah judulnya, karena "Free VIP"
+// berdiri sendiri memang terbaca bertentangan.
+//
+// Menambah alat baru cukup menambah satu baris di sini; sisanya mengikuti.
+const MENU_BONUS: Menu[] = [
+  { id: "uang", label: "Catatan Uang Bulanan", sub: "Pemasukan dan pengeluaran", ikon: IKON_UANG },
 ];
 
 type Tema = "malam" | "terang";
@@ -169,7 +175,9 @@ export default function AlatApp() {
 
       <div className="al-body" ref={kerjaRef}>
         <nav className="al-side" aria-label="Pilih alat" ref={sisiRef}>
-          <p className="al-side-judul">Sembilan alat</p>
+          {/* Jumlahnya dihitung, tidak diketik. "Sembilan alat" yang ditulis
+              tangan akan berbohong pada hari alat kesepuluh ditambahkan. */}
+          <p className="al-side-judul">{MENU.length} alat naskah</p>
           {MENU.map((m, urutan) => (
             <button
               key={m.id}
@@ -190,8 +198,11 @@ export default function AlatApp() {
           {/* Pemisah yang terlihat di ponsel, tempat judul kelompok
               disembunyikan supaya baris alatnya tetap dapat digulir. */}
           <span className="al-side-pisah" aria-hidden="true" />
-          <p className="al-side-judul al-side-judul-lain">Di luar kuliah</p>
-          {MENU_LAIN.map((m, urutan) => (
+          <p className="al-side-judul al-side-judul-lain">
+            Free VIP Tools
+            <small>Bonus untuk pemegang kode</small>
+          </p>
+          {MENU_BONUS.map((m, urutan) => (
             <button
               key={m.id}
               type="button"
