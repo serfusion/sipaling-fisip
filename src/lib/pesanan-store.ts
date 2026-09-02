@@ -5,8 +5,8 @@
 // akses begitu pesanannya lunas.
 // ============================================================
 import { db } from "@/db";
-import { cakrawalaOrders } from "@/db/schema";
-import { and, eq, lt, sql } from "drizzle-orm";
+import { cakrawalaMutations, cakrawalaOrders } from "@/db/schema";
+import { and, desc, eq, gt, lt, sql } from "drizzle-orm";
 import {
   batasAkses, batasBayar, nomorPesanan, nominalUnik, penandaKosong,
   type Paket, type StatusPesanan,
@@ -153,6 +153,155 @@ async function simpanKodeBaru(kode: CakrawalaCode) {
     if (ulang.codes.some((k) => k.code === kode.code)) return true;
   }
   return false;
+}
+
+/**
+ * Cari pesanan yang menunggu nominal ini.
+ *
+ * Nominalnya unik ANTAR PESANAN HIDUP, bukan sepanjang masa: penandanya
+ * didaur ulang setelah pesanan lamanya kedaluwarsa. Karena itu yang berstatus
+ * "menunggu" selalu didahulukan, dan yang sudah kedaluwarsa hanya dilirik
+ * bila tidak ada yang menunggu — orang yang membayar di menit ketujuh belas
+ * tetap harus mendapat kodenya.
+ *
+ * Batas waktunya sengaja ada. Tanpa itu, pembayaran hari ini dapat menyambar
+ * pesanan yang ditinggalkan tiga bulan lalu, dan yang menerima kodenya adalah
+ * orang yang salah.
+ */
+export async function pesananUntukNominal(nominal: number, jamMundur = 24): Promise<Pesanan | null> {
+  if (!Number.isInteger(nominal) || nominal <= 0) return null;
+  const sejak = new Date(Date.now() - jamMundur * 60 * 60_000);
+
+  const baris = await db
+    .select()
+    .from(cakrawalaOrders)
+    .where(and(eq(cakrawalaOrders.amount, nominal), gt(cakrawalaOrders.createdAt, sejak)))
+    .orderBy(desc(cakrawalaOrders.createdAt))
+    .limit(10);
+
+  // Yang sudah lunas dikembalikan apa adanya supaya pemanggilnya dapat
+  // menjawab "sudah, ini kodenya" — pemberitahuan yang sama sering datang
+  // dua kali, dan itu tidak boleh menjadi dua kode.
+  return (
+    baris.find((b) => b.status === "menunggu") ??
+    baris.find((b) => b.status === "lunas") ??
+    baris.find((b) => b.status === "kedaluwarsa") ??
+    null
+  );
+}
+
+// ---------- CATATAN MUTASI ----------
+
+export type HasilMutasi = "cocok" | "tanpa-pesanan" | "bukan-masuk" | "sudah-lunas" | "batal";
+
+/**
+ * Catat satu pemberitahuan yang masuk, COCOK MAUPUN TIDAK.
+ *
+ * Yang tidak cocok justru yang paling perlu dicatat. Tanpa itu, jembatan yang
+ * salah pasang dan jembatan yang benar tetapi belum ada yang membayar
+ * terlihat persis sama dari panel: sunyi. Dan yang pertama perlu diperbaiki
+ * hari ini juga, sedangkan yang kedua tidak perlu disentuh sama sekali.
+ *
+ * Kegagalannya sengaja ditelan: catatan ini untuk ditengok manusia, dan tidak
+ * boleh menggagalkan penerbitan kode yang sudah dibayar orang.
+ */
+export async function catatMutasi(
+  nominal: number,
+  teks: string,
+  masuk: boolean,
+  hasil: HasilMutasi,
+  orderCode?: string | null,
+) {
+  try {
+    await db.insert(cakrawalaMutations).values({
+      amount: nominal,
+      text: teks.slice(0, 400),
+      incoming: masuk,
+      result: hasil,
+      orderCode: orderCode ?? null,
+    });
+  } catch (error) {
+    console.error("catat mutasi", error);
+  }
+}
+
+/**
+ * Adakah pemberitahuan uang masuk bernominal ini yang belum menemukan
+ * pesanannya?
+ *
+ * Dipakai ketika pembeli menekan "Saya sudah membayar". Pemberitahuan dapat
+ * tiba pada saat yang canggung — pesanannya baru saja kedaluwarsa, atau basis
+ * datanya sedang tersendat — dan tanpa pemeriksaan ulang ini, uang yang sudah
+ * masuk berakhir sebagai satu baris log yang tidak dibaca siapa pun.
+ */
+export async function mutasiUntukNominal(nominal: number, jamMundur = 24) {
+  if (!Number.isInteger(nominal) || nominal <= 0) return null;
+  const sejak = new Date(Date.now() - jamMundur * 60 * 60_000);
+  try {
+    const baris = await db
+      .select()
+      .from(cakrawalaMutations)
+      .where(
+        and(
+          eq(cakrawalaMutations.amount, nominal),
+          eq(cakrawalaMutations.incoming, true),
+          gt(cakrawalaMutations.createdAt, sejak),
+        ),
+      )
+      .orderBy(desc(cakrawalaMutations.createdAt))
+      .limit(1);
+    return baris[0] ?? null;
+  } catch (error) {
+    console.error("baca mutasi", error);
+    return null;
+  }
+}
+
+/** Mutasi terakhir untuk panel Super Admin — bukti bahwa jembatannya hidup. */
+export async function mutasiTerakhir(batas = 20) {
+  return db
+    .select()
+    .from(cakrawalaMutations)
+    .orderBy(desc(cakrawalaMutations.createdAt))
+    .limit(batas);
+}
+
+// ---------- KLAIM PEMBAYARAN ----------
+
+/**
+ * Tandai bahwa pembelinya mengaku sudah membayar.
+ *
+ * Ini BUKAN bukti dan tidak pernah menerbitkan kode sendirian — kalau bisa,
+ * Cakrawala menjadi gratis bagi siapa pun yang mau menekan tombol. Yang
+ * dilakukannya dua, dan keduanya berguna:
+ *
+ *   1. Masa berlaku pesanannya diperpanjang. Tanpa itu, nominal uniknya
+ *      didaur ulang lima belas menit kemudian, dan pembayaran yang sedang di
+ *      jalan mendarat pada pesanan milik orang lain.
+ *   2. Pesanannya naik ke puncak panel dengan penanda yang mencolok.
+ */
+export async function klaimPesanan(orderCode: string, jamTambahan = 24) {
+  const sekarang = new Date();
+  const sampai = new Date(sekarang.getTime() + jamTambahan * 60 * 60_000);
+  const hasil = await db
+    .update(cakrawalaOrders)
+    .set({
+      claimedAt: sekarang,
+      // Yang sudah kedaluwarsa dihidupkan lagi. Orang yang membayar di menit
+      // ketujuh belas tetap harus mendapat kodenya, dan status "kedaluwarsa"
+      // yang dibiarkan membuat pesanannya tidak lagi ikut dicocokkan.
+      status: "menunggu" as StatusPesanan,
+      expiresAt: sampai,
+    })
+    .where(
+      and(
+        eq(cakrawalaOrders.orderCode, orderCode),
+        sql`${cakrawalaOrders.status} <> 'lunas'`,
+        sql`${cakrawalaOrders.status} <> 'batal'`,
+      ),
+    )
+    .returning();
+  return hasil[0] ?? null;
 }
 
 export type HasilTerbit =

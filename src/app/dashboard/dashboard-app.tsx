@@ -95,6 +95,19 @@ type PesananBaris = {
   buyerName: string | null;
   accessCode: string | null;
   createdAt: string;
+  /** Kapan pembelinya menekan "Saya sudah membayar". */
+  claimedAt: string | null;
+};
+
+/** Satu pemberitahuan uang masuk yang diteruskan dari ponsel pemilik. */
+type MutasiBaris = {
+  id: number;
+  amount: number;
+  text: string;
+  incoming: boolean;
+  orderCode: string | null;
+  result: string;
+  createdAt: string;
 };
 
 /**
@@ -434,6 +447,8 @@ export default function DashboardApp({
   const [cwDraft, setCwDraft] = useState({ label: "", maxUses: "" });
   const [cwCopied, setCwCopied] = useState("");
 
+  const [mutasi, setMutasi] = useState<MutasiBaris[]>([]);
+
   // Langganan: daftar pelanggan beserta tombol perpanjangannya. Inilah yang
   // dipakai ketika ada yang memperpanjang lewat WhatsApp.
   const [lgDaftar, setLgDaftar] = useState<LanggananBaris[]>([]);
@@ -542,10 +557,12 @@ export default function DashboardApp({
       const data = (await balas.json()) as {
         success?: boolean; message?: string;
         daftar?: PesananBaris[]; ringkasan?: { lunas: number; menunggu: number; rupiah: number };
+        mutasi?: MutasiBaris[];
       };
       if (!balas.ok || !data.success) throw new Error(data.message || "Pesanan tidak dapat dibaca.");
       setPesanan(data.daftar ?? []);
       setPsnRingkas(data.ringkasan ?? null);
+      setMutasi(data.mutasi ?? []);
     } catch (alasan: unknown) {
       setPsnGalat(alasan instanceof Error ? alasan.message : "Pesanan tidak dapat dibaca.");
     }
@@ -673,6 +690,19 @@ export default function DashboardApp({
         .catch(() => {});
     }
   }, [view, profile, muatPesanan, muatLangganan]);
+
+  // Pesanan masuk sendiri selama panelnya terbuka.
+  //
+  // Selama pembayaran masih ditandai lunas dengan tangan, orang yang sudah
+  // membayar sedang menatap layar "menunggu pembayaran" sampai tombolnya
+  // ditekan di sini. Panel yang hanya menyegar saat dimuat berarti pesanannya
+  // baru terlihat pada kali berikutnya halaman ini dibuka — dan menunggu
+  // selama itu terasa seperti uangnya hilang.
+  useEffect(() => {
+    if (!profile || view !== "cakrawala" || profile.role !== "super_admin") return;
+    const jam = setInterval(() => void muatPesanan(), 20_000);
+    return () => clearInterval(jam);
+  }, [view, profile, muatPesanan]);
 
   const allowedMenu = useMemo(
     () =>
@@ -1672,10 +1702,16 @@ export default function DashboardApp({
                         <tr><td colSpan={6}><div className="dempty">Belum ada pesanan masuk.</div></td></tr>
                       ) : (
                         pesanan.map((o) => (
-                          <tr key={o.orderCode}>
+                          <tr key={o.orderCode} className={o.claimedAt && o.status !== "lunas" ? "psn-diklaim" : undefined}>
                             <td>
                               <code>{o.orderCode}</code>
                               {o.buyerName && <small className="psn-nama">{o.buyerName}</small>}
+                              {o.claimedAt && o.status !== "lunas" && (
+                                <small className="psn-klaim">
+                                  ● mengaku sudah bayar ·{" "}
+                                  {new Date(o.claimedAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
+                                </small>
+                              )}
                             </td>
                             <td>{o.packageName} · {o.days} hari</td>
                             {/* Nominalnya yang dicocokkan dengan mutasi, jadi
@@ -1703,6 +1739,53 @@ export default function DashboardApp({
                     </tbody>
                   </table>
                 </div>
+              </div>
+
+              {/* JEMBATAN DANA
+                  Panel kecil yang menjawab satu pertanyaan yang tidak dapat
+                  dijawab dari mana pun juga: apakah pemberitahuan dari ponsel
+                  benar-benar sampai? Tanpa ini, jembatan yang salah pasang
+                  dan jembatan yang benar tetapi belum ada yang membayar
+                  terlihat sama persis — sunyi. */}
+              <div className="panel psn-panel">
+                <div className="psn-kepala">
+                  <div>
+                    <b>Jembatan DANA</b>
+                    <span>
+                      {mutasi.length > 0
+                        ? "Pemberitahuan dari ponsel Anda sampai ke sini. Pesanan yang nominalnya cocok dilunaskan sendiri."
+                        : "Belum ada satu pun pemberitahuan yang sampai. Selama kosong, pelunasan masih harus ditandai dengan tangan di tabel atas."}
+                    </span>
+                  </div>
+                  <span className={`pill ${mutasi.length > 0 ? "psn-lunas" : "psn-kedaluwarsa"}`}>
+                    {mutasi.length > 0 ? "aktif" : "belum aktif"}
+                  </span>
+                </div>
+
+                {mutasi.length > 0 && (
+                  <div className="qtable-wrap">
+                    <table className="qt">
+                      <thead>
+                        <tr><th>Waktu</th><th>Nominal</th><th>Hasil</th><th>Pemberitahuan</th></tr>
+                      </thead>
+                      <tbody>
+                        {mutasi.map((m) => (
+                          <tr key={m.id}>
+                            <td>{new Date(m.createdAt).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</td>
+                            <td><b>Rp {m.amount.toLocaleString("id-ID")}</b></td>
+                            <td>
+                              <span className={`pill ${m.result === "cocok" ? "psn-lunas" : m.result === "tanpa-pesanan" ? "psn-menunggu" : "psn-kedaluwarsa"}`}>
+                                {m.result}
+                              </span>
+                              {m.orderCode && <small className="psn-nama"><code>{m.orderCode}</code></small>}
+                            </td>
+                            <td><small className="psn-mutasi-teks">{m.text}</small></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
 
               {/* Langganan berdiri di antara pesanan dan daftar kode karena

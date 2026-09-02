@@ -4,7 +4,9 @@ import { cakrawalaOrders } from "@/db/schema";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { jadikanDinamis, periksaQris } from "@/lib/qris";
 import { paketDari, rapikanNomorPesanan, MENIT_BAYAR } from "@/lib/paket-cakrawala";
-import { ambilPesanan, buatPesanan, lunaskanPesanan, sapuPesananKedaluwarsa } from "@/lib/pesanan-store";
+import {
+  ambilPesanan, buatPesanan, lunaskanPesanan, mutasiTerakhir, sapuPesananKedaluwarsa,
+} from "@/lib/pesanan-store";
 import { getCurrentProfile } from "@/lib/supabase-server";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { explainServerError } from "@/lib/api-errors";
@@ -129,10 +131,13 @@ export async function GET(request: Request) {
       return Response.json({ success: false, message: "Nomor pesanan wajib diisi." }, { status: 400 });
     }
     await sapuPesananKedaluwarsa();
+    // Yang mengaku sudah membayar naik ke puncak, apa pun tanggalnya. Merekalah
+    // satu-satunya baris di tabel ini yang ada orang sedang menatap layar
+    // menunggunya; sisanya dapat menunggu sampai besok.
     const daftar = await db
       .select()
       .from(cakrawalaOrders)
-      .orderBy(desc(cakrawalaOrders.createdAt))
+      .orderBy(desc(cakrawalaOrders.claimedAt), desc(cakrawalaOrders.createdAt))
       .limit(100);
     const jumlah = await db
       .select({
@@ -141,7 +146,17 @@ export async function GET(request: Request) {
         rupiah: sql<number>`coalesce(sum(amount) filter (where status = 'lunas'), 0)::int`,
       })
       .from(cakrawalaOrders);
-    return Response.json({ success: true, daftar, ringkasan: jumlah[0] });
+    // Mutasi terakhir ikut dikirim. Tanpa ini, jembatan dari ponsel yang
+    // salah pasang dan jembatan yang benar tetapi belum ada yang membayar
+    // terlihat sama persis dari panel: sunyi — padahal yang pertama perlu
+    // diperbaiki hari ini juga.
+    let mutasi: Awaited<ReturnType<typeof mutasiTerakhir>> = [];
+    try {
+      mutasi = await mutasiTerakhir(15);
+    } catch (error) {
+      console.error("baca mutasi terakhir", error);
+    }
+    return Response.json({ success: true, daftar, ringkasan: jumlah[0], mutasi });
   }
 
   // Menanyakan satu pesanan. Terbuka untuk umum — halaman beli menanyakannya
@@ -165,6 +180,9 @@ export async function GET(request: Request) {
         hari: pesanan.days,
         status: lewat ? "kedaluwarsa" : pesanan.status,
         expiresAt: pesanan.expiresAt.toISOString(),
+        // Supaya halaman yang dibuka ulang tahu bahwa klaimnya sudah tercatat
+        // dan tidak menyodorkan tombolnya untuk kedua kali.
+        diklaim: Boolean(pesanan.claimedAt),
         // Kode akses HANYA ikut terkirim setelah pesanannya lunas.
         kode: pesanan.status === "lunas" ? pesanan.accessCode : null,
       },

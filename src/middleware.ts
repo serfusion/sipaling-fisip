@@ -35,6 +35,7 @@ const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 // perlindungan ini dibuat untuknya.
 const TANPA_ORIGIN = [
   "/api/cakrawala-webhook", // tanda tangan HMAC dari gerbang pembayaran
+  "/api/cakrawala-mutasi", // kunci CAKRAWALA_MUTASI_SECRET, dari ponsel pemilik
   "/api/uang/telegram", // secret_token yang dipasang saat mendaftarkan webhook
   "/api/uang/whatsapp", // tanda tangan Meta, atau kata sandi gerbang
   "/api/uang/catat", // kode buku di dalam badan permintaan, dan itu bukan cookie
