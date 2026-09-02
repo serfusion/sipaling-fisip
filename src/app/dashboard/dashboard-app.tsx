@@ -1114,6 +1114,16 @@ export default function DashboardApp({
               // Notifikasi pengajuan judul membuka panel yang relevan.
               if (refCode.startsWith("SIPALING-PRODI-JUDUL-")) {
                 openView(profile.role === "dosen" ? "bimbingan" : "judul");
+                return;
+              }
+              // Notifikasi tiket layanan membuka antrean yang sudah tersaring
+              // ke nomor tiketnya, supaya satu ketukan langsung sampai ke
+              // baris yang dimaksud alih-alih ke daftar ratusan tiket.
+              if (refCode.startsWith("SIPALING-")) {
+                setSearchDraft(refCode);
+                setSearchQ(refCode);
+                setChip("Semua");
+                openView("antrean");
               }
             }}
           />

@@ -6,16 +6,22 @@ import { explainServerError } from "@/lib/api-errors";
 
 export const dynamic = "force-dynamic";
 
-// Role admin yang ikut memantau notifikasi program studi.
-const PRODI_WATCHERS = ["super_admin", "admin", "admin_prodi"];
+// Role yang membawahi seluruh unit, bukan satu unit saja.
+const LINTAS_UNIT = ["super_admin", "admin"];
 
 function audienceFilter(profile: SessionProfile) {
   if (profile.role === "dosen") {
     // Dosen hanya melihat notifikasi yang ditujukan kepada dirinya.
     return profile.lecturerId === null ? null : eq(notifications.lecturerId, profile.lecturerId);
   }
-  if (PRODI_WATCHERS.includes(profile.role)) {
-    return and(isNull(notifications.lecturerId), eq(notifications.audienceRole, "admin_prodi"));
+  if (LINTAS_UNIT.includes(profile.role)) {
+    // Super Admin dan Admin memegang seluruh unit layanan, jadi loncengnya
+    // memuat notifikasi setiap unit — bukan hanya urusan Prodi seperti
+    // sebelumnya, yang membuat tiket perpustakaan, umum, akademik, PDDIKTI,
+    // dan laboratorium tidak pernah sampai ke siapa pun yang memantaunya.
+    // Yang tetap dikecualikan hanya notifikasi bertuan dosen: itu percakapan
+    // antara Prodi dan dosen yang bersangkutan.
+    return isNull(notifications.lecturerId);
   }
   return and(isNull(notifications.lecturerId), eq(notifications.audienceRole, profile.role));
 }

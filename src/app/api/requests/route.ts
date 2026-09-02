@@ -16,6 +16,7 @@ import {
   periksaBerkasBagian,
 } from "@/lib/bukti-penyerahan";
 import { kolomDriveSiap } from "@/lib/kolom-drive";
+import { audienceForServiceType, pushNotification } from "@/lib/notify";
 import { getCurrentProfile, serviceTypeForProfile } from "@/lib/supabase-server";
 import { explainServerError } from "@/lib/api-errors";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
@@ -360,6 +361,40 @@ export async function POST(request: Request) {
         });
       } catch (error) {
         console.error("auto attendance", error); // tidak menggagalkan pengajuan
+      }
+    }
+
+    // Bunyikan lonceng admin unit yang memegang layanan ini — dan dosen
+    // tujuan bila tiketnya punya. Tanpa ini tiket baru hanya muncul di
+    // antrean kalau kebetulan ada yang membuka halamannya, dan loncengnya
+    // selamanya berbunyi "tidak ada notifikasi".
+    //
+    // Absensi dilewati dengan sengaja: ia langsung berstatus Selesai dan
+    // tidak pernah masuk antrean siapa pun, jadi notifikasinya hanya akan
+    // menjadi kebisingan yang menutupi tiket yang benar-benar perlu diperiksa.
+    if (!absensi) {
+      const audienceRole = audienceForServiceType(serviceType);
+      const ringkas = title.length > 90 ? `${title.slice(0, 90)}…` : title;
+      const body = `${studentName} (${nim}) — ${serviceNeed}: "${ringkas}". Perlu diperiksa.`;
+      if (audienceRole) {
+        await pushNotification({
+          audienceRole,
+          kind: "request_submitted",
+          severity: "info",
+          title: "Pengajuan layanan baru",
+          body,
+          refCode: finalTicket,
+        });
+      }
+      if (lecturerId) {
+        await pushNotification({
+          lecturerId,
+          kind: "request_submitted",
+          severity: "info",
+          title: "Pengajuan layanan baru",
+          body,
+          refCode: finalTicket,
+        });
       }
     }
 
