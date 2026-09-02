@@ -37,6 +37,10 @@ export const IKON = {
   kemiripan: "M9 7H6a5 5 0 0 0 0 10h3M15 7h3a5 5 0 0 1 0 10h-3M8 12h8",
 };
 
+/** Gelembung pesan berisi dua baris angka: lambang Catatan Uang. */
+export const IKON_UANG =
+  "M20 15a2 2 0 0 1-2 2H8l-4 3V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2zM8 9h8M8 12.5h5";
+
 /** Kepala kartu: ikon berbingkai lembut, judul, satu baris penjelas. */
 export function Kepala({ ikon, judul, sub }: { ikon: string; judul: string; sub: string }) {
   return (
