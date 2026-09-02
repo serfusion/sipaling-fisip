@@ -623,7 +623,9 @@ export default function SipalingApp() {
   // menerima tautannya. Absensi tidak meminta berkas maupun tulisan apa pun.
   const isPenyerahan = isPenyerahanPerpus(serviceType, selectedNeed);
   const isAbsensi = isAbsensiPerpus(serviceType, selectedNeed);
+  const PAYMENT_NOTICE_TYPES: ServiceType[] = ["Layanan Umum", "Layanan Prodi", "Layanan Akademik", "Layanan Perpustakaan"];
   // Absensi hanya menekan tombol; tidak ada syarat yang perlu dibaca dulu.
+  const showPaymentNotice = PAYMENT_NOTICE_TYPES.includes(serviceType) && !isAbsensi;
   const uploadMode = getUploadMode(serviceType);
   const requiresFile = !isPenyerahan && !isAbsensi && uploadMode !== "optional-document";
   const rawDriveUrl = process.env.NEXT_PUBLIC_SURAT_LAINNYA_DRIVE_URL?.trim() || "";
@@ -984,13 +986,6 @@ export default function SipalingApp() {
               >
                 <span className="hero-kilau">Cakrawala</span>
               </a>
-              <a
-                className="hero-button"
-                href="/uang"
-                title="Catat pemasukan dan pengeluaran cukup dengan mengirim pesan"
-              >
-                <span>Rp</span> Catatan Uang
-              </a>
               <a className={sessionRole ? "hero-button hero-button-logged" : "hero-button"} href="/dashboard">
                 {sessionRole ? `● Dashboard ${DASH_ROLE_LABEL[sessionRole] || "Admin"}` : "Login Dosen/Admin"}
               </a>
@@ -1199,6 +1194,12 @@ export default function SipalingApp() {
                       }
                       required
                     />
+                  </div>
+                )}
+                {showPaymentNotice && (
+                  <div className="field-group field-full requirements-box">
+                    <div className="requirements-title"><span>!</span> Persyaratan Pengajuan</div>
+                    <ul className="requirements-list"><li>Mohon pastikan Anda sudah melakukan pembayaran untuk semester berjalan yang sedang ditempuh.</li></ul>
                   </div>
                 )}
                 {(currentService.requirements && currentService.requirements.length > 0) && (

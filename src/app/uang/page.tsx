@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
+import Link from "next/link";
 import UangApp from "./uang-app";
+import { cakrawalaAccess } from "@/lib/cakrawala-store";
 
 export const metadata: Metadata = {
   title: "Catatan Uang | SiPaling FISIP",
@@ -27,11 +29,39 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-// Seluruh halaman berjalan di peramban: bukunya dikunci oleh kode yang
-// disimpan di perangkat masing-masing, jadi tidak ada yang perlu dirender
-// lebih dulu di server. Pengurai pesannya pun berkas yang sama dengan yang
-// dipakai server, sehingga pratinjau sambil mengetik tidak pernah berbeda
-// hasilnya dengan yang benar-benar tersimpan.
-export default function HalamanUang() {
+// Status kuncinya berubah sewaktu-waktu dan cookie pembukanya berbeda tiap
+// pengunjung, jadi halaman ini tidak boleh disimpan sebagai hasil jadi.
+export const dynamic = "force-dynamic";
+
+/**
+ * Catatan Uang bagian dari Cakrawala, bukan halaman umum.
+ *
+ * Gerbangnya di SERVER dan sama persis dengan yang menjaga /alat. Membuang
+ * tombolnya dari portal saja tidak menjadikannya eksklusif — alamatnya tetap
+ * dapat dibuka siapa pun yang pernah melihatnya sekali, dan alamat semacam
+ * itu selalu beredar. Yang menutup pintu adalah pemeriksaan ini.
+ *
+ * Kalau kelak dipasang sebagai aplikasi tersendiri di layar utama, aplikasi
+ * itu ikut terkunci ketika langganannya habis — dan memang itu maksudnya.
+ */
+export default async function HalamanUang() {
+  const akses = await cakrawalaAccess();
+  if (!akses.allowed) {
+    return (
+      <div className="uang-kunci">
+        <div className="uang-kunci-kotak">
+          <span className="uang-kunci-gembok" aria-hidden="true">🔒</span>
+          <h1>Catatan Uang bagian dari Cakrawala</h1>
+          <p>
+            Fitur ini terbuka untuk pemegang kode akses Cakrawala. Masukkan kode Anda, atau lihat dulu
+            isinya beserta harganya.
+          </p>
+          <Link href="/alat#kode" className="uang-kunci-utama">Saya punya kode akses</Link>
+          <Link href="/alat#beli" className="uang-kunci-lain">Lihat isi dan harganya →</Link>
+          <Link href="/" className="uang-kunci-balik">← Kembali ke portal mahasiswa</Link>
+        </div>
+      </div>
+    );
+  }
   return <UangApp />;
 }
