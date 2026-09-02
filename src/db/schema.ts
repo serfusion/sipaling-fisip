@@ -260,6 +260,39 @@ export const cakrawalaOrders = pgTable("cakrawala_orders", {
   paidAt: timestamp("paid_at", { withTimezone: true }),
   /** Sesudah ini nominalnya boleh dipakai pesanan lain. */
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  /**
+   * Kapan pembelinya menekan "Saya sudah membayar".
+   *
+   * Bukan bukti pembayaran, dan tidak pernah menerbitkan kode sendirian.
+   * Gunanya dua: pesanannya diangkat ke puncak panel supaya tidak menunggu
+   * di antrean, dan masa berlakunya diperpanjang supaya nominal uniknya tidak
+   * didaur ulang sementara uangnya masih di jalan.
+   */
+  claimedAt: timestamp("claimed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// CATATAN MUTASI YANG MASUK
+//
+// Setiap pemberitahuan yang lolos pemeriksaan kunci dicatat di sini, COCOK
+// MAUPUN TIDAK. Dua gunanya, dan yang kedua yang paling sering dipakai:
+//
+//   1. Klaim "saya sudah membayar" dapat diperiksa ulang terhadap catatan
+//      ini, sehingga pemberitahuan yang datang pada saat yang canggung tidak
+//      hilang begitu saja.
+//   2. Pemiliknya dapat melihat apakah jembatan dari ponselnya HIDUP. Tanpa
+//      catatan ini, jembatan yang salah pasang dan jembatan yang benar tetapi
+//      belum ada yang membayar terlihat persis sama: sunyi.
+export const cakrawalaMutations = pgTable("cakrawala_mutations", {
+  id: serial("id").primaryKey(),
+  amount: integer("amount").notNull(),
+  /** Kalimat pemberitahuannya, dipotong. Untuk ditengok manusia, bukan mesin. */
+  text: varchar("text", { length: 400 }).notNull(),
+  incoming: boolean("incoming").notNull().default(true),
+  /** Pesanan yang dilunaskannya, bila ada. */
+  orderCode: varchar("order_code", { length: 20 }),
+  /** "cocok" | "tanpa-pesanan" | "bukan-masuk" | "sudah-lunas" | "batal" */
+  result: varchar("result", { length: 20 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

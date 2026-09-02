@@ -18,7 +18,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { bacaMutasi, teksDariMuatan } from "@/lib/mutasi";
 import { paketDari } from "@/lib/paket-cakrawala";
-import { lunaskanPesanan, pesananUntukNominal } from "@/lib/pesanan-store";
+import { catatMutasi, lunaskanPesanan, pesananUntukNominal } from "@/lib/pesanan-store";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { uraiBadan } from "@/lib/uang/whatsapp";
 
@@ -84,7 +84,12 @@ export async function POST(request: Request) {
   // Uang KELUAR yang nominalnya kebetulan sama tidak boleh menerbitkan kode.
   // Penerus yang sudah menyaring sendiri boleh menyatakannya lewat arah:"masuk".
   const arah = String(badan?.arah ?? "").toLowerCase();
-  if (!mutasi.masuk && arah !== "masuk") {
+  const masuk = mutasi.masuk || arah === "masuk";
+  if (!masuk) {
+    // Tetap dicatat. Pemilik yang bertanya "kenapa kodenya tidak keluar"
+    // perlu melihat bahwa pemberitahuannya SAMPAI, dan ditolak karena
+    // terbaca sebagai uang keluar — bukan menebak-nebak dalam kesunyian.
+    await catatMutasi(nominal, mutasi.teks, false, "bukan-masuk");
     return Response.json({ success: true, dikerjakan: false, alasan: "bukan uang masuk" });
   }
 
@@ -93,10 +98,15 @@ export async function POST(request: Request) {
     if (!pesanan) {
       // Bukan galat. Pemilik nomor DANA yang sama juga menerima uang untuk
       // hal-hal lain, dan itu memang bukan urusan Cakrawala.
-      console.warn("mutasi tanpa pesanan yang cocok:", nominal);
+      //
+      // Dicatat justru karena itu: klaim "saya sudah membayar" memeriksa
+      // ulang catatan ini, jadi pembayaran yang tiba pada saat yang canggung
+      // tidak berakhir sebagai satu baris log yang tidak dibaca siapa pun.
+      await catatMutasi(nominal, mutasi.teks, true, "tanpa-pesanan");
       return Response.json({ success: true, dikerjakan: false, alasan: "tidak ada pesanan dengan nominal itu" });
     }
     if (pesanan.status === "batal") {
+      await catatMutasi(nominal, mutasi.teks, true, "batal", pesanan.orderCode);
       return Response.json({ success: true, dikerjakan: false, alasan: "pesanan sudah dibatalkan" });
     }
 
@@ -114,6 +124,7 @@ export async function POST(request: Request) {
     if (!hasil.ok) {
       return Response.json({ success: false, message: hasil.pesan }, { status: 409 });
     }
+    await catatMutasi(nominal, mutasi.teks, true, hasil.baru ? "cocok" : "sudah-lunas", pesanan.orderCode);
     return Response.json({
       success: true,
       dikerjakan: hasil.baru,

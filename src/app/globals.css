@@ -3719,6 +3719,14 @@ a.al-mini:hover { color: var(--al-ink); }
 .beli-isian input { padding: 10px 12px; border: 1px solid var(--cw-line); border-radius: 10px;
   background: rgba(255, 255, 255, .04); color: var(--cw-ink); font: inherit; font-size: 12.5px; }
 .beli-isian input:focus { outline: none; border-color: var(--cw-emas); }
+/* Tombol "Saya sudah membayar". Sengaja TIDAK dibuat sekuat tombol utama:
+   ia bukan jalan pintas mendapatkan kode, hanya jalan mempercepat
+   pemeriksaannya. Tombol yang terlihat seperti tombol beli akan ditekan
+   orang yang belum membayar sama sekali. */
+.beli-klaim { margin-top: 11px; width: 100%; }
+.beli-lewat-aksi { display: grid; gap: 9px; margin-top: 6px; }
+@media (min-width: 560px) { .beli-lewat-aksi { grid-auto-flow: column; justify-content: center; } }
+
 /* Pesan untuk yang sudah lama menunggu. Kuning, bukan merah: uangnya tidak
    hilang, yang lambat hanya penerbitan kodenya. */
 .beli-lambat { margin-top: 12px; padding: 11px 13px; border-radius: 11px;
@@ -3755,6 +3763,10 @@ a.al-mini:hover { color: var(--al-ink); }
 .beli-tunggu { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding: 13px 15px;
   border: 1px solid var(--cw-line); border-radius: 13px; background: rgba(255, 255, 255, .04);
   text-align: left; }
+/* Ditulis sebagai dua kelas, bukan satu. .beli-tunggu berada di bawah dalam
+   berkas ini, jadi selektor berkelas tunggal akan kalah dan warnanya tidak
+   pernah berubah — persis yang terjadi sebelum baris ini diperbaiki. */
+.beli-tunggu.beli-diperiksa { border-color: rgba(245,197,66,.35); background: rgba(245,197,66,.08); }
 .beli-tunggu b { display: block; color: var(--cw-ink); font-size: 12.5px; }
 .beli-tunggu small { display: block; margin-top: 3px; color: var(--cw-muted);
   font-size: 11px; line-height: 1.6; }
@@ -3807,6 +3819,13 @@ a.al-mini:hover { color: var(--al-ink); }
 .psn-lunas { color: #166534; background: #dcfce7; }
 .psn-kedaluwarsa { color: #64748b; background: #e2e8f0; }
 .psn-batal { color: #991b1b; background: #fee2e2; }
+/* Pesanan yang pembelinya mengaku sudah membayar. Ada orang yang sedang
+   menatap layar menunggu baris ini, jadi ia tidak boleh terlihat sama dengan
+   baris-baris yang dapat menunggu sampai besok. */
+.psn-diklaim > td { background: #fffbeb; }
+.psn-diklaim > td:first-child { box-shadow: inset 3px 0 0 #f59e0b; }
+.psn-klaim { display: block; margin-top: 3px; color: #b45309; font-size: 10.5px; font-weight: 800; }
+.psn-mutasi-teks { display: block; max-width: 26rem; color: var(--muted); font-size: 10.5px; line-height: 1.5; }
 
 /* --- Langganan Cakrawala (panel Super Admin) --- */
 .lg-form { display: grid; gap: 9px; margin-bottom: 12px; padding: 12px;

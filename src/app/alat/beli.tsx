@@ -45,6 +45,11 @@ export default function BeliAkses({ onAkses }: { onAkses: (kode: string, whatsap
   // keduanya berbeda.
   const [tik, setTik] = useState(0);
   const [tersalin, setTersalin] = useState("");
+  // Pembelinya menyatakan sudah membayar. Bukan bukti — lihat komentar di
+  // /api/cakrawala-klaim — tetapi mengubah yang ditampilkan dan menahan
+  // pesanannya supaya nominal uniknya tidak didaur ulang.
+  const [klaim, setKlaim] = useState(false);
+  const [klaimSibuk, setKlaimSibuk] = useState(false);
   const jamRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Nomor pesanan disimpan di perangkat. Mahasiswa yang tertutup halamannya
@@ -88,6 +93,9 @@ export default function BeliAkses({ onAkses }: { onAkses: (kode: string, whatsap
       const data = await balas.json();
       if (!data.success) return;
       setStatus(data.pesanan.status);
+      // Klaim yang sudah tercatat di server ikut dibaca, supaya halaman yang
+      // dibuka ulang di perangkat lain tidak menyodorkan tombolnya lagi.
+      if (data.pesanan.diklaim) setKlaim(true);
       if (data.pesanan.status === "lunas" && data.pesanan.kode) {
         setKode(data.pesanan.kode);
       }
@@ -164,6 +172,40 @@ export default function BeliAkses({ onAkses }: { onAkses: (kode: string, whatsap
     }
   }
 
+  async function klaimBayar() {
+    if (!pesanan || klaimSibuk) return;
+    setKlaimSibuk(true);
+    setGalat("");
+    try {
+      const balas = await fetch("/api/cakrawala-klaim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pesanan: pesanan.orderCode }),
+      });
+      const data = await balas.json();
+      if (!balas.ok || !data.success) throw new Error(data.message || "Klaim belum dapat dikirim.");
+
+      // Pemberitahuan dari ponsel pemilik ternyata sudah tercatat: kodenya
+      // terbit saat itu juga, tanpa siapa pun menandai apa pun.
+      if (data.keadaan === "lunas" && data.kode) {
+        setKode(data.kode);
+        setStatus("lunas");
+        return;
+      }
+      setKlaim(true);
+      // Server menghidupkan kembali pesanan yang sudah kedaluwarsa, jadi
+      // layarnya ikut kembali ke keadaan menunggu — kalau tidak, orang yang
+      // menekan tombol ini dari layar "waktunya habis" tetap melihat layar
+      // itu juga dan menyangka tombolnya tidak berfungsi.
+      setStatus("menunggu");
+      if (data.expiresAt) setPesanan({ ...pesanan, expiresAt: data.expiresAt });
+    } catch (alasan: unknown) {
+      setGalat(alasan instanceof Error ? alasan.message : "Klaim belum dapat dikirim.");
+    } finally {
+      setKlaimSibuk(false);
+    }
+  }
+
   function salin(teks: string, penanda: string) {
     navigator.clipboard
       ?.writeText(teks)
@@ -179,6 +221,7 @@ export default function BeliAkses({ onAkses }: { onAkses: (kode: string, whatsap
     setStatus("menunggu");
     setKode("");
     setGalat("");
+    setKlaim(false);
     try {
       window.localStorage.removeItem(KUNCI_SIMPAN);
     } catch {
@@ -226,22 +269,47 @@ export default function BeliAkses({ onAkses }: { onAkses: (kode: string, whatsap
           </p>
         </div>
 
-        <div className="beli-tunggu">
-          <span className="beli-putar" aria-hidden="true" />
-          <div>
-            <b>Menunggu pembayaran… {sisa}</b>
-            <small>
-              Halaman ini memeriksa sendiri. Begitu pembayarannya masuk, kode akses langsung muncul
-              di sini — jangan ditutup dulu.
-            </small>
+        {klaim ? (
+          <div className="beli-tunggu beli-diperiksa">
+            <span className="beli-putar" aria-hidden="true" />
+            <div>
+              <b>Pembayaranmu sedang diperiksa</b>
+              <small>
+                Pesananmu sudah ditahan supaya nominalnya tidak dipakai orang lain, dan pengelola
+                sudah melihatnya di urutan paling atas. Begitu pembayarannya tercatat, kode akses
+                muncul sendiri di halaman ini — boleh ditinggal, halamannya tetap memeriksa.
+              </small>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="beli-tunggu">
+            <span className="beli-putar" aria-hidden="true" />
+            <div>
+              <b>Menunggu pembayaran… {sisa}</b>
+              <small>
+                Halaman ini memeriksa sendiri. Begitu pembayarannya masuk, kode akses langsung
+                muncul di sini — jangan ditutup dulu.
+              </small>
+            </div>
+          </div>
+        )}
 
-        {lama && (
+        {!klaim && (
+          <button
+            type="button"
+            className="cw-btn beli-klaim"
+            disabled={klaimSibuk}
+            onClick={() => void klaimBayar()}
+          >
+            {klaimSibuk ? "Memeriksa…" : "Saya sudah membayar"}
+          </button>
+        )}
+
+        {(lama || klaim) && (
           <p className="beli-lambat">
-            <b>Sudah bayar tapi belum keluar juga?</b> Pembayarannya tidak hilang. Salin nomor
-            pesanan <code>{pesanan.orderCode}</code> dan kirim ke {KONTAK}; kodenya diterbitkan
-            secara manual dan tetap masuk ke halaman ini.
+            <b>Pembayaranmu tidak hilang.</b> Nomor pesanan <code>{pesanan.orderCode}</code> dan
+            nominal <b>{rupiah(pesanan.nominal)}</b> tersimpan di server. Kalau lebih dari beberapa
+            menit kodenya belum keluar juga, kirim dua angka itu ke {KONTAK}.
           </p>
         )}
 
@@ -261,10 +329,25 @@ export default function BeliAkses({ onAkses }: { onAkses: (kode: string, whatsap
         <h2>QR pembayarannya sudah kedaluwarsa</h2>
         <p>
           QR hanya berlaku {pesanan.menit} menit supaya nominalnya bisa dipakai pembeli lain. Kalau
-          Anda <b>sudah terlanjur membayar</b>, jangan buat pesanan baru — simpan nomor pesanan{" "}
-          <code>{pesanan.orderCode}</code> dan hubungi pengelola; pembayaran Anda tetap tercatat.
+          Anda <b>sudah terlanjur membayar</b>, jangan buat pesanan baru — tekan tombol di bawah.
+          Pesanan <code>{pesanan.orderCode}</code> dihidupkan kembali dan pembayaran Anda tetap
+          tercatat.
         </p>
-        <button type="button" className="cw-btn cw-btn-utama" onClick={ulangi}>Buat pesanan baru</button>
+        {galat && <p className="cw-galat" role="alert">{galat}</p>}
+        <div className="beli-lewat-aksi">
+          {/* Tombolnya didahulukan atas "buat pesanan baru". Orang yang sudah
+              membayar dan disodori tombol memesan lagi akan menekannya, dan
+              uang yang pertama menjadi pekerjaan penelusuran yang tidak perlu. */}
+          <button
+            type="button"
+            className="cw-btn cw-btn-utama"
+            disabled={klaimSibuk}
+            onClick={() => void klaimBayar()}
+          >
+            {klaimSibuk ? "Memeriksa…" : "Saya sudah membayar"}
+          </button>
+          <button type="button" className="cw-btn" onClick={ulangi}>Belum, buat pesanan baru</button>
+        </div>
       </section>
     );
   }
