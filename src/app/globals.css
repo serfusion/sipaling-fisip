@@ -3719,6 +3719,14 @@ a.al-mini:hover { color: var(--al-ink); }
 .beli-isian input { padding: 10px 12px; border: 1px solid var(--cw-line); border-radius: 10px;
   background: rgba(255, 255, 255, .04); color: var(--cw-ink); font: inherit; font-size: 12.5px; }
 .beli-isian input:focus { outline: none; border-color: var(--cw-emas); }
+/* Pesan untuk yang sudah lama menunggu. Kuning, bukan merah: uangnya tidak
+   hilang, yang lambat hanya penerbitan kodenya. */
+.beli-lambat { margin-top: 12px; padding: 11px 13px; border-radius: 11px;
+  border: 1px solid rgba(245,197,66,.35); background: rgba(245,197,66,.09);
+  color: var(--cw-muted); font-size: 11.5px; line-height: 1.65; text-align: left; }
+.beli-lambat b { color: var(--cw-emas); }
+.beli-lambat code { padding: 1px 6px; border-radius: 6px; background: rgba(255,255,255,.08);
+  color: var(--cw-ink); font-size: 11px; font-weight: 800; }
 .beli-bantu { color: var(--cw-muted); font-size: 10.5px; line-height: 1.55;
   text-transform: none; letter-spacing: 0; font-weight: 500; }
 .beli-lanjut { margin-top: 15px; width: 100%; }

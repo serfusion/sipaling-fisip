@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PAKET, rupiah, sisaWaktu, type PaketId } from "@/lib/paket-cakrawala";
 import { rapikanWa } from "@/lib/nomor-wa";
+import { KONTAK } from "@/lib/kontak";
 
 type Pesanan = {
   orderCode: string;
@@ -118,8 +119,12 @@ export default function BeliAkses({ onAkses }: { onAkses: (kode: string, whatsap
   }, [pesanan, status, tanyakan]);
 
   // tik hanya penggerak; angkanya sendiri dibaca dari jam sungguhan.
-  void tik;
   const sisa = pesanan ? sisaWaktu(new Date(pesanan.expiresAt)) : "";
+  // Sudah lama menunggu padahal uangnya mungkin sudah masuk? Sesudah dua
+  // menit, nomor pesanannya ditawarkan beserta cara menghubungi pengelola.
+  // Diam saja selama sisa waktunya berjalan adalah cara tercepat membuat
+  // orang yang sudah membayar merasa uangnya hilang.
+  const lama = tik >= 120;
 
   useEffect(() => {
     if (status === "lunas" && kode) onAkses(kode, kontak);
@@ -231,6 +236,14 @@ export default function BeliAkses({ onAkses }: { onAkses: (kode: string, whatsap
             </small>
           </div>
         </div>
+
+        {lama && (
+          <p className="beli-lambat">
+            <b>Sudah bayar tapi belum keluar juga?</b> Pembayarannya tidak hilang. Salin nomor
+            pesanan <code>{pesanan.orderCode}</code> dan kirim ke {KONTAK}; kodenya diterbitkan
+            secara manual dan tetap masuk ke halaman ini.
+          </p>
+        )}
 
         <div className="beli-kaki">
           <span>Nomor pesanan <code>{pesanan.orderCode}</code></span>

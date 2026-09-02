@@ -674,6 +674,19 @@ export default function DashboardApp({
     }
   }, [view, profile, muatPesanan, muatLangganan]);
 
+  // Pesanan masuk sendiri selama panelnya terbuka.
+  //
+  // Selama pembayaran masih ditandai lunas dengan tangan, orang yang sudah
+  // membayar sedang menatap layar "menunggu pembayaran" sampai tombolnya
+  // ditekan di sini. Panel yang hanya menyegar saat dimuat berarti pesanannya
+  // baru terlihat pada kali berikutnya halaman ini dibuka — dan menunggu
+  // selama itu terasa seperti uangnya hilang.
+  useEffect(() => {
+    if (!profile || view !== "cakrawala" || profile.role !== "super_admin") return;
+    const jam = setInterval(() => void muatPesanan(), 20_000);
+    return () => clearInterval(jam);
+  }, [view, profile, muatPesanan]);
+
   const allowedMenu = useMemo(
     () =>
       MENU.filter(

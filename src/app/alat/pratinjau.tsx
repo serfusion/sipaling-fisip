@@ -27,7 +27,7 @@ import { PENDEKATAN_LABEL } from "@/lib/metodologi";
 
 type ProdiBerdaftar = "komunikasi" | "pemerintahan";
 
-const KONTAK = "@superfaldev";
+import { KONTAK } from "@/lib/kontak";
 
 type Sorot = {
   id: string;

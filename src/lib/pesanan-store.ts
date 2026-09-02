@@ -6,7 +6,7 @@
 // ============================================================
 import { db } from "@/db";
 import { cakrawalaOrders } from "@/db/schema";
-import { and, eq, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gt, lt, sql } from "drizzle-orm";
 import {
   batasAkses, batasBayar, nomorPesanan, nominalUnik, penandaKosong,
   type Paket, type StatusPesanan,
@@ -153,6 +153,41 @@ async function simpanKodeBaru(kode: CakrawalaCode) {
     if (ulang.codes.some((k) => k.code === kode.code)) return true;
   }
   return false;
+}
+
+/**
+ * Cari pesanan yang menunggu nominal ini.
+ *
+ * Nominalnya unik ANTAR PESANAN HIDUP, bukan sepanjang masa: penandanya
+ * didaur ulang setelah pesanan lamanya kedaluwarsa. Karena itu yang berstatus
+ * "menunggu" selalu didahulukan, dan yang sudah kedaluwarsa hanya dilirik
+ * bila tidak ada yang menunggu — orang yang membayar di menit ketujuh belas
+ * tetap harus mendapat kodenya.
+ *
+ * Batas waktunya sengaja ada. Tanpa itu, pembayaran hari ini dapat menyambar
+ * pesanan yang ditinggalkan tiga bulan lalu, dan yang menerima kodenya adalah
+ * orang yang salah.
+ */
+export async function pesananUntukNominal(nominal: number, jamMundur = 24): Promise<Pesanan | null> {
+  if (!Number.isInteger(nominal) || nominal <= 0) return null;
+  const sejak = new Date(Date.now() - jamMundur * 60 * 60_000);
+
+  const baris = await db
+    .select()
+    .from(cakrawalaOrders)
+    .where(and(eq(cakrawalaOrders.amount, nominal), gt(cakrawalaOrders.createdAt, sejak)))
+    .orderBy(desc(cakrawalaOrders.createdAt))
+    .limit(10);
+
+  // Yang sudah lunas dikembalikan apa adanya supaya pemanggilnya dapat
+  // menjawab "sudah, ini kodenya" — pemberitahuan yang sama sering datang
+  // dua kali, dan itu tidak boleh menjadi dua kode.
+  return (
+    baris.find((b) => b.status === "menunggu") ??
+    baris.find((b) => b.status === "lunas") ??
+    baris.find((b) => b.status === "kedaluwarsa") ??
+    null
+  );
 }
 
 export type HasilTerbit =
