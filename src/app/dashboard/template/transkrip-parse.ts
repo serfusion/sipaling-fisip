@@ -13,6 +13,17 @@ export const HMS = Object.keys(AM);
 
 const cellText = (value: string | number | null | undefined) => String(value ?? "").trim();
 
+/**
+ * Apakah teks ini layak dianggap nama mata kuliah versi Inggris?
+ *
+ * Minimal empat huruf dan memuat satu rangkaian tiga huruf. Sel legenda di
+ * bawah tabel ("K", "HM", "AM", "MK") dan pecahan angka karena itu tidak
+ * pernah lolos.
+ */
+function namaLayak(teks: string) {
+  return teks.length >= 4 && /[A-Za-z]{3}/.test(teks);
+}
+
 function findGroups(aoa: Aoa): { head: number; groups: ColumnGroup[] } | null {
   for (let i = 0; i < Math.min(aoa.length, 40); i++) {
     const row = (aoa[i] || []).map((cell) => cellText(cell).toLowerCase());
@@ -108,7 +119,14 @@ export function parseSheetRows(aoa: Aoa): CourseRow[] {
       const row = aoa[i] || [];
       const nama = cellText(row[group.nama]);
       if (!nama) continue;
-      if (/jumlah|total|judul|keterangan|predikat|indeks|yudisium/i.test(nama)) continue;
+      // Daftar mata kuliahnya BERHENTI di sini, tidak sekadar melewati satu
+      // baris. Di bawah tabel ada blok "Keterangan" yang memuat sel berisi
+      // "K", "HM", "AM", "MK" pada kolom yang sama dengan nama mata kuliah;
+      // dilewati satu per satu, sel-sel itu tetap terbaca sebagai nama
+      // Inggris milik mata kuliah terakhir — dan "Etika Pemerintahan" pun
+      // tercetak di transkrip resmi dengan terjemahan "K".
+      if (/jumlah|total kredit|judul|keterangan|predikat|indeks prestasi|yudisium/i.test(nama)) break;
+      if (/^total\b/i.test(nama)) break;
 
       const kreditText = group.k >= 0 ? cellText(row[group.k]).replace(",", ".") : "";
       const kredit = Number(kreditText) || 0;
@@ -132,7 +150,10 @@ export function parseSheetRows(aoa: Aoa): CourseRow[] {
       if (!kredit) {
         // Baris tanpa SKS = kemungkinan besar baris nama INGGRIS milik
         // mata kuliah tepat di atasnya (format bilingual KUI).
-        if (lastPushed && !lastPushed.en && nama !== lastPushed.nama) {
+        // Nama Inggris yang sah selalu berupa kata, bukan singkatan satu-dua
+        // huruf. Batas ini menahan sel legenda ("K", "HM", "AM", "MK") dan
+        // angka yang nyasar ke kolom nama.
+        if (lastPushed && !lastPushed.en && nama !== lastPushed.nama && namaLayak(nama)) {
           lastPushed.en = nama;
         }
         continue;

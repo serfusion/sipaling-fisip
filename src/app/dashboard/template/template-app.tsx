@@ -6,6 +6,7 @@ import { useAutoLogout } from "@/lib/use-auto-logout";
 import { sanitizeLetterHtml } from "@/lib/sanitize-html";
 import { DEFAULT_LETTER_HTML, LETTER_TITLES, type LetterSlug } from "./letter-defaults";
 import { AM, HMS, computeTotals, extractBio, parseSheetRows, type Aoa, type CourseRow } from "./transkrip-parse";
+import { isiInggris, panenKamus } from "@/lib/kamus-matkul";
 import {
   TEMPLATE_BIO_ROWS, TEMPLATE_NILAI_CONTOH, TEMPLATE_NILAI_HEADER,
   TEMPLATE_SHEET_BIO, TEMPLATE_SHEET_NILAI,
@@ -130,6 +131,27 @@ export default function TemplateApp({ profile, initialJenis }: { profile: Sessio
   );
 }
 
+/**
+ * Kalimat ringkas tentang pengisian kolom Inggris.
+ *
+ * Yang hanya tebakan kata DISEBUT jumlahnya, bukan disembunyikan. Transkrip
+ * ikut dilegalisir; admin harus tahu baris mana yang perlu ia lihat sendiri
+ * sebelum mencetaknya.
+ */
+function ringkasBahasa(hasil: { dariKamus: number; dariKasar: number; sudahAda: number; perluDicek: string[] }) {
+  const bagian: string[] = [];
+  if (hasil.dariKamus > 0) bagian.push(`${hasil.dariKamus} nama Inggris terisi dari kamus`);
+  if (hasil.sudahAda > 0) bagian.push(`${hasil.sudahAda} sudah berbahasa Inggris di filenya`);
+  if (hasil.dariKasar > 0) {
+    const contoh = hasil.perluDicek.slice(0, 3).join(", ");
+    bagian.push(
+      `${hasil.dariKasar} diterjemahkan kata per kata dan PERLU DICEK` +
+        (contoh ? ` (${contoh}${hasil.perluDicek.length > 3 ? ", …" : ""})` : ""),
+    );
+  }
+  return bagian.length ? `; ${bagian.join(", ")}` : "";
+}
+
 /* ---------- modul transkrip ---------- */
 
 // Pemecah dwibahasa: menerima pemisah "|" maupun "/".
@@ -234,9 +256,29 @@ function TranskripModule({ lang }: { lang: "id" | "en" }) {
     rektor: "Dr. H. Desri Arwen, M.Pd.",
     nbmrektor: "837.138",
   });
+  // Kamus tambahan hasil koreksi admin sebelumnya. Dibaca sekali saat modul
+  // dibuka; kalau gagal, kamus bawaan tetap bekerja.
+  const [kamusTambahan, setKamusTambahan] = useState<Record<string, string>>({});
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [importMsg, setImportMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [workbook, setWorkbook] = useState<unknown>(null);
+
+  // Kamus tambahan dibaca sekali saat modul dibuka, supaya unggahan pertama
+  // pun sudah memakai koreksi yang pernah dibuat admin sebelumnya.
+  useEffect(() => {
+    let hidup = true;
+    fetch("/api/kamus-matkul", { cache: "no-store" })
+      .then((jawab) => jawab.json())
+      .then((isi: { success?: boolean; kamus?: Record<string, string> }) => {
+        if (hidup && isi.success && isi.kamus) setKamusTambahan(isi.kamus);
+      })
+      .catch(() => {
+        // Kamus bawaan tetap bekerja tanpa yang tambahan.
+      });
+    return () => {
+      hidup = false;
+    };
+  }, []);
 
   const prodiKode = PRODI.find((item) => item.nama === meta.prodi)?.kode || "";
   // Prodi Ilmu Pemerintahan tidak memiliki konsentrasi -> tulis nama prodi utuh.
@@ -280,12 +322,17 @@ function TranskripModule({ lang }: { lang: "id" | "en" }) {
     const aoa = XLSX.utils.sheet_to_json(sheet as Parameters<typeof XLSX.utils.sheet_to_json>[0], { header: 1, defval: "", raw: false }) as Aoa;
     const parsed = parseSheetRows(aoa);
     const bio = extractBio(aoa);
-    setRows(parsed);
+    // Berkas mentah dari SIMAK hanya berbahasa Indonesia. Kolom Inggrisnya
+    // diisi dari kamus supaya transkrip English tidak perlu menunggu kiriman
+    // KUI; yang sudah berisi — berkas dwibahasa — tidak pernah ditimpa.
+    const bahasa = isiInggris(parsed, kamusTambahan);
+    setRows(bahasa.rows);
     applyBio(bio);
     setImportMsg({
       kind: "ok",
       text: `Sheet "${name}": ${parsed.length} mata kuliah terbaca (dua blok kolom digabung)` +
         (bio.nama ? `; biodata ${bio.nama} ikut terisi` : "") +
+        ringkasBahasa(bahasa) +
         ". Semua diproses di browser Anda — file tidak diunggah ke mana pun.",
     });
   }
@@ -311,12 +358,14 @@ function TranskripModule({ lang }: { lang: "id" | "en" }) {
         };
         const parsed = parseTemplateNilai(toAoa(TEMPLATE_SHEET_NILAI));
         const bio = parseTemplateBio(toAoa(TEMPLATE_SHEET_BIO));
-        setRows(parsed);
+        const bahasa = isiInggris(parsed, kamusTambahan);
+        setRows(bahasa.rows);
         applyBio(bio);
         setImportMsg({
           kind: "ok",
           text: `Template SiPaling terbaca: ${parsed.length} mata kuliah` +
             (bio.nama ? `, biodata ${bio.nama} ikut terisi` : "") +
+            ringkasBahasa(bahasa) +
             ". Semua diproses di browser Anda.",
         });
         return;
@@ -374,7 +423,40 @@ function TranskripModule({ lang }: { lang: "id" | "en" }) {
       });
       const payload = (await response.json()) as { success?: boolean; message?: string; rows?: number };
       if (!response.ok || !payload.success) throw new Error(payload.message || "Data belum tersimpan.");
-      setImportMsg({ kind: "ok", text: `Tersimpan: ${payload.rows} mata kuliah. Nanti tinggal klik "Muat data tersimpan" lalu tambah/kurangi baris tanpa unggah ulang.` });
+
+      // Nama Inggris yang dikoreksi tangan ikut diingat, supaya mata kuliah
+      // yang sama pada unggahan berikutnya sudah terisi sendiri. Inilah yang
+      // membuat kamusnya tumbuh tanpa siapa pun perlu menyunting kode.
+      let diingat = 0;
+      try {
+        const pasangan = panenKamus(rows);
+        if (pasangan.length > 0) {
+          const balas = await fetch("/api/kamus-matkul", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pasangan }),
+          });
+          const isi = (await balas.json()) as { success?: boolean; baru?: number };
+          if (isi.success) {
+            diingat = isi.baru ?? 0;
+            setKamusTambahan((kini) => {
+              const berikut = { ...kini };
+              for (const p of pasangan) berikut[p.kode] = p.en;
+              return berikut;
+            });
+          }
+        }
+      } catch {
+        // Kamus bersifat pelengkap; datanya sendiri sudah tersimpan.
+      }
+
+      setImportMsg({
+        kind: "ok",
+        text:
+          `Tersimpan: ${payload.rows} mata kuliah.` +
+          (diingat > 0 ? ` ${diingat} nama Inggris diingat untuk unggahan berikutnya.` : "") +
+          ` Nanti tinggal klik "Muat data tersimpan" lalu tambah/kurangi baris tanpa unggah ulang.`,
+      });
     } catch (reason: unknown) {
       setImportMsg({ kind: "err", text: reason instanceof Error ? reason.message : "Data belum tersimpan." });
     } finally {
