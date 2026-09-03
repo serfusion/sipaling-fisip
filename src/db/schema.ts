@@ -422,3 +422,43 @@ export const cakrawalaRedemptions = pgTable("cakrawala_redemptions", {
   days: integer("days").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ============================================================
+// ARSIP TRANSKRIP NILAI (Admin Akademik)
+//
+// Satu baris = satu mahasiswa yang transkripnya sudah selesai dibuat.
+// Isinya data terstruktur (biodata + daftar mata kuliah), bukan HTML, supaya
+// transkrip lama dapat dimuat kembali, ditambah/dikurangi, lalu dicetak ulang
+// tanpa mengunggah Excel dari SIMAK lagi.
+//
+// KENAPA TABEL SENDIRI, BUKAN app_settings SEPERTI "transkrip_data":
+// `transkrip_data` hanya satu laci — menyimpan transkrip mahasiswa berikutnya
+// MENIMPA milik mahasiswa sebelumnya. Itu cukup sebagai draf yang sedang
+// dikerjakan, tetapi tidak untuk arsip: arsip justru berguna karena isinya
+// menumpuk, satu baris untuk tiap lulusan.
+//
+// NIM dijadikan kunci unik: satu mahasiswa satu transkrip. Menyimpan ulang
+// NIM yang sama berarti memperbaiki transkrip yang itu juga, bukan membuat
+// kembar yang membuat admin harus menebak mana yang terbaru.
+export const transcriptArchives = pgTable("transcript_archives", {
+  id: serial("id").primaryKey(),
+  nim: varchar("nim", { length: 32 }).notNull().unique(),
+  studentName: varchar("student_name", { length: 160 }).notNull(),
+  studyProgram: varchar("study_program", { length: 120 }),
+  concentration: varchar("concentration", { length: 160 }),
+  /** "id" = transkrip Indonesia, "en" = dwibahasa. Sekadar penanda asal. */
+  lang: varchar("lang", { length: 4 }).notNull().default("id"),
+  courseCount: integer("course_count").notNull().default(0),
+  totalSks: integer("total_sks").notNull().default(0),
+  totalMutu: integer("total_mutu").notNull().default(0),
+  ipk: numeric("ipk", { precision: 4, scale: 2 }).notNull().default("0"),
+  predikat: varchar("predikat", { length: 40 }),
+  yudisium: varchar("yudisium", { length: 60 }),
+  thesisTitle: text("thesis_title"),
+  /** Biodata dan daftar mata kuliah, apa adanya, dalam bentuk JSON. */
+  meta: text("meta").notNull(),
+  rows: text("rows").notNull(),
+  savedBy: varchar("saved_by", { length: 160 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

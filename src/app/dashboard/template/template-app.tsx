@@ -7,6 +7,7 @@ import { sanitizeLetterHtml } from "@/lib/sanitize-html";
 import { DEFAULT_LETTER_HTML, LETTER_TITLES, type LetterSlug } from "./letter-defaults";
 import { AM, HMS, computeTotals, extractBio, parseSheetRows, type Aoa, type CourseRow } from "./transkrip-parse";
 import { isiInggris, panenKamus } from "@/lib/kamus-matkul";
+import { periksaSiapArsip, predikatKelulusan, sidikTranskrip } from "@/lib/arsip-transkrip";
 import {
   TEMPLATE_BIO_ROWS, TEMPLATE_NILAI_CONTOH, TEMPLATE_NILAI_HEADER,
   TEMPLATE_SHEET_BIO, TEMPLATE_SHEET_NILAI,
@@ -49,19 +50,12 @@ function fmtIPK(value: number) {
   return value.toFixed(2).replace(".", ",");
 }
 
-function predikat(ipk: number, judul: string) {
-  if (ipk >= 3.51) return "Dengan Pujian";
-  if (ipk >= 3.01) return "Sangat Memuaskan";
-  if (ipk >= 2.76) return "Memuaskan";
-  return judul ? "Lulus" : "—";
-}
-
 /* ---------- komponen utama ---------- */
 
 type Jenis = "transkrip" | LetterSlug;
 const LETTER_SLUGS: LetterSlug[] = ["surat-aktif", "izin-penelitian", "pkl"];
 
-export default function TemplateApp({ profile, initialJenis }: { profile: SessionProfile | null; initialJenis?: string }) {
+export default function TemplateApp({ profile, initialJenis, initialArsip }: { profile: SessionProfile | null; initialJenis?: string; initialArsip?: string }) {
   useAutoLogout(Boolean(profile));
   const canTranskrip = Boolean(profile && TRANSKRIP_ROLES.includes(profile.role));
   const canSurat = Boolean(profile && SURAT_ROLES.includes(profile.role));
@@ -124,8 +118,8 @@ export default function TemplateApp({ profile, initialJenis }: { profile: Sessio
           ))}
         </div>
       </header>
-      {jenis === "transkrip" && canTranskrip ? <TranskripModule lang="id" key="tk-id" />
-        : jenis === "transkrip-en" && canTranskrip ? <TranskripModule lang="en" key="tk-en" />
+      {jenis === "transkrip" && canTranskrip ? <TranskripModule lang="id" arsipAwal={initialArsip} key="tk-id" />
+        : jenis === "transkrip-en" && canTranskrip ? <TranskripModule lang="en" arsipAwal={initialArsip} key="tk-en" />
           : <LetterModule slug={jenis === "transkrip" || jenis === "transkrip-en" ? "surat-aktif" : jenis} key={jenis} />}
     </div>
   );
@@ -194,7 +188,64 @@ const PREDIKAT_EN: Record<string, string> = {
   "Lulus": "Pass",
 };
 
-function TranskripModule({ lang }: { lang: "id" | "en" }) {
+/**
+ * Biodata bawaan satu transkrip kosong.
+ *
+ * Dibuat sebagai fungsi, bukan tetapan: memuat transkrip lain harus mulai
+ * dari lembar yang benar-benar bersih. Kalau isian lama hanya ditimpa
+ * sebagian, konsentrasi atau nomor ijazah milik mahasiswa sebelumnya bisa
+ * ikut tercetak pada transkrip mahasiswa berikutnya.
+ */
+function metaAwal() {
+  return {
+    noijazah: "",
+    nppt: "041051",
+    yudisium: "",
+    akred: "LAMSPAK Nomor 099/AK.03.05/2026",
+    nama: "",
+    nim: "",
+    prodi: PRODI[0].nama,
+    ttl: "",
+    konsentrasi: "",
+    jenjang: "SARJANA / BACHELOR DEGREE (S-1)",
+    judul: "",
+    tanggal: todayID(),
+    dekan: "Dr. H. Achmad Kosasih, MM.",
+    nbmdekan: "739.574",
+    rektor: "Dr. H. Desri Arwen, M.Pd.",
+    nbmrektor: "837.138",
+  };
+}
+
+/** Satu baris pada Arsip Transkrip Nilai (ringkasan; tanpa isi mata kuliah). */
+type BarisArsip = {
+  id: number;
+  nim: string;
+  studentName: string;
+  studyProgram: string | null;
+  concentration: string | null;
+  lang: string;
+  courseCount: number;
+  totalSks: number;
+  totalMutu: number;
+  ipk: string;
+  predikat: string | null;
+  yudisium: string | null;
+  thesisTitle: string | null;
+  savedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+function tanggalSingkat(waktu: string | null) {
+  if (!waktu) return "—";
+  const tanggal = new Date(waktu);
+  return Number.isNaN(tanggal.getTime())
+    ? "—"
+    : tanggal.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: string }) {
   const EN = lang === "en";
   const customSlug: LetterSlug = EN ? "transkrip-en" : "transkrip-custom";
   const L = EN
@@ -238,30 +289,24 @@ function TranskripModule({ lang }: { lang: "id" | "en" }) {
   const [editLayout, setEditLayout] = useState(false);
   const docRef = useRef<HTMLDivElement>(null);
   const [rows, setRows] = useState<CourseRow[]>([]);
-  const [meta, setMeta] = useState({
-    noijazah: "",
-    nppt: "041051",
-    yudisium: "",
-    akred: "LAMSPAK Nomor 099/AK.03.05/2026",
-    nama: "",
-    nim: "",
-    prodi: PRODI[0].nama,
-    ttl: "",
-    konsentrasi: "",
-    jenjang: "SARJANA / BACHELOR DEGREE (S-1)",
-    judul: "",
-    tanggal: todayID(),
-    dekan: "Dr. H. Achmad Kosasih, MM.",
-    nbmdekan: "739.574",
-    rektor: "Dr. H. Desri Arwen, M.Pd.",
-    nbmrektor: "837.138",
-  });
+  const [meta, setMeta] = useState(metaAwal);
   // Kamus tambahan hasil koreksi admin sebelumnya. Dibaca sekali saat modul
   // dibuka; kalau gagal, kamus bawaan tetap bekerja.
   const [kamusTambahan, setKamusTambahan] = useState<Record<string, string>>({});
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [importMsg, setImportMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [workbook, setWorkbook] = useState<unknown>(null);
+
+  // --- Arsip Transkrip Nilai ---------------------------------------------
+  // `sidikArsip` menyimpan bentuk transkrip pada saat terakhir diarsipkan.
+  // Selama yang di layar berbeda dari itu, statusnya berbunyi "belum
+  // disimpan" — dan memang belum: tidak ada penyimpanan yang berjalan sendiri.
+  const [arsip, setArsip] = useState<BarisArsip[]>([]);
+  const [arsipSibuk, setArsipSibuk] = useState("");
+  const [arsipPesan, setArsipPesan] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [sidikArsip, setSidikArsip] = useState<string | null>(null);
+  const [arsipBuka, setArsipBuka] = useState(true);
+  const [cariArsip, setCariArsip] = useState("");
 
   // Kamus tambahan dibaca sekali saat modul dibuka, supaya unggahan pertama
   // pun sudah memakai koreksi yang pernah dibuat admin sebelumnya.
@@ -413,6 +458,37 @@ function TranskripModule({ lang }: { lang: "id" | "en" }) {
     }
   }
 
+  /**
+   * Ingat nama Inggris yang dikoreksi tangan.
+   *
+   * Dipanggil oleh KEDUA tombol simpan. Kalau hanya salah satu yang memanen,
+   * kamusnya berhenti tumbuh begitu admin berpindah kebiasaan ke tombol yang
+   * lain — dan mata kuliah yang sama menuntut koreksi tangan yang sama lagi
+   * pada tiap unggahan berikutnya.
+   */
+  async function ingatKamus() {
+    try {
+      const pasangan = panenKamus(rows);
+      if (pasangan.length === 0) return 0;
+      const balas = await fetch("/api/kamus-matkul", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pasangan }),
+      });
+      const isi = (await balas.json()) as { success?: boolean; baru?: number };
+      if (!isi.success) return 0;
+      setKamusTambahan((kini) => {
+        const berikut = { ...kini };
+        for (const p of pasangan) berikut[p.kode] = p.en;
+        return berikut;
+      });
+      return isi.baru ?? 0;
+    } catch {
+      // Kamus bersifat pelengkap; transkripnya sendiri sudah tersimpan.
+      return 0;
+    }
+  }
+
   async function saveTranskripData() {
     setSavingData(true);
     try {
@@ -424,38 +500,16 @@ function TranskripModule({ lang }: { lang: "id" | "en" }) {
       const payload = (await response.json()) as { success?: boolean; message?: string; rows?: number };
       if (!response.ok || !payload.success) throw new Error(payload.message || "Data belum tersimpan.");
 
-      // Nama Inggris yang dikoreksi tangan ikut diingat, supaya mata kuliah
-      // yang sama pada unggahan berikutnya sudah terisi sendiri. Inilah yang
-      // membuat kamusnya tumbuh tanpa siapa pun perlu menyunting kode.
-      let diingat = 0;
-      try {
-        const pasangan = panenKamus(rows);
-        if (pasangan.length > 0) {
-          const balas = await fetch("/api/kamus-matkul", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ pasangan }),
-          });
-          const isi = (await balas.json()) as { success?: boolean; baru?: number };
-          if (isi.success) {
-            diingat = isi.baru ?? 0;
-            setKamusTambahan((kini) => {
-              const berikut = { ...kini };
-              for (const p of pasangan) berikut[p.kode] = p.en;
-              return berikut;
-            });
-          }
-        }
-      } catch {
-        // Kamus bersifat pelengkap; datanya sendiri sudah tersimpan.
-      }
+      const diingat = await ingatKamus();
 
       setImportMsg({
         kind: "ok",
         text:
-          `Tersimpan: ${payload.rows} mata kuliah.` +
+          `Draf tersimpan: ${payload.rows} mata kuliah.` +
           (diingat > 0 ? ` ${diingat} nama Inggris diingat untuk unggahan berikutnya.` : "") +
-          ` Nanti tinggal klik "Muat data tersimpan" lalu tambah/kurangi baris tanpa unggah ulang.`,
+          ` Nanti tinggal klik "Muat draf" lalu tambah/kurangi baris tanpa unggah ulang.` +
+          ` Ingat: draf hanya SATU laci — transkrip mahasiswa berikutnya menimpanya.` +
+          ` Yang tersimpan per mahasiswa adalah tombol "Save di Arsip Transkrip" di paling bawah.`,
       });
     } catch (reason: unknown) {
       setImportMsg({ kind: "err", text: reason instanceof Error ? reason.message : "Data belum tersimpan." });
@@ -474,11 +528,11 @@ function TranskripModule({ lang }: { lang: "id" | "en" }) {
       };
       if (!response.ok || !payload.success) throw new Error(payload.message || "Data belum dapat dimuat.");
       if (!payload.data || !payload.data.rows?.length) {
-        setImportMsg({ kind: "err", text: "Belum ada data transkrip tersimpan. Simpan dulu setelah mengisi." });
+        setImportMsg({ kind: "err", text: "Belum ada draf tersimpan. Simpan dulu setelah mengisi, atau muat dari Arsip Transkrip Nilai di bawah." });
         return;
       }
       setRows(payload.data.rows);
-      if (payload.data.meta) setMeta((current) => ({ ...current, ...payload.data!.meta }));
+      if (payload.data.meta) setMeta({ ...metaAwal(), ...payload.data.meta });
       setImportMsg({
         kind: "ok",
         text: `Dimuat: ${payload.data.rows.length} mata kuliah` +
@@ -491,6 +545,130 @@ function TranskripModule({ lang }: { lang: "id" | "en" }) {
       setSavingData(false);
     }
   }
+
+  /* ---------- Arsip Transkrip Nilai ---------- */
+
+  // Syarat menyimpan dihitung dari isi yang sekarang di layar, dan alasannya
+  // ditulis apa adanya di bawah tombol. Aturannya satu berkas dengan yang
+  // dipakai server, jadi tombol yang menyala tidak akan ditolak di seberang.
+  const siapArsip = useMemo(() => periksaSiapArsip(meta, rows), [meta, rows]);
+  const sidikKini = useMemo(() => sidikTranskrip(meta, rows), [meta, rows]);
+  const sudahDiarsipkan = sidikArsip !== null && sidikArsip === sidikKini;
+  const arsipTersaring = useMemo(() => {
+    const kunci = cariArsip.trim().toLowerCase();
+    if (!kunci) return arsip;
+    return arsip.filter((baris) =>
+      `${baris.studentName} ${baris.nim} ${baris.studyProgram || ""}`.toLowerCase().includes(kunci),
+    );
+  }, [arsip, cariArsip]);
+
+  const muatDaftarArsip = useCallback(async () => {
+    try {
+      const jawab = await fetch("/api/arsip-transkrip", { cache: "no-store" });
+      const isi = (await jawab.json()) as { success?: boolean; daftar?: BarisArsip[] };
+      if (isi.success) setArsip(isi.daftar || []);
+    } catch {
+      // Daftar arsip hanya pelengkap; pembuatan transkrip tetap bisa jalan.
+    }
+  }, []);
+
+  const muatDariArsip = useCallback(async (id: number) => {
+    setArsipSibuk("muat");
+    setArsipPesan(null);
+    try {
+      const jawab = await fetch(`/api/arsip-transkrip?id=${id}`, { cache: "no-store" });
+      const isi = (await jawab.json()) as {
+        success?: boolean; message?: string;
+        arsip?: { nim: string; studentName: string; meta?: Record<string, string>; rows?: CourseRow[]; savedBy: string | null; updatedAt: string };
+      };
+      if (!jawab.ok || !isi.success || !isi.arsip) throw new Error(isi.message || "Transkrip itu belum dapat dimuat.");
+      const baris = isi.arsip.rows || [];
+      setRows(baris);
+      // Lembar bersih dulu, baru isian dari arsip: transkrip mahasiswa
+      // sebelumnya tidak boleh meninggalkan sisa pada yang ini.
+      const bio = { ...metaAwal(), ...(isi.arsip.meta || {}) };
+      setMeta(bio);
+      // Yang baru dimuat memang sama persis dengan yang ada di arsip, jadi
+      // statusnya langsung "tersimpan" — sampai ada yang diubah.
+      setSidikArsip(sidikTranskrip(bio, baris));
+      setArsipPesan({
+        kind: "ok",
+        text: `Transkrip ${isi.arsip.studentName} (${isi.arsip.nim}) dimuat dari arsip: ${baris.length} mata kuliah. ` +
+          `Silakan ubah seperlunya, lalu simpan lagi untuk memperbaruinya.`,
+      });
+    } catch (alasan: unknown) {
+      setArsipPesan({ kind: "err", text: alasan instanceof Error ? alasan.message : "Transkrip itu belum dapat dimuat." });
+    } finally {
+      setArsipSibuk("");
+    }
+  }, []);
+
+  /**
+   * Simpan transkrip yang sedang dibuat ke Arsip Transkrip Nilai.
+   *
+   * HANYA lewat tombol. Tidak ada pemanggilan lain ke fungsi ini — tidak dari
+   * timer, tidak dari impor Excel, tidak saat pindah tab.
+   */
+  async function simpanKeArsip() {
+    if (!siapArsip.siap) {
+      setArsipPesan({ kind: "err", text: siapArsip.alasan });
+      return;
+    }
+    setArsipSibuk("simpan");
+    setArsipPesan(null);
+    try {
+      const jawab = await fetch("/api/arsip-transkrip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ meta, rows, lang }),
+      });
+      const isi = (await jawab.json()) as {
+        success?: boolean; message?: string; diperbarui?: boolean; arsip?: BarisArsip;
+      };
+      if (!jawab.ok || !isi.success || !isi.arsip) throw new Error(isi.message || "Transkrip belum tersimpan ke arsip.");
+
+      // Daftar diperbarui di tempat: baris dengan NIM yang sama diganti, yang
+      // baru naik ke atas — sama seperti urutan dari server (terbaru dulu).
+      setArsip((kini) => [isi.arsip as BarisArsip, ...kini.filter((baris) => baris.nim !== isi.arsip!.nim)]);
+      setSidikArsip(sidikKini);
+      const diingat = await ingatKamus();
+      setArsipPesan({
+        kind: "ok",
+        text: (isi.diperbarui
+          ? `Transkrip ${isi.arsip.studentName} (${isi.arsip.nim}) DIPERBARUI di arsip`
+          : `Transkrip ${isi.arsip.studentName} (${isi.arsip.nim}) masuk ke arsip`) +
+          `: ${isi.arsip.courseCount} mata kuliah · ${isi.arsip.totalSks} SKS · IPK ${isi.arsip.ipk}.` +
+          (diingat > 0 ? ` ${diingat} nama Inggris diingat untuk unggahan berikutnya.` : "") +
+          ` Daftar lengkapnya ada di Dashboard → Arsip Transkrip Nilai.`,
+      });
+    } catch (alasan: unknown) {
+      setArsipPesan({ kind: "err", text: alasan instanceof Error ? alasan.message : "Transkrip belum tersimpan ke arsip." });
+    } finally {
+      setArsipSibuk("");
+    }
+  }
+
+  // Daftar dibaca sekali saat modul dibuka; kalau alamatnya membawa nomor
+  // arsip (dari Dashboard → Arsip Transkrip Nilai), transkripnya ikut dimuat.
+  useEffect(() => {
+    // Ditunda satu tick supaya pembacaan pertamanya tidak menyalakan render
+    // berantai pada saat modul baru saja terpasang.
+    const jam = window.setTimeout(() => {
+      void muatDaftarArsip();
+      const nomor = Number(arsipAwal || 0);
+      if (nomor > 0) void muatDariArsip(nomor);
+    }, 0);
+    return () => window.clearTimeout(jam);
+  }, [arsipAwal, muatDaftarArsip, muatDariArsip]);
+
+  // Menutup tab dengan transkrip yang belum diarsipkan berarti mengetik ulang
+  // semuanya. Peramban yang bertanya sekali jauh lebih murah daripada itu.
+  useEffect(() => {
+    if (rows.length === 0 || sudahDiarsipkan) return;
+    const jaga = (peristiwa: BeforeUnloadEvent) => peristiwa.preventDefault();
+    window.addEventListener("beforeunload", jaga);
+    return () => window.removeEventListener("beforeunload", jaga);
+  }, [rows.length, sudahDiarsipkan]);
 
   function updateRow(index: number, patch: Partial<CourseRow>) {
     setRows((current) => current.map((row, i) => (i === index ? { ...row, ...patch } : row)));
@@ -521,8 +699,8 @@ function TranskripModule({ lang }: { lang: "id" | "en" }) {
           <p>Dua format diterima otomatis: <b>Template Transkrip SiPaling</b> (unduh di bawah — satu baris satu mata kuliah) dan <b>Excel akademik</b> lama (dua blok kolom NO · KODE MK · NAMA MATA KULIAH · K · HM · AM · MK). Biodata ikut terbaca.</p>
           <div className="tpl-actions tpl-actions-wrap tpl-data-bar">
             <button type="button" className="btn btn-light btn-mini" onClick={downloadTemplate}>⬇ Unduh Template Excel</button>
-            <button type="button" className="btn btn-light btn-mini" onClick={saveTranskripData} disabled={savingData || rows.length === 0}>💾 Simpan data transkrip</button>
-            <button type="button" className="btn btn-light btn-mini" onClick={loadTranskripData} disabled={savingData}>📂 Muat data tersimpan</button>
+            <button type="button" className="btn btn-light btn-mini" onClick={saveTranskripData} disabled={savingData || rows.length === 0} title="Satu laci draf: menyimpan transkrip berikutnya menimpa yang ini. Untuk menyimpan per mahasiswa, pakai tombol Arsip Transkrip di paling bawah.">💾 Simpan draf (1 laci)</button>
+            <button type="button" className="btn btn-light btn-mini" onClick={loadTranskripData} disabled={savingData}>📂 Muat draf</button>
           </div>
           <label className="file-box">
             <span className="file-btn">📁 Pilih File Excel</span>
@@ -610,6 +788,104 @@ function TranskripModule({ lang }: { lang: "id" | "en" }) {
           <button type="button" className="btn btn-light" onClick={() => { window.open("https://drive.google.com/drive/my-drive?hl=ID", "_blank", "noopener"); }} title="Buka Google Drive akun Anda untuk mengunggah PDF hasil cetak">⬢ Simpan ke Google Drive</button>
           <Link className="btn btn-light" href="/dashboard">Arsipkan link Drive di Dashboard → Arsip</Link>
         </div>
+
+        {/* ============================================================
+            ARSIP TRANSKRIP NILAI — tombol terakhir, sesudah transkripnya jadi
+
+            Letaknya paling bawah karena inilah langkah terakhir: nilai sudah
+            benar, biodata sudah benar, transkrip sudah dicetak — baru
+            diarsipkan. Selama tombol ini belum ditekan, tidak ada satu pun
+            data yang masuk ke arsip.
+            ============================================================ */}
+        <section className="tk-arsip">
+          <div className="tk-arsip-head">
+            <div>
+              <strong>Arsip Transkrip Nilai</strong>
+              <p>
+                Simpan transkrip yang sudah selesai agar tercatat siapa saja mahasiswa yang transkripnya sudah dibuat.
+                Tersimpan <b>hanya kalau tombol ini ditekan</b> — selama belum, tidak ada yang diarsipkan.
+              </p>
+            </div>
+            <span className={sudahDiarsipkan ? "tk-arsip-status sudah" : "tk-arsip-status belum"}>
+              {sudahDiarsipkan ? "✓ Sudah tersimpan di arsip" : rows.length === 0 ? "○ Belum ada isi" : "● Belum disimpan"}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-arsip"
+            onClick={() => void simpanKeArsip()}
+            disabled={!siapArsip.siap || arsipSibuk !== ""}
+            title={siapArsip.siap ? "Simpan transkrip ini ke Arsip Transkrip Nilai" : siapArsip.alasan}
+          >
+            {arsipSibuk === "simpan" ? "Menyimpan…" : "💾 Save di Arsip Transkrip"}
+          </button>
+
+          {!siapArsip.siap && <p className="tk-arsip-alasan">⚠ {siapArsip.alasan}</p>}
+          {siapArsip.siap && !sudahDiarsipkan && (
+            <p className="tk-arsip-alasan siap">
+              Siap disimpan: <b>{meta.nama}</b> · {meta.nim} · {rows.length} mata kuliah · {totals.sks} SKS · IPK {showIpk(totals.ipk)}.
+            </p>
+          )}
+          {arsipPesan && <div className={arsipPesan.kind === "ok" ? "dsh-ok" : "dsh-error"}>{arsipPesan.text}</div>}
+
+          <div className="tk-arsip-list">
+            <div className="tk-arsip-list-head">
+              <button type="button" className="collapse-btn" onClick={() => setArsipBuka((buka) => !buka)}>
+                {arsipBuka ? "▲" : "▼"} Sudah dibuat transkripnya ({arsip.length} mahasiswa)
+              </button>
+              <button type="button" className="collapse-btn" onClick={() => void muatDaftarArsip()}>⟳ Segarkan</button>
+            </div>
+            {arsipBuka && (
+              arsip.length === 0 ? (
+                <p className="tk-arsip-kosong">
+                  Arsip masih kosong. Transkrip pertama yang Anda simpan akan muncul di sini.
+                </p>
+              ) : (
+                <>
+                  {arsip.length > 6 && (
+                    <input
+                      className="tk-arsip-cari"
+                      value={cariArsip}
+                      onChange={(e) => setCariArsip(e.target.value)}
+                      placeholder="Cari nama, NIM, atau prodi…"
+                    />
+                  )}
+                  <ul className="tk-arsip-daftar">
+                    {arsipTersaring.map((baris) => (
+                      <li key={baris.id}>
+                        <div className="tk-arsip-siapa">
+                          <b>{baris.studentName}</b>
+                          <span>
+                            {baris.nim} · {baris.studyProgram || "prodi tidak tercatat"} · {baris.courseCount} MK ·{" "}
+                            {baris.totalSks} SKS · IPK {baris.ipk}
+                          </span>
+                          <small>
+                            {tanggalSingkat(baris.updatedAt)}
+                            {baris.savedBy ? ` · oleh ${baris.savedBy}` : ""}
+                          </small>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-light btn-mini"
+                          onClick={() => void muatDariArsip(baris.id)}
+                          disabled={arsipSibuk !== ""}
+                        >
+                          {arsipSibuk === "muat" ? "…" : "Muat"}
+                        </button>
+                      </li>
+                    ))}
+                    {arsipTersaring.length === 0 && <li className="tk-arsip-kosong">Tidak ada yang cocok dengan pencarian itu.</li>}
+                  </ul>
+                </>
+              )
+            )}
+          </div>
+
+          <Link className="tk-arsip-tautan" href="/dashboard?view=arsip-transkrip">
+            Buka Arsip Transkrip Nilai di Dashboard →
+          </Link>
+        </section>
       </section>
 
       <section className="tpl-preview">
@@ -723,7 +999,7 @@ function TranskripModule({ lang }: { lang: "id" | "en" }) {
               </div>
               <div className="dtot-row">
                 <span className="dt-a"><BiIn text={L.totNilai} /></span><span className="dt-b">{totals.mutu}</span>
-                <span className="dt-c"><BiIn text={L.predLbl} /></span><span className="dt-d"><b>{showPredikat(predikat(totals.ipk, meta.judul))}</b></span>
+                <span className="dt-c"><BiIn text={L.predLbl} /></span><span className="dt-d"><b>{showPredikat(predikatKelulusan(totals.ipk, meta.judul))}</b></span>
               </div>
               <div className="dtot-judul"><span><BiVal text={L.judul} /></span><span>{meta.judul || ""}</span></div>
             </div>
