@@ -4224,6 +4224,15 @@ a.al-mini:hover { color: var(--al-ink); }
    selebar kolomnya, karena inilah satu-satunya tindakan yang membuat
    transkrip yang sudah jadi tidak hilang begitu tab ditutup.
    ============================================================ */
+/* Keterangan bahwa pratinjau sedang memakai tata letak hasil suntingan
+   tangan. Warnanya sengaja berbeda dari pesan sukses: ini bukan kabar
+   gembira, melainkan keadaan yang perlu disadari — biodata di kiri berhenti
+   memperbarui pratinjau selama tata letaknya disunting sendiri. */
+.tk-tataletak-nota { margin: 8px 0 0; padding: 9px 11px; border-radius: 11px;
+  border: 1px solid #bfdbfe; background: #eff6ff; color: #1e3a5f;
+  font-size: 10.5px; line-height: 1.6; }
+.tk-tataletak-nota b { color: #1d4ed8; }
+
 .tk-arsip { margin-top: 18px; padding: 14px; border-radius: 14px;
   border: 1px solid #bbf7d0; background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 62%);
   display: flex; flex-direction: column; gap: 10px; }

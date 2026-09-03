@@ -3,6 +3,7 @@ import { appSettings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getCurrentProfile } from "@/lib/supabase-server";
 import { explainServerError } from "@/lib/api-errors";
+import { bersihkanTataLetak } from "@/lib/arsip-transkrip";
 
 export const dynamic = "force-dynamic";
 
@@ -12,9 +13,20 @@ export const dynamic = "force-dynamic";
 // MENGURANGI mata kuliah tanpa perlu mengunggah Excel lagi.
 const EDIT_ROLES = ["super_admin", "admin", "admin_akademik"];
 const KEY = "transkrip_data";
-const MAX_CHARS = 300_000;
+// Draf ikut memuat tata letak hasil suntingan tangan (HTML), jadi batasnya
+// lebih longgar daripada sekadar biodata dan daftar mata kuliah.
+const MAX_CHARS = 800_000;
 
-type Payload = { meta?: Record<string, string>; rows?: unknown[]; savedBy?: string };
+type Payload = {
+  meta?: Record<string, string>;
+  rows?: unknown[];
+  savedBy?: string;
+  /**
+   * HTML pratinjau hasil "Edit tata letak". Kosong berarti transkripnya
+   * dirender dari data — itulah bentuk bawaannya.
+   */
+  tataLetak?: string;
+};
 
 export async function GET() {
   try {
@@ -27,7 +39,11 @@ export async function GET() {
       const parsed = JSON.parse(found[0].value) as Payload;
       return Response.json({
         success: true,
-        data: { meta: parsed.meta || {}, rows: Array.isArray(parsed.rows) ? parsed.rows : [] },
+        data: {
+          meta: parsed.meta || {},
+          rows: Array.isArray(parsed.rows) ? parsed.rows : [],
+          tataLetak: typeof parsed.tataLetak === "string" ? parsed.tataLetak : "",
+        },
         savedBy: parsed.savedBy || null,
         savedAt: found[0].updatedAt,
       });
@@ -51,15 +67,21 @@ export async function PUT(request: Request) {
     if (!rows.length) {
       return Response.json({ success: false, message: "Tidak ada baris nilai untuk disimpan." }, { status: 400 });
     }
-    const value = JSON.stringify({ meta: body.meta || {}, rows, savedBy: profile.fullName });
+    // Tata letak dibersihkan seperti template surat sebelum tersimpan; yang
+    // menampilkannya kembali membersihkannya sekali lagi.
+    const tataLetak = bersihkanTataLetak(body.tataLetak);
+    const value = JSON.stringify({ meta: body.meta || {}, rows, tataLetak, savedBy: profile.fullName });
     if (value.length > MAX_CHARS) {
-      return Response.json({ success: false, message: "Data terlalu besar untuk disimpan." }, { status: 400 });
+      return Response.json({
+        success: false,
+        message: "Draf terlalu besar untuk disimpan. Biasanya karena gambar yang ditempel pada tata letak — perkecil atau hapus gambarnya, lalu simpan lagi.",
+      }, { status: 400 });
     }
     await db
       .insert(appSettings)
       .values({ key: KEY, value, updatedAt: new Date() })
       .onConflictDoUpdate({ target: appSettings.key, set: { value, updatedAt: new Date() } });
-    return Response.json({ success: true, rows: rows.length });
+    return Response.json({ success: true, rows: rows.length, tataLetak: Boolean(tataLetak) });
   } catch (error: unknown) {
     console.error("save transkrip data", error);
     return Response.json({ success: false, message: explainServerError(error, "Data transkrip belum tersimpan.") }, { status: 500 });

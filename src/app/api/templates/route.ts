@@ -3,6 +3,7 @@ import { appSettings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getCurrentProfile } from "@/lib/supabase-server";
 import { explainServerError } from "@/lib/api-errors";
+import { bersihkanHtmlServer } from "@/lib/sanitize-html";
 
 export const dynamic = "force-dynamic";
 
@@ -52,21 +53,12 @@ export async function PUT(request: Request) {
     if (!ALLOWED_SLUGS.includes(slug as (typeof ALLOWED_SLUGS)[number])) {
       return Response.json({ success: false, message: "Template tidak dikenal." }, { status: 400 });
     }
-    const html = String(body.html || "").slice(0, MAX_HTML);
-    // Lapis pertama (server). Versi lama hanya membuang pasangan tag yang
-    // lengkap sehingga `<script src=...>` tanpa penutup dan `<svg/onload=...>`
-    // masih lolos. Sekarang seluruh tag berbahaya dibuang walau tak berpenutup,
-    // dan atribut handler dikenali meski dipisah "/" atau baris baru.
-    // Lapis kedua ada di sisi tampilan (sanitizeLetterHtml) yang membangun
-    // ulang DOM dengan allowlist — itulah pertahanan yang menentukan.
-    const safe = html
-      .replace(/<\s*(script|iframe|object|embed|link|meta|form|svg|math)\b[\s\S]*?(?:<\s*\/\s*\1\s*>|>)/gi, "")
-      .replace(/<\s*\/\s*(script|iframe|object|embed|link|meta|form|svg|math)\s*>/gi, "")
-      .replace(/[\s/]on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-      .replace(/(javascript|vbscript|data)\s*(?::|&#58;)/gi, (match) =>
-        // data: tetap boleh khusus gambar tertanam (tanda tangan hasil scan).
-        /^data/i.test(match) ? match : "blocked:",
-      );
+    // Lapis pertama (server) dipakai bersama dengan tata letak transkrip:
+    // satu berkas yang sama membuang tag berbahaya walau tak berpenutup dan
+    // atribut handler walau dipisah "/" atau baris baru. Lapis kedua ada di
+    // sisi tampilan (sanitizeLetterHtml) yang membangun ulang DOM dengan
+    // allowlist — itulah pertahanan yang menentukan.
+    const safe = bersihkanHtmlServer(String(body.html || ""), MAX_HTML);
     const value = JSON.stringify({ html: safe, updatedBy: profile.fullName });
     await db
       .insert(appSettings)

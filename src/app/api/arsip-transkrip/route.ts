@@ -16,7 +16,7 @@ import { desc, eq } from "drizzle-orm";
 import { getCurrentProfile, type Role } from "@/lib/supabase-server";
 import { explainServerError } from "@/lib/api-errors";
 import {
-  bersihkanBaris, bersihkanMeta, periksaSiapArsip, ringkasTranskrip,
+  bersihkanBaris, bersihkanMeta, bersihkanTataLetak, periksaSiapArsip, ringkasTranskrip,
 } from "@/lib/arsip-transkrip";
 
 export const dynamic = "force-dynamic";
@@ -24,8 +24,22 @@ export const dynamic = "force-dynamic";
 // Transkrip nilai adalah pekerjaan Admin Akademik; Admin dan Super Admin ikut
 // melihatnya karena keduanya menutupi seluruh unit.
 const ARSIP_ROLES: Role[] = ["super_admin", "admin", "admin_akademik"];
-/** Batas satu baris arsip. Transkrip 60 mata kuliah jauh di bawah ini. */
-const MAKS_HURUF = 300_000;
+/**
+ * Batas satu baris arsip. Transkrip 60 mata kuliah jauh di bawah ini; ruang
+ * selebihnya untuk tata letak hasil suntingan tangan, yang tersimpan sebagai
+ * HTML di dalam JSON `meta` (lihat POST di bawah).
+ */
+const MAKS_HURUF = 800_000;
+
+/**
+ * Kunci tata letak di dalam JSON `meta`.
+ *
+ * Tata letak menumpang pada kolom yang sudah ada, BUKAN kolom baru: kolom
+ * baru berarti setiap pemasangan lama harus menjalankan SQL lebih dulu, dan
+ * sampai itu dilakukan tombol simpan arsip akan gagal seluruhnya. Menumpang
+ * pada JSON membuat perbaikan ini langsung bekerja begitu situsnya terbit.
+ */
+const KUNCI_TATA_LETAK = "tataLetak";
 
 function boleh(role: Role) {
   return ARSIP_ROLES.includes(role);
@@ -69,17 +83,20 @@ export async function GET(request: Request) {
         return Response.json({ success: false, message: "Transkrip itu sudah tidak ada di arsip." }, { status: 404 });
       }
       const satu = baris[0];
-      let meta: Record<string, string> = {};
+      let tersimpan: Record<string, string> = {};
       let rows: unknown[] = [];
       try {
-        meta = JSON.parse(satu.meta) as Record<string, string>;
+        tersimpan = JSON.parse(satu.meta) as Record<string, string>;
         rows = JSON.parse(satu.rows) as unknown[];
       } catch {
         return Response.json({ success: false, message: "Isi arsip ini tidak terbaca." }, { status: 500 });
       }
+      // Tata letak dipisahkan lagi dari biodata: yang masuk ke isian Biodata
+      // di layar hanya biodata, tidak ikut kemasukan HTML.
+      const { [KUNCI_TATA_LETAK]: tataLetak = "", ...meta } = tersimpan;
       return Response.json({
         success: true,
-        arsip: { ...satu, meta, rows: bersihkanBaris(rows) },
+        arsip: { ...satu, meta, tataLetak, rows: bersihkanBaris(rows) },
       });
     }
 
@@ -112,9 +129,13 @@ export async function POST(request: Request) {
       return Response.json({ success: false, message: "Role Anda tidak dapat menyimpan ke Arsip Transkrip Nilai." }, { status: 403 });
     }
 
-    const body = (await request.json()) as { meta?: unknown; rows?: unknown; lang?: unknown };
+    const body = (await request.json()) as { meta?: unknown; rows?: unknown; lang?: unknown; tataLetak?: unknown };
     const meta = bersihkanMeta(body.meta);
     const rows = bersihkanBaris(body.rows);
+    // Hanya tata letak yang lewat pembersih HTML yang boleh tersimpan; kunci
+    // dengan nama sama yang menyelinap lewat `meta` dibuang lebih dulu.
+    delete meta[KUNCI_TATA_LETAK];
+    const tataLetak = bersihkanTataLetak(body.tataLetak);
 
     // Syarat yang sama persis dengan yang dipakai tombolnya di layar. Kalau
     // sesuatu tetap lolos sampai sini (mis. dua tab terbuka), alasannya yang
@@ -123,10 +144,13 @@ export async function POST(request: Request) {
     if (!siap.siap) return Response.json({ success: false, message: siap.alasan }, { status: 400 });
 
     const ringkas = ringkasTranskrip(meta, rows);
-    const isiMeta = JSON.stringify(meta);
+    const isiMeta = JSON.stringify(tataLetak ? { ...meta, [KUNCI_TATA_LETAK]: tataLetak } : meta);
     const isiRows = JSON.stringify(rows);
     if (isiMeta.length + isiRows.length > MAKS_HURUF) {
-      return Response.json({ success: false, message: "Data transkrip terlalu besar untuk diarsipkan." }, { status: 400 });
+      return Response.json({
+        success: false,
+        message: "Transkrip ini terlalu besar untuk diarsipkan. Biasanya karena gambar yang ditempel pada tata letak — perkecil atau hapus gambarnya, lalu simpan lagi.",
+      }, { status: 400 });
     }
 
     const lang = body.lang === "en" ? "en" : "id";
