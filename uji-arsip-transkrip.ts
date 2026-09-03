@@ -14,8 +14,8 @@
 //     tombol menyala yang ditolak di seberang — atau sebaliknya.
 
 import {
-  MAKS_BARIS, bersihkanBaris, bersihkanMeta, periksaSiapArsip, predikatKelulusan,
-  ringkasTranskrip, sidikTranskrip,
+  MAKS_BARIS, MAKS_TATA_LETAK, bersihkanBaris, bersihkanMeta, bersihkanTataLetak,
+  periksaSiapArsip, predikatKelulusan, ringkasTranskrip, sidikTranskrip,
 } from "./src/lib/arsip-transkrip";
 import { computeTotals, type CourseRow } from "./src/app/dashboard/template/transkrip-parse";
 
@@ -127,6 +127,32 @@ sama("isian kosong tidak disimpan", meta.kosong, undefined);
 sama("isian kepanjangan dipotong", meta.panjang?.length, 600);
 sama("bukan objek -> kosong", Object.keys(bersihkanMeta(null)).length, 0);
 
+console.log("\n=== TATA LETAK HASIL SUNTINGAN ===\n");
+
+// Inilah yang dulu hilang: yang tersimpan hanya bentuk bawaan, sedangkan
+// suntingan tata letak admin tidak pernah ikut. Sekarang HTML-nya tersimpan —
+// dan karena yang tersimpan HTML, ia harus dibersihkan lebih dulu.
+sama("bukan teks -> tidak ada tata letak", bersihkanTataLetak(null), "");
+sama("HTML kosong -> tidak ada tata letak", bersihkanTataLetak("   "), "");
+sama("hanya tag tanpa isi -> tidak ada tata letak", bersihkanTataLetak("<div>  </div>"), "");
+benar("isi transkrip dipertahankan",
+  bersihkanTataLetak('<div class="doc-title">TRANSKRIP NILAI</div>').includes("TRANSKRIP NILAI"));
+benar("gambar tanda tangan dipertahankan",
+  bersihkanTataLetak('<img src="data:image/png;base64,AAAA">').includes("data:image/png"));
+
+const disunting = bersihkanTataLetak(
+  '<div>Nilai<script>alert(1)</script><img src=x onerror="alert(2)">' +
+  '<a href="javascript:alert(3)">tautan</a><iframe src="//jahat"></div>',
+);
+benar("<script> dibuang", !/script/i.test(disunting), disunting);
+benar("onerror dibuang", !/onerror/i.test(disunting), disunting);
+benar("javascript: diblokir", !/javascript:/i.test(disunting), disunting);
+benar("<iframe> dibuang", !/iframe/i.test(disunting), disunting);
+benar("teksnya sendiri tetap ada", disunting.includes("Nilai"), disunting);
+
+const kepanjangan = bersihkanTataLetak("<div>" + "x".repeat(MAKS_TATA_LETAK * 2) + "</div>");
+benar("tata letak raksasa dipotong", kepanjangan.length <= MAKS_TATA_LETAK, `${kepanjangan.length}`);
+
 console.log("\n=== TANDA \"BELUM DISIMPAN\" ===\n");
 
 // Inilah yang membuat statusnya jujur: selama satu huruf pun berubah,
@@ -142,6 +168,18 @@ benar("biodata berubah -> tanda berubah",
   sidikTranskrip({ ...META_LENGKAP, judul: "Judul Lain" }, BARIS_LENGKAP) !== sidikAwal);
 benar("baris bertambah -> tanda berubah",
   sidikTranskrip(META_LENGKAP, [...BARIS_LENGKAP, mk("Tambahan", "A", 2)]) !== sidikAwal);
+
+// Tata letak yang baru disunting membuat transkrip di layar berbeda dari yang
+// ada di arsip, walau satu angka pun tidak berubah. Kalau tandanya tidak ikut
+// berubah, status di sebelah tombol akan berbohong: "sudah tersimpan"
+// padahal suntingannya belum pernah dikirim ke mana pun.
+benar("tata letak disunting -> tanda berubah",
+  sidikTranskrip(META_LENGKAP, BARIS_LENGKAP, "<div>hasil suntingan</div>") !== sidikAwal);
+benar("tata letak yang sama -> tanda tetap sama",
+  sidikTranskrip(META_LENGKAP, BARIS_LENGKAP, "<div>hasil suntingan</div>") ===
+    sidikTranskrip(META_LENGKAP, BARIS_LENGKAP, "<div>hasil suntingan</div>"));
+benar("tanpa tata letak sama dengan tata letak kosong",
+  sidikTranskrip(META_LENGKAP, BARIS_LENGKAP, "") === sidikAwal);
 
 console.log(`\n${lulus} periksa lulus`);
 if (gagal.length > 0) {

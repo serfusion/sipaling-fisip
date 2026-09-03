@@ -12,10 +12,21 @@ const ALLOWED_TAGS = new Set([
   "H1", "H2", "H3", "H4", "H5", "H6", "BLOCKQUOTE", "PRE", "CODE",
   "UL", "OL", "LI", "TABLE", "THEAD", "TBODY", "TFOOT", "TR", "TD", "TH",
   "A", "IMG", "FIGURE", "FIGCAPTION",
+  // FONT ikut diizinkan karena inilah yang dihasilkan tombol jenis/ukuran
+  // huruf pada toolbar (document.execCommand "fontName"/"fontSize"). Tanpa
+  // ini, setiap perubahan huruf yang dibuat admin akan hilang begitu
+  // dokumennya disimpan lalu dimuat kembali.
+  "FONT",
 ]);
 
 const ALLOWED_ATTRS = new Set([
   "class", "style", "colspan", "rowspan", "width", "height", "align", "alt", "title", "dir",
+  // Atribut milik <font> di atas.
+  "face", "size", "color",
+  // Lapisan hiasan pada pratinjau transkrip (kop, garis bantu, kotak foto)
+  // menandai dirinya sendiri sebagai bukan-isi. Tanpa ini, penanda itu ikut
+  // hilang setiap kali tata letaknya disimpan lalu dimuat kembali.
+  "aria-hidden",
 ]);
 
 // Tag yang isinya ikut dibuang seluruhnya, bukan sekadar tag-nya dilepas.
@@ -116,4 +127,28 @@ export function sanitizeLetterHtml(html: string) {
   const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
   scrub(doc.body);
   return doc.body.innerHTML;
+}
+
+/**
+ * Lapis pertama, berjalan di SERVER.
+ *
+ * DOMParser tidak ada di Node, jadi yang bisa dilakukan sebelum HTML masuk
+ * basis data hanyalah membuang tag dan atribut berbahaya secara tekstual.
+ * Pola ini sengaja tidak bergantung pada tag yang berpasangan rapi:
+ * `<script src=...>` tanpa penutup dan `<svg/onload=...>` pun ikut terbuang.
+ *
+ * Pertahanan yang menentukan tetap `sanitizeLetterHtml` di sisi tampilan,
+ * yang membangun ulang pohon DOM dengan allowlist. Dua lapis, karena satu
+ * saja berarti seluruh keamanan bergantung pada satu berkas yang benar.
+ */
+export function bersihkanHtmlServer(html: string, batas: number) {
+  return String(html || "")
+    .slice(0, batas)
+    .replace(/<\s*(script|iframe|object|embed|link|meta|form|svg|math)\b[\s\S]*?(?:<\s*\/\s*\1\s*>|>)/gi, "")
+    .replace(/<\s*\/\s*(script|iframe|object|embed|link|meta|form|svg|math)\s*>/gi, "")
+    .replace(/[\s/]on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/(javascript|vbscript|data)\s*(?::|&#58;)/gi, (match) =>
+      // data: tetap boleh khusus gambar tertanam (tanda tangan hasil scan).
+      /^data/i.test(match) ? match : "blocked:",
+    );
 }

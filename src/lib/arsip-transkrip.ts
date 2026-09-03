@@ -17,11 +17,20 @@
 // ============================================================
 
 import { AM, computeTotals, type CourseRow } from "@/app/dashboard/template/transkrip-parse";
+import { bersihkanHtmlServer } from "@/lib/sanitize-html";
 
 export type MetaTranskrip = Record<string, string>;
 
 /** Batas wajar satu transkrip. Kurikulum S-1 jauh di bawah angka ini. */
 export const MAKS_BARIS = 200;
+
+/**
+ * Batas panjang HTML tata letak hasil suntingan tangan.
+ *
+ * Satu transkrip penuh berukuran puluhan ribu huruf; angka ini memberi ruang
+ * lebih untuk gambar tanda tangan yang ditempel sebagai data:image.
+ */
+export const MAKS_TATA_LETAK = 400_000;
 
 export type RingkasArsip = {
   nim: string;
@@ -95,6 +104,24 @@ export function bersihkanMeta(masuk: unknown): MetaTranskrip {
   return bersih;
 }
 
+/**
+ * Bersihkan HTML tata letak yang datang dari peramban.
+ *
+ * Tata letak adalah hasil suntingan tangan admin di atas pratinjau: yang
+ * tersimpan memang HTML, bukan data. Karena itu ia dibersihkan seperti
+ * template surat — lapis pertama di sini (server), lapis kedua
+ * `sanitizeLetterHtml` pada saat ditampilkan kembali.
+ *
+ * Kosong berarti "tidak ada suntingan": transkrip dirender dari datanya.
+ */
+export function bersihkanTataLetak(masuk: unknown): string {
+  if (typeof masuk !== "string") return "";
+  const bersih = bersihkanHtmlServer(masuk, MAKS_TATA_LETAK).trim();
+  // HTML yang isinya hanya spasi bukan tata letak; menyimpannya hanya akan
+  // membekukan pratinjau menjadi halaman kosong.
+  return bersih.replace(/<[^>]*>/g, "").trim() === "" && !/<img\b/i.test(bersih) ? "" : bersih;
+}
+
 /** Ringkasan satu transkrip — inilah yang tampil pada daftar arsip. */
 export function ringkasTranskrip(meta: MetaTranskrip, rows: CourseRow[]): RingkasArsip {
   const total = computeTotals(rows);
@@ -145,11 +172,13 @@ export function periksaSiapArsip(meta: MetaTranskrip, rows: CourseRow[]): { siap
  * dengan yang terakhir diarsipkan. Selama berbeda, tombolnya menyala dan
  * status di sebelahnya berbunyi "belum disimpan".
  */
-export function sidikTranskrip(meta: MetaTranskrip, rows: CourseRow[]) {
+export function sidikTranskrip(meta: MetaTranskrip, rows: CourseRow[], tataLetak?: string | null) {
   const inti = rows.map((baris) => `${baris.kode}|${baris.nama}|${baris.en}|${baris.hm}|${baris.k}`).join("\n");
   const bio = Object.keys(meta)
     .sort()
     .map((kunci) => `${kunci}=${meta[kunci]}`)
     .join("\n");
-  return `${bio}\n--\n${inti}`;
+  // Tata letak ikut ditandai: transkrip yang tata letaknya baru disunting
+  // memang belum sama dengan yang tersimpan di arsip, walau angkanya sama.
+  return `${bio}\n--\n${inti}\n--\n${tataLetak || ""}`;
 }
