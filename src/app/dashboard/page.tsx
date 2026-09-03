@@ -9,7 +9,12 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>;
+}) {
   const { profile, tertahanMaintenance } = await getSessionState();
-  return <DashboardApp profile={profile} maintenanceLocked={tertahanMaintenance} />;
+  const params = await searchParams;
+  return <DashboardApp profile={profile} maintenanceLocked={tertahanMaintenance} initialView={params.view} />;
 }

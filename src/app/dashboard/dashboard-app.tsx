@@ -144,6 +144,7 @@ type AttendanceRow = {
 };
 
 import ArsipSkripsi from "./arsip-skripsi";
+import ArsipTranskrip from "./arsip-transkrip";
 
 type ViewId =
   | "ringkasan"
@@ -154,6 +155,7 @@ type ViewId =
   | "database"
   | "template"
   | "arsip"
+  | "arsip-transkrip"
   | "skripsi"
   | "absensi"
   | "pengumuman"
@@ -256,6 +258,9 @@ function downloadCsv(rows: RequestRow[], month: string, year: string) {
 }
 
 const ARCHIVE_ROLES: Role[] = ["super_admin", "admin", "admin_umum", "admin_akademik", "admin_prodi", "admin_pddikti", "admin_perpustakaan", "admin_laboratorium"];
+// Transkrip nilai adalah pekerjaan Admin Akademik; Admin dan Super Admin ikut
+// melihat arsipnya karena keduanya menutupi seluruh unit.
+const TRANSKRIP_ROLES: Role[] = ["super_admin", "admin", "admin_akademik"];
 const ATTENDANCE_ROLES: Role[] = ["super_admin", "admin", "admin_perpustakaan"];
 const UMUM_DRIVE_URL = process.env.NEXT_PUBLIC_UMUM_TEMPLATE_DRIVE_URL || "";
 
@@ -290,6 +295,7 @@ const MENU: MenuItem[] = [
   { id: "database", icon: "🗄", label: "Database Dokumen", roles: DATABASE_ROLES, grup: "dokumen" },
   { id: "template", icon: "▤", label: "Template Dokumen", roles: ARCHIVE_ROLES, grup: "dokumen" },
   { id: "arsip", icon: "⬢", label: "Arsip Drive", roles: ARCHIVE_ROLES, grup: "dokumen" },
+  { id: "arsip-transkrip", icon: "🎓", label: "Arsip Transkrip Nilai", roles: TRANSKRIP_ROLES, grup: "dokumen" },
   { id: "skripsi", icon: "⇩", label: "Arsip Skripsi", roles: ["super_admin", "admin", "admin_perpustakaan"], grup: "dokumen" },
   { id: "absensi", icon: "◔", label: "Absensi Perpustakaan", roles: ATTENDANCE_ROLES, grup: "dokumen" },
   { id: "pengumuman", icon: "✎", label: "Pengumuman & Status", roles: ["super_admin", "admin"] },
@@ -335,6 +341,7 @@ const VIEW_TITLES: Record<ViewId, string> = {
   database: "Database Dokumen",
   template: "Template Dokumen",
   arsip: "Arsip Drive",
+  "arsip-transkrip": "Arsip Transkrip Nilai",
   skripsi: "Arsip Skripsi",
   absensi: "Absensi Perpustakaan",
   pengumuman: "Pengumuman & Status",
@@ -363,14 +370,24 @@ function pillClass(status: string) {
 export default function DashboardApp({
   profile,
   maintenanceLocked = false,
+  initialView,
 }: {
   profile: SessionProfile | null;
   /** Akunnya sah, tetapi portal sedang ditutup dan perannya bukan Super Admin. */
   maintenanceLocked?: boolean;
+  /** Menu yang diminta lewat alamat (?view=…), mis. tautan dari halaman lain. */
+  initialView?: string;
 }) {
   useAutoLogout(Boolean(profile));
   const meta = profile ? ROLE_META[profile.role] : ROLE_META.admin;
-  const [view, setView] = useState<ViewId>("ringkasan");
+  // Alamat boleh menunjuk satu menu langsung, tetapi hanya menu yang memang
+  // boleh dilihat peran ini — alamat tidak pernah menjadi jalan pintas hak.
+  const [view, setView] = useState<ViewId>(() => {
+    if (!profile || !initialView) return "ringkasan";
+    const diminta = MENU.find((item) => item.id === initialView);
+    if (!diminta) return "ringkasan";
+    return diminta.roles === "all" || diminta.roles.includes(profile.role) ? diminta.id : "ringkasan";
+  });
   const [sideOpen, setSideOpen] = useState(false);
   // Menu profil di pojok kanan atas: tempat "Akun" dan "Keluar" sekarang.
   const [meBuka, setMeBuka] = useState(false);
@@ -1261,6 +1278,9 @@ export default function DashboardApp({
                       <button type="button" onClick={() => openView("arsip")}><span className="qi">⬢</span><span><b>Arsip Drive</b><small>Catat link hasil cetak — file tetap di Drive</small></span></button>
                     </>
                   )}
+                  {TRANSKRIP_ROLES.includes(profile.role) && (
+                    <button type="button" onClick={() => openView("arsip-transkrip")}><span className="qi">🎓</span><span><b>Arsip Transkrip Nilai</b><small>Siapa saja yang transkripnya sudah dibuat — buka lagi untuk cetak ulang</small></span></button>
+                  )}
                   {["super_admin", "admin"].includes(profile.role) && (
                     <button type="button" onClick={() => openView("pengumuman")}><span className="qi">✎</span><span><b>Perbarui pengumuman & status layanan</b><small>Tampil di halaman utama mahasiswa</small></span></button>
                   )}
@@ -1424,6 +1444,10 @@ export default function DashboardApp({
                 </table>
               </div>
             </section>
+          )}
+
+          {view === "arsip-transkrip" && TRANSKRIP_ROLES.includes(profile.role) && (
+            <ArsipTranskrip bolehHapus={TRANSKRIP_ROLES.includes(profile.role)} />
           )}
 
           {view === "skripsi" && ["super_admin", "admin", "admin_perpustakaan"].includes(profile.role) && (

@@ -4212,3 +4212,72 @@ a.al-mini:hover { color: var(--al-ink); }
   text-decoration: none; }
 .uang-kunci-balik { color: #93a8cf; font-size: 11.5px; font-weight: 700; text-decoration: none; }
 .uang-kunci-lain:hover, .uang-kunci-balik:hover { color: #fff; }
+
+/* ============================================================
+   v22 — ARSIP TRANSKRIP NILAI
+
+   Dua tempat: kotak penyimpanan di bawah editor transkrip (Template →
+   Transkrip), dan panel daftarnya di Dashboard.
+
+   Tombolnya sengaja paling terang di halaman itu. Semua tombol lain pada
+   kolom editor berwarna abu atau biru muda; yang ini hijau menyala dan
+   selebar kolomnya, karena inilah satu-satunya tindakan yang membuat
+   transkrip yang sudah jadi tidak hilang begitu tab ditutup.
+   ============================================================ */
+.tk-arsip { margin-top: 18px; padding: 14px; border-radius: 14px;
+  border: 1px solid #bbf7d0; background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 62%);
+  display: flex; flex-direction: column; gap: 10px; }
+.tk-arsip-head { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.tk-arsip-head > div { flex: 1 1 220px; min-width: 0; }
+.tk-arsip-head strong { display: block; color: #14532d; font-size: 12.5px; }
+.tk-arsip-head p { margin: 3px 0 0; color: #3f6152; font-size: 10.5px; line-height: 1.55; }
+.tk-arsip-head p b { color: #14532d; }
+.tk-arsip-status { flex: 0 0 auto; padding: 4px 9px; border-radius: 999px;
+  font-size: 10px; font-weight: 800; letter-spacing: .01em; }
+.tk-arsip-status.sudah { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+.tk-arsip-status.belum { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+
+.btn-arsip { width: 100%; min-height: 46px; border-radius: 12px; border: 0; cursor: pointer;
+  font-size: 13.5px; font-weight: 800; letter-spacing: .01em; color: #05300f;
+  background: linear-gradient(135deg, #86efac 0%, #22c55e 48%, #16a34a 100%);
+  box-shadow: 0 10px 22px -12px rgba(22, 163, 74, .95), inset 0 1px 0 rgba(255, 255, 255, .5);
+  transition: transform .12s ease, box-shadow .12s ease, filter .12s ease; }
+.btn-arsip:hover:not(:disabled) { filter: brightness(1.06); transform: translateY(-1px);
+  box-shadow: 0 14px 26px -12px rgba(22, 163, 74, 1), inset 0 1px 0 rgba(255, 255, 255, .55); }
+.btn-arsip:active:not(:disabled) { transform: translateY(0); }
+/* Belum lengkap = tombolnya redup, dan alasannya tertulis tepat di bawahnya. */
+.btn-arsip:disabled { cursor: not-allowed; color: #64748b; background: #e2e8f0; box-shadow: none; }
+
+.tk-arsip-alasan { margin: 0; color: #92400e; font-size: 10.5px; line-height: 1.55; }
+.tk-arsip-alasan.siap { color: #3f6152; }
+.tk-arsip-alasan b { color: #14532d; }
+
+.tk-arsip-list { border-top: 1px dashed #bbf7d0; padding-top: 9px; display: flex;
+  flex-direction: column; gap: 7px; }
+.tk-arsip-list-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tk-arsip-cari { border: 1px solid #cbd5e1; border-radius: 8px; height: 32px; padding: 0 9px;
+  font-size: 11.5px; outline: none; background: #fff; font-family: inherit; }
+.tk-arsip-cari:focus { border-color: #22c55e; box-shadow: 0 0 0 3px rgba(34, 197, 94, .14); }
+.tk-arsip-daftar { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column;
+  gap: 6px; max-height: 260px; overflow-y: auto; }
+.tk-arsip-daftar li { display: flex; align-items: center; gap: 9px; padding: 7px 10px;
+  border: 1px solid #e2e8f0; border-radius: 9px; background: #fff; }
+.tk-arsip-siapa { min-width: 0; flex: 1 1 auto; }
+.tk-arsip-siapa b { display: block; color: #16324f; font-size: 11.5px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.tk-arsip-siapa span { display: block; margin-top: 1px; color: #64748b; font-size: 10px; }
+.tk-arsip-siapa small { display: block; margin-top: 1px; color: #94a3b8; font-size: 9.5px; }
+.tk-arsip-kosong { margin: 0; padding: 12px; text-align: center; color: #64748b; font-size: 11px;
+  background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 9px; list-style: none; }
+.tk-arsip-tautan { color: #166534; font-size: 11px; font-weight: 800; text-decoration: none; }
+.tk-arsip-tautan:hover { text-decoration: underline; }
+
+/* --- panel daftar di Dashboard --- */
+.arsip-tk { display: flex; flex-direction: column; gap: 12px; }
+.arsip-tk-atas { display: flex; flex-direction: column; gap: 10px; }
+.arsip-tk-alat { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.arsip-tk-alat input { flex: 1 1 220px; min-width: 0; border: 1px solid #cbd5e1; border-radius: 9px;
+  height: 36px; padding: 0 11px; font-size: 12px; outline: none; background: #fff; font-family: inherit; }
+.arsip-tk-alat input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(21, 101, 216, .12); }
+.arsip-tk-aksi { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.arsip-tk-hapus { color: #b91c1c; }
