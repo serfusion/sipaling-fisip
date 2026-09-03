@@ -80,9 +80,10 @@ export default function ArsipTranskrip({ bolehHapus }: { bolehHapus: boolean }) 
   }, [daftar, cari]);
 
   const angka = useMemo(() => {
-    const sks = daftar.reduce((jumlah, baris) => jumlah + baris.totalSks, 0);
-    const pujian = daftar.filter((baris) => baris.predikat === "Dengan Pujian").length;
-    return { mahasiswa: daftar.length, sks, pujian };
+    const prodi = (baris: BarisArsip) => (baris.studyProgram || "").trim().toLowerCase();
+    const komunikasi = daftar.filter((baris) => prodi(baris) === "ilmu komunikasi").length;
+    const pemerintahan = daftar.filter((baris) => prodi(baris) === "ilmu pemerintahan").length;
+    return { mahasiswa: daftar.length, komunikasi, pemerintahan };
   }, [daftar]);
 
   async function hapus(id: number) {
@@ -118,15 +119,14 @@ export default function ArsipTranskrip({ bolehHapus }: { bolehHapus: boolean }) 
         <p className="arsip-jelas">
           Daftar mahasiswa yang transkripnya sudah selesai dibuat dan <b>disimpan</b> lewat tombol{" "}
           <b>&ldquo;Save di Arsip Transkrip&rdquo;</b> di halaman Template → Transkrip. Transkrip yang belum disimpan
-          tidak tercatat di sini. Klik <b>Buka</b> untuk memuat kembali biodata dan seluruh nilainya — siap dicetak
-          ulang atau diperbaiki tanpa mengunggah Excel lagi.
+          tidak tercatat di sini. Klik <b>Buka</b> untuk memuat kembali biodata dan seluruh nilainya.
         </p>
 
         <div className="arsip-tk-atas">
           <div className="arsip-angka">
             <div><b>{angka.mahasiswa}</b><span>transkrip tersimpan</span></div>
-            <div><b>{angka.sks}</b><span>total SKS terarsip</span></div>
-            <div><b>{angka.pujian}</b><span>predikat pujian</span></div>
+            <div><b>{angka.komunikasi}</b><span>Ilmu Komunikasi</span></div>
+            <div><b>{angka.pemerintahan}</b><span>Ilmu Pemerintahan</span></div>
           </div>
           <div className="arsip-tk-alat">
             <input
