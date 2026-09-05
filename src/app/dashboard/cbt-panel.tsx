@@ -30,6 +30,7 @@ import {
   type PesertaCetak, type UjianCetak,
 } from "@/lib/cetak-cbt";
 import { buatDocxTemplate, buatXlsxTemplate } from "@/lib/template-soal";
+import { KREDIT_CBT } from "../cbt/kredit";
 
 type Ujian = {
   id: number; code: string; title: string; courseName: string; className: string | null;
@@ -136,6 +137,145 @@ function bentukJenis(jenis: JenisSoal) {
   return { pilihan: [] as string[], kunci: "", pasangan: [] as Pasangan[] };
 }
 
+/**
+ * SETELAN UJIAN, beserta keterangannya masing-masing.
+ *
+ * Satu daftar, dipakai dua kali: pada formulir "Buat ujian" dan pada panel
+ * "Pengaturan ujian" yang dibuka sesudah ujiannya jadi. Dulu daftarnya hanya
+ * ada di formulir pembuatan — artinya satu-satunya kesempatan menyetelnya
+ * adalah sebelum ujiannya pernah dipakai sama sekali.
+ *
+ * Tiap baris membawa KETERANGANNYA sendiri. "Satu perangkat hanya untuk satu
+ * peserta" terbaca jelas oleh yang membuatnya, tetapi tidak menjelaskan apa
+ * yang terjadi pada mahasiswa yang ponselnya sudah dipakai temannya — dan
+ * itulah yang perlu diketahui pengawas pada menit-menit ujian berjalan.
+ *
+ * `bentuk` menandai setelan yang MENGUBAH BENTUK ujian. Hanya keempat itu yang
+ * terkunci selagi ujian berlangsung; aturan yang sama dijaga server pada
+ * /api/cbt/ujian.
+ */
+type KunciSetelan = "randomQuestions" | "randomOptions" | "allowBack" | "showScore" | "singleDevice";
+
+const SETELAN: Array<{ kunci: KunciSetelan; label: string; jelas: string; bentuk: boolean }> = [
+  {
+    kunci: "randomQuestions",
+    label: "Acak urutan soal",
+    jelas: "Tiap peserta menerima urutan soal yang berbeda.",
+    bentuk: true,
+  },
+  {
+    kunci: "randomOptions",
+    label: "Acak urutan pilihan jawaban",
+    jelas: "Huruf A sampai D tidak sama antarpeserta, jadi menyalin jawaban sebelah tidak berguna.",
+    bentuk: true,
+  },
+  {
+    kunci: "allowBack",
+    label: "Boleh kembali ke soal sebelumnya",
+    jelas: "Bila centangnya dilepas, soal yang sudah dilewati tidak dapat dibuka lagi.",
+    bentuk: false,
+  },
+  {
+    kunci: "showScore",
+    label: "Tampilkan nilai setelah selesai",
+    jelas: "Nilai langsung terlihat peserta begitu jawabannya dikumpulkan.",
+    bentuk: false,
+  },
+  {
+    kunci: "singleDevice",
+    label: "Satu perangkat untuk satu peserta",
+    jelas: "Mencegah satu ponsel dipakai bergantian. Lepas centangnya bila ada peserta yang terlanjur terblokir.",
+    bentuk: false,
+  },
+];
+
+/** Kabar yang menempel pada satu tombol. */
+type Kabar = { keadaan: "jalan" | "oke" | "gagal"; teks: string };
+
+/**
+ * Tombol yang mengatakan sendiri apa yang sedang terjadi padanya.
+ *
+ * Sebelumnya seluruh tombol panel ini hanya berubah menjadi abu-abu saat
+ * ditekan, dan kabar hasilnya muncul sebagai pita tipis di puncak panel —
+ * sering jauh di luar layar. Yang menekan tombol menatap tombolnya, jadi di
+ * situlah kabarnya ditulis: "Menghapus…" lalu "✓ Terhapus", di tempat yang
+ * sama, dengan warna yang ikut berganti.
+ */
+function Tbl({
+  kabar, diam, dasar = "btn btn-primary", mati = false, judul, onClick,
+}: {
+  kabar?: Kabar;
+  diam: string;
+  dasar?: string;
+  mati?: boolean;
+  judul?: string;
+  onClick: () => void;
+}) {
+  const rasa =
+    kabar?.keadaan === "oke" ? " btn-oke" : kabar?.keadaan === "gagal" ? " btn-gagal" : "";
+  return (
+    <button
+      type="button"
+      className={`${dasar}${rasa} cbt-tbl`}
+      disabled={mati || kabar?.keadaan === "jalan"}
+      title={judul}
+      onClick={onClick}
+    >
+      <span aria-live="polite">{kabar ? kabar.teks : diam}</span>
+    </button>
+  );
+}
+
+/** Deretan centang setelan, sejajar dan masing-masing membawa keterangannya. */
+function DaftarSetelan({
+  nilai, kunciBentuk = false, ubah,
+}: {
+  nilai: Record<KunciSetelan, boolean>;
+  /** Ujian sedang berlangsung: yang mengubah bentuknya dikunci, sisanya tidak. */
+  kunciBentuk?: boolean;
+  ubah: (kunci: KunciSetelan, nyala: boolean) => void;
+}) {
+  return (
+    <div className="cbt-sakelar">
+      {SETELAN.map((s) => {
+        const mati = kunciBentuk && s.bentuk;
+        return (
+          <label key={s.kunci} className={`cbt-cek${mati ? " mati" : ""}`}>
+            <input
+              type="checkbox"
+              checked={nilai[s.kunci]}
+              disabled={mati}
+              onChange={(e) => ubah(s.kunci, e.target.checked)}
+            />
+            <span>{s.label}</span>
+            <small>{mati ? `${s.jelas} Terkunci sampai ujian selesai.` : s.jelas}</small>
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Salin setelan satu ujian ke bentuk yang dipakai formulir pengaturan. */
+function setelanUjian(u: Ujian) {
+  return {
+    title: u.title,
+    courseName: u.courseName,
+    className: u.className ?? "",
+    instruction: u.instruction ?? "",
+    token: u.token ?? "",
+    questionCount: u.questionCount,
+    durationMinutes: u.durationMinutes,
+    passingGrade: u.passingGrade,
+    maxAttempts: u.maxAttempts,
+    randomQuestions: u.randomQuestions,
+    randomOptions: u.randomOptions,
+    allowBack: u.allowBack,
+    showScore: u.showScore,
+    singleDevice: u.singleDevice,
+  };
+}
+
 /** Ubah tanggal ISO menjadi nilai untuk <input type="datetime-local">. */
 function untukInput(iso: string | null) {
   if (!iso) return "";
@@ -200,7 +340,17 @@ export default function CbtPanel({ role }: { role: string }) {
   const [tersalin, setTersalin] = useState("");
 
   const [jadwal, setJadwal] = useState({ mulai: "", selesai: "" });
-  const [sibuk, setSibuk] = useState(false);
+
+  // Pengaturan ujian yang sedang dibuka. Terlipat sampai diminta, tetapi
+  // isinya selalu disiapkan begitu ujiannya dibuka: yang membukanya karena
+  // keadaan mendesak tidak boleh menunggu satu perjalanan ke server lagi.
+  const [setel, setSetel] = useState({
+    title: "", courseName: "", className: "", instruction: "", token: "",
+    questionCount: 0, durationMinutes: 60, passingGrade: 60, maxAttempts: 1,
+    randomQuestions: true, randomOptions: true, allowBack: true, showScore: true,
+    singleDevice: true,
+  });
+  const [bukaSetel, setBukaSetel] = useState(false);
 
   /**
    * Dua bagian panjang yang dilipat sampai diminta.
@@ -213,20 +363,54 @@ export default function CbtPanel({ role }: { role: string }) {
   const [bukaMedia, setBukaMedia] = useState(false);
 
   /**
-   * Kabar untuk tombol "Tambah ke bank soal".
+   * KABAR PADA TOMBOLNYA SENDIRI, satu per tombol.
    *
-   * "berhasil" membuat tombolnya sendiri berkata "Berhasil ditambahkan" selama
-   * beberapa detik. Kabar keberhasilan yang muncul di pita hijau jauh di atas
-   * formulir tidak pernah terbaca oleh mata yang sedang menatap tombolnya.
+   * Dulu panel ini hanya punya dua tempat berkabar: pita hijau dan pita merah
+   * di puncak halaman. Panelnya panjang — tombol "Hapus soal" yang ditekan di
+   * dasar bank soal membuat pita itu muncul jauh di luar layar, jadi yang
+   * terlihat hanyalah tombol yang berubah abu-abu sebentar. Orang lalu
+   * menekannya dua kali karena mengira tekanan pertamanya tidak masuk.
    *
-   * "tolak" berisi daftar yang kurang atau salah, dan ia muncul sebagai jendela
-   * yang harus ditutup. Sengaja menghalangi: soal yang ditolak diam-diam adalah
-   * soal yang dikira sudah masuk sampai pagi hari ujian.
+   * Sekarang tiap tombol membawa kabarnya sendiri, dikunci pada namanya:
+   * "Menghapus…" saat berjalan, "✓ Terhapus" saat berhasil, "✕ Gagal" saat
+   * tidak. Pita di puncak panel tetap ada untuk keterangan panjangnya.
+   *
+   * `tolakSoal` berisi daftar yang kurang atau salah, dan ia muncul sebagai
+   * jendela yang harus ditutup. Sengaja menghalangi: soal yang ditolak
+   * diam-diam adalah soal yang dikira sudah masuk sampai pagi hari ujian.
    */
-  const [soalOke, setSoalOke] = useState(false);
+  const [aksi, setAksi] = useState<Record<string, Kabar>>({});
   const [tolakSoal, setTolakSoal] = useState<{ judul: string; rincian: string[] } | null>(null);
-  const waktuOke = useRef<number | null>(null);
-  useEffect(() => () => { if (waktuOke.current) window.clearTimeout(waktuOke.current); }, []);
+  const jamAksi = useRef<Record<string, number>>({});
+  useEffect(() => {
+    const jam = jamAksi.current;
+    return () => { Object.values(jam).forEach((t) => window.clearTimeout(t)); };
+  }, []);
+
+  /**
+   * Pasang kabar pada satu tombol, dan padamkan sendiri sesudah `redup` milidetik.
+   *
+   * Penghitung waktunya disimpan per tombol supaya dua tombol yang ditekan
+   * beruntun tidak saling memadamkan kabar masing-masing.
+   */
+  function kabari(kunci: string, keadaan: Kabar["keadaan"], teks: string, redup = 0) {
+    setAksi((kini) => ({ ...kini, [kunci]: { keadaan, teks } }));
+    if (jamAksi.current[kunci]) window.clearTimeout(jamAksi.current[kunci]);
+    delete jamAksi.current[kunci];
+    if (redup > 0) {
+      jamAksi.current[kunci] = window.setTimeout(() => {
+        delete jamAksi.current[kunci];
+        setAksi((kini) => {
+          const salin = { ...kini };
+          delete salin[kunci];
+          return salin;
+        });
+      }, redup);
+    }
+  }
+
+  /** Sedang berjalan? Dipakai tombol yang bukan <Tbl>, mis. label unggah berkas. */
+  const berjalan = (kunci: string) => aksi[kunci]?.keadaan === "jalan";
 
   // Escape menutup jendela penolakan. Jendela yang menghalangi tetapi hanya
   // dapat ditutup dengan tetikus adalah jebakan bagi yang mengetik cepat.
@@ -251,15 +435,21 @@ export default function CbtPanel({ role }: { role: string }) {
     arahan: "",
   });
 
+  // Daftarnya ikut DIKEMBALIKAN, bukan hanya disimpan ke state: yang baru
+  // menyimpan pengaturan perlu membaca nilai yang benar-benar tersimpan
+  // (server membulatkan dan memotongnya) tanpa menunggu gambar berikutnya.
   const muatUjian = useCallback(async () => {
     try {
       const jawab = await fetch("/api/cbt/ujian", { cache: "no-store" });
       const data = await jawab.json();
       if (!jawab.ok || !data.success) throw new Error(data.message || "Daftar ujian tidak terbaca.");
-      setUjian(data.ujian || []);
+      const daftar = (data.ujian || []) as Ujian[];
+      setUjian(daftar);
       setGalat("");
+      return daftar;
     } catch (alasan: unknown) {
       setGalat(alasan instanceof Error ? alasan.message : "Daftar ujian tidak terbaca.");
+      return null;
     } finally {
       setMuat(false);
     }
@@ -331,12 +521,29 @@ export default function CbtPanel({ role }: { role: string }) {
     setRincian([]);
     setSoalBaru({ ...SOAL_KOSONG });
     setJadwal({ mulai: untukInput(u.startAt), selesai: untukInput(u.endAt) });
+    setSetel(setelanUjian(u));
+    setBukaSetel(false);
+    setAksi({});
     void muatSoal(u.id);
     void muatHasil(u.id);
   }
 
-  async function kirim(alamat: string, cara: string, isi: unknown, sukses: string) {
-    setSibuk(true);
+  /**
+   * Satu perjalanan ke server, dengan kabarnya menempel pada tombol pemanggil.
+   *
+   * `kunci` adalah nama tombolnya; `label.jalan` yang tertulis selama menunggu
+   * dan `label.oke` sesudah berhasil — keduanya menyebut apa yang terjadi,
+   * bukan sekadar warna yang berganti. `label.pesan` yang panjang, untuk pita
+   * hijau di puncak panel: satu tombol tidak muat memuat kalimat penuh.
+   */
+  async function kirim(
+    kunci: string,
+    alamat: string,
+    cara: string,
+    isi: unknown,
+    label: { jalan: string; oke: string; pesan?: string },
+  ) {
+    kabari(kunci, "jalan", label.jalan);
     setPesan("");
     setGalat("");
     try {
@@ -347,26 +554,68 @@ export default function CbtPanel({ role }: { role: string }) {
       });
       const data = await jawab.json();
       if (!jawab.ok || !data.success) throw new Error(data.message || "Belum tersimpan.");
-      setPesan(sukses);
+      kabari(kunci, "oke", `✓ ${label.oke}`, 3400);
+      setPesan(label.pesan ?? label.oke);
       return data as Record<string, unknown>;
     } catch (alasan: unknown) {
-      setGalat(alasan instanceof Error ? alasan.message : "Belum tersimpan.");
+      const sebab = alasan instanceof Error ? alasan.message : "Belum tersimpan.";
+      // Sebab lengkapnya tetap di pita merah — tombolnya terlalu sempit untuk
+      // satu kalimat — tetapi tombolnya sendiri yang mengatakan ada yang gagal.
+      kabari(kunci, "gagal", "✕ Gagal, lihat keterangannya", 6000);
+      setGalat(sebab);
       return null;
-    } finally {
-      setSibuk(false);
     }
   }
 
   async function buatUjian() {
     if (!draf.title.trim() || !draf.courseName.trim()) {
       setGalat("Nama ujian dan mata kuliah wajib diisi.");
+      kabari("buat", "gagal", "✕ Nama ujian dan mata kuliah wajib diisi", 5000);
       return;
     }
-    const hasil = await kirim("/api/cbt/ujian", "POST", draf, "Ujian dibuat. Sekarang isi soalnya.");
+    const hasil = await kirim("buat", "/api/cbt/ujian", "POST", draf, {
+      jalan: "Membuat ujian…",
+      oke: "Ujian dibuat",
+      pesan: "Ujian dibuat. Sekarang isi soalnya.",
+    });
     if (!hasil) return;
     setBuatBaru(false);
     setDraf({ ...draf, title: "", className: "", instruction: "", token: "" });
     await muatUjian();
+  }
+
+  /**
+   * Simpan pengaturan ujian yang sedang dibuka.
+   *
+   * Inilah yang selama ini tidak ada: setelan hanya dapat ditentukan pada saat
+   * ujian dibuat, dan sesudah itu tidak ada satu pun layar yang memanggil
+   * PATCH /api/cbt/ujian. Pengawas yang perlu melepas centang "satu perangkat"
+   * di tengah ujian — karena satu mahasiswa terlanjur terblokir oleh ponsel
+   * temannya — tidak punya jalan sama sekali.
+   */
+  async function simpanSetelan() {
+    if (!terbuka) return;
+    if (!setel.title.trim() || !setel.courseName.trim()) {
+      setGalat("Nama ujian dan mata kuliah wajib diisi.");
+      kabari("setel", "gagal", "✕ Nama ujian dan mata kuliah wajib diisi", 5000);
+      return;
+    }
+    if (setelanBerubah.length === 0) {
+      kabari("setel", "oke", "✓ Tidak ada yang perlu disimpan", 2600);
+      return;
+    }
+    const hasil = await kirim("setel", "/api/cbt/ujian", "PATCH", { id: terbuka.id, ...setel }, {
+      jalan: "Menyimpan pengaturan…",
+      oke: "Pengaturan tersimpan",
+      pesan: "Pengaturan ujian tersimpan.",
+    });
+    if (!hasil) return;
+    // Diambil ulang dari server, bukan dianggap sama dengan yang dikirim:
+    // angka di luar batas dibulatkan di sana, dan formulirnya harus
+    // memperlihatkan yang benar-benar berlaku.
+    const daftar = await muatUjian();
+    const baru = daftar?.find((u) => u.id === terbuka.id);
+    if (baru) setSetel(setelanUjian(baru));
   }
 
   /**
@@ -435,7 +684,7 @@ export default function CbtPanel({ role }: { role: string }) {
   /** Unggah satu berkas media untuk soal yang sedang disusun. */
   async function unggahMedia(berkas: File) {
     if (!terbuka) return;
-    setSibuk(true);
+    kabari("media", "jalan", "Mengunggah…");
     setGalat("");
     try {
       const badan = new FormData();
@@ -449,10 +698,10 @@ export default function CbtPanel({ role }: { role: string }) {
         media: { jenis: data.jenis, url: data.url, keterangan: kini.media.keterangan },
       }));
       setPesan("Media terunggah.");
+      kabari("media", "oke", "✓ Media terunggah", 3400);
     } catch (alasan: unknown) {
       setGalat(alasan instanceof Error ? alasan.message : "Media belum dapat diunggah.");
-    } finally {
-      setSibuk(false);
+      kabari("media", "gagal", "✕ Gagal mengunggah", 6000);
     }
   }
 
@@ -487,11 +736,14 @@ export default function CbtPanel({ role }: { role: string }) {
     }
 
     if (target) {
-      const hasil = await kirim("/api/cbt/soal", "PATCH", { id: target, ...isi }, "Soal diperbarui.");
+      const hasil = await kirim("soal", "/api/cbt/soal", "PATCH", { id: target, ...isi }, {
+        jalan: "Menyimpan perubahan…",
+        oke: "Perubahan disimpan",
+        pesan: "Perubahan soal tersimpan.",
+      });
       if (!hasil) return;
       setSoalBaru({ ...SOAL_KOSONG });
       setSunting(null);
-      tandaiBerhasil();
       await muatSoal(terbuka.id);
       return;
     }
@@ -503,7 +755,7 @@ export default function CbtPanel({ role }: { role: string }) {
     setSoalBaru({ ...SOAL_KOSONG });
     setGalat("");
     setPesan("Soal ditambahkan.");
-    tandaiBerhasil();
+    kabari("soal", "oke", "✓ Berhasil ditambahkan", 2600);
 
     try {
       const jawab = await fetch("/api/cbt/soal", {
@@ -524,7 +776,7 @@ export default function CbtPanel({ role }: { role: string }) {
       // dikembalikan ke formulir, dan alasannya dikatakan di jendela yang
       // harus ditutup: kegagalan yang lewat begitu saja meninggalkan dosen
       // dengan bank soal yang ia kira sudah lengkap.
-      setSoalOke(false);
+      kabari("soal", "gagal", "✕ Gagal disimpan", 6000);
       setSoal((kini) => kini.filter((x) => x.id !== idSementara));
       setSoalBaru(isi);
       setPesan("");
@@ -538,35 +790,29 @@ export default function CbtPanel({ role }: { role: string }) {
     }
   }
 
-  /**
-   * Nyalakan tanda "Berhasil ditambahkan" pada tombolnya, lalu padamkan sendiri.
-   *
-   * Penghitung waktunya disimpan pada ref supaya dua penyimpanan yang beruntun
-   * tidak saling memadamkan: yang kedua mematikan penghitung yang pertama
-   * sebelum memasang penghitungnya sendiri.
-   */
-  function tandaiBerhasil() {
-    setSoalOke(true);
-    if (waktuOke.current) window.clearTimeout(waktuOke.current);
-    waktuOke.current = window.setTimeout(() => setSoalOke(false), 2600);
-  }
-
   async function hapusSoal(id: number) {
     if (!terbuka || !window.confirm("Hapus soal ini?")) return;
+    const kunci = `soal-${id}`;
     // Soal yang masih dalam perjalanan ke server belum punya id sungguhan.
-    if (id < 0) { setGalat("Soal ini masih dalam proses penyimpanan. Tunggu sebentar."); return; }
-    setSibuk(true);
+    if (id < 0) {
+      setGalat("Soal ini masih dalam proses penyimpanan. Tunggu sebentar.");
+      kabari(kunci, "gagal", "Masih disimpan", 4000);
+      return;
+    }
+    kabari(kunci, "jalan", "Menghapus…");
     try {
       const jawab = await fetch(`/api/cbt/soal?id=${id}`, { method: "DELETE" });
       const data = await jawab.json();
       if (!jawab.ok || !data.success) throw new Error(data.message || "Soal belum dapat dihapus.");
+      setPesan("Soal dihapus.");
+      // Kabar "✓ Terhapus" tidak sempat terbaca — barisnya ikut hilang bersama
+      // pemuatan ulang — jadi yang dipakai pita hijau di puncak panel.
+      kabari(kunci, "oke", "✓ Terhapus", 2000);
       await muatSoal(terbuka.id);
       await muatUjian();
-      setPesan("Soal dihapus.");
     } catch (alasan: unknown) {
       setGalat(alasan instanceof Error ? alasan.message : "Soal belum dapat dihapus.");
-    } finally {
-      setSibuk(false);
+      kabari(kunci, "gagal", "✕ Gagal", 6000);
     }
   }
 
@@ -574,9 +820,12 @@ export default function CbtPanel({ role }: { role: string }) {
     if (!terbuka) return;
     if (!jadwal.mulai || !jadwal.selesai) {
       setGalat("Jam mulai dan jam selesai wajib diisi.");
+      kabari("aktif", "gagal", "✕ Jam mulai dan selesai wajib diisi", 5000);
       return;
     }
+    const perbarui = Boolean(terbuka.activatedAt);
     const hasil = await kirim(
+      "aktif",
       "/api/cbt/aktivasi",
       "POST",
       {
@@ -585,7 +834,13 @@ export default function CbtPanel({ role }: { role: string }) {
         mulai: new Date(jadwal.mulai).toISOString(),
         selesai: new Date(jadwal.selesai).toISOString(),
       },
-      "Ujian diaktifkan. Ia akan terbuka sendiri pada jam mulainya.",
+      perbarui
+        ? { jalan: "Memperbarui jadwal…", oke: "Jadwal diperbarui" }
+        : {
+            jalan: "Mengaktifkan ujian…",
+            oke: "Ujian diaktifkan",
+            pesan: "Ujian diaktifkan. Ia akan terbuka sendiri pada jam mulainya.",
+          },
     );
     if (hasil) await muatUjian();
   }
@@ -593,10 +848,11 @@ export default function CbtPanel({ role }: { role: string }) {
   async function batalkanAktivasi() {
     if (!terbuka || !window.confirm("Batalkan aktivasi ujian ini?")) return;
     const hasil = await kirim(
+      "batal-aktif",
       "/api/cbt/aktivasi",
       "POST",
       { id: terbuka.id, aksi: "batalkan" },
-      "Aktivasi dibatalkan.",
+      { jalan: "Membatalkan…", oke: "Dibatalkan", pesan: "Aktivasi dibatalkan." },
     );
     if (hasil) await muatUjian();
   }
@@ -608,18 +864,18 @@ export default function CbtPanel({ role }: { role: string }) {
         "Tindakan ini tidak dapat dibatalkan.",
     );
     if (!setuju) return;
-    setSibuk(true);
+    kabari("hapus-ujian", "jalan", "Menghapus ujian…");
     try {
       const jawab = await fetch(`/api/cbt/ujian?id=${terbuka.id}`, { method: "DELETE" });
       const data = await jawab.json();
       if (!jawab.ok || !data.success) throw new Error(data.message || "Ujian belum dapat dihapus.");
       setBuka(null);
       setPesan("Ujian dihapus.");
+      kabari("hapus-ujian", "oke", "✓ Terhapus", 2000);
       await muatUjian();
     } catch (alasan: unknown) {
       setGalat(alasan instanceof Error ? alasan.message : "Ujian belum dapat dihapus.");
-    } finally {
-      setSibuk(false);
+      kabari("hapus-ujian", "gagal", "✕ Gagal menghapus", 6000);
     }
   }
 
@@ -635,6 +891,7 @@ export default function CbtPanel({ role }: { role: string }) {
    */
   async function bukaLembar(p: Peserta) {
     if (!terbuka) return;
+    kabari(`lembar-${p.id}`, "jalan", "Membuka…");
     setBukaPeserta(p);
     setRincian([]);
     setDraftKoreksi({});
@@ -653,8 +910,10 @@ export default function CbtPanel({ role }: { role: string }) {
           isi.filter((r) => r.jenis === "essay").map((r) => [r.id, { poin: String(r.poin ?? 0), catatan: r.catatan || "" }]),
         ),
       );
+      kabari(`lembar-${p.id}`, "oke", "✓ Terbuka di bawah", 2600);
     } catch (alasan: unknown) {
       setGalat(alasan instanceof Error ? alasan.message : "Lembar jawaban tidak terbaca.");
+      kabari(`lembar-${p.id}`, "gagal", "✕ Gagal dibuka", 6000);
       setBukaPeserta(null);
     } finally {
       setMuatRincian(false);
@@ -665,15 +924,18 @@ export default function CbtPanel({ role }: { role: string }) {
     if (!terbuka || !bukaPeserta) return;
     const draf = draftKoreksi[questionId];
     const poin = Number(draf?.poin);
+    const kunci = `koreksi-${questionId}`;
     if (!Number.isFinite(poin) || poin < 0 || poin > bobot) {
       setGalat(`Nilai untuk soal ini harus antara 0 dan ${bobot}.`);
+      kabari(kunci, "gagal", `✕ Nilai harus 0–${bobot}`, 5000);
       return;
     }
     const hasil = await kirim(
+      kunci,
       "/api/cbt/hasil",
       "PATCH",
       { ujian: terbuka.id, attempt: bukaPeserta.id, soal: questionId, poin, catatan: draf?.catatan ?? "" },
-      "Koreksi tersimpan.",
+      { jalan: "Menyimpan nilai…", oke: "Nilai tersimpan", pesan: "Koreksi tersimpan." },
     );
     if (!hasil) return;
     // Ditandai selesai di layar tanpa memuat ulang seluruh lembar, lalu daftar
@@ -706,11 +968,13 @@ export default function CbtPanel({ role }: { role: string }) {
   function unduhTemplateExcel() {
     unduh(buatXlsxTemplate(), "Template-Soal-SiPaling.xlsx");
     setPesan("Template Excel terunduh. Isi lembar \"Soal\", lalu unggah kembali di sini.");
+    kabari("tpl-xlsx", "oke", "✓ Template terunduh", 3400);
   }
 
   function unduhTemplateWord() {
     unduh(buatDocxTemplate(), "Template-Soal-SiPaling.docx");
     setPesan("Template Word terunduh. Tulis soalnya, lalu unggah kembali di sini.");
+    kabari("tpl-docx", "oke", "✓ Template terunduh", 3400);
   }
 
   /**
@@ -840,10 +1104,15 @@ export default function CbtPanel({ role }: { role: string }) {
   async function terbitkanImpor() {
     if (!terbuka || imporSoal.length === 0) return;
     const hasil = await kirim(
+      "impor",
       "/api/cbt/soal",
       "POST",
       { ujian: terbuka.id, soal: imporSoal },
-      `${imporSoal.length} soal masuk ke bank soal.`,
+      {
+        jalan: `Memasukkan ${imporSoal.length} soal…`,
+        oke: `${imporSoal.length} soal masuk`,
+        pesan: `${imporSoal.length} soal masuk ke bank soal.`,
+      },
     );
     if (!hasil) return;
     setImporSoal([]);
@@ -861,14 +1130,16 @@ export default function CbtPanel({ role }: { role: string }) {
    * Cara yang sama dipakai surat tugas dan laporan antrean di portal ini, jadi
    * dosennya sudah mengenalnya: tekan Cetak, lalu pilih "Simpan sebagai PDF".
    */
-  function bukaCetak(html: string) {
+  function bukaCetak(html: string, kunciTombol: string) {
     const jendela = window.open("", "_blank");
     if (!jendela) {
       setGalat("Popup diblokir peramban. Izinkan popup untuk situs ini, lalu coba lagi.");
+      kabari(kunciTombol, "gagal", "✕ Popup diblokir", 6000);
       return;
     }
     jendela.document.write(html);
     jendela.document.close();
+    kabari(kunciTombol, "oke", "✓ Dibuka di tab baru", 3400);
   }
 
   function keteranganUjian(): UjianCetak | null {
@@ -887,9 +1158,11 @@ export default function CbtPanel({ role }: { role: string }) {
   }
 
   function cetakNaskah(denganKunci: boolean) {
+    const kunciTombol = denganKunci ? "naskah-kunci" : "naskah";
     const info = keteranganUjian();
     if (!info || soal.length === 0) {
       setGalat("Bank soalnya masih kosong, belum ada yang dapat dicetak.");
+      kabari(kunciTombol, "gagal", "✕ Bank soal masih kosong", 5000);
       return;
     }
     if (denganKunci) {
@@ -899,10 +1172,10 @@ export default function CbtPanel({ role }: { role: string }) {
       );
       if (!setuju) return;
     }
-    bukaCetak(naskahSoalHtml(info, soal, { denganKunci }));
+    bukaCetak(naskahSoalHtml(info, soal, { denganKunci }), kunciTombol);
   }
 
-  function cetakBeritaAcara() {
+  function cetakBeritaAcara(kunciTombol = "acara") {
     const info = keteranganUjian();
     if (!info) return;
     bukaCetak(
@@ -920,6 +1193,7 @@ export default function CbtPanel({ role }: { role: string }) {
           pindahTab: p.pindahTab, keluarFullscreen: p.keluarFullscreen,
         })),
       }),
+      kunciTombol,
     );
   }
 
@@ -946,6 +1220,7 @@ export default function CbtPanel({ role }: { role: string }) {
         })),
         terbuka.passingGrade,
       ),
+      "laporan",
     );
   }
 
@@ -971,6 +1246,9 @@ export default function CbtPanel({ role }: { role: string }) {
       ...(u.endAt ? [`Ditutup      : ${jamRapi(u.endAt)}`] : []),
       "",
       "Tidak perlu membuat akun. Buka tautannya, isi nama dan NIM, lalu mulai.",
+      "Lama pengerjaannya tertulis di layar sebelum tombol Mulai Ujian ditekan.",
+      "",
+      KREDIT_CBT,
     ].join("\n");
   }
 
@@ -1008,6 +1286,7 @@ export default function CbtPanel({ role }: { role: string }) {
     tautan.download = `nilai-${terbuka.code}.csv`;
     tautan.click();
     URL.revokeObjectURL(alamat);
+    kabari("csv", "oke", "✓ CSV terunduh", 3400);
   }
 
   // ---------- DAFTAR UJIAN ----------
@@ -1071,24 +1350,13 @@ export default function CbtPanel({ role }: { role: string }) {
               <textarea rows={3} value={draf.instruction} onChange={(e) => setDraf({ ...draf, instruction: e.target.value })} placeholder="Kerjakan sendiri. Tidak boleh membuka catatan." />
             </label>
 
-            <div className="cbt-sakelar">
-              {([
-                ["randomQuestions", "Acak urutan soal"],
-                ["randomOptions", "Acak urutan pilihan"],
-                ["allowBack", "Boleh kembali ke soal sebelumnya"],
-                ["showScore", "Tampilkan nilai setelah selesai"],
-                ["singleDevice", "Satu perangkat hanya untuk satu peserta"],
-              ] as const).map(([kunci, label]) => (
-                <label key={kunci} className="cbt-cek">
-                  <input type="checkbox" checked={draf[kunci]} onChange={(e) => setDraf({ ...draf, [kunci]: e.target.checked })} />
-                  <span>{label}</span>
-                </label>
-              ))}
-            </div>
+            <DaftarSetelan nilai={draf} ubah={(kunci, nyala) => setDraf({ ...draf, [kunci]: nyala })} />
+            <p className="cbt-catatan">
+              Seluruh setelan ini masih dapat diubah sesudah ujiannya jadi, lewat
+              <b> ⚙ Pengaturan ujian</b> di dalam ujiannya.
+            </p>
 
-            <button type="button" className="btn btn-primary" disabled={sibuk} onClick={() => void buatUjian()}>
-              {sibuk ? "Menyimpan…" : "Simpan ujian"}
-            </button>
+            <Tbl kabar={aksi.buat} diam="Simpan ujian" onClick={() => void buatUjian()} />
           </div>
         )}
 
@@ -1129,6 +1397,15 @@ export default function CbtPanel({ role }: { role: string }) {
   // ujiannya sedang berlangsung, atau ini bukan ujian Anda.
   const sedangBerlangsung = terbuka.status === "berlangsung";
   const terkunci = sedangBerlangsung || !terbuka.bolehUbah;
+
+  // Setelan yang isinya berbeda dari yang tersimpan di server. Dipakai dua
+  // kali: menyebut jumlahnya pada kepala panel yang terlipat — supaya
+  // perubahan yang belum disimpan tidak hilang di balik lipatan — dan menahan
+  // pengiriman yang tidak mengubah apa pun.
+  const setelanAsli = setelanUjian(terbuka);
+  const setelanBerubah = (Object.keys(setelanAsli) as Array<keyof typeof setelanAsli>).filter(
+    (k) => setel[k] !== setelanAsli[k],
+  );
 
   return (
     <section>
@@ -1209,12 +1486,13 @@ export default function CbtPanel({ role }: { role: string }) {
                 <b> Simpan sebagai PDF</b> bila ingin berkasnya saja.
               </p>
               <div className="cbt-impor-tombol">
-                <button type="button" className="btn btn-primary" onClick={() => cetakNaskah(false)}>
-                  Naskah untuk mahasiswa
-                </button>
-                <button type="button" className="btn btn-light" onClick={() => cetakNaskah(true)}>
-                  Naskah + kunci (pengawas)
-                </button>
+                <Tbl kabar={aksi.naskah} diam="Naskah untuk mahasiswa" onClick={() => cetakNaskah(false)} />
+                <Tbl
+                  kabar={aksi["naskah-kunci"]}
+                  dasar="btn btn-light"
+                  diam="Naskah + kunci (pengawas)"
+                  onClick={() => cetakNaskah(true)}
+                />
               </div>
               <p className="cbt-catatan">
                 Naskah untuk mahasiswa TIDAK memuat kunci jawaban, pembahasan, maupun rambu penilaian
@@ -1251,13 +1529,18 @@ export default function CbtPanel({ role }: { role: string }) {
               <input type="datetime-local" value={jadwal.selesai} onChange={(e) => setJadwal({ ...jadwal, selesai: e.target.value })} />
             </label>
             <div className="cbt-jadwal-aksi">
-              <button type="button" className="btn btn-primary" disabled={sibuk} onClick={() => void aktifkan()}>
-                {terbuka.activatedAt ? "Perbarui jadwal" : "Aktifkan ujian"}
-              </button>
+              <Tbl
+                kabar={aksi.aktif}
+                diam={terbuka.activatedAt ? "Perbarui jadwal" : "Aktifkan ujian"}
+                onClick={() => void aktifkan()}
+              />
               {terbuka.activatedAt && (
-                <button type="button" className="btn btn-danger btn-mini" disabled={sibuk} onClick={() => void batalkanAktivasi()}>
-                  Batalkan
-                </button>
+                <Tbl
+                  kabar={aksi["batal-aktif"]}
+                  dasar="btn btn-danger btn-mini"
+                  diam="Batalkan"
+                  onClick={() => void batalkanAktivasi()}
+                />
               )}
             </div>
           </div>
@@ -1272,13 +1555,128 @@ export default function CbtPanel({ role }: { role: string }) {
 
         {terbuka.bolehHapus && (
           <div className="cbt-hapus-ujian">
-            <button type="button" className="btn btn-danger btn-mini" disabled={sibuk} onClick={() => void hapusUjian()}>
-              Hapus ujian ini
-            </button>
+            <Tbl
+              kabar={aksi["hapus-ujian"]}
+              dasar="btn btn-danger btn-mini"
+              diam="Hapus ujian ini"
+              onClick={() => void hapusUjian()}
+            />
             <span>Soal dan seluruh hasilnya ikut terhapus. Tidak dapat dibatalkan.</span>
           </div>
         )}
       </div>
+
+      {/* ---------- PENGATURAN UJIAN ----------
+          Dulu setelan hanya dapat ditentukan sekali, pada formulir pembuatan,
+          dan sesudah itu tidak ada layar mana pun yang dapat mengubahnya. Yang
+          paling mahal justru terjadi saat ujian berjalan: satu mahasiswa
+          terblokir karena ponselnya sudah dipakai temannya, dan centang "satu
+          perangkat" tidak dapat dilepas sampai ujiannya usai — artinya orang
+          itu tidak ikut ujian sama sekali. Sekarang panel ini terbuka
+          sewaktu-waktu; yang tetap dikunci selama ujian berlangsung hanya
+          setelan yang mengubah BENTUK ujiannya. */}
+      {terbuka.bolehUbah && (
+        <div className="panel cbt-setel">
+          <button
+            type="button"
+            className="cbt-lipat"
+            aria-expanded={bukaSetel}
+            onClick={() => setBukaSetel(!bukaSetel)}
+          >
+            <b>⚙ Pengaturan ujian</b>
+            <span>
+              {setelanBerubah.length > 0 && (
+                <i className="cbt-setel-tanda">{setelanBerubah.length} belum disimpan</i>
+              )}
+              {bukaSetel ? "▲ Sembunyikan" : "▼ Ubah setelan"}
+            </span>
+          </button>
+
+          {bukaSetel && (
+            <div className="cbt-lipat-isi">
+              <p className="cbt-catatan">
+                Boleh diubah sewaktu-waktu, termasuk saat keadaan mendesak.
+                {sedangBerlangsung
+                  ? " Ujian ini SEDANG BERLANGSUNG, jadi jumlah soal, durasi, dan dua pengacakan dikunci dulu — mengubahnya di tengah jalan membuat sebagian peserta mengerjakan ujian yang berbeda dari sebagian yang lain. Selebihnya, termasuk “satu perangkat”, tetap dapat diubah sekarang juga."
+                  : " Perubahan berlaku untuk peserta yang masuk sesudah disimpan."}
+              </p>
+
+              <div className="cbt-baris">
+                <label><span>Nama ujian *</span>
+                  <input value={setel.title} onChange={(e) => setSetel({ ...setel, title: e.target.value })} />
+                </label>
+                <label><span>Mata kuliah *</span>
+                  <input value={setel.courseName} onChange={(e) => setSetel({ ...setel, courseName: e.target.value })} />
+                </label>
+                <label><span>Kelas</span>
+                  <input value={setel.className} onChange={(e) => setSetel({ ...setel, className: e.target.value })} placeholder="A / Reguler" />
+                </label>
+              </div>
+
+              <div className="cbt-baris">
+                <label className={sedangBerlangsung ? "mati" : ""}>
+                  <span>Jumlah soal yang dikerjakan{sedangBerlangsung ? " · terkunci" : ""}</span>
+                  <input
+                    type="number" min={1} max={500} value={setel.questionCount} disabled={sedangBerlangsung}
+                    onChange={(e) => setSetel({ ...setel, questionCount: Number(e.target.value) })}
+                  />
+                </label>
+                <label className={sedangBerlangsung ? "mati" : ""}>
+                  <span>Durasi (menit){sedangBerlangsung ? " · terkunci" : ""}</span>
+                  <input
+                    type="number" min={1} max={600} value={setel.durationMinutes} disabled={sedangBerlangsung}
+                    onChange={(e) => setSetel({ ...setel, durationMinutes: Number(e.target.value) })}
+                  />
+                </label>
+                <label><span>Nilai minimal lulus</span>
+                  <input
+                    type="number" min={0} max={100} value={setel.passingGrade}
+                    onChange={(e) => setSetel({ ...setel, passingGrade: Number(e.target.value) })}
+                  />
+                </label>
+                <label><span>Kode pengawas (opsional)</span>
+                  <input
+                    value={setel.token}
+                    onChange={(e) => setSetel({ ...setel, token: e.target.value.toUpperCase() })}
+                    placeholder="Dibacakan pengawas"
+                  />
+                </label>
+              </div>
+
+              <label className="cbt-lebar"><span>Instruksi untuk mahasiswa</span>
+                <textarea
+                  rows={3} value={setel.instruction}
+                  onChange={(e) => setSetel({ ...setel, instruction: e.target.value })}
+                  placeholder="Kerjakan sendiri. Tidak boleh membuka catatan."
+                />
+              </label>
+
+              <DaftarSetelan
+                nilai={setel}
+                kunciBentuk={sedangBerlangsung}
+                ubah={(kunci, nyala) => setSetel({ ...setel, [kunci]: nyala })}
+              />
+
+              <div className="cbt-form-aksi">
+                <Tbl
+                  kabar={aksi.setel}
+                  diam={
+                    setelanBerubah.length > 0
+                      ? `Simpan ${setelanBerubah.length} perubahan`
+                      : "Simpan pengaturan"
+                  }
+                  onClick={() => void simpanSetelan()}
+                />
+                {setelanBerubah.length > 0 && (
+                  <button type="button" className="btn btn-light" onClick={() => setSetel(setelanUjian(terbuka))}>
+                    Kembalikan seperti semula
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="cbt-tab">
         <button type="button" className={tab === "soal" ? "on" : ""} onClick={() => setTab("soal")}>
@@ -1441,12 +1839,8 @@ export default function CbtPanel({ role }: { role: string }) {
             </div>
 
             <div className="cbt-impor-tombol">
-              <button type="button" className="btn btn-light" onClick={() => unduhTemplateExcel()}>
-                ⇩ Template Excel (.xlsx)
-              </button>
-              <button type="button" className="btn btn-light" onClick={() => unduhTemplateWord()}>
-                ⇩ Template Word (.docx)
-              </button>
+              <Tbl kabar={aksi["tpl-xlsx"]} dasar="btn btn-light" diam="⇩ Template Excel (.xlsx)" onClick={() => unduhTemplateExcel()} />
+              <Tbl kabar={aksi["tpl-docx"]} dasar="btn btn-light" diam="⇩ Template Word (.docx)" onClick={() => unduhTemplateWord()} />
               <label className={`btn btn-primary cbt-unggah ${terkunci ? "mati" : ""}`}>
                 ⇧ Unggah soal
                 <input
@@ -1497,9 +1891,12 @@ export default function CbtPanel({ role }: { role: string }) {
                       {imporSoal.length > 5 && <li className="cbt-impor-sisa">…dan {imporSoal.length - 5} soal lagi.</li>}
                     </ol>
                     <div className="cbt-impor-aksi">
-                      <button type="button" className="btn btn-primary" disabled={sibuk || terkunci} onClick={() => void terbitkanImpor()}>
-                        {sibuk ? "Menyimpan…" : `Masukkan ${imporSoal.length} soal ke bank`}
-                      </button>
+                      <Tbl
+                        kabar={aksi.impor}
+                        diam={`Masukkan ${imporSoal.length} soal ke bank`}
+                        mati={terkunci}
+                        onClick={() => void terbitkanImpor()}
+                      />
                       <button type="button" className="btn btn-light" onClick={() => { setImporSoal([]); setImporTolak([]); setImporNama(""); }}>
                         Batal
                       </button>
@@ -1563,12 +1960,16 @@ export default function CbtPanel({ role }: { role: string }) {
                   onChange={(e) => setSoalBaru({ ...soalBaru, media: { ...soalBaru.media, url: e.target.value } })}
                   placeholder="Tempel tautan gambar / YouTube / Drive, atau unggah berkas →"
                 />
-                <label className={`btn btn-light btn-mini cbt-unggah ${terkunci ? "mati" : ""}`}>
-                  ⇧ Unggah
+                <label
+                  className={`btn btn-light btn-mini cbt-unggah ${terkunci || berjalan("media") ? "mati" : ""} ${
+                    aksi.media?.keadaan === "oke" ? "btn-oke" : aksi.media?.keadaan === "gagal" ? "btn-gagal" : ""
+                  }`}
+                >
+                  {aksi.media ? aksi.media.teks : "⇧ Unggah"}
                   <input
                     type="file"
                     accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm"
-                    disabled={terkunci || sibuk}
+                    disabled={terkunci || berjalan("media")}
                     onChange={(e) => {
                       const berkas = e.target.files?.[0];
                       e.target.value = "";
@@ -1721,16 +2122,12 @@ export default function CbtPanel({ role }: { role: string }) {
             )}
 
             <div className="cbt-form-aksi">
-              <button
-                type="button"
-                className={`btn ${soalOke ? "btn-oke" : "btn-primary"}`}
-                disabled={sibuk || terkunci}
+              <Tbl
+                kabar={aksi.soal}
+                diam={sunting ? "Simpan perubahan" : "+ Tambah ke bank soal"}
+                mati={terkunci}
                 onClick={() => void simpanSoal()}
-              >
-                {soalOke
-                  ? "✓ Berhasil ditambahkan"
-                  : sunting ? "Simpan perubahan" : "+ Tambah ke bank soal"}
-              </button>
+              />
               {sunting && (
                 <button type="button" className="btn btn-light" onClick={() => { setSunting(null); setSoalBaru({ ...SOAL_KOSONG }); }}>
                   Batal
@@ -1760,8 +2157,23 @@ export default function CbtPanel({ role }: { role: string }) {
                         // Media yang tersembunyi di balik lipatan tertutup akan
                         // dikira tidak ada, lalu ikut terhapus tanpa disengaja.
                         if (s.media?.jenis && s.media.url) setBukaMedia(true);
-                      }}>Ubah</button>
-                      <button type="button" disabled={terkunci} onClick={() => void hapusSoal(s.id)}>Hapus</button>
+                        // Formulirnya ada JAUH DI ATAS daftar ini. Tanpa kabar,
+                        // yang menekan Ubah hanya melihat tombolnya berkedip
+                        // dan mengira tekanannya tidak masuk.
+                        kabari(`ubah-${s.id}`, "oke", "✓ Dibuka di formulir ↑", 2600);
+                        setPesan("Soal dibuka pada formulir “Ubah soal” di atas daftar ini.");
+                        setGalat("");
+                      }}>
+                        {aksi[`ubah-${s.id}`] ? aksi[`ubah-${s.id}`].teks : "Ubah"}
+                      </button>
+                      <button
+                        type="button"
+                        className={aksi[`soal-${s.id}`]?.keadaan === "gagal" ? "cbt-aksi-gagal" : ""}
+                        disabled={terkunci || aksi[`soal-${s.id}`]?.keadaan === "jalan"}
+                        onClick={() => void hapusSoal(s.id)}
+                      >
+                        {aksi[`soal-${s.id}`] ? aksi[`soal-${s.id}`].teks : "Hapus"}
+                      </button>
                     </span>
                   </div>
                   <p className="cbt-soal-tanya">{s.pertanyaan}</p>
@@ -1837,12 +2249,20 @@ export default function CbtPanel({ role }: { role: string }) {
                 </span>
               </div>
               <span className="cbt-pantau-aksi">
-                <button type="button" className="btn btn-light btn-mini" onClick={() => void unduhNilai()} disabled={peserta.length === 0}>
-                  ⇩ Unduh nilai (CSV)
-                </button>
-                <button type="button" className="btn btn-light btn-mini" onClick={() => cetakBeritaAcara()} disabled={peserta.length === 0}>
-                  🖨 Berita acara
-                </button>
+                <Tbl
+                  kabar={aksi.csv}
+                  dasar="btn btn-light btn-mini"
+                  diam="⇩ Unduh nilai (CSV)"
+                  mati={peserta.length === 0}
+                  onClick={() => void unduhNilai()}
+                />
+                <Tbl
+                  kabar={aksi["acara-atas"]}
+                  dasar="btn btn-light btn-mini"
+                  diam="🖨 Berita acara"
+                  mati={peserta.length === 0}
+                  onClick={() => cetakBeritaAcara("acara-atas")}
+                />
               </span>
             </div>
 
@@ -1892,12 +2312,14 @@ export default function CbtPanel({ role }: { role: string }) {
                         <td>
                           <button
                             type="button"
-                            className="text-action"
+                            className={`text-action${aksi[`lembar-${p.id}`]?.keadaan === "gagal" ? " cbt-aksi-gagal" : ""}`}
                             onClick={() => void bukaLembar(p)}
-                            disabled={p.status === "berjalan"}
+                            disabled={p.status === "berjalan" || aksi[`lembar-${p.id}`]?.keadaan === "jalan"}
                             title={p.status === "berjalan" ? "Menunggu sampai dikumpulkan" : "Buka lembar jawabannya"}
                           >
-                            {p.tertunda > 0 ? `Koreksi ${p.tertunda} essay` : "Lihat jawaban"}
+                            {aksi[`lembar-${p.id}`]
+                              ? aksi[`lembar-${p.id}`].teks
+                              : p.tertunda > 0 ? `Koreksi ${p.tertunda} essay` : "Lihat jawaban"}
                           </button>
                         </td>
                       </tr>
@@ -1929,9 +2351,7 @@ export default function CbtPanel({ role }: { role: string }) {
               <label className="cbt-lebar"><span>Catatan kejadian selama ujian</span>
                 <textarea rows={2} value={acara.catatan} onChange={(e) => setAcara({ ...acara, catatan: e.target.value })} placeholder="Mis. listrik padam 5 menit pukul 09.20; dua mahasiswa terlambat masuk." />
               </label>
-              <button type="button" className="btn btn-primary" onClick={() => cetakBeritaAcara()}>
-                🖨 Buat berita acara
-              </button>
+              <Tbl kabar={aksi.acara} diam="🖨 Buat berita acara" onClick={() => cetakBeritaAcara()} />
             </div>
           )}
 
@@ -1947,9 +2367,13 @@ export default function CbtPanel({ role }: { role: string }) {
                   </span>
                 </div>
                 <span className="cbt-pantau-aksi">
-                  <button type="button" className="btn btn-light btn-mini" onClick={() => cetakLaporanPeserta()} disabled={rincian.length === 0}>
-                    🖨 Cetak laporan
-                  </button>
+                  <Tbl
+                    kabar={aksi.laporan}
+                    dasar="btn btn-light btn-mini"
+                    diam="🖨 Cetak laporan"
+                    mati={rincian.length === 0}
+                    onClick={() => cetakLaporanPeserta()}
+                  />
                   <button type="button" className="btn btn-light btn-mini" onClick={() => { setBukaPeserta(null); setRincian([]); }}>
                     Tutup
                   </button>
@@ -2020,9 +2444,12 @@ export default function CbtPanel({ role }: { role: string }) {
                                 placeholder="Boleh dikosongkan"
                               />
                             </label>
-                            <button type="button" className="btn btn-primary btn-mini" disabled={sibuk} onClick={() => void koreksi(r.id, r.bobot)}>
-                              {sibuk ? "Menyimpan…" : "Simpan nilai"}
-                            </button>
+                            <Tbl
+                              kabar={aksi[`koreksi-${r.id}`]}
+                              dasar="btn btn-primary btn-mini"
+                              diam="Simpan nilai"
+                              onClick={() => void koreksi(r.id, r.bobot)}
+                            />
                           </div>
                         )}
 

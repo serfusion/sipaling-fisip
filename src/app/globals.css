@@ -671,6 +671,10 @@ table.qt td small { display: block; color: var(--muted); font-size: 9px; margin-
    pita kabar di puncak panel: mata yang menekan tombol masih menatap tombol. */
 .btn-oke { color: #fff; background: #15803d; }
 .btn-oke:hover { background: #15803d; }
+/* Kegagalan pun dikatakan di tempat tombolnya, bukan hanya lewat pita merah
+   yang sering berada di luar layar saat panelnya panjang. */
+.btn-gagal { color: #fff; background: #b91c1c; }
+.btn-gagal:hover { background: #b91c1c; }
 .dfoot { margin-top: 18px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 14px 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; }
 .dfoot strong { color: var(--primary-dark); }
 .dfoot a { margin-left: auto; color: var(--primary); text-decoration: none; font-weight: 800; }
@@ -4399,6 +4403,22 @@ a.al-mini:hover { color: var(--al-ink); }
 .uj-nilai.lulus { border-color: #a9d5ac; background: #eef7ef; color: var(--uj-hijau); }
 .uj-nilai.belum { border-color: #f0c46a; background: #fdf6e6; color: #8a6212; }
 
+/* --- Lama ujian, dikatakan sekali lagi dengan jelas ---
+
+   Kotak fakta di atasnya dibaca sekilas; yang ini dibaca. Ia berdiri tepat
+   sebelum tombol MULAI UJIAN karena di situlah pertanyaannya muncul: saya
+   perlu menyediakan waktu berapa lama sebelum menekan ini. */
+.uj-waktu {
+  display: flex; gap: 12px; align-items: flex-start; margin: 14px 0;
+  padding: 13px 15px; border: 1px solid #a9c6ea; border-radius: 10px; background: #eef4fc;
+}
+.uj-waktu-ikon { flex: 0 0 auto; font-size: 19px; line-height: 1.2; }
+.uj-waktu b { display: block; color: #14459a; font-size: 14.5px; }
+.uj-waktu span { display: block; margin-top: 4px; color: #4a5d75; font-size: 12.5px; line-height: 1.65; }
+.uj-waktu span b { display: inline; font-size: inherit; color: #14459a; }
+.uj-fakta-waktu { border-color: #a9c6ea !important; background: #eef4fc !important; }
+.uj-fakta-waktu b { color: #14459a !important; }
+
 /* ---------- LAYAR MENGERJAKAN ----------
 
    Bentuknya mengikuti rujukan yang diberikan pemilik portal, dan rujukan itu
@@ -4639,10 +4659,28 @@ a.al-mini:hover { color: var(--al-ink); }
   outline: none; border-color: var(--navy); box-shadow: 0 0 0 3px rgba(30, 58, 95, .12);
 }
 .cbt-lebar { grid-column: 1 / -1; }
-.cbt-sakelar { display: flex; flex-wrap: wrap; gap: 14px; }
-.cbt-cek { display: flex !important; align-items: center; gap: 7px; }
-.cbt-cek span { text-transform: none !important; letter-spacing: 0 !important; font-weight: 600 !important;
-  font-size: 12px !important; color: var(--ink) !important; }
+/* --- Deretan centang setelan ---
+
+   Dulu sebaris flex yang membungkus: panjang labelnya berbeda-beda, jadi
+   kotak centangnya berhenti di tempat yang berlainan pada tiap baris dan
+   matanya harus mencari satu per satu. Sekarang kisi dengan lebar kolom yang
+   sama — kotak centangnya sejajar tegak lurus — dan tiap pilihan membawa satu
+   kalimat yang menjelaskan akibatnya, bukan hanya namanya. */
+.cbt-sakelar { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(255px, 1fr)); }
+.cbt-cek {
+  display: grid !important; grid-template-columns: 16px 1fr; align-items: start;
+  column-gap: 9px; row-gap: 3px; padding: 10px 12px; border: 1px solid var(--line);
+  border-radius: 10px; background: var(--white); cursor: pointer;
+  transition: border-color .14s, background .14s;
+}
+.cbt-cek:hover { border-color: var(--navy); }
+.cbt-cek input { width: 16px; height: 16px; margin: 1px 0 0; accent-color: var(--primary); cursor: pointer; }
+.cbt-cek span { text-transform: none !important; letter-spacing: 0 !important; font-weight: 700 !important;
+  font-size: 12px !important; color: var(--ink) !important; line-height: 1.4; }
+.cbt-cek small { grid-column: 2; color: var(--muted); font-size: 11px; line-height: 1.55; }
+.cbt-cek.mati { opacity: .55; cursor: default; background: var(--canvas); }
+.cbt-cek.mati:hover { border-color: var(--line); }
+.cbt-cek.mati input { cursor: default; }
 .cbt-form-aksi { display: flex; flex-wrap: wrap; gap: 9px; }
 .cbt-catatan { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.65; }
 
@@ -4997,6 +5035,36 @@ a.al-mini:hover { color: var(--al-ink); }
   resize: vertical;
 }
 
+/* --- Pengaturan ujian ---
+
+   Terlipat, tetapi tidak diam-diam: jumlah perubahan yang belum disimpan
+   ditulis pada kepalanya, supaya centang yang sudah dilepas tidak terlupakan
+   di balik lipatan yang tertutup. */
+.cbt-setel { margin-bottom: 14px; border-left: 3px solid var(--primary); }
+.cbt-setel-tanda {
+  margin-right: 10px; padding: 3px 8px; border-radius: 999px;
+  background: #fef3c7; color: #92400e; font-size: 10.5px; font-style: normal; font-weight: 800;
+}
+.cbt-setel .cbt-baris label.mati { opacity: .55; }
+.cbt-setel .cbt-baris label.mati input { background: var(--canvas); cursor: not-allowed; }
+.cbt-setel .cbt-lebar { display: grid; gap: 5px; }
+.cbt-setel .cbt-lebar span {
+  color: var(--muted); font-size: 10.5px; font-weight: 800;
+  letter-spacing: .05em; text-transform: uppercase;
+}
+.cbt-setel .cbt-lebar textarea {
+  width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px;
+  background: var(--white); color: var(--ink); font: inherit; font-size: 13px; line-height: 1.6;
+  resize: vertical;
+}
+
+/* Tombol yang membawa kabarnya sendiri berubah lebar saat kata-katanya
+   berganti — "Menghapus…" lalu "✓ Terhapus". Lebar minimumnya dikunci supaya
+   deretan tombol di sebelahnya tidak ikut melompat. */
+.cbt-tbl { min-width: 9.5rem; transition: background .14s, color .14s; }
+.btn-mini.cbt-tbl { min-width: 8rem; }
+.cbt-aksi-gagal { color: #b91c1c !important; }
+
 /* --- Lembar cetak CBT --- */
 .cbt-cetak { margin-bottom: 14px; border-left: 3px solid #64748b; }
 .cbt-acara { margin-bottom: 14px; border-left: 3px solid #0891b2; }
@@ -5114,4 +5182,17 @@ a.al-mini:hover { color: var(--al-ink); }
 .cbtd-btn:hover:not(:disabled) { filter: brightness(1.1); }
 .cbtd-btn:disabled { opacity: .55; cursor: default; }
 .cbtd-btn-tautan { text-decoration: none; }
-.cbtd-versi { margin: 26px 0 0; color: #9aa4af; font-size: 11px; text-align: center; }
+.cbtd-versi { margin: 26px 0 6px; color: #9aa4af; font-size: 11px; text-align: center; }
+.cbtd-kredit-kiri { margin: 12px 0 0; font-size: 11px; line-height: 1.6; opacity: .7; }
+@media (max-width: 860px) { .cbtd-kredit-kiri { display: none; } }
+
+/* --- Kredit situs CBT ---
+
+   Satu baris yang sama di seluruh layar CBT: pintu masuk, layar identitas,
+   layar mengerjakan, dan layar selesai. Sengaja tenang — ia menyebutkan asal
+   sistemnya, bukan bersaing dengan tombol yang sedang dituju mahasiswa. */
+.cbt-kredit {
+  margin: 18px 0 0; color: #98a2ad; font-size: 10.5px; line-height: 1.6;
+  text-align: center; letter-spacing: .01em;
+}
+.cbt-kredit-rapat { margin-top: 12px; }
