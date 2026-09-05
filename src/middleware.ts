@@ -69,7 +69,59 @@ function hostOf(value: string) {
   }
 }
 
+/**
+ * Tuan rumah yang melayani situs CBT, mis. "cbt.sipalingfisip.web.id".
+ *
+ * Kosong berarti CBT hanya dijangkau lewat /cbt pada domain utama, dan itu
+ * tetap berjalan penuh — subdomain hanyalah tambahan.
+ */
+function hostCbt() {
+  return (process.env.CBT_HOST || "").trim().toLowerCase();
+}
+
+/**
+ * Layani subdomain CBT pada akarnya.
+ *
+ * Permintaan ke cbt.<domain>/ dituliskan ulang menjadi /cbt, sehingga CBT
+ * tampil sebagai situs tersendiri — beda alamat, beda jenama — tanpa perlu
+ * penyebaran kedua. Yang DILEWATKAN apa adanya: /api, /_next, dan berkas
+ * statis, karena ketiganya dipakai bersama kedua situs.
+ *
+ * Ini penulisan ulang, bukan pengalihan: alamat di bilah peramban tetap
+ * subdomainnya, dan itu memang yang diinginkan.
+ */
+function rewriteCbt(request: NextRequest): NextResponse | null {
+  const target = hostCbt();
+  if (!target) return null;
+
+  const host = (request.headers.get("host") || "").toLowerCase().split(":")[0];
+  if (host !== target) return null;
+
+  const { pathname } = request.nextUrl;
+  if (
+    pathname.startsWith("/api/") ||
+    pathname.startsWith("/_next/") ||
+    pathname === "/favicon.ico" ||
+    pathname.startsWith("/cbt")
+  ) {
+    return null;
+  }
+
+  const alamat = request.nextUrl.clone();
+  alamat.pathname = pathname === "/" ? "/cbt" : `/cbt${pathname}`;
+  return NextResponse.rewrite(alamat);
+}
+
 export function middleware(request: NextRequest) {
+  const keCbt = rewriteCbt(request);
+  if (keCbt) return keCbt;
+
+  // Perlindungan CSRF tetap HANYA untuk /api, sama seperti sebelum daftar
+  // jalurnya diperluas demi subdomain CBT. Memperluasnya diam-diam ke seluruh
+  // halaman akan mengubah perilaku jalur yang tidak sedang dikerjakan sama
+  // sekali — dan perubahan seperti itu baru ketahuan dari laporan pengguna.
+  if (!request.nextUrl.pathname.startsWith("/api/")) return NextResponse.next();
+
   if (!MUTATING.has(request.method)) return NextResponse.next();
   if (memeriksaSendiri(request.nextUrl.pathname)) return NextResponse.next();
 
@@ -94,6 +146,12 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Hanya route API yang diperiksa; aset statis dilewati agar tetap cepat.
-  matcher: ["/api/:path*"],
+  // Dua tugas sekaligus di sini, dan cakupannya berbeda:
+  //   - perlindungan CSRF hanya menyentuh /api
+  //   - penulisan ulang subdomain CBT harus menyentuh HALAMAN, bukan API
+  //
+  // Karena itu daftarnya diperluas ke seluruh jalur, dengan aset statis
+  // dikecualikan lewat pola negatif supaya gambar dan berkas Next.js tidak
+  // ikut melewati middleware pada tiap permintaan.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|webp|svg|ico|woff2?|ttf)$).*)"],
 };

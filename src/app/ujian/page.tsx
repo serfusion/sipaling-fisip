@@ -1,16 +1,16 @@
-import type { Metadata } from "next";
-import UjianApp from "./ujian-app";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Ujian Online · SiPaling FISIP",
-  description: "Masuk dengan nama, NIM, dan kode ujian. Tanpa membuat akun.",
-};
-
-// Halaman ini tidak pernah boleh disimpan di cache mana pun: isinya bergantung
-// pada jam server, dan ujian yang tampil "belum dibuka" dari cache lima menit
-// lalu berarti mahasiswa menatap layar yang salah pada saat yang paling genting.
+// Alamat lama. Ujian pindah ke situs CBT tersendiri, tetapi tautan yang
+// sudah terlanjur dibagikan ke grup kelas TIDAK boleh mati — kode ujiannya
+// ikut dibawa supaya mahasiswa tetap mendarat pada ujian yang benar.
 export const dynamic = "force-dynamic";
 
-export default function Page() {
-  return <UjianApp />;
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const kode = typeof params.kode === "string" ? params.kode : "";
+  redirect(kode ? `/cbt/ujian?kode=${encodeURIComponent(kode)}` : "/cbt/ujian");
 }

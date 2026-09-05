@@ -4972,3 +4972,105 @@ a.al-mini:hover { color: var(--al-ink); }
 .cbt-pantau-aksi { display: flex; flex-wrap: wrap; gap: 8px; }
 .cbt-putus { display: block; margin-top: 2px; color: #b45309; font-size: 10.5px; font-weight: 700; }
 .cbt-genting { color: #b91c1c; font-weight: 800; }
+
+/* ======================================================================
+   SITUS CBT — halaman depan
+
+   Dua kolom seperti rujukan rancangannya: jenama di kiri dengan latar biru
+   penuh, pintu masuk di kanan pada latar putih. Di ponsel keduanya bertumpuk,
+   dan kolom jenama menyusut menjadi kepala yang ringkas — mahasiswa yang
+   membuka dari HP lima menit sebelum ujian tidak perlu menggulir melewati
+   daftar keunggulan untuk menemukan kotak kodenya.
+   ====================================================================== */
+.cbtd {
+  --cbtd-biru: #2b3f8f;
+  --cbtd-biru-tua: #1e2d6b;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 1fr;
+  background: #fff;
+  color: #26313f;
+}
+@media (min-width: 900px) { .cbtd { grid-template-columns: 46% 54%; } }
+
+.cbtd-kiri {
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: clamp(28px, 5vw, 64px);
+  background: linear-gradient(150deg, var(--cbtd-biru) 0%, var(--cbtd-biru-tua) 100%);
+  color: #fff;
+}
+/* Dua bulatan samar, seperti pada rujukannya. Murni hiasan, jadi ia tidak
+   pernah dibacakan pembaca layar. */
+.cbtd-kiri::before, .cbtd-kiri::after {
+  content: ""; position: absolute; border-radius: 50%;
+  background: rgba(255, 255, 255, .055); pointer-events: none;
+}
+.cbtd-kiri::before { width: 30rem; height: 30rem; top: -9rem; right: -11rem; }
+.cbtd-kiri::after { width: 20rem; height: 20rem; bottom: -8rem; right: 3rem; }
+.cbtd-kiri > * { position: relative; }
+
+.cbtd-lambang {
+  width: 54px; height: 54px; display: grid; place-items: center; margin-bottom: 20px;
+  border-radius: 14px; background: rgba(255, 255, 255, .16); font-size: 26px;
+}
+.cbtd-kiri h1 { margin: 0 0 8px; font-size: clamp(28px, 4.4vw, 40px); font-weight: 800; line-height: 1.1; }
+.cbtd-sub { margin: 0 0 26px; font-size: 14px; line-height: 1.65; opacity: .9; max-width: 30rem; }
+.cbtd-nilai { display: grid; gap: 11px; margin: 0; padding: 0; list-style: none; max-width: 30rem; }
+.cbtd-nilai li { position: relative; padding-left: 28px; font-size: 13.5px; line-height: 1.6; opacity: .95; }
+.cbtd-nilai li::before {
+  content: "✓"; position: absolute; left: 0; top: -1px;
+  width: 19px; height: 19px; display: grid; place-items: center;
+  border-radius: 50%; background: rgba(255, 255, 255, .2); font-size: 11px; font-weight: 800;
+}
+.cbtd-kaki-kiri { margin: 30px 0 0; font-size: 12px; opacity: .75; }
+.cbtd-kaki-kiri a { color: #fff; text-decoration: underline; }
+@media (max-width: 899px) {
+  .cbtd-kiri { padding: 26px 20px 24px; }
+  /* Daftar keunggulan disembunyikan di ponsel: yang membuka dari HP lima menit
+     sebelum ujian sedang mencari kotak kode, bukan alasan memakai sistem ini. */
+  .cbtd-nilai, .cbtd-kaki-kiri { display: none; }
+  .cbtd-lambang { width: 42px; height: 42px; font-size: 21px; margin-bottom: 12px; }
+  .cbtd-sub { margin-bottom: 0; }
+}
+
+.cbtd-kanan { display: grid; place-items: center; padding: clamp(24px, 5vw, 56px); }
+.cbtd-kotak { width: 100%; max-width: 25rem; }
+.cbtd-kotak h2 { margin: 0 0 6px; font-size: 26px; font-weight: 800; color: #1b2434; }
+.cbtd-lead { margin: 0 0 20px; color: #6b7684; font-size: 13.5px; }
+
+.cbtd-tab {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 22px;
+  padding: 4px; border: 1px solid #e2e6ec; border-radius: 10px; background: #f6f8fa;
+}
+.cbtd-tab button {
+  padding: 10px 8px; border: 0; border-radius: 7px; background: none;
+  color: #6b7684; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.cbtd-tab button.on { background: #fff; color: var(--cbtd-biru); box-shadow: 0 1px 3px rgba(15, 23, 42, .12); }
+
+.cbtd-kotak label {
+  display: block; margin-bottom: 7px; color: #3f4854; font-size: 12.5px; font-weight: 700;
+}
+.cbtd-input {
+  width: 100%; padding: 13px 15px; border: 1px solid #cfd6df; border-radius: 8px;
+  background: #fff; color: #26313f; font: inherit; font-size: 15px;
+}
+.cbtd-input::placeholder { color: #aeb6c0; letter-spacing: normal; }
+.cbtd-input:focus { outline: none; border-color: var(--cbtd-biru); box-shadow: 0 0 0 3px rgba(43, 63, 143, .15); }
+.cbtd-input-kode { text-align: center; font-size: 25px; font-weight: 800; letter-spacing: .32em; text-transform: uppercase; }
+
+.cbtd-bantu { margin: 10px 0 0; color: #6b7684; font-size: 12px; line-height: 1.65; }
+.cbtd-galat {
+  margin: 12px 0 0; padding: 10px 13px; border-radius: 8px;
+  border: 1px solid #edb4b4; background: #fdeeee; color: #8f2222; font-size: 12.5px; line-height: 1.6;
+}
+.cbtd-btn {
+  display: block; width: 100%; margin-top: 18px; padding: 14px 16px; border: 0; border-radius: 8px;
+  background: var(--cbtd-biru); color: #fff; font: inherit; font-size: 14.5px; font-weight: 800;
+  text-align: center; cursor: pointer; transition: filter .12s;
+}
+.cbtd-btn:hover:not(:disabled) { filter: brightness(1.1); }
+.cbtd-btn:disabled { opacity: .55; cursor: default; }
+.cbtd-btn-tautan { text-decoration: none; }
+.cbtd-versi { margin: 26px 0 0; color: #9aa4af; font-size: 11px; text-align: center; }
