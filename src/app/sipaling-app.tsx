@@ -312,7 +312,7 @@ function KartuAbsensi({
 
       <div className="absen-utama">
         <small>Kunjungan ke</small>
-        <b>{data.absensi.visitNumber > 0 ? data.absensi.visitNumber : "—"}</b>
+        <b>{data.absensi.visitNumber > 0 ? data.absensi.visitNumber : "-"}</b>
         <span>{waktuKunjungan(data.absensi.visitDate)}</span>
       </div>
 
@@ -1076,7 +1076,7 @@ export default function SipalingApp() {
               <a
                 className={cakrawalaLocked ? "hero-button hero-button-locked" : "hero-button"}
                 href="/alat"
-                title={cakrawalaLocked ? "Cakrawala terkunci — lihat pratinjaunya dan masukkan kode akses" : undefined}
+                title={cakrawalaLocked ? "Cakrawala terkunci, lihat pratinjaunya dan masukkan kode akses" : undefined}
               >
                 <span className="hero-kilau">Cakrawala</span>
               </a>
@@ -1580,7 +1580,7 @@ export default function SipalingApp() {
                   <p className="section-eyebrow">PEMBARUAN BERKAS</p>
                   <h2>Upload Revisi</h2>
                   <p className="section-subtitle">
-                    Masukkan nomor tiket dan NIM dulu. Berkas yang diminta menyesuaikan layanannya —
+                    Masukkan nomor tiket dan NIM dulu. Berkas yang diminta menyesuaikan layanannya:
                     penyerahan skripsi ke perpustakaan meminta empat berkas, sama seperti waktu
                     mengajukan. Upload revisi hanya dapat dilakukan ketika status layanan adalah{" "}
                     <strong>Revisi</strong>.
@@ -1644,7 +1644,7 @@ export default function SipalingApp() {
                       <span>{revLayanan.serviceNeed}</span>
                       <span className={`rev-status ${revLayanan.status === "Revisi" ? "" : "rev-status-beda"}`}>
                         Status saat ini: {revLayanan.status}
-                        {revLayanan.status !== "Revisi" && " — upload revisi belum dibuka untuk tiket ini."}
+                        {revLayanan.status !== "Revisi" && ", upload revisi belum dibuka untuk tiket ini."}
                       </span>
                       <small>
                         {jumlahBerkas(revBentuk) > 1

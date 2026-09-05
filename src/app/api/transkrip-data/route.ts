@@ -74,7 +74,7 @@ export async function PUT(request: Request) {
     if (value.length > MAX_CHARS) {
       return Response.json({
         success: false,
-        message: "Draf terlalu besar untuk disimpan. Biasanya karena gambar yang ditempel pada tata letak — perkecil atau hapus gambarnya, lalu simpan lagi.",
+        message: "Draf terlalu besar untuk disimpan. Biasanya karena gambar yang ditempel pada tata letak. Perkecil atau hapus gambarnya, lalu simpan lagi.",
       }, { status: 400 });
     }
     await db

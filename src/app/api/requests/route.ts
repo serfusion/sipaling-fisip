@@ -380,7 +380,7 @@ export async function POST(request: Request) {
           audienceRole: audienceUntukLayanan(serviceType),
           kind: "pengajuan-baru",
           title: `Pengajuan baru · ${serviceNeed}`,
-          body: `${studentName} (${nim}) mengirim ${serviceType} — ${serviceNeed}, ${berkasnya}.`,
+          body: `${studentName} (${nim}) mengirim ${serviceType}: ${serviceNeed}, ${berkasnya}.`,
           refCode: finalTicket,
         },
         // Dosen tujuan diberi tahu langsung, bukan menunggu ia membuka daftar.

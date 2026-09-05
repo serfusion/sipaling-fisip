@@ -238,10 +238,10 @@ type BarisArsip = {
 };
 
 function tanggalSingkat(waktu: string | null) {
-  if (!waktu) return "—";
+  if (!waktu) return "-";
   const tanggal = new Date(waktu);
   return Number.isNaN(tanggal.getTime())
-    ? "—"
+    ? "-"
     : tanggal.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 }
 
@@ -415,7 +415,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
       text: `Sheet "${name}": ${parsed.length} mata kuliah terbaca (dua blok kolom digabung)` +
         (bio.nama ? `; biodata ${bio.nama} ikut terisi` : "") +
         ringkasBahasa(bahasa) +
-        ". Semua diproses di browser Anda — file tidak diunggah ke mana pun." +
+        ". Semua diproses di browser Anda, file tidak diunggah ke mana pun." +
         (dilepas ? " Tata letak kembali ke bentuk bawaan karena isinya diganti." : ""),
     });
   }
@@ -556,7 +556,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
           (bentuk ? " beserta tata letak hasil suntingan Anda." : ".") +
           (diingat > 0 ? ` ${diingat} nama Inggris diingat untuk unggahan berikutnya.` : "") +
           ` Nanti tinggal klik "Muat draf" lalu tambah/kurangi baris tanpa unggah ulang.` +
-          ` Ingat: draf hanya SATU laci — transkrip mahasiswa berikutnya menimpanya.` +
+          ` Ingat: draf hanya SATU laci, transkrip mahasiswa berikutnya menimpanya.` +
           ` Yang tersimpan per mahasiswa adalah tombol "Save di Arsip Transkrip" di paling bawah.`,
       });
     } catch (reason: unknown) {
@@ -841,7 +841,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
       <section className="tpl-editor no-print">
         <div className="import-box">
           <strong>Impor dari Excel (.xlsx)</strong>
-          <p>Dua format diterima otomatis: <b>Template Transkrip SiPaling</b> (unduh di bawah — satu baris satu mata kuliah) dan <b>Excel akademik</b> lama (dua blok kolom NO · KODE MK · NAMA MATA KULIAH · K · HM · AM · MK). Biodata ikut terbaca.</p>
+          <p>Dua format diterima otomatis: <b>Template Transkrip SiPaling</b> (unduh di bawah, satu baris satu mata kuliah) dan <b>Excel akademik</b> lama (dua blok kolom NO · KODE MK · NAMA MATA KULIAH · K · HM · AM · MK). Biodata ikut terbaca.</p>
           <div className="tpl-actions tpl-actions-wrap tpl-data-bar">
             <button type="button" className="btn btn-light btn-mini" onClick={downloadTemplate}>⬇ Unduh Template Excel</button>
             <button type="button" className="btn btn-light btn-mini" onClick={saveTranskripData} disabled={savingData || rows.length === 0} title="Satu laci draf: menyimpan transkrip berikutnya menimpa yang ini. Untuk menyimpan per mahasiswa, pakai tombol Arsip Transkrip di paling bawah.">💾 Simpan draf (1 laci)</button>
@@ -852,7 +852,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
             <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} />
           </label>
           {sheetNames.length > 1 && (
-            <label className="sheet-pick">File berisi beberapa sheet — pilih mahasiswa/sheet:
+            <label className="sheet-pick">File berisi beberapa sheet, pilih mahasiswa/sheet:
               <select onChange={(event) => { if (workbook) void parseSheetByName(workbook, event.target.value); }}>
                 {sheetNames.map((name) => <option key={name}>{name}</option>)}
               </select>
@@ -895,7 +895,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
           </button>
         </h3>
         <p className="tpl-hint" hidden={!showHint}>
-          HM → AM otomatis (A=4 · B=3 · C=2 · D=1 · E=0), M = K × AM. Pilih HM &quot;–&quot; untuk MK tanpa nilai huruf (mis. Skripsi) — SKS-nya tetap dihitung dalam total & IPK.
+          HM → AM otomatis (A=4 · B=3 · C=2 · D=1 · E=0), M = K × AM. Pilih HM &quot;–&quot; untuk MK tanpa nilai huruf (mis. Skripsi), SKS-nya tetap dihitung dalam total & IPK.
           Urutan nomor mengikuti daftar ini <strong>atas ke bawah</strong>: kolom kiri transkrip = No. 1–{half || 1}, lalu lanjut kolom kanan.
           {EN && <> Transkrip tercetak <strong>dwibahasa</strong>: nama Indonesia + nama Inggris kecil miring di bawahnya (otomatis dari file KUI, bisa diedit per baris).</>}
         </p>
@@ -954,7 +954,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
             ✎ Pratinjau memakai <b>tata letak hasil suntingan tangan</b>, dan bentuk inilah yang ikut
             tersimpan pada <b>Simpan draf</b> maupun <b>Save di Arsip Transkrip</b>.
             Selama masih begini, perubahan Biodata &amp; nilai di sebelah kiri <b>tidak lagi</b> ikut ke
-            pratinjau — suntingannya akan tertimpa kalau ikut. Sesudah selesai menyunting, tombol
+            pratinjau. Suntingannya akan tertimpa kalau ikut. Sesudah selesai menyunting, tombol
             <b>↺ Kembali ke tata letak bawaan</b> membuat pratinjau mengikuti data lagi.
           </p>
         )}
@@ -973,7 +973,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
               <strong>Arsip Transkrip Nilai</strong>
               <p>
                 Simpan transkrip yang sudah selesai agar tercatat siapa saja mahasiswa yang transkripnya sudah dibuat.
-                Tersimpan <b>hanya kalau tombol ini ditekan</b> — selama belum, tidak ada yang diarsipkan.
+                Tersimpan <b>hanya kalau tombol ini ditekan</b>. Selama belum, tidak ada yang diarsipkan.
               </p>
             </div>
             <span className={sudahDiarsipkan ? "tk-arsip-status sudah" : "tk-arsip-status belum"}>
@@ -1121,7 +1121,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
             <div className="doc-top">
               <div className="dt-cell"><span className="dt-lbl"><Lbl text={L.noij} /></span><span className="dt-sep">:</span><span className="dt-val">{meta.noijazah || "................................"}</span></div>
               <div className="dt-cell"><span className="dt-lbl"><Lbl text={L.nppt} /></span><span className="dt-sep">:</span><span className="dt-val">{meta.nppt}</span></div>
-              <div className="dt-cell"><span className="dt-lbl"><Lbl text={L.yud} /></span><span className="dt-sep">:</span><span className="dt-val">{meta.yudisium || "—"}</span></div>
+              <div className="dt-cell"><span className="dt-lbl"><Lbl text={L.yud} /></span><span className="dt-sep">:</span><span className="dt-val">{meta.yudisium || "-"}</span></div>
               <div className="dt-cell"><span className="dt-lbl"><Lbl text={L.akred} /></span><span className="dt-sep">:</span><span className="dt-val">{meta.akred}</span></div>
             </div>
 
@@ -1517,7 +1517,7 @@ function LetterModule({ slug }: { slug: LetterSlug }) {
       if (!response.ok || !payload.success) throw new Error(payload.message || "Template belum tersimpan.");
       discardDraft();
       dirtyRef.current = false;
-      setMessage({ kind: "ok", text: "Template tersimpan — menjadi tampilan awal untuk semua admin berikutnya." });
+      setMessage({ kind: "ok", text: "Template tersimpan, menjadi tampilan awal untuk semua admin berikutnya." });
     } catch (reason: unknown) {
       setMessage({ kind: "err", text: reason instanceof Error ? reason.message : "Template belum tersimpan." });
     } finally {
@@ -1608,7 +1608,7 @@ function LetterModule({ slug }: { slug: LetterSlug }) {
   function saveToDrive() {
     downloadDoc();
     window.open("https://drive.google.com/drive/my-drive?hl=ID", "_blank", "noopener");
-    setMessage({ kind: "ok", text: "File .doc terunduh & Google Drive Anda terbuka — seret file ke Drive, salin tautannya, lalu catat di Dashboard → Arsip." });
+    setMessage({ kind: "ok", text: "File .doc terunduh & Google Drive Anda terbuka. Seret file ke Drive, salin tautannya, lalu catat di Dashboard → Arsip." });
   }
 
   return (
@@ -1620,7 +1620,7 @@ function LetterModule({ slug }: { slug: LetterSlug }) {
           <p className="tpl-hint tpl-hint-dim">Template tersimpan terakhir oleh <strong>{savedInfo.by}</strong>{savedInfo.at ? ` · ${new Date(savedInfo.at).toLocaleString("id-ID")}` : ""}.</p>
         )}
         <p className="tpl-hint">
-          Klik teks pada pratinjau untuk mengedit — bagian <mark className="isian-demo">kuning</mark> adalah isian yang biasanya berubah.
+          Klik teks pada pratinjau untuk mengedit. Bagian <mark className="isian-demo">kuning</mark> adalah isian yang biasanya berubah.
           Kop FISIP hanya pratinjau; <strong>hasil cetak otomatis tanpa kop</strong> (kertas kop tersedia di printer kampus).
         </p>
         {draftAvailable && (

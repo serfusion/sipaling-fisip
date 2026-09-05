@@ -19,7 +19,7 @@ export const LETTER_TITLES: Record<LetterSlug, string> = {
   pkl: "Permohonan Praktek Kerja Lapangan",
   "surat-aktif": "Surat Keterangan Aktif",
   "transkrip-custom": "Transkrip Nilai (format unggahan)",
-  "transkrip-en": "Transkrip Nilai — English",
+  "transkrip-en": "Transkrip Nilai (English)",
 };
 
 const SIGN_GAP = '<div class="sign-space"><br /></div>';
@@ -109,8 +109,8 @@ Di<br />
 <p class="align-justify">Unggah file .docx transkrip Anda lewat tombol <strong>⇪ Ganti dari .docx</strong> untuk mengganti isi halaman ini, atau ketik langsung di sini. Pratinjau tampil dengan kop FISIP; hasil cetak otomatis tanpa kop (untuk kertas kop kampus).</p>
 `,
   "transkrip-en": `
-<p class="align-center p-gap"><strong>ACADEMIC TRANSCRIPT</strong><br /><em>(Transkrip Nilai — Versi Bahasa Inggris)</em></p>
-<p class="align-justify"><strong>Halaman ini disiapkan untuk transkrip berbahasa Inggris.</strong> Begitu hasil terjemahan resmi dari Kantor Urusan Internasional (KUI) diterima dalam bentuk .docx, klik tombol <strong>⇪ Ganti dari .docx</strong> di atas, pilih filenya, rapikan bila perlu, lalu klik <strong>💾 Simpan template</strong> — sejak itu template English siap dipakai semua admin.</p>
+<p class="align-center p-gap"><strong>ACADEMIC TRANSCRIPT</strong><br /><em>(Transkrip Nilai versi Bahasa Inggris)</em></p>
+<p class="align-justify"><strong>Halaman ini disiapkan untuk transkrip berbahasa Inggris.</strong> Begitu hasil terjemahan resmi dari Kantor Urusan Internasional (KUI) diterima dalam bentuk .docx, klik tombol <strong>⇪ Ganti dari .docx</strong> di atas, pilih filenya, rapikan bila perlu, lalu klik <strong>💾 Simpan template</strong>. Sejak itu template English siap dipakai semua admin.</p>
 <p class="align-justify">Pratinjau tampil dengan kop FISIP; hasil cetak otomatis tanpa kop (memakai kertas kop pra-cetak kampus), sama seperti template lainnya.</p>
 `,
 };

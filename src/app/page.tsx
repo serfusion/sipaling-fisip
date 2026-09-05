@@ -46,7 +46,7 @@ export default async function HomePage({
         <div className="mt-bypass-bar">
           <span className="mt-bypass-dot" aria-hidden="true" />
           <b>Mode maintenance sedang menyala.</b>
-          <span>Pengunjung umum melihat halaman istirahat — Anda dilewatkan karena sudah login.</span>
+          <span>Pengunjung umum melihat halaman istirahat. Anda dilewatkan karena sudah login.</span>
           <Link href="/dashboard">Buka dashboard →</Link>
         </div>
         <SipalingApp />

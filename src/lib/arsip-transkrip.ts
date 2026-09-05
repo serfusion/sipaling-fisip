@@ -60,7 +60,7 @@ export function predikatKelulusan(ipk: number, judul: string) {
   if (ipk >= 3.51) return "Dengan Pujian";
   if (ipk >= 3.01) return "Sangat Memuaskan";
   if (ipk >= 2.76) return "Memuaskan";
-  return judul ? "Lulus" : "—";
+  return judul ? "Lulus" : "-";
 }
 
 /**
@@ -157,7 +157,7 @@ export function periksaSiapArsip(meta: MetaTranskrip, rows: CourseRow[]): { siap
   if (!rows.length) return { siap: false, alasan: "Belum ada mata kuliah. Impor Excel atau tambah baris dulu." };
   if (rows.length > MAKS_BARIS) return { siap: false, alasan: `Terlalu banyak baris (maks. ${MAKS_BARIS}).` };
   if (!nama) return { siap: false, alasan: "Nama mahasiswa belum diisi pada Biodata." };
-  if (nim.length < 4) return { siap: false, alasan: "NIM belum diisi pada Biodata — NIM dipakai sebagai penanda arsip." };
+  if (nim.length < 4) return { siap: false, alasan: "NIM belum diisi pada Biodata. NIM dipakai sebagai penanda arsip." };
 
   const tanpaNama = rows.findIndex((baris) => !baris.nama.trim());
   if (tanpaNama >= 0) return { siap: false, alasan: `Baris ke-${tanpaNama + 1} belum punya nama mata kuliah.` };

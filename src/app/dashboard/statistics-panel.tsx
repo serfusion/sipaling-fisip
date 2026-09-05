@@ -29,7 +29,7 @@ function Cincin({
           />
         </svg>
         <span className="st-ring-val" style={{ color: warna }}>
-          {nilai === null ? "—" : <>{pct}<i>%</i></>}
+          {nilai === null ? "-" : <>{pct}<i>%</i></>}
         </span>
       </div>
       <b className="st-ring-label">{judul}</b>
@@ -278,7 +278,7 @@ export default function StatisticsPanel() {
                     <td className="right st-num" data-l="Median">{angka(u.medianHari, "hari")}</td>
                     <td data-l="Tuntas">
                       <span className="st-cellbar"><i style={{ width: `${u.tuntasPersen ?? 0}%` }} /></span>
-                      <span className="st-cellbar-n">{u.tuntasPersen === null ? "—" : `${u.tuntasPersen}%`}</span>
+                      <span className="st-cellbar-n">{u.tuntasPersen === null ? "-" : `${u.tuntasPersen}%`}</span>
                     </td>
                     <td className={`right st-num ${u.menggantung === 0 ? "dim" : ""}`} data-l="Lewat 7 hari">{u.menggantung}</td>
                     <td data-l="Keadaan"><span className={`pill s-${sev}`}>{label}</span></td>
@@ -308,7 +308,7 @@ export default function StatisticsPanel() {
                 <div className="st-fnl-band a"><span className="st-fnl-shape" /><div className="st-fnl-txt"><b>{corong.diajukan}</b><span>Diajukan mahasiswa</span></div></div>
                 {gugurBerkas > 0 && <div className="st-fnl-leak">↓ {gugurBerkas} belum lolos berkas</div>}
                 <div className="st-fnl-band b"><span className="st-fnl-shape" style={{ clipPath: `polygon(${(100 - lolosPct) / 2}% 0, ${100 - (100 - lolosPct) / 2}% 0, ${100 - (100 - diterimaPct) / 2}% 100%, ${(100 - diterimaPct) / 2}% 100%)` }} /><div className="st-fnl-txt"><b>{corong.lolosBerkas}</b><span>Lolos verifikasi berkas</span></div></div>
-                {corong.ditolakDosen > 0 && <div className="st-fnl-leak">↓ {corong.ditolakDosen} ditolak dosen — cari pengganti</div>}
+                {corong.ditolakDosen > 0 && <div className="st-fnl-leak">↓ {corong.ditolakDosen} ditolak dosen, cari pengganti</div>}
                 <div className="st-fnl-band c"><span className="st-fnl-shape" style={{ clipPath: `polygon(${(100 - diterimaPct) / 2}% 0, ${100 - (100 - diterimaPct) / 2}% 0, ${100 - (100 - diterimaPct) / 2}% 100%, ${(100 - diterimaPct) / 2}% 100%)` }} /><div className="st-fnl-txt"><b>{corong.diterima}</b><span>Diterima dosen</span></div></div>
               </div>
               <p className="st-note">
@@ -318,7 +318,7 @@ export default function StatisticsPanel() {
           )}
           <Why>
             <p><b>Hitungan:</b> jumlah pengajuan di tiap tahap; selisih antar tahap dihitung sebagai kebocoran.</p>
-            <p><b>Sumber:</b> <code>title_proposals</code> — kolom <code>status</code>, <code>finance_verified</code>, <code>eligibility_verified</code>.</p>
+            <p><b>Sumber:</b> <code>title_proposals</code>, kolom <code>status</code>, <code>finance_verified</code>, <code>eligibility_verified</code>.</p>
             <p>Lebar tiap pita sebanding dengan jumlahnya.</p>
           </Why>
         </div>
@@ -397,7 +397,7 @@ export default function StatisticsPanel() {
               {JAM_KERJA.map((jam) => {
                 const n = peta.map.get(`${hi + 1}-${jam}`) || 0;
                 const lvl = n === 0 ? 0 : Math.min(4, Math.max(1, Math.ceil((n / (peta.max || 1)) * 4)));
-                return <span className={`st-hm-cell l${lvl}`} key={jam} title={`${hari} pukul ${jam}.00 — ${n} tiket`}>{n || ""}</span>;
+                return <span className={`st-hm-cell l${lvl}`} key={jam} title={`${hari} pukul ${jam}.00: ${n} tiket`}>{n || ""}</span>;
               })}
             </span>
           ))}
@@ -410,7 +410,7 @@ export default function StatisticsPanel() {
         <Why>
           <p><b>Hitungan:</b> tiket dikelompokkan menurut hari dan jam kedatangannya, tiga bulan terakhir.</p>
           <p><b>Sumber:</b> <code>service_requests.created_at</code>, dikonversi ke zona Asia/Jakarta.</p>
-          <p>Berguna untuk mengatur jadwal jaga loket — jam sepi tidak perlu dijaga penuh.</p>
+          <p>Berguna untuk mengatur jadwal jaga loket: jam sepi tidak perlu dijaga penuh.</p>
         </Why>
       </div>
 
@@ -429,7 +429,7 @@ export default function StatisticsPanel() {
             ))}
           </div>
           <Why>
-            <p><b>Hitungan:</b> jumlah tiket PDDIKTI per bulan — makin sedikit makin baik.</p>
+            <p><b>Hitungan:</b> jumlah tiket PDDIKTI per bulan, makin sedikit makin baik.</p>
             <p><b>Sumber:</b> <code>service_requests</code> dengan <code>service_type = &apos;Layanan PDDIKTI&apos;</code>.</p>
             <p>Tiap tiket di sini berarti ada data mahasiswa yang salah. Sepi berarti data sudah bersih, bukan unit yang tidak terpakai.</p>
           </Why>
@@ -470,7 +470,7 @@ export default function StatisticsPanel() {
           <Why>
             <p><b>Hitungan:</b> jumlah entri per tahun, dipisah menurut tiga jenis dokumen terbanyak.</p>
             <p><b>Sumber:</b> <code>document_records</code> dikelompokkan per <code>document_date</code> dan <code>category</code>.</p>
-            <p>Ini mengukur produktivitas, bukan mutu layanan — inilah yang ditanya asesor akreditasi.</p>
+            <p>Ini mengukur produktivitas, bukan mutu layanan. Inilah yang ditanya asesor akreditasi.</p>
           </Why>
         </div>
 
@@ -495,7 +495,7 @@ export default function StatisticsPanel() {
             </ul>
           )}
           <div className="st-cakupan">
-            <p className="st-sub st-tight">Cakupan dosen — berapa yang punya minimal satu luaran</p>
+            <p className="st-sub st-tight">Cakupan dosen: berapa yang punya minimal satu luaran</p>
             <div className="st-picto-key">
               <span className="on">{ORANG} Punya luaran ({cakupan.punyaLuaran})</span>
               <span className="off">{ORANG} Belum ada ({Math.max(0, cakupan.totalDosen - cakupan.punyaLuaran)})</span>

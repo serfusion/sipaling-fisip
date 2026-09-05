@@ -82,7 +82,7 @@ export const HARI_KERJA = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"];
 export const JAM_KERJA = [8, 9, 10, 11, 12, 13, 14, 15, 16];
 
 export function angka(value: number | null, satuan = "") {
-  if (value === null) return "—";
+  if (value === null) return "-";
   const teks = Number.isInteger(value) ? String(value) : value.toFixed(1).replace(".", ",");
   return satuan ? `${teks} ${satuan}` : teks;
 }

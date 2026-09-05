@@ -19,7 +19,7 @@
 // ============================================================
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ejaWaktu, jawabanKosong, uraiJodoh, type JenisSoal, type Media } from "@/lib/cbt";
+import { jawabanKosong, uraiJodoh, type JenisSoal, type Media } from "@/lib/cbt";
 import MediaSoal from "./media-soal";
 
 type Ujian = {
@@ -123,7 +123,6 @@ export default function UjianApp() {
   const [sisa, setSisa] = useState(0);
   const [simpanan, setSimpanan] = useState<"aman" | "menyimpan" | "tertunda">("aman");
   const [ditandai, setDitandai] = useState<number[]>([]);
-  const [bukaNav, setBukaNav] = useState(false);
   const [hasil, setHasil] = useState<Hasil | null>(null);
   const [pesanSelesai, setPesanSelesai] = useState("");
 
@@ -253,7 +252,7 @@ export default function UjianApp() {
       if (tertinggal > 0 && !otomatis) {
         setSimpanan("tertunda");
         setGalat(
-          `${tertinggal} jawaban belum sampai ke server — sepertinya jaringanmu sedang terputus. ` +
+          `${tertinggal} jawaban belum sampai ke server, sepertinya jaringanmu sedang terputus. ` +
             "Jangan tutup halaman ini; tunggu sebentar lalu tekan Kumpulkan lagi.",
         );
         setSibuk(false);
@@ -499,7 +498,6 @@ export default function UjianApp() {
     setDitandai([]);
     setNomor(0);
     setGalat("");
-    setBukaNav(false);
     setLayar("kode");
   }
 
@@ -609,7 +607,7 @@ export default function UjianApp() {
           {ujian.kelas && <p className="uj-kelas">Kelas {ujian.kelas}</p>}
 
           <div className="uj-fakta">
-            <div><b>{ujian.jumlahSoal || "—"}</b><span>soal</span></div>
+            <div><b>{ujian.jumlahSoal || "-"}</b><span>soal</span></div>
             <div><b>{ujian.durasi}</b><span>menit</span></div>
             <div><b>{ujian.pakaiToken ? "Ya" : "Tidak"}</b><span>pakai kode</span></div>
           </div>
@@ -618,7 +616,7 @@ export default function UjianApp() {
 
           {belumBuka && (
             <div className="uj-kabar uj-kabar-tunggu">
-              Ujian ini dibuka <b>{tanggalRapi(ujian.mulai)}</b>. Halaman ini boleh ditutup dulu —
+              Ujian ini dibuka <b>{tanggalRapi(ujian.mulai)}</b>. Halaman ini boleh ditutup dulu,
               buka lagi saat waktunya tiba.
             </div>
           )}
@@ -720,13 +718,14 @@ export default function UjianApp() {
   const detik = sisa % 60;
   const dua = (n: number) => String(n).padStart(2, "0");
   const raguKini = ditandai.includes(soalKini.id);
+  const soalTerakhir = nomor >= soal.length - 1;
 
   const palet = soal.map((s, i) => (
     <button
       key={s.id}
       type="button"
       className={`ck-nomor ${keadaanSoal(s.id)}`}
-      onClick={() => { keSoal(i); setBukaNav(false); }}
+      onClick={() => keSoal(i)}
       aria-label={`Soal ${i + 1}`}
       aria-current={i === nomor ? "true" : undefined}
     >
@@ -824,7 +823,7 @@ export default function UjianApp() {
                       onChange={(e) => jodohkan(soalKini.id, i, e.target.value)}
                       aria-label={`Pasangan untuk ${kiri}`}
                     >
-                      <option value="">— pilih —</option>
+                      <option value="">Pilih pasangan</option>
                       {soalKini.pilihan.map((p, n) => (
                         <option key={n} value={String(n)}>{String.fromCharCode(65 + n)}. {p}</option>
                       ))}
@@ -876,18 +875,38 @@ export default function UjianApp() {
             >
               {raguKini ? "✓ RAGU-RAGU" : "RAGU-RAGU"}
             </button>
-            <button
-              type="button"
-              className="ck-tbl ck-biru ck-maju"
-              disabled={nomor >= soal.length - 1}
-              onClick={() => keSoal(Math.min(soal.length - 1, nomor + 1))}
-            >
-              SOAL SELANJUTNYA ›
-            </button>
+            {/* Pada soal terakhir tombol ini berhenti menjadi tombol jalan dan
+                menjadi tombol akhir. Warnanya ikut berganti merah supaya tangan
+                yang sudah hafal letaknya sadar bahwa ketukan berikutnya bukan
+                pindah soal lagi, melainkan menutup ujian. */}
+            {soalTerakhir ? (
+              <button
+                type="button"
+                className="ck-tbl ck-akhiri ck-maju"
+                disabled={sibuk}
+                onClick={mintaKumpul}
+              >
+                {sibuk ? "MENGUMPULKAN…" : "AKHIRI UJIAN"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="ck-tbl ck-biru ck-maju"
+                onClick={() => keSoal(Math.min(soal.length - 1, nomor + 1))}
+              >
+                SOAL SELANJUTNYA ›
+              </button>
+            )}
           </div>
         </section>
 
-        {/* ---------- PANEL NOMOR SOAL ---------- */}
+        {/* ---------- PANEL NOMOR SOAL ----------
+            Selalu terlihat, di layar lebar maupun di ponsel. Sebelumnya di
+            ponsel ia disembunyikan di balik laci yang harus diketuk dulu, dan
+            akibatnya satu-satunya penanda soal mana yang sudah dijawab justru
+            tidak kelihatan pada layar yang paling banyak dipakai mengerjakan.
+            Di ponsel panel ini turun ke bawah kartu soal, mengisi ruang yang
+            memang kosong. */}
         <aside className="ck-sisi">
           <div className="ck-panel">
             <div className="ck-panel-kepala">NOMOR SOAL</div>
@@ -913,31 +932,6 @@ export default function UjianApp() {
         </aside>
       </div>
 
-      {/* ---------- DI PONSEL: LACI NOMOR SOAL ---------- */}
-      <button type="button" className="ck-bilah-hp" onClick={() => setBukaNav(true)}>
-        <b>{terjawab}/{soal.length} terjawab</b>
-        <span>{ejaWaktu(sisa)}</span>
-        <span>NOMOR SOAL ▲</span>
-      </button>
-
-      {bukaNav && (
-        <div className="ck-tirai" role="dialog" aria-label="Nomor soal">
-          <div className="ck-laci">
-            <div className="ck-laci-kepala">
-              <b>NOMOR SOAL</b>
-              <button type="button" className="ck-tutup" onClick={() => setBukaNav(false)} aria-label="Tutup">✕</button>
-            </div>
-            <div className="ck-grid">{palet}</div>
-            {legenda}
-            <button type="button" className="ck-henti" disabled={sibuk} onClick={mintaKumpul}>
-              {sibuk ? "MENGUMPULKAN…" : "HENTIKAN UJIAN"}
-            </button>
-            <button type="button" className="ck-laci-kembali" onClick={() => setBukaNav(false)}>
-              Kembali mengerjakan
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

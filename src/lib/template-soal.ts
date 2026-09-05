@@ -46,7 +46,7 @@ export const PETUNJUK_EXCEL: string[][] = [
   ["JENIS SOAL"],
   ["3. PG → isi PILIHAN A sampai E seperlunya, KUNCI ditulis hurufnya (A/B/C/D/E)."],
   ["4. PG KOMPLEKS → jawaban benar boleh lebih dari satu. KUNCI ditulis dipisah koma: A,C"],
-  ["   Dinilai per bagian, dan yang keliru MENGURANGI yang tepat — jadi mencentang semua"],
+  ["   Dinilai per bagian, dan yang keliru MENGURANGI yang tepat, jadi mencentang semua"],
   ["   pilihan tidak menghasilkan nilai penuh. Sisakan minimal satu pengecoh."],
   ["5. PENJODOHAN → kolom PASANGAN diisi satu pasangan per baris, dipisah tanda ="],
   ["      Agenda setting = McCombs & Shaw"],
@@ -68,7 +68,7 @@ export const PETUNJUK_EXCEL: string[][] = [
   ["10. BOBOT diisi angka. Nilai akhir dihitung dari jumlah bobot, bukan jumlah soal,"],
   ["    jadi soal essay boleh diberi bobot lebih besar daripada pilihan ganda."],
   ["11. TINGKAT diisi mudah / sedang / sulit. Kosong dianggap sedang."],
-  ["12. Urutan kolom boleh digeser dan kolom yang tidak dipakai boleh dihapus —"],
+  ["12. Urutan kolom boleh digeser dan kolom yang tidak dipakai boleh dihapus,"],
   ["    yang dicari sistem NAMA kolomnya, bukan letaknya."],
   ["13. Simpan berkas, lalu unggah lewat tombol \"Unggah soal\" di dashboard CBT."],
   [""],
@@ -79,7 +79,7 @@ export const PETUNJUK_EXCEL: string[][] = [
 // ---------- WORD ----------
 
 const NASKAH_WORD = [
-  "TEMPLATE SOAL UJIAN — SiPaling FISIP",
+  "TEMPLATE SOAL UJIAN SiPaling FISIP",
   "",
   "Tulis soal langsung di bawah ini. Tiap soal diawali nomor, lalu pilihan berhuruf,",
   "lalu baris KUNCI. Baris BOBOT, MATERI, TINGKAT, dan PEMBAHASAN boleh dikosongkan.",
@@ -197,7 +197,7 @@ export function buatXlsxTemplate(): Blob {
     {
       tinggi: 30,
       sel: KOLOM_EXCEL.map((_, i) =>
-        i === 0 ? { nilai: "TEMPLATE SOAL UJIAN — SiPaling FISIP", gaya: GAYA.judul } : { nilai: "", gaya: GAYA.judul },
+        i === 0 ? { nilai: "TEMPLATE SOAL UJIAN SiPaling FISIP", gaya: GAYA.judul } : { nilai: "", gaya: GAYA.judul },
       ),
     },
     {

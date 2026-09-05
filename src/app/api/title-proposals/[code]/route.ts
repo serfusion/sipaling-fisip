@@ -204,7 +204,7 @@ export async function PATCH(
         kind: "proposal_assigned",
         severity: "info",
         title: "Pengajuan bimbingan baru",
-        body: `${proposal.studentName} (${proposal.nim}) — "${proposal.title}". Pilih TERIMA atau TOLAK.`,
+        body: `${proposal.studentName} (${proposal.nim}): "${proposal.title}". Pilih TERIMA atau TOLAK.`,
         refCode: proposal.code,
       });
 

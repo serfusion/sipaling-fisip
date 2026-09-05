@@ -143,7 +143,7 @@ export function parseSheetRows(aoa: Aoa): CourseRow[] {
           if (diff < 0.6) hm = best;
         }
       }
-      if (!(hm in AM)) hm = ""; // tanpa nilai huruf (mis. Skripsi) — tetap sah
+      if (!(hm in AM)) hm = ""; // tanpa nilai huruf (mis. Skripsi), tetap sah
 
       if (kredit > 12) continue; // baris subtotal/JUMLAH yang nyasar, bukan mata kuliah
 

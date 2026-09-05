@@ -62,6 +62,6 @@ export type DocumentRow = {
 };
 
 export function formatStamp(value: string | null) {
-  if (!value) return "—";
+  if (!value) return "-";
   return new Date(value).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
 }
