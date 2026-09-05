@@ -8,6 +8,7 @@ import {
   serial,
   text,
   timestamp,
+  uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
 
@@ -562,17 +563,40 @@ export const cbtAttempts = pgTable("cbt_attempts", {
   leftFullscreen: integer("left_fullscreen").notNull().default(0),
   switchedTab: integer("switched_tab").notNull().default(0),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
-});
+}, (t) => [
+  // Batas percobaan ditegakkan basis data, bukan hanya pemeriksaan di kode:
+  // dua permintaan yang datang bersamaan dapat lolos pemeriksaan bersama-sama.
+  uniqueIndex("idx_cbt_attempts_sekali").on(t.examId, t.nim, t.attemptNo),
+]);
 
 export const cbtAnswers = pgTable("cbt_answers", {
   id: serial("id").primaryKey(),
   attemptId: integer("attempt_id").notNull().references(() => cbtAttempts.id, { onDelete: "cascade" }),
   questionId: integer("question_id").notNull().references(() => cbtQuestions.id, { onDelete: "cascade" }),
   answer: text("answer").notNull().default(""),
+  /**
+   * Ditandai mahasiswa untuk ditinjau ulang sebelum dikumpulkan.
+   *
+   * Disimpan di server, bukan hanya di perambannya: penanda yang hilang saat
+   * halaman dimuat ulang membuat mahasiswa kehilangan daftar soal yang ia
+   * sisihkan untuk dikerjakan belakangan — dan itu terjadi justru ketika
+   * jaringannya bermasalah, saat ia paling membutuhkannya.
+   */
+  marked: boolean("marked").notNull().default(false),
   /** null = essay yang belum dikoreksi dosen. */
   isCorrect: boolean("is_correct"),
   points: integer("points").notNull().default(0),
   feedback: text("feedback"),
   gradedBy: varchar("graded_by", { length: 120 }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [
+  // WAJIB, dan bukan sekadar demi kerapian. Auto-save menulis jawaban yang
+  // sama berkali-kali lewat "on conflict do update"; tanpa indeks ini
+  // perintahnya DITOLAK basis data, penyimpanan gagal diam-diam, dan yang
+  // hilang adalah jawaban mahasiswa yang layarnya tetap menunjukkan hijau.
+  //
+  // Dulu indeks ini hanya ada di berkas SQL migrasi. Basis data yang
+  // disiapkan dari skema ini saja karena itu berdiri tanpa indeksnya — dan
+  // kegagalannya baru terlihat ketika ada yang benar-benar mengerjakan ujian.
+  uniqueIndex("idx_cbt_answers_satu").on(t.attemptId, t.questionId),
+]);
