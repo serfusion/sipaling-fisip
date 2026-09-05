@@ -1,5 +1,5 @@
 -- =====================================================================
--- V22 — CBT (Computer Based Test)
+-- V24 — CBT (Computer Based Test)
 --
 -- Jalankan sekali di SQL Editor Supabase. Aman diulang.
 --

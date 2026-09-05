@@ -1,4 +1,4 @@
-# v22: CBT — Ujian Berbasis Komputer
+# v24: CBT — Ujian Berbasis Komputer
 
 MVP sesuai bagian 23 blueprint. Mahasiswa **tidak punya akun**; identitasnya
 melekat pada attempt ujian, bukan pada tabel pengguna.
@@ -115,7 +115,7 @@ dengan benar).
 ## Yang perlu Anda lakukan
 
 ```
-supabase-update-v22-cbt.sql
+supabase-update-v24-cbt.sql
 ```
 
 Lalu buka dashboard → **Ujian Online (CBT)**.
