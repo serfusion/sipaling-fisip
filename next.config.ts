@@ -35,12 +35,24 @@ const csp = [
     : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
-  "img-src 'self' data: blob:",
+  // https: dibuka untuk gambar dan video sejak soal CBT boleh membawa media.
+  // Dosen menempelkan tautan gambar dari mana saja — Wikipedia, situs
+  // kampus, penyimpanan awan miliknya sendiri — dan daftar putih tuan rumah
+  // akan menolak yang sah jauh lebih sering daripada menahan yang jahat.
+  //
+  // Yang DILEPAS di sini hanya pemuatan gambar dan media, bukan skrip: berkas
+  // gambar tidak menjalankan kode, dan connect-src tetap terkunci sehingga
+  // data portal tidak dapat dikirim ke tuan rumah asing.
+  "img-src 'self' data: blob: https:",
   `connect-src 'self' ${supabase.http} ${supabase.ws}`,
-  "media-src 'self'",
+  "media-src 'self' blob: https:",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
-  "frame-src 'none'",
+  // Video sematan pada soal. Daftarnya SEMPIT dan disengaja: iframe adalah
+  // halaman asing yang berjalan di dalam layar ujian, jadi ia tidak boleh
+  // dibuka selebar img-src di atas.
+  "frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com " +
+    "https://player.vimeo.com https://drive.google.com",
   "frame-ancestors 'none'",
   "form-action 'self'",
   "base-uri 'self'",

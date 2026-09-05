@@ -4,7 +4,7 @@
 import { db } from "@/db";
 import { cbtAnswers, cbtAttempts, cbtExams, cbtQuestions } from "@/db/schema";
 import { and, asc, eq } from "drizzle-orm";
-import type { JenisSoal, Soal } from "@/lib/cbt";
+import type { JenisMedia, JenisSoal, Pasangan, Soal } from "@/lib/cbt";
 
 export type Ujian = typeof cbtExams.$inferSelect;
 export type Attempt = typeof cbtAttempts.$inferSelect;
@@ -30,13 +30,37 @@ export function bacaSoal(row: typeof cbtQuestions.$inferSelect): Soal {
     // Pilihan yang rusak dibaca sebagai kosong; soalnya tetap tampil supaya
     // dosen dapat melihat dan memperbaikinya, bukan hilang tanpa jejak.
   }
+  // Pasangan penjodohan. Baris yang rusak dibuang satu per satu, bukan
+  // menggugurkan seluruh soal: soal yang hilang dari bank jauh lebih sulit
+  // ditelusuri dosennya daripada soal yang pasangannya kurang satu.
+  let pasangan: Pasangan[] = [];
+  try {
+    const isi = JSON.parse(row.pairs || "[]");
+    if (Array.isArray(isi)) {
+      pasangan = isi
+        .map((p) => ({ kiri: String((p as Pasangan)?.kiri ?? ""), kanan: Number((p as Pasangan)?.kanan) }))
+        .filter((p) => p.kiri !== "" && Number.isInteger(p.kanan) && p.kanan >= 0 && p.kanan < pilihan.length);
+    }
+  } catch {
+    // Sama seperti pilihan: dibaca kosong, soalnya tetap tampil.
+  }
+
   const tingkat = row.difficulty === "mudah" || row.difficulty === "sulit" ? row.difficulty : "sedang";
+  const jenisMedia = (row.mediaType || "") as JenisMedia;
   return {
     id: row.id,
     jenis: (row.type as JenisSoal) || "pg",
     pertanyaan: row.question,
     pilihan,
     kunci: row.answerKey || "",
+    pasangan,
+    media: {
+      // Media tanpa tautan bukan media. Menyimpan jenisnya saja membuat layar
+      // mahasiswa menyediakan kotak gambar yang selamanya kosong.
+      jenis: row.mediaUrl && (jenisMedia === "gambar" || jenisMedia === "video") ? jenisMedia : "",
+      url: row.mediaUrl || "",
+      keterangan: row.mediaCaption || "",
+    },
     bobot: row.points || 1,
     materi: row.material || "",
     tingkat,

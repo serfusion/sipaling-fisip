@@ -28,8 +28,9 @@ import { explainServerError } from "@/lib/api-errors";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { blockedByMaintenance } from "@/lib/maintenance-gate";
 import {
-  batasWaktu, benihBaru, bolehMasuk, hitungNilai, nilaiJawaban, periksaMasuk,
-  sisaDetik, statusUjian, susunPaket, type Soal,
+  batasWaktu, benihBaru, bolehMasuk, hitungNilai, kunciNama, nilaiJawaban,
+  periksaGanda, periksaMasuk, rapikanPerangkat, sisaDetik, statusUjian,
+  susunPaket, type Soal,
 } from "@/lib/cbt";
 import { attemptDariKunci, bacaLembar, soalUjian, ujianDariKode, type Ujian } from "@/lib/cbt-store";
 
@@ -106,6 +107,10 @@ function lembarUntukLayar(bank: Soal[], lembar: Array<{ id: number; peta: number
         // Urutan pilihan mengikuti peta yang tersimpan pada attempt, supaya
         // memuat ulang halaman tidak mengubah letak jawaban yang sudah dipilih.
         pilihan: item.peta.length ? item.peta.map((i) => soal.pilihan[i] ?? "") : soal.pilihan,
+        // Kolom kiri penjodohan. Hanya teksnya — pasangannya tertinggal di
+        // server, tempat satu-satunya yang boleh mengetahui kuncinya.
+        kiri: soal.jenis === "penjodohan" ? soal.pasangan.map((p) => p.kiri) : [],
+        media: soal.media,
         bobot: soal.bobot,
       };
     })
@@ -169,6 +174,10 @@ export async function POST(request: Request) {
         });
       }
 
+      // ---------- SATU ORANG, SATU KALI ----------
+      // Diperiksa SESUDAH jalur "lanjutkan yang masih berjalan" di atas,
+      // supaya mahasiswa yang kembali ke ujiannya sendiri tidak pernah
+      // tertahan oleh pemeriksaan yang ditujukan kepada orang lain.
       if (sudah.length >= ujian.maxAttempts) {
         return Response.json(
           {
@@ -180,6 +189,28 @@ export async function POST(request: Request) {
           },
           { status: 409 },
         );
+      }
+
+      // Nama dan perangkat diperiksa terhadap SELURUH peserta ujian ini, bukan
+      // hanya terhadap NIM yang sama. Kolomnya sengaja sedikit: daftar peserta
+      // dapat berisi ratusan baris, dan lembar soal masing-masing tidak ada
+      // gunanya di sini.
+      const nameKey = kunciNama(identitas.nama);
+      const deviceId = rapikanPerangkat(body.perangkat);
+      const semua = await db
+        .select({
+          nim: cbtAttempts.nim,
+          nameKey: cbtAttempts.nameKey,
+          deviceId: cbtAttempts.deviceId,
+          status: cbtAttempts.status,
+        })
+        .from(cbtAttempts)
+        .where(eq(cbtAttempts.examId, ujian.id));
+      const ganda = periksaGanda({ nim: identitas.nim, nameKey, deviceId }, semua, {
+        satuPerangkat: ujian.singleDevice,
+      });
+      if (!ganda.ok) {
+        return Response.json({ success: false, message: ganda.pesan }, { status: 409 });
       }
 
       const bank = await soalUjian(ujian.id);
@@ -206,6 +237,8 @@ export async function POST(request: Request) {
           examId: ujian.id,
           nim: identitas.nim,
           name: identitas.nama,
+          nameKey,
+          deviceId,
           attemptNo: sudah.length + 1,
           sessionKey: kunciSesi,
           seed: benih,
@@ -242,7 +275,8 @@ export async function POST(request: Request) {
         kunciSesi,
         ujian: ringkasUjian(ujian, sekarang),
         soal: paket.map((s) => ({
-          id: s.id, jenis: s.jenis, pertanyaan: s.pertanyaan, pilihan: s.pilihan, bobot: s.bobot,
+          id: s.id, jenis: s.jenis, pertanyaan: s.pertanyaan, pilihan: s.pilihan,
+          kiri: s.kiri, media: s.media, bobot: s.bobot,
         })),
         jawaban: {},
         sisaDetik: sisaDetik(deadline, sekarang),
@@ -282,6 +316,17 @@ export async function POST(request: Request) {
 
     if (attempt.status !== "berjalan") {
       return Response.json({ success: false, message: "Ujian ini sudah dikumpulkan." }, { status: 409 });
+    }
+
+    // ---------- DENYUT ----------
+    // Peramban mahasiswa menyapa tiap sepuluh detik. Dua gunanya, dan
+    // dua-duanya penting: papan pantau dosen dapat membedakan "sedang
+    // mengerjakan" dari "layarnya mati sejak sepuluh menit lalu", dan sisa
+    // waktu yang berlaku — yang dihitung SERVER — dikembalikan untuk
+    // meluruskan jam di perambannya.
+    if (aksi === "denyut") {
+      await db.update(cbtAttempts).set({ lastSeenAt: sekarang }).where(eq(cbtAttempts.id, attempt.id));
+      return Response.json({ success: true, sisaDetik: sisaDetik(attempt.deadlineAt, sekarang) });
     }
 
     // ---------- CATAT PELANGGARAN ----------
@@ -392,6 +437,7 @@ export async function POST(request: Request) {
           score: Math.round(ringkas.nilai),
           correct: ringkas.benar,
           wrong: ringkas.salah,
+          partial: ringkas.sebagian,
           blank: ringkas.kosong,
           pending: ringkas.tertunda,
           lastSeenAt: sekarang,
@@ -406,6 +452,11 @@ export async function POST(request: Request) {
         hasil: ujian.showScore
           ? {
               nilai: ringkas.nilai, benar: ringkas.benar, salah: ringkas.salah,
+              // Ikut dikirim sejak ada PG kompleks dan penjodohan. Tanpa
+              // angka ini, mahasiswa yang benar sebagian pada dua soal
+              // membaca "1 benar, 0 salah" dari empat soal — dan dua soal
+              // sisanya seolah lenyap.
+              sebagian: ringkas.sebagian,
               kosong: ringkas.kosong, tertunda: ringkas.tertunda,
               lulus: ringkas.lulus, passing: ujian.passingGrade,
             }

@@ -8,7 +8,7 @@ import {
   statusUjian, bolehMasuk, batasWaktu, sisaDetik, ejaWaktu,
   kocok, acakBerbenih, susunPaket, nilaiJawaban, hitungNilai, rapikanIsian,
   periksaMasuk, rapikanNim, rapikanNama, rapikanToken, kodeUjianBaru,
-  analisisSoal, statistikNilai, otomatis, type Soal,
+  analisisSoal, statistikNilai, otomatis, MEDIA_KOSONG, type Soal,
 } from "./src/lib/cbt";
 
 let lulus = 0;
@@ -82,7 +82,7 @@ benar("pengacak menghasilkan angka 0..1",
 const bank: Soal[] = Array.from({ length: 20 }, (_, i) => ({
   id: i + 1, jenis: "pg", pertanyaan: `Soal ${i + 1}`,
   pilihan: ["A", "B", "C", "D"], kunci: "1", bobot: 1,
-  materi: "", tingkat: "sedang", pembahasan: "",
+  materi: "", tingkat: "sedang", pembahasan: "", pasangan: [], media: MEDIA_KOSONG,
 }));
 
 const paket = susunPaket(bank, { acakSoal: true, acakPilihan: true, jumlahSoal: 8 }, 777);
@@ -105,7 +105,7 @@ sama("jumlah 0 berarti semua soal",
 
 console.log("\n=== PENILAIAN ===\n");
 
-const pg: Soal = { id: 1, jenis: "pg", pertanyaan: "?", pilihan: ["A", "B", "C", "D"], kunci: "2", bobot: 5, materi: "", tingkat: "sedang", pembahasan: "" };
+const pg: Soal = { id: 1, jenis: "pg", pertanyaan: "?", pilihan: ["A", "B", "C", "D"], kunci: "2", bobot: 5, materi: "", tingkat: "sedang", pembahasan: "", pasangan: [], media: MEDIA_KOSONG };
 sama("jawaban benar tanpa acak", nilaiJawaban(pg, "2").poin, 5);
 sama("jawaban salah", nilaiJawaban(pg, "0").benar, false);
 sama("tidak dijawab dianggap salah, poin nol", nilaiJawaban(pg, "").poin, 0);

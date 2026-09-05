@@ -13,7 +13,7 @@ import {
   KOLOM_EXCEL, type Aoa,
 } from "./src/lib/impor-soal";
 import { CONTOH_EXCEL, NASKAH_TEMPLATE_WORD, buatDocxTemplate } from "./src/lib/template-soal";
-import { nilaiJawaban, type Soal } from "./src/lib/cbt";
+import { MEDIA_KOSONG, nilaiJawaban, type Soal } from "./src/lib/cbt";
 
 let lulus = 0;
 const gagal: string[] = [];
@@ -78,9 +78,18 @@ benar("essay tidak menuntut kunci", bacaKunci("essay", "", []).ok);
 console.log("\n=== EXCEL ===\n");
 
 const baris = (isi: Array<string | number>) => isi as Array<string | number>;
+// Judul kolomnya ditulis TEGAS di sini, bukan diambil dari KOLOM_EXCEL.
+// Dua sebabnya: daftar kolom bawaan bertambah tiap kali ada jenis soal baru —
+// dan baris contoh yang mematok posisi akan bergeser diam-diam setiap kali —
+// sedangkan yang hendak diuji di sini justru bahwa kolom dicari dari NAMANYA,
+// termasuk pada berkas yang tidak memuat seluruh kolom bawaan.
 const sheet: Aoa = [
   ["Template Soal Ujian"], [""],
-  KOLOM_EXCEL,
+  [
+    "NO", "JENIS", "PERTANYAAN",
+    "PILIHAN A", "PILIHAN B", "PILIHAN C", "PILIHAN D", "PILIHAN E",
+    "KUNCI", "BOBOT", "MATERI", "TINGKAT", "PEMBAHASAN",
+  ],
   baris([1, "PG", "Ibu kota Indonesia?", "Bandung", "Jakarta", "Medan", "Surabaya", "", "B", 5, "Umum", "mudah", "Sejak 1945."]),
   baris([2, "BENAR-SALAH", "Bumi itu bulat.", "", "", "", "", "", "BENAR", 3, "", "", ""]),
   baris([3, "ISIAN", "Sebutkan ibu kota Jawa Barat.", "", "", "", "", "", "bandung", 4, "", "", ""]),
@@ -194,9 +203,17 @@ console.log("\n=== TEMPLATE YANG DIUNDUH TERBACA KEMBALI ===\n");
 // Template yang kami sediakan sendiri WAJIB lolos pembacanya sendiri. Kalau
 // tidak, orang pertama yang mengunduhnya langsung menemui penolakan.
 const dariTemplate = imporDariExcel([KOLOM_EXCEL, ...CONTOH_EXCEL] as Aoa);
-sama("empat contoh Excel terbaca semua", dariTemplate.soal.length, 4);
+// Dicari berdasarkan JENIS, bukan nomor baris. Template ini tumbuh setiap
+// kali ada jenis soal baru, dan uji yang mematok posisi akan patah tiap kali —
+// padahal yang berubah cuma urutan contohnya.
+const contoh = (jenis: string) => dariTemplate.soal.find((s) => s.jenis === jenis);
+sama("seluruh contoh Excel terbaca", dariTemplate.soal.length, CONTOH_EXCEL.length);
 sama("tanpa satu pun ditolak", dariTemplate.tolak.length, 0);
-sama("contoh PG kuncinya A", dariTemplate.soal[0].kunci, "0");
+sama("contoh PG kuncinya A", contoh("pg")?.kunci, "0");
+sama("contoh PG kompleks kuncinya A,B,D", contoh("pg_kompleks")?.kunci, "0,1,3");
+sama("contoh penjodohan punya tiga pasangan", contoh("penjodohan")?.pasangan.length, 3);
+sama("contoh penjodohan membawa pengecoh", contoh("penjodohan")?.pilihan.length, 4);
+sama("contoh essay membawa media", contoh("essay")?.media.jenis, "gambar");
 
 const dariWord = imporDariWord(NASKAH_TEMPLATE_WORD.join("\n"));
 sama("empat contoh Word terbaca semua", dariWord.soal.length, 4);
@@ -206,11 +223,12 @@ sama("tanpa satu pun ditolak", dariWord.tolak.length, 0);
 const jadiSoal = (s: (typeof dariTemplate.soal)[number], id: number): Soal => ({
   id, jenis: s.jenis, pertanyaan: s.pertanyaan, pilihan: s.pilihan,
   kunci: s.kunci, bobot: s.bobot, materi: s.materi, tingkat: s.tingkat, pembahasan: s.pembahasan,
+  pasangan: s.pasangan ?? [], media: s.media ?? MEDIA_KOSONG,
 });
-const pgTemplate = jadiSoal(dariTemplate.soal[0], 1);
+const pgTemplate = jadiSoal(contoh("pg")!, 1);
 sama("jawaban benar dinilai benar", nilaiJawaban(pgTemplate, "0").benar, true);
 sama("jawaban salah dinilai salah", nilaiJawaban(pgTemplate, "1").benar, false);
-const isianTemplate = jadiSoal(dariTemplate.soal[2], 3);
+const isianTemplate = jadiSoal(contoh("isian")!, 3);
 sama("isian kunci pertama diterima", nilaiJawaban(isianTemplate, "Agenda Setting").benar, true);
 sama("isian kunci kedua diterima", nilaiJawaban(isianTemplate, "penentuan agenda").benar, true);
 

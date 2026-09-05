@@ -5,6 +5,7 @@ import {
   integer,
   numeric,
   pgTable,
+  real,
   serial,
   text,
   timestamp,
@@ -488,6 +489,14 @@ export const cbtExams = pgTable("cbt_exams", {
   /** Dosen pemilik ujian. Null untuk ujian yang dibuat admin sendiri. */
   lecturerId: integer("lecturer_id").references(() => lecturers.id, { onDelete: "set null" }),
   createdBy: varchar("created_by", { length: 120 }).notNull(),
+  /**
+   * Id profil pembuatnya. INILAH penentu kepemilikan.
+   *
+   * Semula kepemilikan hanya dilihat dari lecturerId, dan itu mengunci dosen
+   * yang akun profilnya belum tersambung ke baris dosen: ia dapat membuat
+   * ujian, lalu tidak pernah dapat membukanya lagi.
+   */
+  createdById: varchar("created_by_id", { length: 64 }),
   createdByRole: varchar("created_by_role", { length: 40 }).notNull(),
 
   // Ditentukan dosen.
@@ -499,6 +508,15 @@ export const cbtExams = pgTable("cbt_exams", {
   randomOptions: boolean("random_options").notNull().default(true),
   allowBack: boolean("allow_back").notNull().default(true),
   showScore: boolean("show_score").notNull().default(true),
+  /**
+   * Satu perangkat hanya untuk satu peserta.
+   *
+   * Menyala secara bawaan, karena yang paling sering terjadi adalah satu ponsel
+   * dipakai bergantian oleh dua orang yang duduk bersebelahan. Dapat dimatikan
+   * dosennya untuk ujian di laboratorium, tempat satu komputer memang dipakai
+   * bergantian sepanjang hari.
+   */
+  singleDevice: boolean("single_device").notNull().default(true),
   /** Kode tambahan yang diketik mahasiswa. Kosong berarti tanpa kode. */
   token: varchar("token", { length: 12 }),
 
@@ -519,13 +537,34 @@ export const cbtExams = pgTable("cbt_exams", {
 export const cbtQuestions = pgTable("cbt_questions", {
   id: serial("id").primaryKey(),
   examId: integer("exam_id").notNull().references(() => cbtExams.id, { onDelete: "cascade" }),
-  /** "pg" | "benar_salah" | "isian" | "essay" */
+  /** "pg" | "pg_kompleks" | "penjodohan" | "benar_salah" | "isian" | "essay" */
   type: varchar("type", { length: 20 }).notNull().default("pg"),
   question: text("question").notNull(),
-  /** Pilihan jawaban sebagai JSON array of string. */
+  /**
+   * Pilihan jawaban sebagai JSON array of string. Untuk penjodohan ia adalah
+   * KOLOM KANAN, dan boleh memuat pengecoh yang tidak berpasangan.
+   */
   options: text("options").notNull().default("[]"),
-  /** Indeks pilihan benar (pg/benar_salah), atau teks kunci (isian). */
+  /**
+   * pg / benar_salah : indeks pilihan benar, mis. "2"
+   * pg_kompleks      : beberapa indeks dipisah koma, mis. "0,2,3"
+   * isian            : teks kunci, beberapa kemungkinan dipisah "|"
+   * penjodohan       : tidak dipakai — kuncinya ada pada kolom pairs
+   */
   answerKey: varchar("answer_key", { length: 400 }).notNull().default(""),
+  /**
+   * Pasangan penjodohan sebagai JSON: [{"kiri":"...","kanan":0}].
+   *
+   * "kanan" adalah INDEKS ke dalam options, bukan teksnya. Menyimpan teks
+   * membuat penilaian pecah diam-diam begitu dosen membetulkan satu huruf di
+   * kolom kanan — dan pecahnya baru ketahuan sesudah ujian berlangsung.
+   */
+  pairs: text("pairs").notNull().default("[]"),
+  /** "" | "gambar" | "video" */
+  mediaType: varchar("media_type", { length: 12 }).notNull().default(""),
+  /** Tautan gambar/video: hasil unggahan ke Storage, atau tautan luar. */
+  mediaUrl: text("media_url"),
+  mediaCaption: varchar("media_caption", { length: 240 }),
   points: integer("points").notNull().default(1),
   material: varchar("material", { length: 120 }),
   difficulty: varchar("difficulty", { length: 12 }).notNull().default("sedang"),
@@ -542,6 +581,19 @@ export const cbtAttempts = pgTable("cbt_attempts", {
   nim: varchar("nim", { length: 20 }).notNull(),
   name: varchar("name", { length: 120 }).notNull(),
   attemptNo: integer("attempt_no").notNull().default(1),
+  /**
+   * Nama yang sudah diseragamkan, untuk mencegah satu orang mendaftar dua kali
+   * dengan NIM berbeda. "Budi  Santoso" dan "budi santoso" adalah satu nama.
+   */
+  nameKey: varchar("name_key", { length: 120 }).notNull().default(""),
+  /**
+   * Penanda perangkat, dibuat sekali di peramban mahasiswa dan disimpan di
+   * sana. Bukan sidik jari perangkat sungguhan — ia dapat dihapus dengan
+   * membersihkan data peramban — melainkan pencegah yang paling sering
+   * dibutuhkan: satu ponsel dipakai bergantian oleh dua orang di ruangan yang
+   * sama.
+   */
+  deviceId: varchar("device_id", { length: 64 }).notNull().default(""),
   /** Kunci rahasia yang dipegang peramban mahasiswa selama ujian. */
   sessionKey: varchar("session_key", { length: 64 }).notNull().unique(),
   /** Benih pengacak, supaya urutan soalnya sama tiap kali halaman dimuat. */
@@ -557,6 +609,12 @@ export const cbtAttempts = pgTable("cbt_attempts", {
   score: integer("score"),
   correct: integer("correct").notNull().default(0),
   wrong: integer("wrong").notNull().default(0),
+  /**
+   * Dijawab sebagian benar — hanya mungkin pada PG kompleks dan penjodohan.
+   * Dipisahkan dari "wrong" supaya laporan tidak menyebut gagal total
+   * mahasiswa yang benar tiga dari empat pasangan.
+   */
+  partial: integer("partial").notNull().default(0),
   blank: integer("blank").notNull().default(0),
   pending: integer("pending").notNull().default(0),
   /** Penghitung pelanggaran: keluar fullscreen, pindah tab. */
@@ -585,7 +643,16 @@ export const cbtAnswers = pgTable("cbt_answers", {
   marked: boolean("marked").notNull().default(false),
   /** null = essay yang belum dikoreksi dosen. */
   isCorrect: boolean("is_correct"),
-  points: integer("points").notNull().default(0),
+  /**
+   * Poin yang didapat jawaban ini. PECAHAN, bukan bilangan bulat.
+   *
+   * PG kompleks dan penjodohan dinilai sebagian: dua dari tiga pasangan pada
+   * soal berbobot 5 bernilai 3,33. Menyimpannya sebagai bilangan bulat bukan
+   * sekadar membulatkan — Postgres MENOLAK angka pecahan yang masuk ke kolom
+   * integer, dan penolakannya terjadi tepat saat mahasiswa menekan
+   * "kumpulkan".
+   */
+  points: real("points").notNull().default(0),
   feedback: text("feedback"),
   gradedBy: varchar("graded_by", { length: 120 }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
