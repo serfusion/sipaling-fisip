@@ -639,11 +639,8 @@ export default function UjianApp() {
             <div>
               <b>Waktu pengerjaan {ejaMenit(ujian.durasi)}</b>
               <span>
-                Hitungan mundur baru berjalan sesudah tombol <b>MULAI UJIAN</b> ditekan, jadi
-                bersiaplah dulu: alat tulis, daya baterai, dan sambungan internet.
-                {ujian.selesai
-                  ? ` Ujian ini ditutup ${tanggalRapi(ujian.selesai)}; yang mulai mendekati jam tutup hanya mendapat sisa waktu sampai jam itu.`
-                  : ""}
+                ⏱️ Waktu dihitung setelah tombol <b>&ldquo;MULAI UJIAN&rdquo;</b> ditekan.
+                Pastikan alat tulis, baterai, dan koneksi internet siap.
               </span>
             </div>
           </div>
