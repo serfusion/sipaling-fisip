@@ -1,0 +1,301 @@
+// ============================================================
+// CBT — UJIAN (sisi dosen dan admin)
+//
+// GET    daftar ujian yang boleh dilihat pemanggilnya
+// POST   buat ujian baru
+// PATCH  ubah ujian yang belum diaktifkan
+// DELETE hapus ujian beserta soal dan hasilnya
+//
+// Yang boleh MENGAKTIFKAN ada di /api/cbt/aktivasi, bukan di sini. Pemisahan
+// itu disengaja: dosen memegang isi ujiannya, admin memegang kapan ia terbuka.
+// ============================================================
+import { db } from "@/db";
+import { cbtAttempts, cbtExams, cbtQuestions } from "@/db/schema";
+import { and, desc, eq, sql } from "drizzle-orm";
+import { getCurrentProfile, type SessionProfile } from "@/lib/supabase-server";
+import { explainServerError } from "@/lib/api-errors";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
+import { kodeUjianBaru, statusUjian } from "@/lib/cbt";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+/** Role yang boleh memakai CBT sama sekali. Admin bagian sengaja di luar. */
+export const CBT_ROLES = ["super_admin", "admin", "dosen"];
+/** Role yang boleh MENGAKTIFKAN ujian. Lebih sempit lagi. */
+export const AKTIVATOR = ["super_admin", "admin"];
+
+export function bolehCbt(profile: SessionProfile | null) {
+  return Boolean(profile && CBT_ROLES.includes(profile.role));
+}
+
+/** Ujian ini miliknya? Admin memegang semuanya; dosen hanya miliknya sendiri. */
+export function miliknya(profile: SessionProfile, ujian: { lecturerId: number | null; createdBy: string }) {
+  if (profile.role !== "dosen") return true;
+  return profile.lecturerId !== null && ujian.lecturerId === profile.lecturerId;
+}
+
+const teks = (nilai: unknown, batas: number) =>
+  typeof nilai === "string" ? nilai.replace(/\s+/g, " ").trim().slice(0, batas) : "";
+
+const angka = (nilai: unknown, bawaan: number, min: number, maks: number) => {
+  const n = Number(nilai);
+  if (!Number.isFinite(n)) return bawaan;
+  return Math.max(min, Math.min(Math.round(n), maks));
+};
+
+const waktu = (nilai: unknown): Date | null => {
+  if (typeof nilai !== "string" || !nilai.trim()) return null;
+  const d = new Date(nilai);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+export async function GET() {
+  try {
+    const profile = await getCurrentProfile();
+    if (!bolehCbt(profile) || !profile) {
+      return Response.json({ success: false, message: "Menu CBT tidak tersedia untuk role Anda." }, { status: 403 });
+    }
+
+    // Dosen hanya melihat ujiannya sendiri. Admin melihat semuanya, karena
+    // merekalah yang harus mengaktifkannya.
+    const saring =
+      profile.role === "dosen"
+        ? profile.lecturerId === null
+          ? sql`false`
+          : eq(cbtExams.lecturerId, profile.lecturerId)
+        : undefined;
+
+    const daftar = await db
+      .select({
+        id: cbtExams.id,
+        code: cbtExams.code,
+        title: cbtExams.title,
+        courseName: cbtExams.courseName,
+        className: cbtExams.className,
+        lecturerId: cbtExams.lecturerId,
+        createdBy: cbtExams.createdBy,
+        questionCount: cbtExams.questionCount,
+        durationMinutes: cbtExams.durationMinutes,
+        passingGrade: cbtExams.passingGrade,
+        maxAttempts: cbtExams.maxAttempts,
+        randomQuestions: cbtExams.randomQuestions,
+        randomOptions: cbtExams.randomOptions,
+        allowBack: cbtExams.allowBack,
+        showScore: cbtExams.showScore,
+        token: cbtExams.token,
+        startAt: cbtExams.startAt,
+        endAt: cbtExams.endAt,
+        activatedAt: cbtExams.activatedAt,
+        activatedBy: cbtExams.activatedBy,
+        description: cbtExams.description,
+        instruction: cbtExams.instruction,
+        createdAt: cbtExams.createdAt,
+      })
+      .from(cbtExams)
+      .where(saring)
+      .orderBy(desc(cbtExams.createdAt))
+      .limit(200);
+
+    // Jumlah soal dan peserta dihitung sekali untuk seluruh daftar, bukan
+    // satu pertanyaan per ujian: dua puluh ujian berarti empat puluh
+    // perjalanan ke basis data yang semuanya menunggu.
+    const bankRows = await db
+      .select({ examId: cbtQuestions.examId, n: sql<number>`count(*)::int` })
+      .from(cbtQuestions)
+      .groupBy(cbtQuestions.examId);
+    const bank = new Map(bankRows.map((b) => [b.examId, b.n]));
+
+    const pesertaRows = await db
+      .select({
+        examId: cbtAttempts.examId,
+        total: sql<number>`count(*)::int`,
+        berjalan: sql<number>`count(*) filter (where status = 'berjalan')::int`,
+        selesai: sql<number>`count(*) filter (where status <> 'berjalan')::int`,
+      })
+      .from(cbtAttempts)
+      .groupBy(cbtAttempts.examId);
+    const peserta = new Map(pesertaRows.map((p) => [p.examId, p]));
+
+    const sekarang = new Date();
+    return Response.json({
+      success: true,
+      bolehAktivasi: AKTIVATOR.includes(profile.role),
+      ujian: daftar.map((u) => ({
+        ...u,
+        status: statusUjian({ aktif: Boolean(u.activatedAt), mulai: u.startAt, selesai: u.endAt }, sekarang),
+        jumlahBank: bank.get(u.id) ?? 0,
+        peserta: peserta.get(u.id) ?? { total: 0, berjalan: 0, selesai: 0 },
+      })),
+    });
+  } catch (error: unknown) {
+    console.error("daftar ujian cbt", error);
+    return Response.json(
+      { success: false, message: explainServerError(error, "Daftar ujian belum dapat dimuat.") },
+      { status: 500 },
+    );
+  }
+}
+
+export async function POST(request: Request) {
+  const batas = rateLimit({ request, name: "cbt-buat-ujian", limit: 30, windowMs: 10 * 60_000 });
+  if (!batas.ok) return tooManyRequests(batas.retryAfter);
+
+  try {
+    const profile = await getCurrentProfile();
+    if (!bolehCbt(profile) || !profile) {
+      return Response.json({ success: false, message: "Menu CBT tidak tersedia untuk role Anda." }, { status: 403 });
+    }
+
+    const body = (await request.json()) as Record<string, unknown>;
+    const title = teks(body.title, 160);
+    const courseName = teks(body.courseName, 120);
+    if (!title || !courseName) {
+      return Response.json({ success: false, message: "Nama ujian dan mata kuliah wajib diisi." }, { status: 400 });
+    }
+
+    // Kode diulang bila kebetulan tabrakan. Enam huruf dari 32 abjad memberi
+    // lebih dari satu miliar kemungkinan; tabrakan itu jarang, bukan mustahil.
+    for (let coba = 0; coba < 5; coba += 1) {
+      const code = kodeUjianBaru();
+      try {
+        const dibuat = await db
+          .insert(cbtExams)
+          .values({
+            code,
+            title,
+            courseName,
+            className: teks(body.className, 80) || null,
+            description: teks(body.description, 2000) || null,
+            instruction: teks(body.instruction, 2000) || null,
+            lecturerId: profile.role === "dosen" ? profile.lecturerId : null,
+            createdBy: profile.fullName,
+            createdByRole: profile.role,
+            questionCount: angka(body.questionCount, 0, 0, 500),
+            durationMinutes: angka(body.durationMinutes, 60, 1, 600),
+            passingGrade: angka(body.passingGrade, 60, 0, 100),
+            maxAttempts: angka(body.maxAttempts, 1, 1, 10),
+            randomQuestions: body.randomQuestions !== false,
+            randomOptions: body.randomOptions !== false,
+            allowBack: body.allowBack !== false,
+            showScore: body.showScore !== false,
+            token: teks(body.token, 12).toUpperCase() || null,
+          })
+          .returning({ id: cbtExams.id, code: cbtExams.code });
+        return Response.json({ success: true, ujian: dibuat[0] }, { status: 201 });
+      } catch (error) {
+        if (coba >= 4) throw error;
+      }
+    }
+    return Response.json({ success: false, message: "Ujian belum dapat dibuat." }, { status: 500 });
+  } catch (error: unknown) {
+    console.error("buat ujian cbt", error);
+    return Response.json(
+      { success: false, message: explainServerError(error, "Ujian belum tersimpan.") },
+      { status: 500 },
+    );
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const profile = await getCurrentProfile();
+    if (!bolehCbt(profile) || !profile) {
+      return Response.json({ success: false, message: "Menu CBT tidak tersedia untuk role Anda." }, { status: 403 });
+    }
+
+    const body = (await request.json()) as Record<string, unknown>;
+    const id = Number(body.id);
+    if (!Number.isInteger(id)) {
+      return Response.json({ success: false, message: "Ujian tidak dikenali." }, { status: 400 });
+    }
+
+    const ada = await db.select().from(cbtExams).where(eq(cbtExams.id, id)).limit(1);
+    const ujian = ada[0];
+    if (!ujian) return Response.json({ success: false, message: "Ujian tidak ditemukan." }, { status: 404 });
+    if (!miliknya(profile, ujian)) {
+      return Response.json({ success: false, message: "Ujian ini milik dosen lain." }, { status: 403 });
+    }
+
+    // Ujian yang SEDANG berlangsung tidak boleh diubah isinya. Mengubah
+    // durasi atau jumlah soal di tengah jalan berarti sebagian mahasiswa
+    // mengerjakan ujian yang berbeda dari sebagian yang lain.
+    const status = statusUjian({ aktif: Boolean(ujian.activatedAt), mulai: ujian.startAt, selesai: ujian.endAt });
+    if (status === "berlangsung") {
+      return Response.json(
+        { success: false, message: "Ujian sedang berlangsung. Menunggu selesai sebelum diubah." },
+        { status: 409 },
+      );
+    }
+
+    const ubah: Record<string, unknown> = { updatedAt: new Date() };
+    if (typeof body.title === "string") ubah.title = teks(body.title, 160);
+    if (typeof body.courseName === "string") ubah.courseName = teks(body.courseName, 120);
+    if (typeof body.className === "string") ubah.className = teks(body.className, 80) || null;
+    if (typeof body.description === "string") ubah.description = teks(body.description, 2000) || null;
+    if (typeof body.instruction === "string") ubah.instruction = teks(body.instruction, 2000) || null;
+    if (body.questionCount !== undefined) ubah.questionCount = angka(body.questionCount, 0, 0, 500);
+    if (body.durationMinutes !== undefined) ubah.durationMinutes = angka(body.durationMinutes, 60, 1, 600);
+    if (body.passingGrade !== undefined) ubah.passingGrade = angka(body.passingGrade, 60, 0, 100);
+    if (body.maxAttempts !== undefined) ubah.maxAttempts = angka(body.maxAttempts, 1, 1, 10);
+    if (body.randomQuestions !== undefined) ubah.randomQuestions = body.randomQuestions !== false;
+    if (body.randomOptions !== undefined) ubah.randomOptions = body.randomOptions !== false;
+    if (body.allowBack !== undefined) ubah.allowBack = body.allowBack !== false;
+    if (body.showScore !== undefined) ubah.showScore = body.showScore !== false;
+    if (body.token !== undefined) ubah.token = teks(body.token, 12).toUpperCase() || null;
+
+    await db.update(cbtExams).set(ubah).where(eq(cbtExams.id, id));
+    return Response.json({ success: true });
+  } catch (error: unknown) {
+    console.error("ubah ujian cbt", error);
+    return Response.json(
+      { success: false, message: explainServerError(error, "Perubahan belum tersimpan.") },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const profile = await getCurrentProfile();
+    if (!bolehCbt(profile) || !profile) {
+      return Response.json({ success: false, message: "Menu CBT tidak tersedia untuk role Anda." }, { status: 403 });
+    }
+    const id = Number(new URL(request.url).searchParams.get("id"));
+    if (!Number.isInteger(id)) {
+      return Response.json({ success: false, message: "Ujian tidak dikenali." }, { status: 400 });
+    }
+
+    const ada = await db.select().from(cbtExams).where(eq(cbtExams.id, id)).limit(1);
+    const ujian = ada[0];
+    if (!ujian) return Response.json({ success: true });
+    if (!miliknya(profile, ujian)) {
+      return Response.json({ success: false, message: "Ujian ini milik dosen lain." }, { status: 403 });
+    }
+
+    // Ujian yang sudah dikerjakan orang hanya boleh dihapus Super Admin.
+    // Hasil ujian adalah catatan akademik; menghapusnya bukan kerja harian.
+    const dipakai = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(cbtAttempts)
+      .where(eq(cbtAttempts.examId, id));
+    if ((dipakai[0]?.n ?? 0) > 0 && profile.role !== "super_admin") {
+      return Response.json(
+        {
+          success: false,
+          message: "Ujian ini sudah dikerjakan mahasiswa. Penghapusannya hanya oleh Super Admin.",
+        },
+        { status: 403 },
+      );
+    }
+
+    await db.delete(cbtExams).where(and(eq(cbtExams.id, id)));
+    return Response.json({ success: true });
+  } catch (error: unknown) {
+    console.error("hapus ujian cbt", error);
+    return Response.json(
+      { success: false, message: explainServerError(error, "Ujian belum dapat dihapus.") },
+      { status: 500 },
+    );
+  }
+}

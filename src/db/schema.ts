@@ -462,3 +462,117 @@ export const transcriptArchives = pgTable("transcript_archives", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ============================================================
+// CBT — UJIAN BERBASIS KOMPUTER (v24)
+//
+// Mahasiswa TIDAK punya akun. Identitasnya melekat pada attempt, bukan pada
+// tabel pengguna: nama + NIM + (kode ujian). Itu keputusan pokok blueprint-nya,
+// dan seluruh bentuk tabel di bawah mengikuti dari sana.
+//
+// Kontrol aktivasi sengaja dipisah dari kepemilikan. Dosen membuat ujian dan
+// menentukan jumlah soal serta durasinya; yang MENGAKTIFKAN hanya Super Admin
+// dan Admin — bukan admin bagian. Sesudah diaktifkan, pembukaannya murni dari
+// jam: disetel pukul sepuluh, terbuka sendiri pukul sepuluh.
+// ============================================================
+export const cbtExams = pgTable("cbt_exams", {
+  id: serial("id").primaryKey(),
+  /** Kode publik yang dibagikan ke mahasiswa, mis. "K7M2QX". */
+  code: varchar("code", { length: 12 }).notNull().unique(),
+  title: varchar("title", { length: 160 }).notNull(),
+  courseName: varchar("course_name", { length: 120 }).notNull(),
+  className: varchar("class_name", { length: 80 }),
+  description: text("description"),
+  instruction: text("instruction"),
+  /** Dosen pemilik ujian. Null untuk ujian yang dibuat admin sendiri. */
+  lecturerId: integer("lecturer_id").references(() => lecturers.id, { onDelete: "set null" }),
+  createdBy: varchar("created_by", { length: 120 }).notNull(),
+  createdByRole: varchar("created_by_role", { length: 40 }).notNull(),
+
+  // Ditentukan dosen.
+  questionCount: integer("question_count").notNull().default(0),
+  durationMinutes: integer("duration_minutes").notNull().default(60),
+  passingGrade: integer("passing_grade").notNull().default(60),
+  maxAttempts: integer("max_attempts").notNull().default(1),
+  randomQuestions: boolean("random_questions").notNull().default(true),
+  randomOptions: boolean("random_options").notNull().default(true),
+  allowBack: boolean("allow_back").notNull().default(true),
+  showScore: boolean("show_score").notNull().default(true),
+  /** Kode tambahan yang diketik mahasiswa. Kosong berarti tanpa kode. */
+  token: varchar("token", { length: 12 }),
+
+  // Jadwal. Pembukaannya murni dari dua kolom ini.
+  startAt: timestamp("start_at", { withTimezone: true }),
+  endAt: timestamp("end_at", { withTimezone: true }),
+
+  // GERBANG AKTIVASI — hanya Super Admin dan Admin yang boleh mengisinya.
+  activatedAt: timestamp("activated_at", { withTimezone: true }),
+  activatedBy: varchar("activated_by", { length: 120 }),
+
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Bank soal. Menempel pada ujiannya supaya dosen dapat menyusun banknya lebih
+// banyak daripada yang dikerjakan, lalu sistem mengambil sebagiannya.
+export const cbtQuestions = pgTable("cbt_questions", {
+  id: serial("id").primaryKey(),
+  examId: integer("exam_id").notNull().references(() => cbtExams.id, { onDelete: "cascade" }),
+  /** "pg" | "benar_salah" | "isian" | "essay" */
+  type: varchar("type", { length: 20 }).notNull().default("pg"),
+  question: text("question").notNull(),
+  /** Pilihan jawaban sebagai JSON array of string. */
+  options: text("options").notNull().default("[]"),
+  /** Indeks pilihan benar (pg/benar_salah), atau teks kunci (isian). */
+  answerKey: varchar("answer_key", { length: 400 }).notNull().default(""),
+  points: integer("points").notNull().default(1),
+  material: varchar("material", { length: 120 }),
+  difficulty: varchar("difficulty", { length: 12 }).notNull().default("sedang"),
+  explanation: text("explanation"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Satu percobaan ujian oleh satu mahasiswa. INILAH identitas mahasiswanya —
+// tidak ada tabel akun, dan memang tidak perlu ada.
+export const cbtAttempts = pgTable("cbt_attempts", {
+  id: serial("id").primaryKey(),
+  examId: integer("exam_id").notNull().references(() => cbtExams.id, { onDelete: "cascade" }),
+  nim: varchar("nim", { length: 20 }).notNull(),
+  name: varchar("name", { length: 120 }).notNull(),
+  attemptNo: integer("attempt_no").notNull().default(1),
+  /** Kunci rahasia yang dipegang peramban mahasiswa selama ujian. */
+  sessionKey: varchar("session_key", { length: 64 }).notNull().unique(),
+  /** Benih pengacak, supaya urutan soalnya sama tiap kali halaman dimuat. */
+  seed: integer("seed").notNull(),
+  /** Daftar id soal beserta peta pilihannya, sebagai JSON. */
+  paper: text("paper").notNull().default("[]"),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  /** Batas waktu, DIHITUNG DI SERVER. Jam peramban tidak dipercaya. */
+  deadlineAt: timestamp("deadline_at", { withTimezone: true }).notNull(),
+  submittedAt: timestamp("submitted_at", { withTimezone: true }),
+  /** "berjalan" | "selesai" | "waktu_habis" */
+  status: varchar("status", { length: 20 }).notNull().default("berjalan"),
+  score: integer("score"),
+  correct: integer("correct").notNull().default(0),
+  wrong: integer("wrong").notNull().default(0),
+  blank: integer("blank").notNull().default(0),
+  pending: integer("pending").notNull().default(0),
+  /** Penghitung pelanggaran: keluar fullscreen, pindah tab. */
+  leftFullscreen: integer("left_fullscreen").notNull().default(0),
+  switchedTab: integer("switched_tab").notNull().default(0),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+});
+
+export const cbtAnswers = pgTable("cbt_answers", {
+  id: serial("id").primaryKey(),
+  attemptId: integer("attempt_id").notNull().references(() => cbtAttempts.id, { onDelete: "cascade" }),
+  questionId: integer("question_id").notNull().references(() => cbtQuestions.id, { onDelete: "cascade" }),
+  answer: text("answer").notNull().default(""),
+  /** null = essay yang belum dikoreksi dosen. */
+  isCorrect: boolean("is_correct"),
+  points: integer("points").notNull().default(0),
+  feedback: text("feedback"),
+  gradedBy: varchar("graded_by", { length: 120 }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

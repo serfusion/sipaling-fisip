@@ -8,6 +8,7 @@ import type { LecturerOption } from "../lecturer-picker";
 import DatabasePanel from "./database-panel";
 import GuidancePanel from "./guidance-panel";
 import NotificationBell from "./notification-bell";
+import CbtPanel from "./cbt-panel";
 import ProposalPanel from "./proposal-panel";
 import StatisticsPanel from "./statistics-panel";
 import {
@@ -161,6 +162,7 @@ type ViewId =
   | "pengumuman"
   | "maintenance"
   | "cakrawala"
+  | "cbt"
   | "akun";
 
 const STATUSES = ["Masuk", "Dicek", "Revisi", "Diproses", "Selesai", "Ditolak"];
@@ -292,6 +294,9 @@ const MENU: MenuItem[] = [
   // kehilangan gunanya kalau tersembunyi di balik satu ketukan.
   { id: "antrean", icon: "☰", label: "Antrean Layanan", roles: "all" },
   { id: "bimbingan", icon: "⚘", label: "Bimbingan & Surat Tugas", roles: ["dosen"] },
+  // Menunya ada di portal dosen. Yang MENGAKTIFKAN ujian hanya Super Admin
+  // dan Admin — admin bagian sengaja tidak melihat menu ini sama sekali.
+  { id: "cbt", icon: "◈", label: "Ujian Online (CBT)", roles: ["super_admin", "admin", "dosen"] },
   { id: "database", icon: "🗄", label: "Database Dokumen", roles: DATABASE_ROLES, grup: "dokumen" },
   { id: "template", icon: "▤", label: "Template Dokumen", roles: ARCHIVE_ROLES, grup: "dokumen" },
   { id: "arsip", icon: "⬢", label: "Arsip Drive", roles: ARCHIVE_ROLES, grup: "dokumen" },
@@ -347,6 +352,7 @@ const VIEW_TITLES: Record<ViewId, string> = {
   pengumuman: "Pengumuman & Status",
   maintenance: "Mode Maintenance",
   cakrawala: "Kunci Cakrawala",
+  cbt: "Ujian Online (CBT)",
   akun: "Akun",
 };
 
@@ -1691,6 +1697,10 @@ export default function DashboardApp({
                 </div>
               </div>
             </section>
+          )}
+
+          {view === "cbt" && ["super_admin", "admin", "dosen"].includes(profile.role) && (
+            <CbtPanel role={profile.role} />
           )}
 
           {view === "cakrawala" && profile.role === "super_admin" && (
