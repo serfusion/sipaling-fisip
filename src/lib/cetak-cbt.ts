@@ -109,9 +109,9 @@ ${isi}
 }
 
 function tanggalPanjang(iso?: string | null) {
-  if (!iso) return "—";
+  if (!iso) return "-";
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "-";
   return d.toLocaleString("id-ID", {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
     hour: "2-digit", minute: "2-digit",
@@ -122,7 +122,7 @@ function kop(ujian: UjianCetak, subjudul: string) {
   return `<div class="kop">
   <h1>${lolos(subjudul)}</h1>
   <p>FAKULTAS ILMU SOSIAL DAN ILMU POLITIK</p>
-  <p>SiPaling FISIP — Sistem Ujian Berbasis Komputer</p>
+  <p>SiPaling FISIP: Sistem Ujian Berbasis Komputer</p>
 </div>`;
 }
 
@@ -159,7 +159,7 @@ export function naskahSoalHtml(
       if (s.media?.jenis && s.media.url) {
         bagian.push(
           `<p class="media-catatan">[Soal ini disertai ${s.media.jenis}` +
-            `${s.media.keterangan ? `: ${lolos(s.media.keterangan)}` : ""} — tidak tercetak]</p>`,
+            `${s.media.keterangan ? `: ${lolos(s.media.keterangan)}` : ""}, tidak tercetak]</p>`,
         );
       }
 
@@ -211,12 +211,12 @@ ${kop(ujian, denganKunci ? "NASKAH SOAL DAN KUNCI JAWABAN" : "NASKAH SOAL UJIAN"
 ${barisKeterangan([
   ["Mata Kuliah", ujian.mataKuliah],
   ["Nama Ujian", ujian.judul],
-  ["Kelas", ujian.kelas || "—"],
+  ["Kelas", ujian.kelas || "-"],
   ["Waktu", `${ujian.durasi} menit`],
   ["Jumlah Soal", `${soal.length} butir`],
   ["Total Bobot", `${soal.reduce((n, s) => n + s.bobot, 0)} poin`],
 ])}
-${denganKunci ? '<div class="petunjuk"><b>BERKAS PENGAWAS — JANGAN DIBAGIKAN KE MAHASISWA.</b>Berkas ini memuat kunci jawaban.</div>' : ""}
+${denganKunci ? '<div class="petunjuk"><b>BERKAS PENGAWAS: JANGAN DIBAGIKAN KE MAHASISWA.</b>Berkas ini memuat kunci jawaban.</div>' : ""}
 <div class="petunjuk">
   <b>PETUNJUK</b>
   ${ujian.instruksi ? `${lolos(ujian.instruksi)}<br>` : ""}
@@ -227,7 +227,7 @@ ${!denganKunci ? barisKeterangan([["Nama", "………………………………
 <ol class="soal">${daftar}</ol>
 <div class="kaki">Kode ujian ${lolos(ujian.kode)} · dicetak ${tanggalPanjang(new Date().toISOString())}</div>`;
 
-  return bungkus(`Naskah Soal — ${ujian.judul}`, isi);
+  return bungkus(`Naskah Soal: ${ujian.judul}`, isi);
 }
 
 // ---------- 2. BERITA ACARA ----------
@@ -268,13 +268,13 @@ ${kop(ujian, "BERITA ACARA PELAKSANAAN UJIAN")}
 ${barisKeterangan([
   ["Mata Kuliah", ujian.mataKuliah],
   ["Nama Ujian", ujian.judul],
-  ["Kelas", ujian.kelas || "—"],
+  ["Kelas", ujian.kelas || "-"],
   ["Kode Ujian", ujian.kode],
   ["Hari / Tanggal", tanggalPanjang(ujian.mulai)],
   ["Waktu Berakhir", tanggalPanjang(ujian.selesai)],
   ["Durasi", `${ujian.durasi} menit`],
   ["Ruang / Moda", acara.ruang || "Daring"],
-  ["Pengawas", acara.pengawas || "—"],
+  ["Pengawas", acara.pengawas || "-"],
 ])}
 
 <h3>A. Kehadiran</h3>
@@ -288,7 +288,7 @@ ${barisKeterangan([
 ${daftarLanggar}
 
 <h3>C. Catatan pengawas</h3>
-<div class="petunjuk" style="min-height:70px">${acara.catatan ? lolos(acara.catatan) : "—"}</div>
+<div class="petunjuk" style="min-height:70px">${acara.catatan ? lolos(acara.catatan) : "-"}</div>
 
 <p>Demikian berita acara ini dibuat dengan sebenarnya untuk dipergunakan sebagaimana mestinya.</p>
 
@@ -298,7 +298,7 @@ ${daftarLanggar}
   <tr><td>(………………………………)</td><td>(${lolos(acara.pengawas || "………………………………")})</td></tr>
 </table>`;
 
-  return bungkus(`Berita Acara — ${ujian.judul}`, isi);
+  return bungkus(`Berita Acara: ${ujian.judul}`, isi);
 }
 
 // ---------- 3. LAPORAN PER PESERTA ----------
@@ -358,15 +358,15 @@ ${barisKeterangan([
   ["NIM", peserta.nim],
   ["Mata Kuliah", ujian.mataKuliah],
   ["Nama Ujian", ujian.judul],
-  ["Kelas", ujian.kelas || "—"],
+  ["Kelas", ujian.kelas || "-"],
   ["Mulai Mengerjakan", tanggalPanjang(peserta.mulai)],
   ["Dikumpulkan", tanggalPanjang(peserta.kumpul)],
 ])}
 
 <h3>A. Ringkasan nilai</h3>
 <table class="nilai">
-  <tr><th>Nilai akhir</th><td><b style="font-size:15pt">${peserta.nilai ?? "—"}</b>
-    &nbsp; (batas lulus ${passing}) — <b>${peserta.nilai === null ? "belum dinilai" : lulus ? "LULUS" : "BELUM LULUS"}</b></td></tr>
+  <tr><th>Nilai akhir</th><td><b style="font-size:15pt">${peserta.nilai ?? "-"}</b>
+    &nbsp; (batas lulus ${passing}) · <b>${peserta.nilai === null ? "belum dinilai" : lulus ? "LULUS" : "BELUM LULUS"}</b></td></tr>
   <tr><th>Benar</th><td>${peserta.benar} butir</td></tr>
   ${peserta.sebagian ? `<tr><th>Benar sebagian</th><td>${peserta.sebagian} butir</td></tr>` : ""}
   <tr><th>Salah</th><td>${peserta.salah} butir</td></tr>
@@ -391,5 +391,5 @@ Catatan ini penanda, bukan putusan.</p>` : ""}
   <tr><td>(………………………………)</td><td>(${lolos(peserta.nama)})</td></tr>
 </table>`;
 
-  return bungkus(`Laporan — ${peserta.nama}`, isi);
+  return bungkus(`Laporan: ${peserta.nama}`, isi);
 }

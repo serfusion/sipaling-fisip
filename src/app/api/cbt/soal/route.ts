@@ -108,7 +108,7 @@ function rapikanSoal(m: Masukan): { ok: true; nilai: Record<string, unknown> } |
     if (nomor.length === pilihan.length) {
       return {
         ok: false,
-        pesan: "Seluruh pilihan ditandai benar. Soal seperti ini tidak mengukur apa pun — sisakan minimal satu pengecoh.",
+        pesan: "Seluruh pilihan ditandai benar. Soal seperti ini tidak mengukur apa pun. Sisakan minimal satu pengecoh.",
       };
     }
     kunci = nomor.join(",");

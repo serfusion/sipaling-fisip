@@ -835,7 +835,7 @@ export default function PratinjauCakrawala({ habis = null }: { habis?: Habis }) 
                       year: "numeric",
                     })}
                   </b>
-                  . Perpanjang dengan mengirim pesan ke {KONTAK} — nomormu sudah terdaftar, jadi
+                  . Perpanjang dengan mengirim pesan ke {KONTAK}, nomormu sudah terdaftar, jadi
                   harinya langsung ditambahkan ke akun yang sama. Semua project dan catatanmu masih
                   utuh di sana.
                 </p>
@@ -900,11 +900,11 @@ export default function PratinjauCakrawala({ habis = null }: { habis?: Habis }) 
             {galat && <p className="cw-galat" role="alert">{galat}</p>}
             <p className="cw-kunci-catatan">
               Nomor WhatsApp didaftarkan <b>sekali</b> saat kode ditukar, lalu kode itu terkunci pada
-              nomor tersebut. Tidak ada OTP dan tidak ada kata sandi — cukup kode dan nomor yang sama.
+              nomor tersebut. Tidak ada OTP dan tidak ada kata sandi, cukup kode dan nomor yang sama.
             </p>
             <p className="cw-kunci-catatan">
               Kalau langganan habis, cukup kirim pesan ke {KONTAK} untuk perpanjang. Nomornya sudah
-              terdaftar, jadi kode barunya langsung menambah hari di akun yang sama — web dan
+              terdaftar, jadi kode barunya langsung menambah hari di akun yang sama, web dan
               aplikasi sekaligus.
             </p>
             <p className="cw-kunci-catatan">

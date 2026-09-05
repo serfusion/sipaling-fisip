@@ -232,15 +232,15 @@ export default function ProposalPanel({
             <div><dt>Konsentrasi</dt><dd>{selected.concentration}</dd></div>
             <div><dt>IPK Terakhir</dt><dd>{Number(selected.gpa).toFixed(2).replace(".", ",")}</dd></div>
             <div><dt>Jenis Tugas Akhir</dt><dd>{selected.finalTaskType}</dd></div>
-            <div className="dwide"><dt>Alamat</dt><dd>{selected.address || "—"}</dd></div>
-            <div><dt>Kontak</dt><dd>{selected.contact || "—"}</dd></div>
-            <div><dt>Diverifikasi oleh</dt><dd>{selected.reviewedBy || "—"}{selected.reviewedAt ? ` · ${formatStamp(selected.reviewedAt)}` : ""}</dd></div>
+            <div className="dwide"><dt>Alamat</dt><dd>{selected.address || "-"}</dd></div>
+            <div><dt>Kontak</dt><dd>{selected.contact || "-"}</dd></div>
+            <div><dt>Diverifikasi oleh</dt><dd>{selected.reviewedBy || "-"}{selected.reviewedAt ? ` · ${formatStamp(selected.reviewedAt)}` : ""}</dd></div>
             <div className="dwide"><dt>Pernyataan pemohon</dt><dd className="prop-statement">{selected.statement}</dd></div>
           </dl>
 
           {selected.paymentFileName ? (
             <a className="dlink dlink-file" href={`/api/proposal-files/${encodeURIComponent(selected.code)}`} target="_blank" rel="noreferrer">
-              ⇩ Buka bukti keuangan — {selected.paymentFileName}
+              ⇩ Buka bukti keuangan: {selected.paymentFileName}
             </a>
           ) : (
             <div className="nofile">Bukti keuangan tidak terlampir pada pengajuan ini.</div>

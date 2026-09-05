@@ -96,7 +96,7 @@ export async function GET(request: Request) {
       cutoff: cutoff.toISOString(),
       filesDeleted,
       rowsCleaned,
-      note: rowsCleaned >= BATCH * 2 ? "Masih ada sisa — akan dilanjutkan pada jadwal berikutnya." : "Selesai.",
+      note: rowsCleaned >= BATCH * 2 ? "Masih ada sisa, akan dilanjutkan pada jadwal berikutnya." : "Selesai.",
     };
     await db
       .insert(appSettings)

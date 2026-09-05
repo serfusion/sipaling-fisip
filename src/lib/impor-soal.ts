@@ -123,7 +123,7 @@ export function bacaKunciJamak(
 
   if (nomor.size === 0) return { ok: false, alasan: "kunci jawaban kosong" };
   if (nomor.size === pilihan.length) {
-    return { ok: false, alasan: "seluruh pilihan ditandai benar — soal seperti ini tidak mengukur apa pun" };
+    return { ok: false, alasan: "seluruh pilihan ditandai benar, soal seperti ini tidak mengukur apa pun" };
   }
   return { ok: true, kunci: [...nomor].sort((a, b) => a - b).join(",") };
 }
@@ -215,7 +215,7 @@ export function bacaKunci(
     if (bersih.startsWith("salah") || bersih === "s" || bersih === "false") {
       return { ok: true, kunci: "1" };
     }
-    return { ok: false, alasan: `kunci "${isi}" tidak terbaca — tulis BENAR atau SALAH` };
+    return { ok: false, alasan: `kunci "${isi}" tidak terbaca: tulis BENAR atau SALAH` };
   }
 
   // Pilihan ganda. Satu huruf dulu, karena itu yang paling sering ditulis.
@@ -326,7 +326,7 @@ export function imporDariExcel(aoa: Aoa): HasilImpor {
   if (kepala < 0) {
     return {
       soal: [],
-      tolak: [{ baris: "—", alasan: "Baris judul kolom tidak ditemukan. Pakai template yang diunduh dari dashboard." }],
+      tolak: [{ baris: "-", alasan: "Baris judul kolom tidak ditemukan. Pakai template yang diunduh dari dashboard." }],
     };
   }
 
@@ -528,7 +528,7 @@ export function imporDariWord(mentah: string): HasilImpor {
 
   if (soal.length === 0 && tolak.length === 0) {
     tolak.push({
-      baris: "—",
+      baris: "-",
       alasan: "Tidak ada soal bernomor yang terbaca. Tiap soal diawali \"1.\", \"2.\", dan seterusnya.",
     });
   }

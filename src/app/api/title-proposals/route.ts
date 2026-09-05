@@ -207,7 +207,7 @@ export async function POST(request: Request) {
       kind: "proposal_submitted",
       severity: "info",
       title: "Pengajuan judul baru",
-      body: `${studentName} (${nim}) — ${finalTaskType}: "${title}". Perlu verifikasi.`,
+      body: `${studentName} (${nim}), ${finalTaskType}: "${title}". Perlu verifikasi.`,
       refCode: code,
     });
 

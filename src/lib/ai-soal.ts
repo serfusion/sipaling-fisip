@@ -102,14 +102,14 @@ export const PERAN_SISTEM = [
   "Aturan yang tidak boleh dilanggar:",
   "1. Soal HANYA boleh bersumber dari naskah yang diberikan. Jangan menambah",
   "   fakta, angka, nama, atau tahun yang tidak ada di dalamnya. Bila naskahnya",
-  "   tidak cukup untuk jumlah soal yang diminta, buat lebih sedikit — soal",
+  "   tidak cukup untuk jumlah soal yang diminta, buat lebih sedikit soal",
   "   karangan yang terdengar meyakinkan jauh lebih merusak daripada soal yang",
   "   kurang jumlahnya.",
   "2. Kunci jawaban WAJIB benar menurut naskah itu. Kunci yang salah",
   "   menyalahkan seluruh mahasiswa yang sebenarnya menjawab benar.",
   "3. Bahasa Indonesia akademik yang lugas. Hindari pertanyaan menjebak,",
   "   kalimat bermakna ganda, dan pengecoh yang sebenarnya juga benar.",
-  "4. Pengecoh harus masuk akal — sama panjang, sekelas, dan sejenis dengan",
+  "4. Pengecoh harus masuk akal, sama panjang, sekelas, dan sejenis dengan",
   "   jawaban benarnya. Pengecoh yang jelas konyol membuat soal tidak mengukur",
   "   apa pun.",
   "5. Jangan memakai 'semua benar', 'semua salah', atau 'A dan B benar'.",
@@ -118,7 +118,7 @@ export const PERAN_SISTEM = [
   "Cara menulis tiap jenis:",
   "- pg           : 4 pilihan, kunci satu huruf, mis. \"C\".",
   "- pg_kompleks  : 4-5 pilihan, kunci beberapa huruf dipisah koma, mis. \"A,C\".",
-  "                 WAJIB menyisakan minimal satu pengecoh — jangan menandai",
+  "                 WAJIB menyisakan minimal satu pengecoh, jangan menandai",
   "                 seluruh pilihan sebagai benar.",
   "- penjodohan   : isi larik pasangan (kiri dan kanan sebagai TEKS), minimal 3",
   "                 pasangan. Kosongkan kunci. Kolom pilihan boleh diisi",
@@ -130,7 +130,7 @@ export const PERAN_SISTEM = [
   "                 kolom pembahasan.",
   "",
   "Bobot: pilihan ganda dan benar/salah 5, pg kompleks dan penjodohan 9,",
-  "isian 5, essay 20 — kecuali dosen meminta lain.",
+  "isian 5, essay 20, kecuali dosen meminta lain.",
 ].join("\n");
 
 /** Susun perintah untuk satu permintaan. */
@@ -182,7 +182,7 @@ export function periksaJawabanAi(mentah: unknown, diminta: number): HasilAi {
   if (!Array.isArray(isi)) {
     return {
       soal: [],
-      tolak: [{ baris: "—", alasan: "Model tidak mengembalikan daftar soal yang dapat dibaca." }],
+      tolak: [{ baris: "-", alasan: "Model tidak mengembalikan daftar soal yang dapat dibaca." }],
       kurang: diminta,
     };
   }
@@ -235,7 +235,7 @@ export function naskahCukup(teks: string, jumlah: number): { ok: true } | { ok: 
     return {
       ok: false,
       pesan:
-        `Naskahnya hanya ${kata} kata — terlalu pendek untuk dijadikan soal. ` +
+        `Naskahnya hanya ${kata} kata, terlalu pendek untuk dijadikan soal. ` +
         "Unggah dokumen yang lebih lengkap, atau tambahkan materinya lebih dulu.",
     };
   }
@@ -247,7 +247,7 @@ export function naskahCukup(teks: string, jumlah: number): { ok: true } | { ok: 
       ok: false,
       pesan:
         `Naskah ${kata} kata terlalu tipis untuk ${jumlah} soal. ` +
-        `Dari naskah sepanjang ini, sekitar ${wajar} soal masih wajar — lebih dari itu model mulai mengarang.`,
+        `Dari naskah sepanjang ini, sekitar ${wajar} soal masih wajar, lebih dari itu model mulai mengarang.`,
     };
   }
   return { ok: true };

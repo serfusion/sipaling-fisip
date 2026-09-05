@@ -47,7 +47,7 @@ async function mekarkan(data: Uint8Array, metode: number): Promise<Uint8Array> {
   if (typeof DecompressionStream === "undefined") {
     throw new Error(
       "Peramban ini belum dapat membuka berkas .pptx. Pakai Chrome, Edge, Firefox, " +
-        "atau Safari versi 16.4 ke atas — atau unggah dokumennya sebagai .docx / .pdf.",
+        "atau Safari versi 16.4 ke atas, atau unggah dokumennya sebagai .docx / .pdf.",
     );
   }
   const aliran = new Blob([data as BlobPart]).stream().pipeThrough(new DecompressionStream("deflate-raw"));

@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as { ticket?: string; nim?: string };
     const ticket = body.ticket?.trim();
-    const nim = body.nim?.trim(); // opsional — dipertahankan untuk kompatibilitas
+    const nim = body.nim?.trim(); // opsional, dipertahankan untuk kompatibilitas
 
     if (!ticket) {
       return Response.json({ success: false, message: "Nomor tiket wajib diisi." }, { status: 400 });

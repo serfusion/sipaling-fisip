@@ -149,7 +149,7 @@ export async function POST(request: Request) {
     if (isiMeta.length + isiRows.length > MAKS_HURUF) {
       return Response.json({
         success: false,
-        message: "Transkrip ini terlalu besar untuk diarsipkan. Biasanya karena gambar yang ditempel pada tata letak — perkecil atau hapus gambarnya, lalu simpan lagi.",
+        message: "Transkrip ini terlalu besar untuk diarsipkan. Biasanya karena gambar yang ditempel pada tata letak. Perkecil atau hapus gambarnya, lalu simpan lagi.",
       }, { status: 400 });
     }
 

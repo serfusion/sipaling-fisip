@@ -14,9 +14,9 @@ import type { ReactNode } from "react";
 // ============================================================
 
 export const metadata: Metadata = {
-  title: "SiPaling CBT — Ujian Berbasis Komputer",
+  title: "SiPaling CBT: Ujian Berbasis Komputer",
   description:
-    "Sistem ujian berbasis komputer FISIP. Mahasiswa masuk dengan kode ujian, nama, dan NIM — tanpa membuat akun.",
+    "Sistem ujian berbasis komputer FISIP. Mahasiswa masuk dengan kode ujian, nama, dan NIM, tanpa membuat akun.",
   robots: { index: false, follow: false },
 };
 

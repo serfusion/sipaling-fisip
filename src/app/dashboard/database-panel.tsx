@@ -307,7 +307,7 @@ export default function DatabasePanel({
                     <b>{row.title}</b>
                     {row.description && <small>{row.description}</small>}
                   </td>
-                  <td>{row.contributors.length ? row.contributors.map((c) => c.lecturerName).join(", ") : "—"}</td>
+                  <td>{row.contributors.length ? row.contributors.map((c) => c.lecturerName).join(", ") : "-"}</td>
                   <td><b>{row.addedByName}</b><small>{ROLE_LABEL[row.addedByRole] || row.addedByRole}</small></td>
                   <td>{formatStamp(row.createdAt)}{row.documentDate && <small>Dokumen: {row.documentDate}</small>}</td>
                   <td className="db-row-actions">

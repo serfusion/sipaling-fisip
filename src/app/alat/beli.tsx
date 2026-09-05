@@ -150,7 +150,7 @@ export default function BeliAkses({ onAkses }: { onAkses: (kode: string, whatsap
     // belakangan berarti ada jeda ketika seseorang sudah membayar tetapi
     // belum punya tempat untuk menyimpan apa yang ia beli.
     if (!rapikanWa(kontak)) {
-      setGalat("Nomor WhatsApp belum benar. Tulis seperti 0812xxxxxxxx — nomor inilah yang menyimpan langgananmu.");
+      setGalat("Nomor WhatsApp belum benar. Tulis seperti 0812xxxxxxxx, nomor inilah yang menyimpan langgananmu.");
       return;
     }
     setSibuk(true);
@@ -246,7 +246,7 @@ export default function BeliAkses({ onAkses }: { onAkses: (kode: string, whatsap
         </button>
         <p className="beli-jadi-sub">
           Masukkan kode ini pada kotak <b>Kode Akses</b> di bawah bersama nomor WhatsApp Anda, lalu
-          Cakrawala terbuka. Simpan kodenya — dengan nomor yang sama, ia dapat dipakai lagi kapan
+          Cakrawala terbuka. Simpan kodenya: dengan nomor yang sama, ia dapat dipakai lagi kapan
           pun Anda berganti HP atau membuka di laptop.
         </p>
       </section>
@@ -269,7 +269,7 @@ export default function BeliAkses({ onAkses }: { onAkses: (kode: string, whatsap
             <span>{tersalin === "nominal" ? "Tersalin ✓" : "salin"}</span>
           </button>
           <p>
-            Angka di belakangnya sengaja unik — itulah yang menandai pesanan Anda, jadi kodenya bisa
+            Angka di belakangnya sengaja unik. Itulah yang menandai pesanan Anda, jadi kodenya bisa
             keluar sendiri tanpa Anda perlu mengirim bukti apa pun.
           </p>
         </div>
@@ -285,7 +285,7 @@ export default function BeliAkses({ onAkses }: { onAkses: (kode: string, whatsap
               <small>
                 Pesananmu sudah ditahan supaya nominalnya tidak dipakai orang lain, dan pengelola
                 sudah dikabari langsung ke ponselnya. Begitu pembayarannya dipastikan, kode akses
-                muncul sendiri di halaman ini — boleh ditinggal, halamannya tetap memeriksa.
+                muncul sendiri di halaman ini. Boleh ditinggal, halamannya tetap memeriksa.
               </small>
             </div>
           </div>
@@ -296,7 +296,7 @@ export default function BeliAkses({ onAkses }: { onAkses: (kode: string, whatsap
               <b>Menunggu pembayaran… {sisa}</b>
               <small>
                 Halaman ini memeriksa sendiri. Begitu pembayarannya masuk, kode akses langsung
-                muncul di sini — jangan ditutup dulu.
+                muncul di sini, jangan ditutup dulu.
               </small>
             </div>
           </div>
@@ -337,7 +337,7 @@ export default function BeliAkses({ onAkses }: { onAkses: (kode: string, whatsap
         <h2>QR pembayarannya sudah kedaluwarsa</h2>
         <p>
           QR hanya berlaku {pesanan.menit} menit supaya nominalnya bisa dipakai pembeli lain. Kalau
-          Anda <b>sudah terlanjur membayar</b>, jangan buat pesanan baru — tekan tombol di bawah.
+          Anda <b>sudah terlanjur membayar</b>, jangan buat pesanan baru. Tekan tombol di bawah.
           Pesanan <code>{pesanan.orderCode}</code> dihidupkan kembali dan pembayaran Anda tetap
           tercatat.
         </p>

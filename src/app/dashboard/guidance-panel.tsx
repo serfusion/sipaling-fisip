@@ -153,7 +153,7 @@ export default function GuidancePanel({ lecturerName }: { lecturerName: string }
 
       <div className="panel">
         <div className="list-head">
-          <h3>Surat Tugas — {accepted.length} mahasiswa bimbingan</h3>
+          <h3>Surat Tugas: {accepted.length} mahasiswa bimbingan</h3>
           <button type="button" className="btn btn-primary btn-mini" onClick={downloadSuratTugas} disabled={accepted.length === 0}>
             ⇩ Unduh Surat Tugas (PDF)
           </button>
@@ -195,7 +195,7 @@ export default function GuidancePanel({ lecturerName }: { lecturerName: string }
                   <tr key={row.id}>
                     <td><b>{row.studentName}</b><small>{row.nim}</small></td>
                     <td>{row.title}</td>
-                    <td>{row.lecturerNote || "—"}</td>
+                    <td>{row.lecturerNote || "-"}</td>
                     <td>{formatStamp(row.decidedAt || row.updatedAt)}</td>
                   </tr>
                 ))}

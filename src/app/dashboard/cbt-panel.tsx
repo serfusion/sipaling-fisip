@@ -17,7 +17,7 @@
 // tidak melihat menu ini sama sekali.
 // ============================================================
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ejaWaktu, JENIS_LABEL, MEDIA_KOSONG, SEMUA_JENIS, STATUS_LABEL, uraiKunciJamak,
   type JenisSoal, type Media, type Pasangan, type StatusUjian,
@@ -86,6 +86,17 @@ type Statistik = {
   median: number; lulus: number; tidakLulus: number; persenLulus: number;
 };
 
+/**
+ * Menu "Buat soal dengan AI" DIPADAMKAN.
+ *
+ * Bukan dihapus: seluruh jalannya masih utuh, dari pembaca dokumen di peramban
+ * sampai /api/cbt/ai-soal, dan menyalakannya kembali cukup dengan menyetel
+ * tetapan ini menjadi true. Yang dimatikan hanya pintunya di layar dosen,
+ * beserta satu permintaan ke server yang tadinya berjalan pada tiap pemuatan
+ * panel hanya untuk menanyakan apakah kuncinya terpasang.
+ */
+const AI_SOAL_TAMPIL = false;
+
 const SOAL_KOSONG = {
   jenis: "pg" as JenisSoal,
   pertanyaan: "",
@@ -94,6 +105,11 @@ const SOAL_KOSONG = {
   pasangan: [] as Pasangan[],
   media: { ...MEDIA_KOSONG } as Media,
   bobot: 1,
+  // Materi dan tingkat kesulitan tidak lagi punya isian di layar: keduanya
+  // hampir tidak pernah diisi, sementara dua kotak itu memakan tempat pada
+  // baris yang sama dengan jenis dan bobot. Nilainya tetap ikut terkirim
+  // supaya kolomnya di basis data tidak berubah bentuk, dan soal yang datang
+  // dari impor Excel atau Word tetap membawa tingkatnya sendiri.
   materi: "",
   tingkat: "sedang",
   pembahasan: "",
@@ -129,7 +145,7 @@ function untukInput(iso: string | null) {
 }
 
 function jamRapi(iso: string | null) {
-  if (!iso) return "—";
+  if (!iso) return "-";
   return new Date(iso).toLocaleString("id-ID", {
     day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
   });
@@ -186,6 +202,41 @@ export default function CbtPanel({ role }: { role: string }) {
   const [jadwal, setJadwal] = useState({ mulai: "", selesai: "" });
   const [sibuk, setSibuk] = useState(false);
 
+  /**
+   * Dua bagian panjang yang dilipat sampai diminta.
+   *
+   * Keduanya jarang dipakai tetapi memakan tinggi layar yang sama besarnya
+   * dengan bagian yang dipakai setiap hari. Cetak naskah hanya keluar sekali
+   * menjelang ujian, dan sebagian besar soal tidak bergambar sama sekali.
+   */
+  const [lipatCetak, setLipatCetak] = useState(false);
+  const [bukaMedia, setBukaMedia] = useState(false);
+
+  /**
+   * Kabar untuk tombol "Tambah ke bank soal".
+   *
+   * "berhasil" membuat tombolnya sendiri berkata "Berhasil ditambahkan" selama
+   * beberapa detik. Kabar keberhasilan yang muncul di pita hijau jauh di atas
+   * formulir tidak pernah terbaca oleh mata yang sedang menatap tombolnya.
+   *
+   * "tolak" berisi daftar yang kurang atau salah, dan ia muncul sebagai jendela
+   * yang harus ditutup. Sengaja menghalangi: soal yang ditolak diam-diam adalah
+   * soal yang dikira sudah masuk sampai pagi hari ujian.
+   */
+  const [soalOke, setSoalOke] = useState(false);
+  const [tolakSoal, setTolakSoal] = useState<{ judul: string; rincian: string[] } | null>(null);
+  const waktuOke = useRef<number | null>(null);
+  useEffect(() => () => { if (waktuOke.current) window.clearTimeout(waktuOke.current); }, []);
+
+  // Escape menutup jendela penolakan. Jendela yang menghalangi tetapi hanya
+  // dapat ditutup dengan tetikus adalah jebakan bagi yang mengetik cepat.
+  useEffect(() => {
+    if (!tolakSoal) return;
+    const tekan = (e: KeyboardEvent) => { if (e.key === "Escape") setTolakSoal(null); };
+    window.addEventListener("keydown", tekan);
+    return () => window.removeEventListener("keydown", tekan);
+  }, [tolakSoal]);
+
   // ---------- BUAT SOAL DENGAN AI ----------
   const [aiSiap, setAiSiap] = useState<boolean | null>(null);
   const [aiPenyedia, setAiPenyedia] = useState<string[]>([]);
@@ -223,6 +274,7 @@ export default function CbtPanel({ role }: { role: string }) {
   // "belum ada kunci" sesudah dosen mengunggah dokumen dan menunggu satu menit
   // adalah cara paling buruk menyampaikan kabar itu.
   useEffect(() => {
+    if (!AI_SOAL_TAMPIL) return;
     const tunda = window.setTimeout(() => {
       fetch("/api/cbt/ai-soal", { cache: "no-store" })
         .then((jawab) => jawab.json())
@@ -324,36 +376,52 @@ export default function CbtPanel({ role }: { role: string }) {
    * berlaku dan tetap menjadi penentu; yang di sini hanya menjaga agar soal
    * yang sudah pasti ditolak tidak sempat muncul di daftar sebagai soal yang
    * seolah-olah tersimpan.
+   *
+   * Yang dikembalikan DAFTAR, bukan satu kalimat. Dulu pemeriksaan berhenti
+   * pada keluhan pertama, jadi dosen yang lupa mengisi pilihan sekaligus lupa
+   * menandai kuncinya memperbaikinya satu per satu, menekan tombol, dan
+   * menemukan keluhan berikutnya. Sekarang semuanya disebut sekali jalan.
    */
-  function periksaSoal(isi: typeof SOAL_KOSONG): string {
-    if (isi.pertanyaan.trim().length < 3) return "Pertanyaan belum diisi.";
+  function periksaSoal(isi: typeof SOAL_KOSONG): string[] {
+    const keluhan: string[] = [];
+    if (isi.pertanyaan.trim().length < 3) keluhan.push("Pertanyaan belum diisi.");
     const terisi = isi.pilihan.filter((p) => p.trim().length > 0);
+    const adaKosong = isi.pilihan.length > terisi.length;
 
     if (isi.jenis === "pg" || isi.jenis === "benar_salah") {
-      if (terisi.length < 2) return "Pilihan jawaban minimal dua.";
+      if (terisi.length < 2) keluhan.push("Pilihan jawaban minimal dua, dan keduanya harus ada isinya.");
+      else if (adaKosong) keluhan.push("Ada kotak pilihan yang masih kosong. Isi atau buang kotaknya.");
       const nomor = Number(isi.kunci);
       if (!Number.isInteger(nomor) || nomor < 0 || nomor >= terisi.length) {
-        return "Kunci jawaban belum dipilih.";
+        keluhan.push("Kunci jawaban belum ditandai. Tekan lingkaran huruf di sebelah kiri pilihan yang benar.");
       }
     }
     if (isi.jenis === "pg_kompleks") {
-      if (terisi.length < 2) return "Pilihan jawaban minimal dua.";
+      if (terisi.length < 2) keluhan.push("Pilihan jawaban minimal dua, dan keduanya harus ada isinya.");
+      else if (adaKosong) keluhan.push("Ada kotak pilihan yang masih kosong. Isi atau buang kotaknya.");
       const kunci = uraiKunciJamak(isi.kunci);
-      if (kunci.size === 0) return "Tandai dulu jawaban mana saja yang benar.";
-      if (kunci.size >= terisi.length) {
-        return "Seluruh pilihan ditandai benar — sisakan minimal satu pengecoh, kalau tidak soalnya tidak mengukur apa pun.";
+      if (kunci.size === 0) keluhan.push("Belum ada jawaban yang ditandai benar. Tandai semua yang benar.");
+      else if (kunci.size >= terisi.length) {
+        keluhan.push("Seluruh pilihan ditandai benar. Sisakan minimal satu pengecoh, kalau tidak soalnya tidak mengukur apa pun.");
       }
     }
     if (isi.jenis === "penjodohan") {
-      if (terisi.length < 2) return "Kolom jawaban penjodohan minimal dua.";
+      if (terisi.length < 2) keluhan.push("Kolom jawaban penjodohan minimal dua, dan keduanya harus ada isinya.");
       const lengkap = isi.pasangan.filter(
         (p) => p.kiri.trim().length > 0 && Number.isInteger(p.kanan) && p.kanan >= 0 && p.kanan < terisi.length,
       );
-      if (lengkap.length < 2) return "Penjodohan perlu minimal dua pasangan yang lengkap.";
+      if (lengkap.length < 2) keluhan.push("Penjodohan perlu minimal dua pasangan yang lengkap: kolom kiri terisi dan jawabannya dipilih.");
     }
-    if (isi.jenis === "isian" && !isi.kunci.trim()) return "Kunci jawaban isian singkat belum diisi.";
-    if (isi.media.jenis && !isi.media.url.trim()) return "Media sudah dipilih jenisnya, tetapi tautannya masih kosong.";
-    return "";
+    if (isi.jenis === "isian" && !isi.kunci.trim()) {
+      keluhan.push("Kunci jawaban isian singkat belum diisi.");
+    }
+    if (isi.media.jenis && !isi.media.url.trim()) {
+      keluhan.push("Media sudah dipilih jenisnya, tetapi tautannya masih kosong. Tempel tautannya, unggah berkasnya, atau kembalikan ke Tanpa media.");
+    }
+    if (!Number.isInteger(isi.bobot) || isi.bobot < 1 || isi.bobot > 100) {
+      keluhan.push("Bobot nilai harus berupa angka 1 sampai 100.");
+    }
+    return keluhan;
   }
 
   /** Centang atau lepas satu pilihan sebagai kunci pada PG kompleks. */
@@ -407,13 +475,23 @@ export default function CbtPanel({ role }: { role: string }) {
     const isi = { ...soalBaru, pilihan: [...soalBaru.pilihan] };
 
     const keluhan = periksaSoal(isi);
-    if (keluhan) { setGalat(keluhan); return; }
+    if (keluhan.length > 0) {
+      // Menyebut media yang salah sambil membiarkan bagiannya terlipat berarti
+      // menyuruh dosen mencari sendiri isian yang tidak kelihatan.
+      if (keluhan.some((k) => k.startsWith("Media"))) setBukaMedia(true);
+      setTolakSoal({
+        judul: target ? "Perubahan belum dapat disimpan" : "Soal belum dapat ditambahkan",
+        rincian: keluhan,
+      });
+      return;
+    }
 
     if (target) {
       const hasil = await kirim("/api/cbt/soal", "PATCH", { id: target, ...isi }, "Soal diperbarui.");
       if (!hasil) return;
       setSoalBaru({ ...SOAL_KOSONG });
       setSunting(null);
+      tandaiBerhasil();
       await muatSoal(terbuka.id);
       return;
     }
@@ -425,6 +503,7 @@ export default function CbtPanel({ role }: { role: string }) {
     setSoalBaru({ ...SOAL_KOSONG });
     setGalat("");
     setPesan("Soal ditambahkan.");
+    tandaiBerhasil();
 
     try {
       const jawab = await fetch("/api/cbt/soal", {
@@ -440,11 +519,36 @@ export default function CbtPanel({ role }: { role: string }) {
       );
       if (!asli) await muatSoal(terbuka.id);
     } catch (alasan: unknown) {
+      // Gagal sesudah tombolnya sempat berkata berhasil. Tanda hijau itu
+      // ditarik kembali, soalnya dikeluarkan lagi dari daftar, isinya
+      // dikembalikan ke formulir, dan alasannya dikatakan di jendela yang
+      // harus ditutup: kegagalan yang lewat begitu saja meninggalkan dosen
+      // dengan bank soal yang ia kira sudah lengkap.
+      setSoalOke(false);
       setSoal((kini) => kini.filter((x) => x.id !== idSementara));
       setSoalBaru(isi);
       setPesan("");
-      setGalat(alasan instanceof Error ? alasan.message : "Soal belum tersimpan.");
+      setTolakSoal({
+        judul: "Soal gagal disimpan ke server",
+        rincian: [
+          alasan instanceof Error ? alasan.message : "Soal belum tersimpan.",
+          "Isian soalnya sudah dikembalikan ke formulir, jadi tidak ada yang perlu diketik ulang. Periksa sambungan internet, lalu tekan tombolnya lagi.",
+        ],
+      });
     }
+  }
+
+  /**
+   * Nyalakan tanda "Berhasil ditambahkan" pada tombolnya, lalu padamkan sendiri.
+   *
+   * Penghitung waktunya disimpan pada ref supaya dua penyimpanan yang beruntun
+   * tidak saling memadamkan: yang kedua mematikan penghitung yang pertama
+   * sebelum memasang penghitungnya sendiri.
+   */
+  function tandaiBerhasil() {
+    setSoalOke(true);
+    if (waktuOke.current) window.clearTimeout(waktuOke.current);
+    waktuOke.current = window.setTimeout(() => setSoalOke(false), 2600);
   }
 
   async function hapusSoal(id: number) {
@@ -670,7 +774,7 @@ export default function CbtPanel({ role }: { role: string }) {
       if (hasil.kata < 120) {
         throw new Error(
           `Hanya ${hasil.kata} kata yang terbaca dari berkas ini. ` +
-            "Bila ini PDF hasil pindaian, teksnya berupa gambar dan belum dapat dibaca — " +
+            "Bila ini PDF hasil pindaian, teksnya berupa gambar dan belum dapat dibaca, " +
             "pakai dokumen aslinya.",
         );
       }
@@ -785,7 +889,7 @@ export default function CbtPanel({ role }: { role: string }) {
   function cetakNaskah(denganKunci: boolean) {
     const info = keteranganUjian();
     if (!info || soal.length === 0) {
-      setGalat("Bank soalnya masih kosong — belum ada yang dapat dicetak.");
+      setGalat("Bank soalnya masih kosong, belum ada yang dapat dicetak.");
       return;
     }
     if (denganKunci) {
@@ -855,7 +959,7 @@ export default function CbtPanel({ role }: { role: string }) {
   function pesanGrup(u: Ujian) {
     return [
       `*${u.title}*`,
-      `${u.courseName}${u.className ? ` — Kelas ${u.className}` : ""}`,
+      `${u.courseName}${u.className ? ` · Kelas ${u.className}` : ""}`,
       "",
       `Tautan ujian : ${alamatUjian(u.code)}`,
       `Kode ujian   : ${u.code}`,
@@ -923,7 +1027,7 @@ export default function CbtPanel({ role }: { role: string }) {
               Mereka cukup membuka <code>/ujian</code>, memasukkan kode ujian, nama, dan NIM.
               {" Ujian baru terbuka setelah dosen pemiliknya mengaktifkan dan jam mulainya tiba."}
               {pemantau
-                ? " Anda memantau seluruh ujian dan dapat menghapusnya, tetapi aktivasi ujian milik dosen lain bukan di tangan Anda — buat ujian sendiri bila perlu mengadakan seleksi."
+                ? " Anda memantau seluruh ujian dan dapat menghapusnya, tetapi aktivasi ujian milik dosen lain bukan di tangan Anda. Buat ujian sendiri bila perlu mengadakan seleksi."
                 : ""}
             </span>
           </div>
@@ -1046,8 +1150,7 @@ export default function CbtPanel({ role }: { role: string }) {
           <div className="cbt-bagi-kepala">
             <b>Bagikan ke mahasiswa</b>
             <span>
-              Tempel salah satu ke grup kelas. Mahasiswa tidak perlu membuat akun — buka tautannya,
-              isi nama dan NIM, selesai.
+              Tempel salah satu ke grup kelas. Mahasiswa tidak perlu membuat akun.
               {!terbuka.activatedAt && " Ujian baru dapat dimasuki setelah diaktifkan dan jam mulainya tiba."}
             </span>
           </div>
@@ -1088,30 +1191,38 @@ export default function CbtPanel({ role }: { role: string }) {
         </div>
       )}
 
-      {/* ---------- CETAK NASKAH SOAL (CADANGAN) ---------- */}
+      {/* ---------- CETAK NASKAH SOAL (CADANGAN) ----------
+          Terlipat sampai diminta. Isinya panjang dan hanya dipakai sekali,
+          menjelang ujian; dibiarkan terbuka ia mendorong bank soal jauh ke
+          bawah setiap kali panel ini dibuka. */}
       {soal.length > 0 && (
         <div className="panel cbt-cetak">
-          <div className="cbt-impor-kepala">
+          <button type="button" className="cbt-lipat" aria-expanded={lipatCetak} onClick={() => setLipatCetak(!lipatCetak)}>
             <b>🖨 Cetak naskah soal</b>
-            <span>
-              Cadangan tercetak untuk keadaan darurat — listrik padam, jaringan mati, atau
-              laboratorium tidak dapat dipakai. Tekan Cetak pada jendela yang terbuka, lalu pilih
-              <b> Simpan sebagai PDF</b> bila ingin berkasnya saja.
-            </span>
-          </div>
-          <div className="cbt-impor-tombol">
-            <button type="button" className="btn btn-primary" onClick={() => cetakNaskah(false)}>
-              Naskah untuk mahasiswa
-            </button>
-            <button type="button" className="btn btn-light" onClick={() => cetakNaskah(true)}>
-              Naskah + kunci (pengawas)
-            </button>
-          </div>
-          <p className="cbt-catatan">
-            Naskah untuk mahasiswa TIDAK memuat kunci jawaban, pembahasan, maupun rambu penilaian
-            essay — sudah termasuk lembar identitas dan ruang menulis. Soal yang memakai gambar atau
-            video ditandai, karena medianya tidak dapat ikut tercetak.
-          </p>
+            <span>{lipatCetak ? "▲ Sembunyikan" : "▼ Tampilkan"}</span>
+          </button>
+          {lipatCetak && (
+            <div className="cbt-lipat-isi">
+              <p className="cbt-catatan">
+                Cadangan tercetak untuk keadaan darurat: listrik padam, jaringan mati, atau
+                laboratorium tidak dapat dipakai. Tekan Cetak pada jendela yang terbuka, lalu pilih
+                <b> Simpan sebagai PDF</b> bila ingin berkasnya saja.
+              </p>
+              <div className="cbt-impor-tombol">
+                <button type="button" className="btn btn-primary" onClick={() => cetakNaskah(false)}>
+                  Naskah untuk mahasiswa
+                </button>
+                <button type="button" className="btn btn-light" onClick={() => cetakNaskah(true)}>
+                  Naskah + kunci (pengawas)
+                </button>
+              </div>
+              <p className="cbt-catatan">
+                Naskah untuk mahasiswa TIDAK memuat kunci jawaban, pembahasan, maupun rambu penilaian
+                essay, dan sudah termasuk lembar identitas serta ruang menulis. Soal yang memakai
+                gambar atau video ditandai, karena medianya tidak dapat ikut tercetak.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -1122,9 +1233,9 @@ export default function CbtPanel({ role }: { role: string }) {
             <b>{terbuka.activatedAt ? "Ujian sudah diaktifkan" : "Belum diaktifkan"}</b>
             <span>
               {terbuka.activatedAt
-                ? `Dibuka sendiri ${jamRapi(terbuka.startAt)} sampai ${jamRapi(terbuka.endAt)}. Diaktifkan oleh ${terbuka.activatedBy ?? "—"}.`
+                ? `Dibuka sendiri ${jamRapi(terbuka.startAt)} sampai ${jamRapi(terbuka.endAt)}. Diaktifkan oleh ${terbuka.activatedBy ?? "-"}.`
                 : terbuka.bolehUbah
-                  ? "Setel jam mulai dan jam selesai, lalu aktifkan. Pada jam mulainya ujian terbuka sendiri — tidak ada tombol yang perlu ditekan lagi."
+                  ? "Setel jam mulai dan jam selesai, lalu aktifkan. Pada jam mulainya ujian terbuka sendiri, tidak ada tombol yang perlu ditekan lagi."
                   : `Ujian ini milik ${terbuka.createdBy}. Hanya dosen pemiliknya yang dapat menjadwalkan dan mengaktifkannya.`}
             </span>
           </div>
@@ -1154,7 +1265,7 @@ export default function CbtPanel({ role }: { role: string }) {
           <p className="cbt-catatan">
             Jadwal dan aktivasi ujian ini dipegang dosen pemiliknya. Anda dapat memantau peserta dan
             nilainya di tab sebelah{terbuka.bolehHapus ? ", dan menghapus ujian ini bila memang perlu" : ""}.
-            Untuk ujian seleksi, buatlah ujian sendiri — ujian yang Anda buat menjadi milik Anda,
+            Untuk ujian seleksi, buatlah ujian sendiri: ujian yang Anda buat menjadi milik Anda,
             beserta tombol aktivasinya.
           </p>
         )}
@@ -1182,7 +1293,7 @@ export default function CbtPanel({ role }: { role: string }) {
         <>
           {sedangBerlangsung && (
             <div className="dsh-error">
-              Ujian sedang berlangsung. Soal dikunci sampai selesai — mengubahnya sekarang berarti
+              Ujian sedang berlangsung. Soal dikunci sampai selesai, mengubahnya sekarang berarti
               sebagian mahasiswa mengerjakan ujian yang berbeda dari sebagian yang lain.
             </div>
           )}
@@ -1193,12 +1304,13 @@ export default function CbtPanel({ role }: { role: string }) {
             </div>
           )}
 
-          {/* ---------- BUAT SOAL DENGAN AI ---------- */}
+          {/* ---------- BUAT SOAL DENGAN AI (DIPADAMKAN) ---------- */}
+          {AI_SOAL_TAMPIL && (
           <div className="panel cbt-ai">
             <div className="cbt-impor-kepala">
               <b>✨ Buat soal dengan AI</b>
               <span>
-                Unggah bahan ajar — Word, PowerPoint, atau PDF — lalu biarkan soalnya disusun dari
+                Unggah bahan ajar (Word, PowerPoint, atau PDF) lalu biarkan soalnya disusun dari
                 isi dokumen itu. Dokumennya dibaca di komputer Anda sendiri; yang dikirim ke server
                 hanya teksnya. Soal yang keluar TIDAK langsung masuk bank: Anda memeriksanya dulu.
               </span>
@@ -1316,6 +1428,7 @@ export default function CbtPanel({ role }: { role: string }) {
               </>
             )}
           </div>
+          )}
 
           {/* ---------- IMPOR MASSAL ---------- */}
           <div className="panel cbt-impor">
@@ -1362,7 +1475,7 @@ export default function CbtPanel({ role }: { role: string }) {
                 {imporTolak.length > 0 && (
                   <ul className="cbt-impor-tolak">
                     {imporTolak.slice(0, 8).map((t, i) => (
-                      <li key={i}><b>{t.baris}</b> — {t.alasan}</li>
+                      <li key={i}><b>{t.baris}</b>: {t.alasan}</li>
                     ))}
                     {imporTolak.length > 8 && <li>…dan {imporTolak.length - 8} lagi.</li>}
                   </ul>
@@ -1414,25 +1527,26 @@ export default function CbtPanel({ role }: { role: string }) {
               <label><span>Bobot nilai</span>
                 <input type="number" min={1} max={100} value={soalBaru.bobot} onChange={(e) => setSoalBaru({ ...soalBaru, bobot: Number(e.target.value) })} />
               </label>
-              <label><span>Materi</span>
-                <input value={soalBaru.materi} onChange={(e) => setSoalBaru({ ...soalBaru, materi: e.target.value })} placeholder="Bab 2" />
-              </label>
-              <label><span>Tingkat</span>
-                <select value={soalBaru.tingkat} onChange={(e) => setSoalBaru({ ...soalBaru, tingkat: e.target.value })}>
-                  <option value="mudah">Mudah</option>
-                  <option value="sedang">Sedang</option>
-                  <option value="sulit">Sulit</option>
-                </select>
-              </label>
             </div>
 
             <label className="cbt-lebar"><span>Pertanyaan *</span>
               <textarea rows={3} value={soalBaru.pertanyaan} onChange={(e) => setSoalBaru({ ...soalBaru, pertanyaan: e.target.value })} />
             </label>
 
-            {/* ---------- MEDIA: GAMBAR ATAU VIDEO ---------- */}
+            {/* ---------- MEDIA: GAMBAR ATAU VIDEO ----------
+                Terlipat sampai diminta. Sebagian besar soal tidak bergambar,
+                dan bagian ini berdiri persis di antara pertanyaan dan pilihan
+                jawaban: dua isian yang justru selalu dipakai. */}
             <div className="cbt-media-edit">
-              <span className="cbt-opsi-judul">Media soal (opsional)</span>
+              <button type="button" className="cbt-lipat" aria-expanded={bukaMedia} onClick={() => setBukaMedia(!bukaMedia)}>
+                <b>Media soal (opsional)</b>
+                <span>
+                  {soalBaru.media.jenis && soalBaru.media.url
+                    ? bukaMedia ? "▲ Sembunyikan" : "▼ Terpasang, tampilkan"
+                    : bukaMedia ? "▲ Sembunyikan" : "▼ Tampilkan"}
+                </span>
+              </button>
+              {bukaMedia && (
               <div className="cbt-media-baris">
                 <select
                   value={soalBaru.media.jenis}
@@ -1463,7 +1577,8 @@ export default function CbtPanel({ role }: { role: string }) {
                   />
                 </label>
               </div>
-              {soalBaru.media.jenis && (
+              )}
+              {bukaMedia && soalBaru.media.jenis && (
                 <input
                   className="cbt-media-ket-edit"
                   value={soalBaru.media.keterangan}
@@ -1471,11 +1586,13 @@ export default function CbtPanel({ role }: { role: string }) {
                   placeholder="Keterangan gambar/video (opsional)"
                 />
               )}
-              <p className="cbt-catatan">
-                Gambar maksimal 5 MB, video 50 MB. Video panjang lebih baik ditempel sebagai tautan
-                YouTube atau Google Drive — tautan sematan tidak punya batas ukuran dan tidak
-                memakan kuota penyimpanan.
-              </p>
+              {bukaMedia && (
+                <p className="cbt-catatan">
+                  Gambar maksimal 5 MB, video 50 MB. Video panjang lebih baik ditempel sebagai tautan
+                  YouTube atau Google Drive, sebab tautan sematan tidak punya batas ukuran dan tidak
+                  memakan kuota penyimpanan.
+                </p>
+              )}
             </div>
 
             {(soalBaru.jenis === "pg" || soalBaru.jenis === "pg_kompleks" ||
@@ -1483,10 +1600,10 @@ export default function CbtPanel({ role }: { role: string }) {
               <div className="cbt-opsi-edit">
                 <span className="cbt-opsi-judul">
                   {soalBaru.jenis === "penjodohan"
-                    ? "Kolom jawaban (kanan) — boleh diberi pengecoh yang tidak berpasangan"
+                    ? "Kolom jawaban (kanan), boleh diberi pengecoh yang tidak berpasangan"
                     : soalBaru.jenis === "pg_kompleks"
-                      ? "Pilihan jawaban — tandai SEMUA yang benar, sisakan minimal satu pengecoh"
-                      : "Pilihan jawaban — tekan lingkarannya untuk menandai kunci"}
+                      ? "Pilihan jawaban: tandai SEMUA yang benar, sisakan minimal satu pengecoh"
+                      : "Pilihan jawaban: tekan lingkarannya untuk menandai kunci"}
                 </span>
                 {soalBaru.pilihan.map((p, i) => (
                   <div key={i} className="cbt-opsi-baris">
@@ -1549,7 +1666,7 @@ export default function CbtPanel({ role }: { role: string }) {
             {/* ---------- PASANGAN PENJODOHAN ---------- */}
             {soalBaru.jenis === "penjodohan" && (
               <div className="cbt-opsi-edit">
-                <span className="cbt-opsi-judul">Pasangan — kolom kiri dan jawaban yang benar</span>
+                <span className="cbt-opsi-judul">Pasangan: kolom kiri dan jawaban yang benar</span>
                 {soalBaru.pasangan.map((pas, i) => (
                   <div key={i} className="cbt-jodoh-edit">
                     <span className="cbt-jodoh-no">{i + 1}</span>
@@ -1594,7 +1711,7 @@ export default function CbtPanel({ role }: { role: string }) {
             )}
 
             {soalBaru.jenis === "isian" && (
-              <label className="cbt-lebar"><span>Kunci jawaban — pisahkan beberapa kemungkinan dengan |</span>
+              <label className="cbt-lebar"><span>Kunci jawaban: pisahkan beberapa kemungkinan dengan |</span>
                 <input value={soalBaru.kunci} onChange={(e) => setSoalBaru({ ...soalBaru, kunci: e.target.value })} placeholder="komunikasi massa|mass communication" />
               </label>
             )}
@@ -1604,8 +1721,15 @@ export default function CbtPanel({ role }: { role: string }) {
             )}
 
             <div className="cbt-form-aksi">
-              <button type="button" className="btn btn-primary" disabled={sibuk || terkunci} onClick={() => void simpanSoal()}>
-                {sunting ? "Simpan perubahan" : "+ Tambah ke bank soal"}
+              <button
+                type="button"
+                className={`btn ${soalOke ? "btn-oke" : "btn-primary"}`}
+                disabled={sibuk || terkunci}
+                onClick={() => void simpanSoal()}
+              >
+                {soalOke
+                  ? "✓ Berhasil ditambahkan"
+                  : sunting ? "Simpan perubahan" : "+ Tambah ke bank soal"}
               </button>
               {sunting && (
                 <button type="button" className="btn btn-light" onClick={() => { setSunting(null); setSoalBaru({ ...SOAL_KOSONG }); }}>
@@ -1632,6 +1756,10 @@ export default function CbtPanel({ role }: { role: string }) {
                           pasangan: s.pasangan ?? [],
                           media: s.media ?? { ...MEDIA_KOSONG },
                         });
+                        // Soal yang sudah bergambar dibuka lipatannya sendiri.
+                        // Media yang tersembunyi di balik lipatan tertutup akan
+                        // dikira tidak ada, lalu ikut terhapus tanpa disengaja.
+                        if (s.media?.jenis && s.media.url) setBukaMedia(true);
                       }}>Ubah</button>
                       <button type="button" disabled={terkunci} onClick={() => void hapusSoal(s.id)}>Hapus</button>
                     </span>
@@ -1660,7 +1788,7 @@ export default function CbtPanel({ role }: { role: string }) {
                     <ul className="cbt-soal-opsi">
                       {(s.pasangan || []).map((pas, i) => (
                         <li key={i} className="kunci">
-                          <b>{i + 1}.</b> {pas.kiri} <i>↔ {s.pilihan[pas.kanan] ?? "—"}</i>
+                          <b>{i + 1}.</b> {pas.kiri} <i>↔ {s.pilihan[pas.kanan] ?? "-"}</i>
                         </li>
                       ))}
                       {s.pilihan.length > (s.pasangan || []).length && (
@@ -1703,7 +1831,7 @@ export default function CbtPanel({ role }: { role: string }) {
                       (p) => p.status === "berjalan" && p.diamDetik !== null && p.diamDetik > AMBANG_TERPUTUS,
                     ).length;
                     return putus > 0
-                      ? ` ${putus} peserta tampak terputus — layarnya tidak menyapa lebih dari semenit.`
+                      ? ` ${putus} peserta tampak terputus, layarnya tidak menyapa lebih dari semenit.`
                       : "";
                   })()}
                 </span>
@@ -1743,11 +1871,11 @@ export default function CbtPanel({ role }: { role: string }) {
                           {p.status === "berjalan" ? (
                             <span className={p.sisaDetik <= 300 ? "cbt-genting" : ""}>{ejaWaktu(p.sisaDetik)}</span>
                           ) : (
-                            <small className="psn-nama">—</small>
+                            <small className="psn-nama">-</small>
                           )}
                         </td>
                         <td>
-                          {p.nilai === null ? "—" : <b>{p.nilai}</b>}
+                          {p.nilai === null ? "-" : <b>{p.nilai}</b>}
                           {p.tertunda > 0 && <small className="psn-nama">{p.tertunda} essay menunggu</small>}
                         </td>
                         <td>
@@ -1758,7 +1886,7 @@ export default function CbtPanel({ role }: { role: string }) {
                               {p.keluarFullscreen > 0 && `keluar layar penuh ${p.keluarFullscreen}×`}
                             </small>
                           ) : (
-                            <small className="psn-nama">—</small>
+                            <small className="psn-nama">-</small>
                           )}
                         </td>
                         <td>
@@ -1795,7 +1923,7 @@ export default function CbtPanel({ role }: { role: string }) {
                   <input value={acara.pengawas} onChange={(e) => setAcara({ ...acara, pengawas: e.target.value })} placeholder="Nama lengkap pengawas" />
                 </label>
                 <label><span>Ruang / moda</span>
-                  <input value={acara.ruang} onChange={(e) => setAcara({ ...acara, ruang: e.target.value })} placeholder="Lab Komputer 2 — kosongkan bila daring" />
+                  <input value={acara.ruang} onChange={(e) => setAcara({ ...acara, ruang: e.target.value })} placeholder="Lab Komputer 2, kosongkan bila daring" />
                 </label>
               </div>
               <label className="cbt-lebar"><span>Catatan kejadian selama ujian</span>
@@ -1913,7 +2041,7 @@ export default function CbtPanel({ role }: { role: string }) {
                 <div>
                   <b>Analisis soal</b>
                   <span>
-                    Soal yang dijawab benar di bawah 30% ditandai perlu ditinjau — bisa jadi memang
+                    Soal yang dijawab benar di bawah 30% ditandai perlu ditinjau, bisa jadi memang
                     sulit, bisa jadi kuncinya yang salah.
                   </span>
                 </div>
@@ -1933,6 +2061,43 @@ export default function CbtPanel({ role }: { role: string }) {
             </div>
           )}
         </>
+      )}
+
+      {/* ---------- JENDELA PENOLAKAN SOAL ----------
+          Muncul menghalangi, dan hanya untuk penolakan. Pita merah di kepala
+          panel sudah kalah jauh dari pandangan mata yang sedang menatap tombol
+          di dasar formulir sepanjang layar, dan soal yang ditolak tanpa
+          disadari baru ketahuan pada pagi hari ujian. */}
+      {tolakSoal && (
+        <div className="cbt-tirai" role="presentation" onClick={() => setTolakSoal(null)}>
+          <div
+            className="cbt-pop"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="cbt-pop-judul"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="cbt-pop-kepala">
+              <b id="cbt-pop-judul">⚠ {tolakSoal.judul}</b>
+              <button type="button" className="cbt-pop-tutup" onClick={() => setTolakSoal(null)} aria-label="Tutup">✕</button>
+            </div>
+            <p className="cbt-pop-lead">
+              {tolakSoal.rincian.length > 1
+                ? `Ada ${tolakSoal.rincian.length} hal yang perlu dibereskan dulu:`
+                : "Satu hal yang perlu dibereskan dulu:"}
+            </p>
+            <ul className="cbt-pop-daftar">
+              {tolakSoal.rincian.map((r, i) => <li key={i}>{r}</li>)}
+            </ul>
+            <p className="cbt-catatan">
+              Isian yang sudah diketik tidak hilang. Tutup jendela ini, perbaiki bagian yang
+              disebut, lalu tekan tombolnya lagi.
+            </p>
+            <button type="button" className="btn btn-primary cbt-pop-oke" onClick={() => setTolakSoal(null)}>
+              Mengerti, perbaiki dulu
+            </button>
+          </div>
+        </div>
       )}
     </section>
   );

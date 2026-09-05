@@ -614,7 +614,7 @@ export function periksaMasuk(
   const nim = rapikanNim(masukan.nim);
   if (!nim) return { ok: false, pesan: "NIM belum diisi." };
   if (nim.length < ujian.nimMin) {
-    return { ok: false, pesan: `NIM sepertinya kurang lengkap — minimal ${ujian.nimMin} angka.` };
+    return { ok: false, pesan: `NIM sepertinya kurang lengkap, minimal ${ujian.nimMin} angka.` };
   }
 
   if (ujian.token) {

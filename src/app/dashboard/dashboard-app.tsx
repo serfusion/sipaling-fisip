@@ -643,7 +643,7 @@ export default function DashboardApp({
       setLgPesan(
         aksi === "hentikan"
           ? "Langganan dihentikan."
-          : `Langganan diperpanjang sampai ${data.sampai ? new Date(data.sampai).toLocaleDateString("id-ID") : "—"}.`,
+          : `Langganan diperpanjang sampai ${data.sampai ? new Date(data.sampai).toLocaleDateString("id-ID") : "-"}.`,
       );
       await muatLangganan();
     } catch (alasan: unknown) {
@@ -885,7 +885,7 @@ export default function DashboardApp({
       if (!response.ok || !payload.success || !payload.archive) throw new Error(payload.message || "Arsip belum tersimpan.");
       setArchives((rows) => [payload.archive as ArchiveRow, ...rows]);
       setArchiveForm({ docType: "", studentName: "", nim: "", driveUrl: "" });
-      setArchiveMessage("Metadata tersimpan — file tetap berada di Google Drive.");
+      setArchiveMessage("Metadata tersimpan, file tetap berada di Google Drive.");
     } catch (reason: unknown) {
       setArchiveError(reason instanceof Error ? reason.message : "Arsip belum tersimpan.");
     }
@@ -1077,7 +1077,7 @@ export default function DashboardApp({
     });
   }
   if (["admin_pddikti", "admin_perpustakaan", "admin_laboratorium"].includes(profile.role)) {
-    templateCards.push({ icon: "＋", title: "Template unit Anda", desc: "Pola yang sama dengan Transkrip/Surat — template unit ini akan ditambahkan berikutnya.", href: undefined });
+    templateCards.push({ icon: "＋", title: "Template unit Anda", desc: "Pola yang sama dengan Transkrip/Surat. Template unit ini akan ditambahkan berikutnya.", href: undefined });
   }
 
   return (
@@ -1227,7 +1227,7 @@ export default function DashboardApp({
                 <span className="qmark">”</span>
                 <div>
                   <p>“{quote[0]}”</p>
-                  <small>— {quote[1]}</small>
+                  <small>{quote[1]}</small>
                 </div>
                 <button type="button" title="Kutipan lain" onClick={() => setQuoteIndex((index) => index + 1)}>↻</button>
               </div>
@@ -1244,7 +1244,7 @@ export default function DashboardApp({
                     <button type="button" className="linklike" onClick={() => openView("antrean")}>Buka antrean →</button>
                   </div>
                   {needAction.length === 0 ? (
-                    <div className="dempty">Tidak ada yang menunggu — antrean Anda bersih ✨</div>
+                    <div className="dempty">Tidak ada yang menunggu, antrean Anda bersih ✨</div>
                   ) : (
                     needAction.map((row) => (
                       <button
@@ -1281,11 +1281,11 @@ export default function DashboardApp({
                   {ARCHIVE_ROLES.includes(profile.role) && (
                     <>
                       <button type="button" onClick={() => openView("template")}><span className="qi">▤</span><span><b>Buat dokumen dari template</b><small>Transkrip, surat, dan template unit Anda</small></span></button>
-                      <button type="button" onClick={() => openView("arsip")}><span className="qi">⬢</span><span><b>Arsip Drive</b><small>Catat link hasil cetak — file tetap di Drive</small></span></button>
+                      <button type="button" onClick={() => openView("arsip")}><span className="qi">⬢</span><span><b>Arsip Drive</b><small>Catat link hasil cetak, file tetap di Drive</small></span></button>
                     </>
                   )}
                   {TRANSKRIP_ROLES.includes(profile.role) && (
-                    <button type="button" onClick={() => openView("arsip-transkrip")}><span className="qi">🎓</span><span><b>Arsip Transkrip Nilai</b><small>Siapa saja yang transkripnya sudah dibuat — buka lagi untuk cetak ulang</small></span></button>
+                    <button type="button" onClick={() => openView("arsip-transkrip")}><span className="qi">🎓</span><span><b>Arsip Transkrip Nilai</b><small>Siapa saja yang transkripnya sudah dibuat, buka lagi untuk cetak ulang</small></span></button>
                   )}
                   {["super_admin", "admin"].includes(profile.role) && (
                     <button type="button" onClick={() => openView("pengumuman")}><span className="qi">✎</span><span><b>Perbarui pengumuman & status layanan</b><small>Tampil di halaman utama mahasiswa</small></span></button>
@@ -1366,7 +1366,7 @@ export default function DashboardApp({
                     </tbody>
                   </table>
                 </div>
-                <div className="pagerow"><span>Menampilkan {filteredRows.length} dari {rowsAll.length} tiket termuat {periodYear ? "(periode terpilih, maks. 2000)" : "(maks. 200 terbaru — pilih tahun untuk laporan penuh)"}</span></div>
+                <div className="pagerow"><span>Menampilkan {filteredRows.length} dari {rowsAll.length} tiket termuat {periodYear ? "(periode terpilih, maks. 2000)" : "(maks. 200 terbaru, pilih tahun untuk laporan penuh)"}</span></div>
               </div>
             </section>
           )}
@@ -1417,10 +1417,10 @@ export default function DashboardApp({
           {view === "arsip" && (
             <section>
               <p className="section-eyebrow">GOOGLE DRIVE</p>
-              <h2 className="dsh-title">Arsip dokumen — metadata di web, file di Drive</h2>
+              <h2 className="dsh-title">Arsip dokumen: metadata di web, file di Drive</h2>
               <form className="panel arsip-add" onSubmit={submitArchive}>
                 <div className="arsip-grid">
-                  <input required maxLength={120} placeholder="Nama dokumen (mis. Transkrip Nilai — cetak resmi)" value={archiveForm.docType} onChange={(event) => setArchiveForm({ ...archiveForm, docType: event.target.value })} />
+                  <input required maxLength={120} placeholder="Nama dokumen (mis. Transkrip Nilai, cetak resmi)" value={archiveForm.docType} onChange={(event) => setArchiveForm({ ...archiveForm, docType: event.target.value })} />
                   <input maxLength={160} placeholder="Nama mahasiswa (opsional)" value={archiveForm.studentName} onChange={(event) => setArchiveForm({ ...archiveForm, studentName: event.target.value })} />
                   <input maxLength={32} placeholder="NIM (opsional)" value={archiveForm.nim} onChange={(event) => setArchiveForm({ ...archiveForm, nim: event.target.value })} />
                   <input required placeholder="Tempel link Google Drive (https://drive.google.com/…)" value={archiveForm.driveUrl} onChange={(event) => setArchiveForm({ ...archiveForm, driveUrl: event.target.value })} />
@@ -1439,8 +1439,8 @@ export default function DashboardApp({
                       archives.map((row) => (
                         <tr key={row.id}>
                           <td><b>{row.docType}</b><small>{row.driveUrl}</small></td>
-                          <td>{row.studentName || "—"}<small>{row.nim || ""}</small></td>
-                          <td>{row.createdBy || "—"}</td>
+                          <td>{row.studentName || "-"}<small>{row.nim || ""}</small></td>
+                          <td>{row.createdBy || "-"}</td>
                           <td>{formatDate(row.createdAt)}</td>
                           <td><a className="dlink" href={row.driveUrl} target="_blank" rel="noreferrer">Buka di Drive ↗</a></td>
                         </tr>
@@ -1491,7 +1491,7 @@ export default function DashboardApp({
                           <td>{row.studentName}</td>
                           <td>{row.visitNumber}</td>
                           <td>{formatDate(row.visitDate)}</td>
-                          <td>{row.note || "—"}</td>
+                          <td>{row.note || "-"}</td>
                           {profile.role === "super_admin" && (
                             <td className="qt-aksi">
                               {attHapus === row.id ? (
@@ -1539,9 +1539,9 @@ export default function DashboardApp({
               <form className="panel annform" onSubmit={submitServiceStatus} style={{ marginTop: 14 }}>
                 <label>Indikator status layanan (tampil di portal)
                   <select value={svc.status} onChange={(event) => setSvc({ ...svc, status: event.target.value as "green" | "yellow" | "red" })}>
-                    <option value="green">Hijau — semua layanan aktif</option>
-                    <option value="yellow">Kuning — sebagian layanan terganggu</option>
-                    <option value="red">Merah — layanan sedang tidak tersedia</option>
+                    <option value="green">Hijau: semua layanan aktif</option>
+                    <option value="yellow">Kuning: sebagian layanan terganggu</option>
+                    <option value="red">Merah: layanan sedang tidak tersedia</option>
                   </select>
                 </label>
                 <label>Pesan status<input value={svc.message} onChange={(event) => setSvc({ ...svc, message: event.target.value })} placeholder="Semua layanan aktif" /></label>
@@ -1587,8 +1587,8 @@ export default function DashboardApp({
                     <b>Admin dan dosen boleh masuk selama maintenance</b>
                     <span>
                       {mt.adminLogin
-                        ? "MENYALA — Admin unit dan dosen dapat login dan bekerja seperti biasa selagi portal ditutup. Pilih ini bila perbaikannya butuh banyak tangan."
-                        : "MATI — Admin unit dan dosen tidak dapat login selama portal ditutup, dan yang sesinya masih hidup ikut dikeluarkan. Hanya Anda sebagai Super Admin yang tetap masuk."}
+                        ? "MENYALA: Admin unit dan dosen dapat login dan bekerja seperti biasa selagi portal ditutup. Pilih ini bila perbaikannya butuh banyak tangan."
+                        : "MATI: Admin unit dan dosen tidak dapat login selama portal ditutup, dan yang sesinya masih hidup ikut dikeluarkan. Hanya Anda sebagai Super Admin yang tetap masuk."}
                       {" "}Sakelar ini tidak berpengaruh pada akun Anda sendiri.
                     </span>
                   </div>
@@ -1608,7 +1608,7 @@ export default function DashboardApp({
                     <b>Pintu rahasia pada titik huruf &ldquo;i&rdquo;</b>
                     <span>
                       Titik di atas huruf i pada kata &ldquo;maintenance&rdquo; menjadi tautan tersembunyi ke halaman login.
-                      Tanpa penanda, tanpa tooltip, dan tidak ikut urutan Tab — hanya yang tahu letaknya yang bisa masuk.
+                      Tanpa penanda, tanpa tooltip, dan tidak ikut urutan Tab. Hanya yang tahu letaknya yang bisa masuk.
                       Bila dimatikan, titik itu kembali menjadi titik biasa.
                     </span>
                   </div>
@@ -1689,7 +1689,7 @@ export default function DashboardApp({
 
                 <div className="mtp-hint">
                   <b>Yang perlu diketahui.</b> Menu ini hanya tampil untuk Super Admin, dan server pun hanya menerima
-                  perubahan dari Super Admin — Admin biasa ditolak. Selama maintenance menyala, pengiriman form dari
+                  perubahan dari Super Admin, Admin biasa ditolak. Selama maintenance menyala, pengiriman form dari
                   pengunjung umum ditolak sementara. Akun Super Admin Anda tidak pernah ikut terkunci, dan halaman
                   login tetap bisa dibuka langsung lewat <code>/login</code>, jadi Anda tidak akan pernah terkunci
                   di luar walaupun pintu rahasianya dimatikan. Yang ditolak tidak diberi tahu bahwa masih ada peran
@@ -1716,7 +1716,7 @@ export default function DashboardApp({
                     <b>Pesanan akses</b>
                     <span>
                       Tekan &ldquo;Tandai lunas&rdquo; setelah pembayarannya terlihat di mutasi. Kodenya terbit
-                      sendiri dan langsung muncul di layar pembelinya — tanpa Anda perlu mengirim apa pun.
+                      sendiri dan langsung muncul di layar pembelinya, tanpa Anda perlu mengirim apa pun.
                     </span>
                   </div>
                   <button type="button" className="btn btn-light btn-mini" onClick={() => void muatPesanan()}>
@@ -1761,7 +1761,7 @@ export default function DashboardApp({
                                 ditulis penuh dan mudah disalin mata. */}
                             <td><b>Rp {o.amount.toLocaleString("id-ID")}</b></td>
                             <td><span className={`pill psn-${o.status}`}>{o.status}</span></td>
-                            <td>{o.accessCode ? <code>{o.accessCode}</code> : "—"}</td>
+                            <td>{o.accessCode ? <code>{o.accessCode}</code> : "-"}</td>
                             <td className="qt-aksi">
                               {o.status === "menunggu" || o.status === "kedaluwarsa" ? (
                                 <button
@@ -1774,7 +1774,7 @@ export default function DashboardApp({
                                 </button>
                               ) : o.status === "lunas" ? (
                                 <span className="psn-sudah">✓ terbit</span>
-                              ) : "—"}
+                              ) : "-"}
                             </td>
                           </tr>
                         ))
@@ -1924,14 +1924,14 @@ export default function DashboardApp({
                           return (
                             <tr key={a.id}>
                               <td><code>{a.whatsapp}</code></td>
-                              <td>{a.nama || "—"}</td>
+                              <td>{a.nama || "-"}</td>
                               <td>
                                 {new Date(a.sampai).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
                                 <small className={`lg-sisa${sisa <= 0 ? " lg-habis" : sisa <= 7 ? " lg-dekat" : ""}`}>
                                   {sisa <= 0 ? "sudah habis" : sisa === 1 ? "sisa 1 hari" : `sisa ${sisa} hari`}
                                 </small>
                               </td>
-                              <td>{a.kodeTerakhir ? <code>{a.kodeTerakhir}</code> : "—"}</td>
+                              <td>{a.kodeTerakhir ? <code>{a.kodeTerakhir}</code> : "-"}</td>
                               <td className="qt-aksi">
                                 <button
                                   type="button"
@@ -2010,7 +2010,7 @@ export default function DashboardApp({
                     <input
                       value={cwDraft.label}
                       maxLength={80}
-                      placeholder="Contoh: Rina — Ilkom 2021, atau Kelas Metopen A"
+                      placeholder="Contoh: Rina, Ilkom 2021, atau Kelas Metopen A"
                       onChange={(event) => setCwDraft({ ...cwDraft, label: event.target.value })}
                     />
                   </label>
@@ -2093,7 +2093,7 @@ export default function DashboardApp({
                 <div className="mtp-hint">
                   <b>Yang perlu diketahui.</b> Menu ini hanya tampil untuk Super Admin, dan server pun hanya menerima
                   perubahan dari Super Admin. Kode yang dimasukkan mahasiswa disimpan pada cookie perangkatnya selama
-                  30 hari — menonaktifkan atau menghapus kode langsung menutup akses semua perangkat yang memakainya.
+                  30 hari. Menonaktifkan atau menghapus kode langsung menutup akses semua perangkat yang memakainya.
                   Akun Super Admin sendiri selalu dapat membuka Cakrawala tanpa kode.
                 </div>
               </div>
@@ -2115,7 +2115,7 @@ export default function DashboardApp({
 
           <div className="dfoot">
             <strong>SiPaling FISIP</strong>
-            <span>Dashboard Admin — Concept Superfal Dev · © {new Date().getFullYear()}</span>
+            <span>Dashboard Admin · Concept Superfal Dev · © {new Date().getFullYear()}</span>
             <Link href="/">Portal mahasiswa →</Link>
           </div>
         </main>

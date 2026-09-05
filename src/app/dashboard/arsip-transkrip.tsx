@@ -33,10 +33,10 @@ type BarisArsip = {
 };
 
 function tanggal(waktu: string | null) {
-  if (!waktu) return "—";
+  if (!waktu) return "-";
   const isi = new Date(waktu);
   return Number.isNaN(isi.getTime())
-    ? "—"
+    ? "-"
     : isi.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
 }
 
@@ -179,12 +179,12 @@ export default function ArsipTranskrip({ bolehHapus }: { bolehHapus: boolean }) 
                     <small>{baris.nim}{baris.yudisium ? ` · yudisium ${baris.yudisium}` : ""}</small>
                   </td>
                   <td>
-                    {baris.studyProgram || "—"}
+                    {baris.studyProgram || "-"}
                     <small>{baris.concentration || ""}</small>
                   </td>
                   <td>
                     <b>IPK {baris.ipk}</b>
-                    <small>{baris.courseCount} MK · {baris.totalSks} SKS · {baris.predikat || "—"}</small>
+                    <small>{baris.courseCount} MK · {baris.totalSks} SKS · {baris.predikat || "-"}</small>
                   </td>
                   <td>
                     {tanggal(baris.updatedAt)}

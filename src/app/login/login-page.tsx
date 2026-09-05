@@ -117,7 +117,7 @@ export default function LoginPage({ habisWaktu = false }: { habisWaktu?: boolean
         )}
         {terkunciMaintenance && !error && (
           <div className="login-info">
-            <strong>Portal sedang maintenance.</strong> Login ditutup sementara. Akun Anda tidak bermasalah —
+            <strong>Portal sedang maintenance.</strong> Login ditutup sementara. Akun Anda tidak bermasalah,
             silakan coba lagi setelah portal dibuka kembali.
           </div>
         )}

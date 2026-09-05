@@ -52,7 +52,7 @@ export default function MasukCbt() {
         <div className="cbtd-lambang" aria-hidden="true">📝</div>
         <h1>SiPaling CBT</h1>
         <p className="cbtd-sub">
-          Ujian Berbasis Komputer — Fakultas Ilmu Sosial dan Ilmu Politik
+          Ujian Berbasis Komputer, Fakultas Ilmu Sosial dan Ilmu Politik
         </p>
         <ul className="cbtd-nilai">
           <li>Tidak perlu membuat akun. Cukup kode ujian, nama, dan NIM.</li>
@@ -121,7 +121,7 @@ export default function MasukCbt() {
               </Link>
               <p className="cbtd-bantu">
                 Belum punya akun? Hubungi Super Admin fakultas. Menu CBT hanya terbuka untuk dosen,
-                Admin, dan Super Admin — bukan admin bagian.
+                Admin, dan Super Admin. Bukan admin bagian.
               </p>
             </>
           )}
