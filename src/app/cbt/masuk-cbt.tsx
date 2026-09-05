@@ -19,6 +19,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import KreditCbt, { KREDIT_CBT } from "./kredit";
 
 export default function MasukCbt() {
   const router = useRouter();
@@ -63,6 +64,7 @@ export default function MasukCbt() {
         <p className="cbtd-kaki-kiri">
           Bagian dari <Link href="/">SiPaling FISIP</Link>
         </p>
+        <p className="cbtd-kredit-kiri">{KREDIT_CBT}</p>
       </aside>
 
       {/* ---------- KANAN: PINTU MASUK ---------- */}
@@ -103,7 +105,8 @@ export default function MasukCbt() {
               />
               <p className="cbtd-bantu">
                 Kode diberikan dosen Anda, biasanya lewat grup kelas. Nama dan NIM diisi pada
-                langkah berikutnya.
+                langkah berikutnya, bersama <b>lama waktu ujiannya</b> — jadi Anda sempat bersiap
+                sebelum menekan Mulai Ujian.
               </p>
               {galat && <p className="cbtd-galat" role="alert">{galat}</p>}
               <button type="button" className="cbtd-btn" disabled={sibuk} onClick={() => void lanjut()}>
@@ -127,6 +130,7 @@ export default function MasukCbt() {
           )}
 
           <p className="cbtd-versi">Sistem Ujian Berbasis Komputer</p>
+          <KreditCbt />
         </div>
       </main>
     </div>

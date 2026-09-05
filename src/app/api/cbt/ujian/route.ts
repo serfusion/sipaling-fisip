@@ -3,7 +3,7 @@
 //
 // GET    daftar ujian yang boleh dilihat pemanggilnya
 // POST   buat ujian baru
-// PATCH  ubah ujian yang belum diaktifkan
+// PATCH  ubah setelan ujian — setelan pengawasan tetap terbuka walau berjalan
 // DELETE hapus ujian beserta soal dan hasilnya
 //
 // Yang boleh MENGAKTIFKAN ada di /api/cbt/aktivasi, bukan di sini — dan yang
@@ -36,6 +36,27 @@ const angka = (nilai: unknown, bawaan: number, min: number, maks: number) => {
   const n = Number(nilai);
   if (!Number.isFinite(n)) return bawaan;
   return Math.max(min, Math.min(Math.round(n), maks));
+};
+
+/**
+ * Setelan yang MENGUBAH BENTUK ujian, dan hanya itu yang terkunci selama ujian
+ * berlangsung.
+ *
+ * Dulu seluruh perubahan ditolak begitu ujiannya berjalan. Terdengar aman,
+ * tetapi yang terjadi di ruang ujian justru sebaliknya: seorang mahasiswa
+ * terblokir karena ponselnya sudah dipakai temannya, dan pengawas tidak dapat
+ * melepas centang "satu perangkat" sampai ujiannya usai — artinya orang itu
+ * tidak ikut ujian sama sekali. Setelan pengawasan dan keterangan karena itu
+ * tetap terbuka; yang tetap dikunci hanya empat hal yang membuat sebagian
+ * peserta mengerjakan ujian yang berbeda dari sebagian yang lain.
+ */
+const BENTUK = ["questionCount", "durationMinutes", "randomQuestions", "randomOptions"] as const;
+
+const NAMA_BENTUK: Record<(typeof BENTUK)[number], string> = {
+  questionCount: "jumlah soal",
+  durationMinutes: "durasi",
+  randomQuestions: "pengacakan urutan soal",
+  randomOptions: "pengacakan urutan pilihan",
 };
 
 export async function GET() {
@@ -222,16 +243,8 @@ export async function PATCH(request: Request) {
       );
     }
 
-    // Ujian yang SEDANG berlangsung tidak boleh diubah isinya. Mengubah
-    // durasi atau jumlah soal di tengah jalan berarti sebagian mahasiswa
-    // mengerjakan ujian yang berbeda dari sebagian yang lain.
     const status = statusUjian({ aktif: Boolean(ujian.activatedAt), mulai: ujian.startAt, selesai: ujian.endAt });
-    if (status === "berlangsung") {
-      return Response.json(
-        { success: false, message: "Ujian sedang berlangsung. Menunggu selesai sebelum diubah." },
-        { status: 409 },
-      );
-    }
+    const berlangsung = status === "berlangsung";
 
     const ubah: Record<string, unknown> = { updatedAt: new Date() };
     if (typeof body.title === "string") ubah.title = teks(body.title, 160);
@@ -250,8 +263,32 @@ export async function PATCH(request: Request) {
     if (body.singleDevice !== undefined) ubah.singleDevice = body.singleDevice !== false;
     if (body.token !== undefined) ubah.token = teks(body.token, 12).toUpperCase() || null;
 
+    // Selama ujian berjalan, yang mengubah bentuknya ditolak — tetapi hanya
+    // bila nilainya memang berbeda. Layar dosen mengirim seluruh formulir
+    // sekaligus, dan menolaknya karena membawa durasi yang sama persis dengan
+    // yang tersimpan berarti mengunci setelan yang sebenarnya boleh diubah.
+    if (berlangsung) {
+      const tersendat = BENTUK.filter(
+        (k) => k in ubah && ubah[k] !== (ujian as unknown as Record<string, unknown>)[k],
+      );
+      if (tersendat.length > 0) {
+        return Response.json(
+          {
+            success: false,
+            message:
+              `Ujian sedang berlangsung, jadi ${tersendat.map((k) => NAMA_BENTUK[k]).join(", ")} ` +
+              "belum dapat diubah — sebagian peserta akan mengerjakan ujian yang berbeda dari " +
+              "sebagian yang lain. Setelan pengawasan seperti “satu perangkat”, kode " +
+              "pengawas, dan instruksi tetap dapat diubah sekarang.",
+          },
+          { status: 409 },
+        );
+      }
+      for (const k of BENTUK) delete ubah[k];
+    }
+
     await db.update(cbtExams).set(ubah).where(eq(cbtExams.id, id));
-    return Response.json({ success: true });
+    return Response.json({ success: true, berlangsung });
   } catch (error: unknown) {
     console.error("ubah ujian cbt", error);
     return Response.json(

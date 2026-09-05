@@ -20,6 +20,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { jawabanKosong, uraiJodoh, type JenisSoal, type Media } from "@/lib/cbt";
+import KreditCbt from "../kredit";
 import MediaSoal from "./media-soal";
 
 type Ujian = {
@@ -97,6 +98,21 @@ function penandaPerangkat() {
   } catch {
     return "";
   }
+}
+
+/**
+ * Lamanya ujian, dieja seperti orang mengucapkannya.
+ *
+ * "90 menit" benar tetapi tidak langsung terbayang; "1 jam 30 menit" langsung
+ * terbayang. Mahasiswa yang membuka tautannya perlu tahu ia harus menyediakan
+ * berapa lama SEBELUM menekan Mulai Ujian, bukan sesudah jam mundur berjalan.
+ */
+function ejaMenit(menit: number) {
+  const utuh = Math.max(0, Math.round(menit));
+  if (utuh < 60) return `${utuh} menit`;
+  const jam = Math.floor(utuh / 60);
+  const sisa = utuh % 60;
+  return sisa === 0 ? `${jam} jam` : `${jam} jam ${sisa} menit`;
 }
 
 function tanggalRapi(iso: string | null) {
@@ -590,6 +606,7 @@ export default function UjianApp() {
             {sibuk ? "Memeriksa…" : "Lanjut"}
           </button>
           <p className="uj-kaki">SiPaling FISIP · Sistem Pelayanan Akademik Lingkungan FISIP</p>
+          <KreditCbt rapat />
         </div>
       </div>
     );
@@ -608,16 +625,36 @@ export default function UjianApp() {
 
           <div className="uj-fakta">
             <div><b>{ujian.jumlahSoal || "-"}</b><span>soal</span></div>
-            <div><b>{ujian.durasi}</b><span>menit</span></div>
+            <div className="uj-fakta-waktu"><b>{ujian.durasi}</b><span>menit</span></div>
             <div><b>{ujian.pakaiToken ? "Ya" : "Tidak"}</b><span>pakai kode</span></div>
+          </div>
+
+          {/* ---------- LAMA UJIAN, DIKATAKAN SEKALI LAGI DENGAN JELAS ----------
+              Angka pada kotak fakta di atas mudah terlewat: tiga kotak seukuran
+              yang dibaca sekilas. Yang paling ditanyakan mahasiswa saat membuka
+              tautannya justru satu hal — ini berapa lama — dan ia perlu tahu
+              SEBELUM menekan Mulai Ujian, bukan sesudah jam mundur berjalan. */}
+          <div className="uj-waktu">
+            <span className="uj-waktu-ikon" aria-hidden="true">⏱</span>
+            <div>
+              <b>Waktu pengerjaan {ejaMenit(ujian.durasi)}</b>
+              <span>
+                Hitungan mundur baru berjalan sesudah tombol <b>MULAI UJIAN</b> ditekan, jadi
+                bersiaplah dulu: alat tulis, daya baterai, dan sambungan internet.
+                {ujian.selesai
+                  ? ` Ujian ini ditutup ${tanggalRapi(ujian.selesai)}; yang mulai mendekati jam tutup hanya mendapat sisa waktu sampai jam itu.`
+                  : ""}
+              </span>
+            </div>
           </div>
 
           {ujian.instruksi && <div className="uj-instruksi"><b>Instruksi</b><p>{ujian.instruksi}</p></div>}
 
           {belumBuka && (
             <div className="uj-kabar uj-kabar-tunggu">
-              Ujian ini dibuka <b>{tanggalRapi(ujian.mulai)}</b>. Halaman ini boleh ditutup dulu,
-              buka lagi saat waktunya tiba.
+              Ujian ini dibuka <b>{tanggalRapi(ujian.mulai)}</b> dan dikerjakan selama{" "}
+              <b>{ejaMenit(ujian.durasi)}</b>. Halaman ini boleh ditutup dulu, buka lagi saat
+              waktunya tiba.
             </div>
           )}
           {sudahTutup && <div className="uj-kabar uj-kabar-tutup">Ujian ini sudah ditutup.</div>}
@@ -642,8 +679,8 @@ export default function UjianApp() {
                 {sibuk ? "Menyiapkan…" : "MULAI UJIAN"}
               </button>
               <p className="uj-catatan">
-                Waktu mulai berjalan begitu tombol ini ditekan. Jawabanmu tersimpan otomatis, jadi
-                kalau jaringan sempat terputus, pekerjaanmu tidak hilang.
+                Waktu {ejaMenit(ujian.durasi)} mulai berjalan begitu tombol ini ditekan. Jawabanmu
+                tersimpan otomatis, jadi kalau jaringan sempat terputus, pekerjaanmu tidak hilang.
               </p>
             </>
           )}
@@ -651,6 +688,7 @@ export default function UjianApp() {
           <button type="button" className="uj-btn uj-btn-sunyi" onClick={() => { setLayar("kode"); setGalat(""); }}>
             ← Ganti kode ujian
           </button>
+          <KreditCbt rapat />
         </div>
       </div>
     );
@@ -698,6 +736,7 @@ export default function UjianApp() {
           )}
 
           <p className="uj-kaki">Terima kasih. Halaman ini boleh ditutup.</p>
+          <KreditCbt rapat />
         </div>
       </div>
     );
@@ -929,6 +968,8 @@ export default function UjianApp() {
               Jawabanmu dikumpulkan dan ujian ditutup. Tidak dapat dibuka lagi.
             </p>
           </div>
+
+          <KreditCbt rapat />
         </aside>
       </div>
 
