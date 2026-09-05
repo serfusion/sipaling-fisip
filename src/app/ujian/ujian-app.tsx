@@ -19,7 +19,8 @@
 // ============================================================
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ejaWaktu, type JenisSoal } from "@/lib/cbt";
+import { ejaWaktu, jawabanKosong, uraiJodoh, type JenisSoal, type Media } from "@/lib/cbt";
+import MediaSoal from "./media-soal";
 
 type Ujian = {
   kode: string; judul: string; mataKuliah: string; kelas: string | null;
@@ -29,10 +30,21 @@ type Ujian = {
   status: string; mulai: string | null; selesai: string | null;
 };
 
-type Soal = { id: number; jenis: JenisSoal; pertanyaan: string; pilihan: string[]; bobot: number };
+type Soal = {
+  id: number;
+  jenis: JenisSoal;
+  pertanyaan: string;
+  pilihan: string[];
+  /** Kolom kiri penjodohan. Kosong untuk jenis lain. */
+  kiri: string[];
+  media: Media;
+  bobot: number;
+};
 
 type Hasil = {
   nilai: number; benar: number; salah: number; kosong: number;
+  /** Benar sebagian — hanya pada PG kompleks dan penjodohan. */
+  sebagian: number;
   tertunda: number; lulus: boolean; passing: number;
 };
 
@@ -349,6 +361,40 @@ export default function UjianApp() {
     jamKirimRef.current = setTimeout(() => { void kirimAntrean(); }, JEDA_SIMPAN_MS);
   }
 
+  /**
+   * Centang atau lepas satu pilihan pada PG kompleks.
+   *
+   * Jawabannya disimpan sebagai daftar nomor dipisah koma, mis. "0,2". Selalu
+   * diurutkan supaya "2,0" dan "0,2" tidak terbaca sebagai dua jawaban yang
+   * berbeda ketika dibandingkan dengan yang tersimpan.
+   */
+  function centang(id: number, nomor: number) {
+    const kini = String(jawaban[id] ?? "")
+      .split(",")
+      .map((n) => n.trim())
+      .filter(Boolean);
+    const ada = kini.includes(String(nomor));
+    const berikut = ada ? kini.filter((n) => n !== String(nomor)) : [...kini, String(nomor)];
+    jawab(id, berikut.map(Number).sort((a, b) => a - b).join(","));
+  }
+
+  function tercentang(id: number, nomor: number) {
+    return String(jawaban[id] ?? "").split(",").map((n) => n.trim()).includes(String(nomor));
+  }
+
+  /** Pasangkan satu baris kiri dengan satu pilihan kanan. */
+  function jodohkan(id: number, kiri: number, kanan: string) {
+    const kini = uraiJodoh(String(jawaban[id] ?? ""));
+    if (kanan === "") kini.delete(kiri);
+    else kini.set(kiri, Number(kanan));
+    jawab(id, JSON.stringify(Object.fromEntries(kini)));
+  }
+
+  function pasanganKini(id: number, kiri: number): string {
+    const nilai = uraiJodoh(String(jawaban[id] ?? "")).get(kiri);
+    return nilai === undefined ? "" : String(nilai);
+  }
+
   async function kirimAntrean() {
     const antre = Array.from(antreRef.current.entries());
     if (antre.length === 0 || !kunciRef.current) { setSimpanan("aman"); return; }
@@ -447,11 +493,24 @@ export default function UjianApp() {
    */
   function keadaanSoal(id: number): "ragu" | "isi" | "kosong" {
     if (ditandai.includes(id)) return "ragu";
-    if (String(jawaban[id] ?? "").trim()) return "isi";
+    if (sudahDijawab(id)) return "isi";
     return "kosong";
   }
 
-  const terjawab = soal.filter((s) => String(jawaban[s.id] ?? "").trim()).length;
+  /**
+   * Sudah dijawab?
+   *
+   * Lewat jawabanKosong, bukan sekadar memeriksa tali kosong: penjodohan yang
+   * belum disentuh tetap tersimpan sebagai "{}", dan itu akan terbaca hijau
+   * pada palet nomor padahal belum dikerjakan sama sekali.
+   */
+  function sudahDijawab(id: number) {
+    const soalnya = soal.find((s) => s.id === id);
+    if (!soalnya) return false;
+    return !jawabanKosong(soalnya.jenis, String(jawaban[id] ?? ""));
+  }
+
+  const terjawab = soal.filter((s) => !jawabanKosong(s.jenis, String(jawaban[s.id] ?? ""))).length;
   const soalKini = soal[nomor];
   const hampirHabis = sisa > 0 && sisa <= 300;
 
@@ -565,9 +624,18 @@ export default function UjianApp() {
               </div>
               <div className="uj-fakta">
                 <div><b>{hasil.benar}</b><span>benar</span></div>
+                {hasil.sebagian > 0 && (
+                  <div><b>{hasil.sebagian}</b><span>benar sebagian</span></div>
+                )}
                 <div><b>{hasil.salah}</b><span>salah</span></div>
                 <div><b>{hasil.kosong}</b><span>kosong</span></div>
               </div>
+              {hasil.sebagian > 0 && (
+                <p className="uj-catatan">
+                  Soal pilihan jamak dan penjodohan dinilai per bagian, jadi jawaban yang benar
+                  sebagian tetap mendapat nilai.
+                </p>
+              )}
               {hasil.tertunda > 0 && (
                 <p className="uj-catatan">
                   {hasil.tertunda} soal essay menunggu koreksi dosen, jadi nilai ini masih bisa naik.
@@ -653,6 +721,7 @@ export default function UjianApp() {
 
           <div className="ck-kartu-isi">
             <p className="ck-tanya">{soalKini.pertanyaan}</p>
+            <MediaSoal media={soalKini.media} />
 
             {soalKini.jenis === "pg" || soalKini.jenis === "benar_salah" ? (
               <div className="ck-opsi-daftar" role="radiogroup" aria-label={`Pilihan jawaban soal ${nomor + 1}`}>
@@ -669,6 +738,47 @@ export default function UjianApp() {
                     <span className="ck-opsi-huruf">{String.fromCharCode(65 + i)}.</span>
                     <span className="ck-opsi-teks">{p}</span>
                   </button>
+                ))}
+              </div>
+            ) : soalKini.jenis === "pg_kompleks" ? (
+              <div className="ck-opsi-daftar" aria-label={`Pilihan jawaban soal ${nomor + 1}`}>
+                <p className="ck-petunjuk">Boleh memilih lebih dari satu jawaban.</p>
+                {soalKini.pilihan.map((p, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    role="checkbox"
+                    aria-checked={tercentang(soalKini.id, i)}
+                    className={`ck-opsi ${tercentang(soalKini.id, i) ? "on" : ""}`}
+                    onClick={() => centang(soalKini.id, i)}
+                  >
+                    {/* Kotak, bukan lingkaran. Bentuknya sendiri yang harus
+                        mengatakan bahwa jawabannya boleh lebih dari satu. */}
+                    <span className="ck-kotak" aria-hidden="true">{tercentang(soalKini.id, i) ? "✓" : ""}</span>
+                    <span className="ck-opsi-huruf">{String.fromCharCode(65 + i)}.</span>
+                    <span className="ck-opsi-teks">{p}</span>
+                  </button>
+                ))}
+              </div>
+            ) : soalKini.jenis === "penjodohan" ? (
+              <div className="ck-jodoh">
+                <p className="ck-petunjuk">Pilih pasangan yang tepat untuk setiap baris.</p>
+                {soalKini.kiri.map((kiri, i) => (
+                  <div key={i} className="ck-jodoh-baris">
+                    <span className="ck-jodoh-nomor">{i + 1}</span>
+                    <span className="ck-jodoh-kiri">{kiri}</span>
+                    <select
+                      className="ck-jodoh-pilih"
+                      value={pasanganKini(soalKini.id, i)}
+                      onChange={(e) => jodohkan(soalKini.id, i, e.target.value)}
+                      aria-label={`Pasangan untuk ${kiri}`}
+                    >
+                      <option value="">— pilih —</option>
+                      {soalKini.pilihan.map((p, n) => (
+                        <option key={n} value={String(n)}>{String.fromCharCode(65 + n)}. {p}</option>
+                      ))}
+                    </select>
+                  </div>
                 ))}
               </div>
             ) : soalKini.jenis === "isian" ? (
@@ -689,7 +799,7 @@ export default function UjianApp() {
               />
             )}
 
-            {isi !== "" && (
+            {!jawabanKosong(soalKini.jenis, isi) && (
               <button type="button" className="ck-hapus" onClick={() => jawab(soalKini.id, "")}>
                 Hapus jawaban soal ini
               </button>

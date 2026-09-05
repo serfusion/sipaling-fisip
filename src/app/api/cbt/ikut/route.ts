@@ -107,6 +107,10 @@ function lembarUntukLayar(bank: Soal[], lembar: Array<{ id: number; peta: number
         // Urutan pilihan mengikuti peta yang tersimpan pada attempt, supaya
         // memuat ulang halaman tidak mengubah letak jawaban yang sudah dipilih.
         pilihan: item.peta.length ? item.peta.map((i) => soal.pilihan[i] ?? "") : soal.pilihan,
+        // Kolom kiri penjodohan. Hanya teksnya — pasangannya tertinggal di
+        // server, tempat satu-satunya yang boleh mengetahui kuncinya.
+        kiri: soal.jenis === "penjodohan" ? soal.pasangan.map((p) => p.kiri) : [],
+        media: soal.media,
         bobot: soal.bobot,
       };
     })
@@ -271,7 +275,8 @@ export async function POST(request: Request) {
         kunciSesi,
         ujian: ringkasUjian(ujian, sekarang),
         soal: paket.map((s) => ({
-          id: s.id, jenis: s.jenis, pertanyaan: s.pertanyaan, pilihan: s.pilihan, bobot: s.bobot,
+          id: s.id, jenis: s.jenis, pertanyaan: s.pertanyaan, pilihan: s.pilihan,
+          kiri: s.kiri, media: s.media, bobot: s.bobot,
         })),
         jawaban: {},
         sisaDetik: sisaDetik(deadline, sekarang),
@@ -421,6 +426,7 @@ export async function POST(request: Request) {
           score: Math.round(ringkas.nilai),
           correct: ringkas.benar,
           wrong: ringkas.salah,
+          partial: ringkas.sebagian,
           blank: ringkas.kosong,
           pending: ringkas.tertunda,
           lastSeenAt: sekarang,
@@ -435,6 +441,11 @@ export async function POST(request: Request) {
         hasil: ujian.showScore
           ? {
               nilai: ringkas.nilai, benar: ringkas.benar, salah: ringkas.salah,
+              // Ikut dikirim sejak ada PG kompleks dan penjodohan. Tanpa
+              // angka ini, mahasiswa yang benar sebagian pada dua soal
+              // membaca "1 benar, 0 salah" dari empat soal — dan dua soal
+              // sisanya seolah lenyap.
+              sebagian: ringkas.sebagian,
               kosong: ringkas.kosong, tertunda: ringkas.tertunda,
               lulus: ringkas.lulus, passing: ujian.passingGrade,
             }

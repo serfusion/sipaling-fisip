@@ -18,7 +18,10 @@
 // ============================================================
 
 import { useCallback, useEffect, useState } from "react";
-import { JENIS_LABEL, STATUS_LABEL, type JenisSoal, type StatusUjian } from "@/lib/cbt";
+import {
+  JENIS_LABEL, MEDIA_KOSONG, SEMUA_JENIS, STATUS_LABEL, uraiKunciJamak,
+  type JenisSoal, type Media, type Pasangan, type StatusUjian,
+} from "@/lib/cbt";
 import { imporDariExcel, imporDariWord, type SoalImpor, type Aoa } from "@/lib/impor-soal";
 import { buatDocxTemplate, buatXlsxTemplate } from "@/lib/template-soal";
 
@@ -46,7 +49,8 @@ type Rincian = {
 
 type Soal = {
   id: number; jenis: JenisSoal; pertanyaan: string; pilihan: string[];
-  kunci: string; bobot: number; materi: string; tingkat: string; pembahasan: string;
+  kunci: string; pasangan: Pasangan[]; media: Media;
+  bobot: number; materi: string; tingkat: string; pembahasan: string;
 };
 
 type Peserta = {
@@ -70,11 +74,34 @@ const SOAL_KOSONG = {
   pertanyaan: "",
   pilihan: ["", "", "", ""],
   kunci: "0",
+  pasangan: [] as Pasangan[],
+  media: { ...MEDIA_KOSONG } as Media,
   bobot: 1,
   materi: "",
   tingkat: "sedang",
   pembahasan: "",
 };
+
+/**
+ * Isi awal formulir untuk tiap jenis soal.
+ *
+ * Berganti jenis berarti berganti bentuk isian. Membiarkan sisa isian jenis
+ * sebelumnya membuat dosen menyimpan soal penjodohan yang kuncinya masih
+ * menunjuk pilihan ganda — dan itu baru ketahuan saat mahasiswa mengerjakan.
+ */
+function bentukJenis(jenis: JenisSoal) {
+  if (jenis === "benar_salah") return { pilihan: ["Benar", "Salah"], kunci: "0", pasangan: [] as Pasangan[] };
+  if (jenis === "pg") return { pilihan: ["", "", "", ""], kunci: "0", pasangan: [] as Pasangan[] };
+  if (jenis === "pg_kompleks") return { pilihan: ["", "", "", ""], kunci: "", pasangan: [] as Pasangan[] };
+  if (jenis === "penjodohan") {
+    return {
+      pilihan: ["", "", ""],
+      kunci: "",
+      pasangan: [{ kiri: "", kanan: 0 }, { kiri: "", kanan: 1 }] as Pasangan[],
+    };
+  }
+  return { pilihan: [] as string[], kunci: "", pasangan: [] as Pasangan[] };
+}
 
 /** Ubah tanggal ISO menjadi nilai untuk <input type="datetime-local">. */
 function untukInput(iso: string | null) {
@@ -248,16 +275,65 @@ export default function CbtPanel({ role }: { role: string }) {
    */
   function periksaSoal(isi: typeof SOAL_KOSONG): string {
     if (isi.pertanyaan.trim().length < 3) return "Pertanyaan belum diisi.";
+    const terisi = isi.pilihan.filter((p) => p.trim().length > 0);
+
     if (isi.jenis === "pg" || isi.jenis === "benar_salah") {
-      const terisi = isi.pilihan.filter((p) => p.trim().length > 0);
       if (terisi.length < 2) return "Pilihan jawaban minimal dua.";
       const nomor = Number(isi.kunci);
       if (!Number.isInteger(nomor) || nomor < 0 || nomor >= terisi.length) {
         return "Kunci jawaban belum dipilih.";
       }
     }
+    if (isi.jenis === "pg_kompleks") {
+      if (terisi.length < 2) return "Pilihan jawaban minimal dua.";
+      const kunci = uraiKunciJamak(isi.kunci);
+      if (kunci.size === 0) return "Tandai dulu jawaban mana saja yang benar.";
+      if (kunci.size >= terisi.length) {
+        return "Seluruh pilihan ditandai benar — sisakan minimal satu pengecoh, kalau tidak soalnya tidak mengukur apa pun.";
+      }
+    }
+    if (isi.jenis === "penjodohan") {
+      if (terisi.length < 2) return "Kolom jawaban penjodohan minimal dua.";
+      const lengkap = isi.pasangan.filter(
+        (p) => p.kiri.trim().length > 0 && Number.isInteger(p.kanan) && p.kanan >= 0 && p.kanan < terisi.length,
+      );
+      if (lengkap.length < 2) return "Penjodohan perlu minimal dua pasangan yang lengkap.";
+    }
     if (isi.jenis === "isian" && !isi.kunci.trim()) return "Kunci jawaban isian singkat belum diisi.";
+    if (isi.media.jenis && !isi.media.url.trim()) return "Media sudah dipilih jenisnya, tetapi tautannya masih kosong.";
     return "";
+  }
+
+  /** Centang atau lepas satu pilihan sebagai kunci pada PG kompleks. */
+  function tandaiKunciJamak(nomor: number) {
+    const kini = uraiKunciJamak(soalBaru.kunci);
+    if (kini.has(nomor)) kini.delete(nomor);
+    else kini.add(nomor);
+    setSoalBaru({ ...soalBaru, kunci: [...kini].sort((a, b) => a - b).join(",") });
+  }
+
+  /** Unggah satu berkas media untuk soal yang sedang disusun. */
+  async function unggahMedia(berkas: File) {
+    if (!terbuka) return;
+    setSibuk(true);
+    setGalat("");
+    try {
+      const badan = new FormData();
+      badan.append("ujian", String(terbuka.id));
+      badan.append("berkas", berkas);
+      const jawab = await fetch("/api/cbt/media", { method: "POST", body: badan });
+      const data = await jawab.json();
+      if (!jawab.ok || !data.success) throw new Error(data.message || "Media belum dapat diunggah.");
+      setSoalBaru((kini) => ({
+        ...kini,
+        media: { jenis: data.jenis, url: data.url, keterangan: kini.media.keterangan },
+      }));
+      setPesan("Media terunggah.");
+    } catch (alasan: unknown) {
+      setGalat(alasan instanceof Error ? alasan.message : "Media belum dapat diunggah.");
+    } finally {
+      setSibuk(false);
+    }
   }
 
   /**
@@ -946,14 +1022,9 @@ export default function CbtPanel({ role }: { role: string }) {
               <label><span>Jenis</span>
                 <select value={soalBaru.jenis} onChange={(e) => {
                   const jenis = e.target.value as JenisSoal;
-                  setSoalBaru((s) => ({
-                    ...s,
-                    jenis,
-                    pilihan: jenis === "benar_salah" ? ["Benar", "Salah"] : jenis === "pg" ? ["", "", "", ""] : [],
-                    kunci: jenis === "essay" ? "" : "0",
-                  }));
+                  setSoalBaru((s) => ({ ...s, jenis, ...bentukJenis(jenis) }));
                 }}>
-                  {(Object.keys(JENIS_LABEL) as JenisSoal[]).map((j) => (
+                  {SEMUA_JENIS.map((j) => (
                     <option key={j} value={j}>{JENIS_LABEL[j]}</option>
                   ))}
                 </select>
@@ -977,19 +1048,86 @@ export default function CbtPanel({ role }: { role: string }) {
               <textarea rows={3} value={soalBaru.pertanyaan} onChange={(e) => setSoalBaru({ ...soalBaru, pertanyaan: e.target.value })} />
             </label>
 
-            {(soalBaru.jenis === "pg" || soalBaru.jenis === "benar_salah") && (
+            {/* ---------- MEDIA: GAMBAR ATAU VIDEO ---------- */}
+            <div className="cbt-media-edit">
+              <span className="cbt-opsi-judul">Media soal (opsional)</span>
+              <div className="cbt-media-baris">
+                <select
+                  value={soalBaru.media.jenis}
+                  onChange={(e) =>
+                    setSoalBaru({ ...soalBaru, media: { ...soalBaru.media, jenis: e.target.value as Media["jenis"] } })
+                  }
+                >
+                  <option value="">Tanpa media</option>
+                  <option value="gambar">Gambar</option>
+                  <option value="video">Video</option>
+                </select>
+                <input
+                  value={soalBaru.media.url}
+                  onChange={(e) => setSoalBaru({ ...soalBaru, media: { ...soalBaru.media, url: e.target.value } })}
+                  placeholder="Tempel tautan gambar / YouTube / Drive, atau unggah berkas →"
+                />
+                <label className={`btn btn-light btn-mini cbt-unggah ${terkunci ? "mati" : ""}`}>
+                  ⇧ Unggah
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm"
+                    disabled={terkunci || sibuk}
+                    onChange={(e) => {
+                      const berkas = e.target.files?.[0];
+                      e.target.value = "";
+                      if (berkas) void unggahMedia(berkas);
+                    }}
+                  />
+                </label>
+              </div>
+              {soalBaru.media.jenis && (
+                <input
+                  className="cbt-media-ket-edit"
+                  value={soalBaru.media.keterangan}
+                  onChange={(e) => setSoalBaru({ ...soalBaru, media: { ...soalBaru.media, keterangan: e.target.value } })}
+                  placeholder="Keterangan gambar/video (opsional)"
+                />
+              )}
+              <p className="cbt-catatan">
+                Gambar maksimal 5 MB, video 50 MB. Video panjang lebih baik ditempel sebagai tautan
+                YouTube atau Google Drive — tautan sematan tidak punya batas ukuran dan tidak
+                memakan kuota penyimpanan.
+              </p>
+            </div>
+
+            {(soalBaru.jenis === "pg" || soalBaru.jenis === "pg_kompleks" ||
+              soalBaru.jenis === "benar_salah" || soalBaru.jenis === "penjodohan") && (
               <div className="cbt-opsi-edit">
-                <span className="cbt-opsi-judul">Pilihan jawaban — tekan lingkarannya untuk menandai kunci</span>
+                <span className="cbt-opsi-judul">
+                  {soalBaru.jenis === "penjodohan"
+                    ? "Kolom jawaban (kanan) — boleh diberi pengecoh yang tidak berpasangan"
+                    : soalBaru.jenis === "pg_kompleks"
+                      ? "Pilihan jawaban — tandai SEMUA yang benar, sisakan minimal satu pengecoh"
+                      : "Pilihan jawaban — tekan lingkarannya untuk menandai kunci"}
+                </span>
                 {soalBaru.pilihan.map((p, i) => (
                   <div key={i} className="cbt-opsi-baris">
-                    <button
-                      type="button"
-                      className={`cbt-kunci ${soalBaru.kunci === String(i) ? "on" : ""}`}
-                      onClick={() => setSoalBaru({ ...soalBaru, kunci: String(i) })}
-                      title="Tandai sebagai kunci jawaban"
-                    >
-                      {String.fromCharCode(65 + i)}
-                    </button>
+                    {soalBaru.jenis === "penjodohan" ? (
+                      <span className="cbt-kunci cbt-kunci-mati">{String.fromCharCode(65 + i)}</span>
+                    ) : (
+                      <button
+                        type="button"
+                        className={`cbt-kunci ${
+                          soalBaru.jenis === "pg_kompleks"
+                            ? uraiKunciJamak(soalBaru.kunci).has(i) ? "on" : ""
+                            : soalBaru.kunci === String(i) ? "on" : ""
+                        }`}
+                        onClick={() =>
+                          soalBaru.jenis === "pg_kompleks"
+                            ? tandaiKunciJamak(i)
+                            : setSoalBaru({ ...soalBaru, kunci: String(i) })
+                        }
+                        title="Tandai sebagai kunci jawaban"
+                      >
+                        {String.fromCharCode(65 + i)}
+                      </button>
+                    )}
                     <input
                       value={p}
                       onChange={(e) => {
@@ -999,17 +1137,75 @@ export default function CbtPanel({ role }: { role: string }) {
                       }}
                       placeholder={`Pilihan ${String.fromCharCode(65 + i)}`}
                     />
-                    {soalBaru.jenis === "pg" && soalBaru.pilihan.length > 2 && (
+                    {soalBaru.jenis !== "benar_salah" && soalBaru.pilihan.length > 2 && (
                       <button type="button" className="cbt-buang" onClick={() => {
                         const berikut = soalBaru.pilihan.filter((_, n) => n !== i);
-                        setSoalBaru({ ...soalBaru, pilihan: berikut, kunci: "0" });
+                        // Kunci dan pasangan ikut disetel ulang: keduanya
+                        // menunjuk pilihan LEWAT NOMOR, dan menghapus satu
+                        // pilihan menggeser seluruh nomor di bawahnya.
+                        setSoalBaru({
+                          ...soalBaru,
+                          pilihan: berikut,
+                          kunci: soalBaru.jenis === "pg_kompleks" ? "" : "0",
+                          pasangan: soalBaru.pasangan.map((x) => ({
+                            ...x,
+                            kanan: x.kanan >= berikut.length ? 0 : x.kanan,
+                          })),
+                        });
                       }}>✕</button>
                     )}
                   </div>
                 ))}
-                {soalBaru.jenis === "pg" && soalBaru.pilihan.length < 6 && (
+                {soalBaru.jenis !== "benar_salah" && soalBaru.pilihan.length < 8 && (
                   <button type="button" className="btn btn-light btn-mini" onClick={() => setSoalBaru({ ...soalBaru, pilihan: [...soalBaru.pilihan, ""] })}>
                     + Tambah pilihan
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* ---------- PASANGAN PENJODOHAN ---------- */}
+            {soalBaru.jenis === "penjodohan" && (
+              <div className="cbt-opsi-edit">
+                <span className="cbt-opsi-judul">Pasangan — kolom kiri dan jawaban yang benar</span>
+                {soalBaru.pasangan.map((pas, i) => (
+                  <div key={i} className="cbt-jodoh-edit">
+                    <span className="cbt-jodoh-no">{i + 1}</span>
+                    <input
+                      value={pas.kiri}
+                      onChange={(e) => {
+                        const berikut = [...soalBaru.pasangan];
+                        berikut[i] = { ...berikut[i], kiri: e.target.value };
+                        setSoalBaru({ ...soalBaru, pasangan: berikut });
+                      }}
+                      placeholder={`Pertanyaan baris ${i + 1}`}
+                    />
+                    <select
+                      value={String(pas.kanan)}
+                      onChange={(e) => {
+                        const berikut = [...soalBaru.pasangan];
+                        berikut[i] = { ...berikut[i], kanan: Number(e.target.value) };
+                        setSoalBaru({ ...soalBaru, pasangan: berikut });
+                      }}
+                    >
+                      {soalBaru.pilihan.map((opsi, n) => (
+                        <option key={n} value={String(n)}>
+                          {String.fromCharCode(65 + n)}. {opsi.slice(0, 40) || "(kosong)"}
+                        </option>
+                      ))}
+                    </select>
+                    {soalBaru.pasangan.length > 2 && (
+                      <button type="button" className="cbt-buang" onClick={() =>
+                        setSoalBaru({ ...soalBaru, pasangan: soalBaru.pasangan.filter((_, n) => n !== i) })
+                      }>✕</button>
+                    )}
+                  </div>
+                ))}
+                {soalBaru.pasangan.length < 10 && (
+                  <button type="button" className="btn btn-light btn-mini" onClick={() =>
+                    setSoalBaru({ ...soalBaru, pasangan: [...soalBaru.pasangan, { kiri: "", kanan: 0 }] })
+                  }>
+                    + Tambah pasangan
                   </button>
                 )}
               </div>
@@ -1046,18 +1242,54 @@ export default function CbtPanel({ role }: { role: string }) {
                   <div className="cbt-soal-kepala">
                     <span className={`pill cbt-t-${s.tingkat}`}>{JENIS_LABEL[s.jenis]} · {s.bobot} poin</span>
                     <span className="cbt-soal-aksi">
-                      <button type="button" disabled={terkunci} onClick={() => { setSunting(s.id); setSoalBaru({ ...s, pilihan: s.pilihan.length ? s.pilihan : ["", ""] }); }}>Ubah</button>
+                      <button type="button" disabled={terkunci} onClick={() => {
+                        setSunting(s.id);
+                        setSoalBaru({
+                          ...s,
+                          pilihan: s.pilihan.length ? s.pilihan : ["", ""],
+                          pasangan: s.pasangan ?? [],
+                          media: s.media ?? { ...MEDIA_KOSONG },
+                        });
+                      }}>Ubah</button>
                       <button type="button" disabled={terkunci} onClick={() => void hapusSoal(s.id)}>Hapus</button>
                     </span>
                   </div>
                   <p className="cbt-soal-tanya">{s.pertanyaan}</p>
-                  {s.pilihan.length > 0 && (
+                  {s.media?.jenis && s.media.url && (
+                    <p className="cbt-soal-media">
+                      {s.media.jenis === "video" ? "🎬" : "🖼"} {s.media.keterangan || s.media.url}
+                    </p>
+                  )}
+                  {s.pilihan.length > 0 && s.jenis !== "penjodohan" && (
                     <ul className="cbt-soal-opsi">
-                      {s.pilihan.map((p, i) => (
-                        <li key={i} className={s.kunci === String(i) ? "kunci" : ""}>
-                          <b>{String.fromCharCode(65 + i)}.</b> {p}{s.kunci === String(i) && <i> ← kunci</i>}
+                      {s.pilihan.map((p, i) => {
+                        const kunci = s.jenis === "pg_kompleks"
+                          ? uraiKunciJamak(s.kunci).has(i)
+                          : s.kunci === String(i);
+                        return (
+                          <li key={i} className={kunci ? "kunci" : ""}>
+                            <b>{String.fromCharCode(65 + i)}.</b> {p}{kunci && <i> ← kunci</i>}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                  {s.jenis === "penjodohan" && (
+                    <ul className="cbt-soal-opsi">
+                      {(s.pasangan || []).map((pas, i) => (
+                        <li key={i} className="kunci">
+                          <b>{i + 1}.</b> {pas.kiri} <i>↔ {s.pilihan[pas.kanan] ?? "—"}</i>
                         </li>
                       ))}
+                      {s.pilihan.length > (s.pasangan || []).length && (
+                        <li>
+                          <i>
+                            Pengecoh: {s.pilihan
+                              .filter((_, n) => !(s.pasangan || []).some((pas) => pas.kanan === n))
+                              .join(", ")}
+                          </i>
+                        </li>
+                      )}
                     </ul>
                   )}
                   {s.jenis === "isian" && <p className="cbt-soal-kunci">Kunci: {s.kunci}</p>}

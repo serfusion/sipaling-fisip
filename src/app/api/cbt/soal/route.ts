@@ -14,14 +14,35 @@ import { getCurrentProfile } from "@/lib/supabase-server";
 import { explainServerError } from "@/lib/api-errors";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import {
-  angkaParam, bolehCbt, bolehPantau, bolehUbah, statusUjian, type JenisSoal,
+  angkaParam, bolehCbt, bolehPantau, bolehUbah, statusUjian, uraiKunciJamak,
+  SEMUA_JENIS, type JenisMedia, type JenisSoal, type Pasangan,
 } from "@/lib/cbt";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const JENIS: JenisSoal[] = ["pg", "benar_salah", "isian", "essay"];
+const JENIS: JenisSoal[] = SEMUA_JENIS;
 const TINGKAT = ["mudah", "sedang", "sulit"];
+const MEDIA: JenisMedia[] = ["", "gambar", "video"];
+
+/**
+ * Tautan media yang boleh disimpan.
+ *
+ * Hanya http(s), dan hanya sampai seribu huruf. Yang ditahan di sini terutama
+ * "javascript:" dan "data:" — keduanya berubah menjadi jalan menjalankan kode
+ * begitu tautannya dipasang pada halaman yang dibuka mahasiswa.
+ */
+function tautanAman(nilai: unknown): string {
+  const isi = String(nilai ?? "").trim().slice(0, 1000);
+  if (!isi) return "";
+  try {
+    const alamat = new URL(isi);
+    if (alamat.protocol !== "http:" && alamat.protocol !== "https:") return "";
+    return alamat.toString();
+  } catch {
+    return "";
+  }
+}
 
 const teks = (nilai: unknown, batas: number) =>
   typeof nilai === "string" ? nilai.replace(/\r\n/g, "\n").trim().slice(0, batas) : "";
@@ -29,7 +50,20 @@ const teks = (nilai: unknown, batas: number) =>
 type Masukan = {
   jenis?: unknown; pertanyaan?: unknown; pilihan?: unknown; kunci?: unknown;
   bobot?: unknown; materi?: unknown; tingkat?: unknown; pembahasan?: unknown;
+  pasangan?: unknown; media?: unknown;
 };
+
+/** Bersihkan pasangan penjodohan, dan buang yang menunjuk ke luar daftar. */
+function rapikanPasangan(mentah: unknown, pilihan: string[]): Pasangan[] {
+  if (!Array.isArray(mentah)) return [];
+  return mentah
+    .slice(0, 20)
+    .map((p) => {
+      const isi = p as { kiri?: unknown; kanan?: unknown };
+      return { kiri: teks(isi?.kiri, 400), kanan: Number(isi?.kanan) };
+    })
+    .filter((p) => p.kiri.length > 0 && Number.isInteger(p.kanan) && p.kanan >= 0 && p.kanan < pilihan.length);
+}
 
 /**
  * Bersihkan dan periksa satu soal.
@@ -48,6 +82,16 @@ function rapikanSoal(m: Masukan): { ok: true; nilai: Record<string, unknown> } |
     pilihan = m.pilihan.map((p) => teks(p, 500)).filter((p) => p.length > 0);
   }
   let kunci = teks(m.kunci, 400);
+  let pasangan: Pasangan[] = [];
+
+  const mediaMentah = (m.media ?? {}) as { jenis?: unknown; url?: unknown; keterangan?: unknown };
+  const mediaUrl = tautanAman(mediaMentah.url);
+  const mediaJenisDiminta = String(mediaMentah.jenis ?? "") as JenisMedia;
+  // Media tanpa tautan yang sah bukan media. Menyimpan jenisnya saja
+  // menyediakan kotak gambar yang selamanya kosong di layar mahasiswa.
+  const mediaJenis: JenisMedia = mediaUrl && MEDIA.includes(mediaJenisDiminta) && mediaJenisDiminta !== ""
+    ? mediaJenisDiminta
+    : mediaUrl ? "gambar" : "";
 
   if (jenis === "pg" || jenis === "benar_salah") {
     if (jenis === "benar_salah" && pilihan.length === 0) pilihan = ["Benar", "Salah"];
@@ -57,6 +101,22 @@ function rapikanSoal(m: Masukan): { ok: true; nilai: Record<string, unknown> } |
       return { ok: false, pesan: "Kunci jawaban belum dipilih." };
     }
     kunci = String(nomor);
+  } else if (jenis === "pg_kompleks") {
+    if (pilihan.length < 2) return { ok: false, pesan: "Pilihan jawaban minimal dua." };
+    const nomor = [...uraiKunciJamak(kunci)].filter((n) => n < pilihan.length).sort((a, b) => a - b);
+    if (nomor.length === 0) return { ok: false, pesan: "Tandai dulu jawaban mana saja yang benar." };
+    if (nomor.length === pilihan.length) {
+      return {
+        ok: false,
+        pesan: "Seluruh pilihan ditandai benar. Soal seperti ini tidak mengukur apa pun — sisakan minimal satu pengecoh.",
+      };
+    }
+    kunci = nomor.join(",");
+  } else if (jenis === "penjodohan") {
+    if (pilihan.length < 2) return { ok: false, pesan: "Kolom jawaban penjodohan minimal dua." };
+    pasangan = rapikanPasangan(m.pasangan, pilihan);
+    if (pasangan.length < 2) return { ok: false, pesan: "Penjodohan perlu minimal dua pasangan yang lengkap." };
+    kunci = "";
   } else if (jenis === "isian") {
     pilihan = [];
     if (!kunci) return { ok: false, pesan: "Kunci jawaban isian singkat belum diisi." };
@@ -65,6 +125,7 @@ function rapikanSoal(m: Masukan): { ok: true; nilai: Record<string, unknown> } |
     pilihan = [];
     kunci = "";
   }
+  if (jenis !== "penjodohan") pasangan = [];
 
   const bobotAngka = Number(m.bobot);
   const bobot = Number.isFinite(bobotAngka) ? Math.max(1, Math.min(Math.round(bobotAngka), 100)) : 1;
@@ -77,6 +138,10 @@ function rapikanSoal(m: Masukan): { ok: true; nilai: Record<string, unknown> } |
       question: pertanyaan,
       options: JSON.stringify(pilihan),
       answerKey: kunci,
+      pairs: JSON.stringify(pasangan),
+      mediaType: mediaJenis,
+      mediaUrl: mediaUrl || null,
+      mediaCaption: teks(mediaMentah.keterangan, 240) || null,
       points: bobot,
       material: teks(m.materi, 120) || null,
       difficulty: tingkat,
@@ -147,6 +212,8 @@ export async function GET(request: Request) {
         pertanyaan: s.question,
         pilihan: JSON.parse(s.options || "[]") as string[],
         kunci: s.answerKey,
+        pasangan: JSON.parse(s.pairs || "[]") as Pasangan[],
+        media: { jenis: s.mediaType || "", url: s.mediaUrl || "", keterangan: s.mediaCaption || "" },
         bobot: s.points,
         materi: s.material || "",
         tingkat: s.difficulty,
@@ -224,6 +291,8 @@ export async function POST(request: Request) {
           pertanyaan: s.question,
           pilihan: JSON.parse(s.options || "[]") as string[],
           kunci: s.answerKey,
+          pasangan: JSON.parse(s.pairs || "[]") as Pasangan[],
+          media: { jenis: s.mediaType || "", url: s.mediaUrl || "", keterangan: s.mediaCaption || "" },
           bobot: s.points,
           materi: s.material || "",
           tingkat: s.difficulty,

@@ -262,7 +262,11 @@ export async function PATCH(request: Request) {
       return Boolean(j && String(j.answer).trim() && j.isCorrect === null);
     }).length;
     const benar = jawaban.filter((j) => j.isCorrect === true).length;
-    const salah = jawaban.filter((j) => j.isCorrect === false).length;
+    // PG kompleks dan penjodohan dapat bernilai sebagian: isCorrect false,
+    // tetapi poinnya di atas nol. Menghitungnya sebagai salah membuat
+    // laporan menyebut gagal total mahasiswa yang benar tiga dari empat.
+    const sebagian = jawaban.filter((j) => j.isCorrect === false && (j.points || 0) > 0).length;
+    const salah = jawaban.filter((j) => j.isCorrect === false && (j.points || 0) <= 0).length;
 
     await db
       .update(cbtAttempts)
@@ -270,6 +274,7 @@ export async function PATCH(request: Request) {
         score: poinMaks > 0 ? Math.round((poinDapat / poinMaks) * 100) : 0,
         correct: benar,
         wrong: salah,
+        partial: sebagian,
         pending: tertunda,
       })
       .where(eq(cbtAttempts.id, attemptId));

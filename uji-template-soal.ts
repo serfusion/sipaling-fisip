@@ -38,14 +38,20 @@ async function jalan() {
   // terbaca pengimpornya sendiri. Template yang cantik tetapi ditolak
   // pengimpornya lebih buruk daripada tabel mentah.
   const bacaan = imporDariExcel(aoa.slice(2));
-  cek("pengimpornya membaca 4 contoh", bacaan.soal.length === CONTOH_EXCEL.length,
+  cek("pengimpornya membaca seluruh contoh", bacaan.soal.length === CONTOH_EXCEL.length,
       `${bacaan.soal.length} soal, ${bacaan.tolak.length} ditolak: ${JSON.stringify(bacaan.tolak)}`);
-  cek("contoh pertama pilihan ganda dengan kunci A",
-      bacaan.soal[0]?.jenis === "pg" && bacaan.soal[0]?.kunci === "0",
-      JSON.stringify(bacaan.soal[0]));
-  cek("contoh keempat essay bobot 20",
-      bacaan.soal[3]?.jenis === "essay" && bacaan.soal[3]?.bobot === 20,
-      JSON.stringify(bacaan.soal[3]));
+  // Dicari berdasarkan jenis, bukan nomor baris: template ini bertambah tiap
+  // kali ada jenis soal baru.
+  const contoh = (jenis: string) => bacaan.soal.find((s) => s.jenis === jenis);
+  cek("contoh pilihan ganda kuncinya A", contoh("pg")?.kunci === "0", JSON.stringify(contoh("pg")));
+  cek("contoh essay bobot 20", contoh("essay")?.bobot === 20, JSON.stringify(contoh("essay")));
+  cek("keenam jenis soal ada contohnya",
+      new Set(bacaan.soal.map((s) => s.jenis)).size === 6,
+      JSON.stringify([...new Set(bacaan.soal.map((s) => s.jenis))]));
+  cek("contoh PG kompleks kuncinya jamak", contoh("pg_kompleks")?.kunci === "0,1,3",
+      JSON.stringify(contoh("pg_kompleks")));
+  cek("contoh penjodohan punya pasangan", (contoh("penjodohan")?.pasangan.length ?? 0) === 3,
+      JSON.stringify(contoh("penjodohan")));
 
   const petunjuk = XLSX.utils.sheet_to_json(wb.Sheets["Petunjuk"], { header: 1, defval: "", raw: false }) as string[][];
   cek("lembar petunjuk berisi langkah-langkahnya", petunjuk.length > 8, String(petunjuk.length));

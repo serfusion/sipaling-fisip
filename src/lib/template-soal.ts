@@ -19,30 +19,58 @@ export { KOLOM_EXCEL };
 export const MIME_DOCX =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
-/** Tiga baris contoh yang sudah benar, supaya bentuknya tidak perlu ditebak. */
+/**
+ * Satu contoh untuk TIAP jenis soal, dan semuanya sudah benar.
+ *
+ * Urutan selnya mengikuti KOLOM_EXCEL persis. Menyisipkan satu kolom di sana
+ * tanpa menggeser baris-baris ini akan membuat seluruh contoh salah kolom —
+ * dan salahnya senyap: berkasnya tetap terbuka, hanya isinya yang bergeser.
+ */
 export const CONTOH_EXCEL: Array<Array<string | number>> = [
-  [1, "PG", "Siapa perumus teori agenda setting?", "McCombs & Shaw", "Lasswell", "Habermas", "Gerbner", "", "A", 5, "Teori Komunikasi", "sedang", "Dirumuskan McCombs dan Shaw pada 1972."],
-  [2, "BENAR-SALAH", "Opini publik dapat dibentuk media massa.", "Benar", "Salah", "", "", "", "BENAR", 5, "Teori Komunikasi", "mudah", ""],
-  [3, "ISIAN", "Sebutkan istilah pengaturan agenda oleh media.", "", "", "", "", "", "agenda setting|penentuan agenda", 5, "Teori Komunikasi", "sedang", "Beberapa kemungkinan jawaban dipisah tanda |"],
-  [4, "ESSAY", "Jelaskan peran media massa dalam kampanye politik.", "", "", "", "", "", "", 20, "Komunikasi Politik", "sulit", "Dikoreksi dosen setelah ujian selesai."],
+  //  NO JENIS          PERTANYAAN                     A                  B                 C            D          E    KUNCI                              PASANGAN                                            MEDIA                                BOBOT MATERI               TINGKAT   PEMBAHASAN
+  [1, "PG", "Siapa perumus teori agenda setting?", "McCombs & Shaw", "Lasswell", "Habermas", "Gerbner", "", "A", "", "", 5, "Teori Komunikasi", "sedang", "Dirumuskan McCombs dan Shaw pada 1972."],
+  [2, "PG KOMPLEKS", "Manakah yang termasuk teori komunikasi massa? (jawaban boleh lebih dari satu)", "Agenda setting", "Kultivasi", "Fotosintesis", "Spiral of silence", "", "A,B,D", "", "", 9, "Teori Komunikasi", "sulit", "Dinilai per bagian; yang keliru mengurangi yang tepat."],
+  [3, "PENJODOHAN", "Jodohkan teori berikut dengan perumusnya.", "Lasswell", "", "", "", "", "", "Agenda setting = McCombs & Shaw\nSpiral of silence = Noelle-Neumann\nKultivasi = Gerbner", "", 6, "Teori Komunikasi", "sedang", "Kolom PILIHAN diisi pengecoh yang tidak berpasangan."],
+  [4, "BENAR-SALAH", "Opini publik dapat dibentuk media massa.", "Benar", "Salah", "", "", "", "BENAR", "", "", 5, "Teori Komunikasi", "mudah", ""],
+  [5, "ISIAN", "Sebutkan istilah pengaturan agenda oleh media.", "", "", "", "", "", "agenda setting|penentuan agenda", "", "", 5, "Teori Komunikasi", "sedang", "Beberapa kemungkinan jawaban dipisah tanda |"],
+  [6, "ESSAY", "Jelaskan peran media massa dalam kampanye politik.", "", "", "", "", "", "", "", "https://upload.wikimedia.org/contoh-poster.jpg", 20, "Komunikasi Politik", "sulit", "Kolom MEDIA boleh diisi tautan gambar atau video."],
 ];
 
 export const PETUNJUK_EXCEL: string[][] = [
   ["PETUNJUK PENGISIAN TEMPLATE SOAL"],
   [""],
-  ["1. Isi mulai baris di bawah judul kolom pada sheet \"Soal\". Hapus 4 baris contoh, lalu isi soal asli."],
-  ["2. Kolom JENIS diisi salah satu: PG, BENAR-SALAH, ISIAN, atau ESSAY. Kosong dianggap PG."],
-  ["3. PG  → isi PILIHAN A sampai E seperlunya, KUNCI ditulis hurufnya (A/B/C/D/E)."],
-  ["4. BENAR-SALAH → pilihan boleh dikosongkan, KUNCI ditulis BENAR atau SALAH."],
-  ["5. ISIAN → pilihan dikosongkan, KUNCI berisi jawabannya."],
+  ["1. Isi mulai baris di bawah judul kolom pada sheet \"Soal\". Hapus 6 baris contoh, lalu isi soal asli."],
+  ["2. Kolom JENIS diisi salah satu:"],
+  ["   PG · PG KOMPLEKS · PENJODOHAN · BENAR-SALAH · ISIAN · ESSAY. Kosong dianggap PG."],
+  [""],
+  ["JENIS SOAL"],
+  ["3. PG → isi PILIHAN A sampai E seperlunya, KUNCI ditulis hurufnya (A/B/C/D/E)."],
+  ["4. PG KOMPLEKS → jawaban benar boleh lebih dari satu. KUNCI ditulis dipisah koma: A,C"],
+  ["   Dinilai per bagian, dan yang keliru MENGURANGI yang tepat — jadi mencentang semua"],
+  ["   pilihan tidak menghasilkan nilai penuh. Sisakan minimal satu pengecoh."],
+  ["5. PENJODOHAN → kolom PASANGAN diisi satu pasangan per baris, dipisah tanda ="],
+  ["      Agenda setting = McCombs & Shaw"],
+  ["      Kultivasi = Gerbner"],
+  ["   Kolom kanan otomatis menjadi daftar jawaban dan diacak untuk mahasiswa."],
+  ["   Kolom PILIHAN A-E boleh diisi PENGECOH yang tidak berpasangan dengan apa pun."],
+  ["   Dinilai per pasangan: satu kekeliruan tidak menghapus jawaban yang sudah benar."],
+  ["6. BENAR-SALAH → pilihan boleh dikosongkan, KUNCI ditulis BENAR atau SALAH."],
+  ["7. ISIAN → pilihan dikosongkan, KUNCI berisi jawabannya."],
   ["   Beberapa kemungkinan jawaban dipisah tanda | misalnya: agenda setting|penentuan agenda"],
-  ["6. ESSAY → pilihan dan KUNCI dikosongkan. Dikoreksi dosen setelah ujian selesai."],
-  ["7. BOBOT diisi angka. Nilai akhir dihitung dari jumlah bobot, bukan jumlah soal,"],
-  ["   jadi soal essay boleh diberi bobot lebih besar daripada pilihan ganda."],
-  ["8. TINGKAT diisi mudah / sedang / sulit. Kosong dianggap sedang."],
-  ["9. Urutan kolom boleh digeser dan kolom yang tidak dipakai boleh dihapus —"],
-  ["   yang dicari sistem NAMA kolomnya, bukan letaknya."],
-  ["10. Simpan berkas, lalu unggah lewat tombol \"Unggah soal\" di dashboard CBT."],
+  ["8. ESSAY → pilihan dan KUNCI dikosongkan. Dikoreksi dosen setelah ujian selesai."],
+  [""],
+  ["MEDIA, BOBOT, DAN LAIN-LAIN"],
+  ["9. MEDIA diisi tautan gambar atau video, dan boleh dikosongkan."],
+  ["   Gambar: tautan langsung ke berkas .jpg / .png / .webp"],
+  ["   Video : tautan YouTube, Google Drive, atau berkas .mp4"],
+  ["   Jenisnya ditebak sendiri dari tautannya. Berkas dari komputer diunggah lewat"],
+  ["   tombol Unggah di penyunting soal, bukan lewat berkas ini."],
+  ["10. BOBOT diisi angka. Nilai akhir dihitung dari jumlah bobot, bukan jumlah soal,"],
+  ["    jadi soal essay boleh diberi bobot lebih besar daripada pilihan ganda."],
+  ["11. TINGKAT diisi mudah / sedang / sulit. Kosong dianggap sedang."],
+  ["12. Urutan kolom boleh digeser dan kolom yang tidak dipakai boleh dihapus —"],
+  ["    yang dicari sistem NAMA kolomnya, bukan letaknya."],
+  ["13. Simpan berkas, lalu unggah lewat tombol \"Unggah soal\" di dashboard CBT."],
   [""],
   ["Satu baris yang bermasalah TIDAK menggagalkan seluruh berkas: yang sah tetap masuk,"],
   ["dan yang ditolak ditampilkan beserta nomor barisnya supaya tinggal diperbaiki."],
@@ -178,7 +206,7 @@ export function buatXlsxTemplate(): Blob {
         i === 0
           ? {
               nilai:
-                "Hapus empat baris contoh berwarna abu di bawah, lalu isi soal Anda sendiri. " +
+                "Hapus enam baris contoh berwarna abu di bawah, lalu isi soal Anda sendiri. " +
                 "Petunjuk lengkap ada pada lembar sebelah.",
               gaya: GAYA.anak,
             }
@@ -189,7 +217,8 @@ export function buatXlsxTemplate(): Blob {
     ...CONTOH_EXCEL.map((c) => ({
       sel: KOLOM_EXCEL.map((_, i) => ({
         nilai: c[i] ?? "",
-        gaya: i === 0 || i === 9 ? GAYA.contohTengah : GAYA.contoh,
+        // Kolom NO dan BOBOT dipusatkan; sisanya rata kiri.
+        gaya: i === 0 || i === 11 ? GAYA.contohTengah : GAYA.contoh,
       })),
     })),
     // Dua puluh baris kosong yang sudah bergaris, supaya dosen langsung
@@ -197,7 +226,7 @@ export function buatXlsxTemplate(): Blob {
     ...Array.from({ length: 20 }, () => ({
       sel: KOLOM_EXCEL.map((_, i) => ({
         nilai: "",
-        gaya: i === 0 || i === 9 ? GAYA.isiTengah : GAYA.isi,
+        gaya: i === 0 || i === 11 ? GAYA.isiTengah : GAYA.isi,
       })),
     })),
   ];
@@ -214,7 +243,7 @@ export function buatXlsxTemplate(): Blob {
     {
       nama: "Soal",
       baris,
-      lebar: [5, 14, 52, 22, 22, 22, 22, 22, 26, 8, 20, 11, 40],
+      lebar: [5, 14, 52, 22, 22, 22, 22, 22, 26, 34, 30, 8, 20, 11, 40],
       beku: 3,
       saring: `A3:${kolomTerakhir}3`,
       gabung: [`A1:${kolomTerakhir}1`, `A2:${kolomTerakhir}2`],

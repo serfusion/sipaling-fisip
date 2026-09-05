@@ -33,28 +33,78 @@ export function angkaParam(nilai: string | null | undefined): number | null {
   return Number.isInteger(angka) && angka > 0 ? angka : null;
 }
 
-export type JenisSoal = "pg" | "benar_salah" | "isian" | "essay";
+export type JenisSoal =
+  | "pg"
+  | "pg_kompleks"
+  | "penjodohan"
+  | "benar_salah"
+  | "isian"
+  | "essay";
 
 export const JENIS_LABEL: Record<JenisSoal, string> = {
   pg: "Pilihan ganda",
+  pg_kompleks: "PG kompleks (jawaban jamak)",
+  penjodohan: "Penjodohan",
   benar_salah: "Benar / Salah",
   isian: "Isian singkat",
   essay: "Essay",
 };
+
+export const SEMUA_JENIS: JenisSoal[] = [
+  "pg", "pg_kompleks", "penjodohan", "benar_salah", "isian", "essay",
+];
 
 /** Soal yang dapat dinilai mesin. Essay selalu menunggu dosen. */
 export function otomatis(jenis: JenisSoal) {
   return jenis !== "essay";
 }
 
+/** Jenis yang jawabannya dipilih dari daftar pilihan. */
+export function berpilihan(jenis: JenisSoal) {
+  return jenis === "pg" || jenis === "pg_kompleks" || jenis === "benar_salah" || jenis === "penjodohan";
+}
+
+/**
+ * Satu pasangan pada soal penjodohan.
+ *
+ * `kanan` adalah INDEKS ke dalam daftar pilihan, bukan teksnya. Menyimpan
+ * teksnya akan membuat penilaian pecah begitu dosen membetulkan satu huruf di
+ * kolom kanan — dan pecahnya diam-diam, sesudah ujian berlangsung.
+ */
+export type Pasangan = { kiri: string; kanan: number };
+
+export type JenisMedia = "" | "gambar" | "video";
+
+export type Media = {
+  jenis: JenisMedia;
+  /** Tautan gambar/video, atau berkas yang diunggah ke Supabase Storage. */
+  url: string;
+  keterangan: string;
+};
+
+export const MEDIA_KOSONG: Media = { jenis: "", url: "", keterangan: "" };
+
 export type Soal = {
   id: number;
   jenis: JenisSoal;
   pertanyaan: string;
-  /** Pilihan untuk pg dan benar_salah. Kosong untuk isian dan essay. */
+  /**
+   * Pilihan untuk pg, pg_kompleks, dan benar_salah. Untuk penjodohan ia
+   * adalah KOLOM KANAN — dan boleh memuat pengecoh yang tidak berpasangan
+   * dengan apa pun. Kosong untuk isian dan essay.
+   */
   pilihan: string[];
-  /** Untuk pg: indeks pilihan benar. Untuk isian: teks. Essay: kosong. */
+  /**
+   * pg / benar_salah  : indeks pilihan benar, mis. "2"
+   * pg_kompleks       : beberapa indeks dipisah koma, mis. "0,2,3"
+   * isian             : teks, beberapa kemungkinan dipisah "|"
+   * penjodohan        : tidak dipakai — kuncinya ada pada `pasangan`
+   * essay             : kosong
+   */
   kunci: string;
+  /** Hanya untuk penjodohan. */
+  pasangan: Pasangan[];
+  media: Media;
   bobot: number;
   materi: string;
   tingkat: "mudah" | "sedang" | "sulit";
@@ -67,6 +117,12 @@ export type SoalTampil = {
   jenis: JenisSoal;
   pertanyaan: string;
   pilihan: string[];
+  /**
+   * Kolom kiri penjodohan. Hanya teksnya yang ikut — pasangannya tertinggal
+   * di server, tempat satu-satunya yang boleh mengetahui kuncinya.
+   */
+  kiri: string[];
+  media: Media;
   bobot: number;
   /** Peta urutan pilihan yang diacak ke urutan aslinya. */
   petaPilihan: number[];
@@ -196,6 +252,11 @@ export function susunPaket(bank: Soal[], aturan: AturanAcak, benih: number): Soa
       jenis: soal.jenis,
       pertanyaan: soal.pertanyaan,
       pilihan: petaPilihan.map((i) => soal.pilihan[i]),
+      // Kolom kiri penjodohan TIDAK ikut diacak bersama kolom kanan. Yang
+      // diacak hanya jawabannya; pertanyaannya tetap berurutan supaya
+      // mahasiswa dapat menyebut "nomor 3" dan pengawas tahu yang mana.
+      kiri: soal.jenis === "penjodohan" ? soal.pasangan.map((p) => p.kiri) : [],
+      media: soal.media,
       bobot: soal.bobot,
       petaPilihan,
     };
@@ -211,6 +272,62 @@ export function rapikanIsian(teks: string) {
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/**
+ * Baca kunci PG kompleks: "0,2,3" menjadi himpunan {0,2,3}.
+ *
+ * Tahan terhadap spasi, koma berlebih, dan tulisan yang bukan angka — berkas
+ * impor dari Excel penuh dengan ketiganya.
+ */
+export function uraiKunciJamak(kunci: string): Set<number> {
+  return new Set(
+    String(kunci || "")
+      .split(/[,;\s]+/)
+      .map((n) => Number(n.trim()))
+      .filter((n) => Number.isInteger(n) && n >= 0),
+  );
+}
+
+/**
+ * Baca jawaban penjodohan.
+ *
+ * Bentuknya JSON objek "indeks kiri" → "indeks kanan yang dipilih", mis.
+ * {"0":2,"1":0}. Jawaban yang rusak diperlakukan sebagai belum dijawab, bukan
+ * sebagai galat: yang rusak biasanya jaringan, dan yang menanggungnya jangan
+ * sampai mahasiswa.
+ */
+export function uraiJodoh(jawaban: string): Map<number, number> {
+  const hasil = new Map<number, number>();
+  try {
+    const isi = JSON.parse(String(jawaban || "{}")) as Record<string, unknown>;
+    if (!isi || typeof isi !== "object" || Array.isArray(isi)) return hasil;
+    for (const [kiri, kanan] of Object.entries(isi)) {
+      const a = Number(kiri);
+      const b = Number(kanan);
+      if (Number.isInteger(a) && a >= 0 && Number.isInteger(b) && b >= 0) hasil.set(a, b);
+    }
+  } catch {
+    // Bukan JSON. Dianggap belum dijawab.
+  }
+  return hasil;
+}
+
+/**
+ * Apakah jawaban ini benar-benar kosong?
+ *
+ * Tidak cukup memeriksa tali kosong. Penjodohan yang belum disentuh sama
+ * sekali tetap tersimpan sebagai "{}", dan itu BUKAN tali kosong — sehingga
+ * tanpa pemeriksaan ini soal penjodohan yang tidak dikerjakan siapa pun
+ * terbaca "sudah dijawab" pada palet nomor, pada penghitung "x dari y", dan
+ * pada laporan.
+ */
+export function jawabanKosong(jenis: JenisSoal, jawaban: string): boolean {
+  const isi = String(jawaban ?? "").trim();
+  if (!isi) return true;
+  if (jenis === "penjodohan") return uraiJodoh(isi).size === 0;
+  if (jenis === "pg_kompleks") return uraiKunciJamak(isi).size === 0;
+  return false;
 }
 
 export type HasilSatuSoal = { benar: boolean | null; poin: number };
@@ -231,13 +348,59 @@ export function nilaiJawaban(soal: Soal, jawaban: string, petaPilihan?: number[]
   if (soal.jenis === "essay") return { benar: null, poin: 0 };
   if (!isi) return { benar: false, poin: 0 };
 
+  // Nomor pilihan yang dilihat mahasiswa dikembalikan ke nomor pada banknya.
+  const keAsli = (tampil: number) =>
+    petaPilihan && petaPilihan.length > tampil && tampil >= 0 ? petaPilihan[tampil] : tampil;
+
   if (soal.jenis === "pg" || soal.jenis === "benar_salah") {
     const dipilih = Number(isi);
     if (!Number.isInteger(dipilih) || dipilih < 0) return { benar: false, poin: 0 };
-    // Kembalikan ke nomor pilihan pada bank soal sebelum dibandingkan.
-    const asli = petaPilihan && petaPilihan.length > dipilih ? petaPilihan[dipilih] : dipilih;
-    const benar = String(asli) === String(soal.kunci).trim();
+    const benar = String(keAsli(dipilih)) === String(soal.kunci).trim();
     return { benar, poin: benar ? soal.bobot : 0 };
+  }
+
+  if (soal.jenis === "pg_kompleks") {
+    const kunci = uraiKunciJamak(soal.kunci);
+    if (kunci.size === 0) return { benar: false, poin: 0 };
+
+    const dipilih = new Set(
+      isi.split(",")
+        .map((n) => Number(n.trim()))
+        .filter((n) => Number.isInteger(n) && n >= 0)
+        .map(keAsli),
+    );
+
+    let tepat = 0;
+    let keliru = 0;
+    for (const n of dipilih) (kunci.has(n) ? (tepat += 1) : (keliru += 1));
+
+    // Penskoran sebagian ala AKM: yang keliru mengurangi yang tepat, dan
+    // nilainya tidak pernah turun di bawah nol. Tanpa pengurangan itu,
+    // mencentang SELURUH pilihan selalu menghasilkan nilai penuh — dan soal
+    // pilihan jamak berhenti mengukur apa pun.
+    const bagian = Math.max(0, tepat - keliru) / kunci.size;
+    const penuh = tepat === kunci.size && keliru === 0;
+    return { benar: penuh, poin: Math.round(bagian * soal.bobot * 100) / 100 };
+  }
+
+  if (soal.jenis === "penjodohan") {
+    const jumlah = soal.pasangan.length;
+    if (jumlah === 0) return { benar: false, poin: 0 };
+    const dijawab = uraiJodoh(isi);
+
+    let tepat = 0;
+    for (const [urut, pasang] of soal.pasangan.entries()) {
+      const pilih = dijawab.get(urut);
+      if (pilih === undefined) continue;
+      if (keAsli(pilih) === pasang.kanan) tepat += 1;
+    }
+
+    // Penjodohan dinilai per pasangan. Semua-atau-tidak sama sekali membuat
+    // satu kekeliruan menghapus empat jawaban yang benar.
+    return {
+      benar: tepat === jumlah,
+      poin: Math.round((tepat / jumlah) * soal.bobot * 100) / 100,
+    };
   }
 
   // Isian singkat: beberapa kunci dipisah "|", cocok bila salah satunya sama.
@@ -257,6 +420,14 @@ export type RingkasNilai = {
   kosong: number;
   /** Essay yang menunggu dosen. */
   tertunda: number;
+  /**
+   * Dijawab sebagian benar — hanya mungkin pada PG kompleks dan penjodohan.
+   *
+   * Dihitung terpisah karena memasukkannya ke "salah" membuat mahasiswa yang
+   * benar tiga dari empat pasangan terbaca gagal total pada laporan, padahal
+   * nilainya sudah menghitungnya dengan benar.
+   */
+  sebagian: number;
   poin: number;
   poinMaks: number;
   lulus: boolean;
@@ -279,12 +450,14 @@ export function hitungNilai(
   let salah = 0;
   let kosong = 0;
   let tertunda = 0;
+  let sebagian = 0;
   let poin = 0;
   let poinMaks = 0;
 
   for (const s of soal) {
     poinMaks += s.bobot;
-    const isi = String(jawaban[s.id] ?? "").trim();
+    const mentah = String(jawaban[s.id] ?? "").trim();
+    const isi = jawabanKosong(s.jenis, mentah) ? "" : mentah;
 
     if (s.jenis === "essay") {
       if (!isi) {
@@ -309,11 +482,12 @@ export function hitungNilai(
     const hasil = nilaiJawaban(s, isi, peta[s.id]);
     poin += hasil.poin;
     if (hasil.benar) benar += 1;
+    else if (hasil.poin > 0) sebagian += 1;
     else salah += 1;
   }
 
   const nilai = poinMaks > 0 ? Math.round((poin / poinMaks) * 1000) / 10 : 0;
-  return { nilai, benar, salah, kosong, tertunda, poin, poinMaks, lulus: nilai >= passing };
+  return { nilai, benar, salah, kosong, tertunda, sebagian, poin, poinMaks, lulus: nilai >= passing };
 }
 
 // ---------- IDENTITAS MAHASISWA ----------

@@ -5,6 +5,7 @@ import {
   integer,
   numeric,
   pgTable,
+  real,
   serial,
   text,
   timestamp,
@@ -536,13 +537,34 @@ export const cbtExams = pgTable("cbt_exams", {
 export const cbtQuestions = pgTable("cbt_questions", {
   id: serial("id").primaryKey(),
   examId: integer("exam_id").notNull().references(() => cbtExams.id, { onDelete: "cascade" }),
-  /** "pg" | "benar_salah" | "isian" | "essay" */
+  /** "pg" | "pg_kompleks" | "penjodohan" | "benar_salah" | "isian" | "essay" */
   type: varchar("type", { length: 20 }).notNull().default("pg"),
   question: text("question").notNull(),
-  /** Pilihan jawaban sebagai JSON array of string. */
+  /**
+   * Pilihan jawaban sebagai JSON array of string. Untuk penjodohan ia adalah
+   * KOLOM KANAN, dan boleh memuat pengecoh yang tidak berpasangan.
+   */
   options: text("options").notNull().default("[]"),
-  /** Indeks pilihan benar (pg/benar_salah), atau teks kunci (isian). */
+  /**
+   * pg / benar_salah : indeks pilihan benar, mis. "2"
+   * pg_kompleks      : beberapa indeks dipisah koma, mis. "0,2,3"
+   * isian            : teks kunci, beberapa kemungkinan dipisah "|"
+   * penjodohan       : tidak dipakai — kuncinya ada pada kolom pairs
+   */
   answerKey: varchar("answer_key", { length: 400 }).notNull().default(""),
+  /**
+   * Pasangan penjodohan sebagai JSON: [{"kiri":"...","kanan":0}].
+   *
+   * "kanan" adalah INDEKS ke dalam options, bukan teksnya. Menyimpan teks
+   * membuat penilaian pecah diam-diam begitu dosen membetulkan satu huruf di
+   * kolom kanan — dan pecahnya baru ketahuan sesudah ujian berlangsung.
+   */
+  pairs: text("pairs").notNull().default("[]"),
+  /** "" | "gambar" | "video" */
+  mediaType: varchar("media_type", { length: 12 }).notNull().default(""),
+  /** Tautan gambar/video: hasil unggahan ke Storage, atau tautan luar. */
+  mediaUrl: text("media_url"),
+  mediaCaption: varchar("media_caption", { length: 240 }),
   points: integer("points").notNull().default(1),
   material: varchar("material", { length: 120 }),
   difficulty: varchar("difficulty", { length: 12 }).notNull().default("sedang"),
@@ -587,6 +609,12 @@ export const cbtAttempts = pgTable("cbt_attempts", {
   score: integer("score"),
   correct: integer("correct").notNull().default(0),
   wrong: integer("wrong").notNull().default(0),
+  /**
+   * Dijawab sebagian benar — hanya mungkin pada PG kompleks dan penjodohan.
+   * Dipisahkan dari "wrong" supaya laporan tidak menyebut gagal total
+   * mahasiswa yang benar tiga dari empat pasangan.
+   */
+  partial: integer("partial").notNull().default(0),
   blank: integer("blank").notNull().default(0),
   pending: integer("pending").notNull().default(0),
   /** Penghitung pelanggaran: keluar fullscreen, pindah tab. */
@@ -615,7 +643,16 @@ export const cbtAnswers = pgTable("cbt_answers", {
   marked: boolean("marked").notNull().default(false),
   /** null = essay yang belum dikoreksi dosen. */
   isCorrect: boolean("is_correct"),
-  points: integer("points").notNull().default(0),
+  /**
+   * Poin yang didapat jawaban ini. PECAHAN, bukan bilangan bulat.
+   *
+   * PG kompleks dan penjodohan dinilai sebagian: dua dari tiga pasangan pada
+   * soal berbobot 5 bernilai 3,33. Menyimpannya sebagai bilangan bulat bukan
+   * sekadar membulatkan — Postgres MENOLAK angka pecahan yang masuk ke kolom
+   * integer, dan penolakannya terjadi tepat saat mahasiswa menekan
+   * "kumpulkan".
+   */
+  points: real("points").notNull().default(0),
   feedback: text("feedback"),
   gradedBy: varchar("graded_by", { length: 120 }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

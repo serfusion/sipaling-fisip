@@ -4348,7 +4348,7 @@ a.al-mini:hover { color: var(--al-ink); }
 .uj-input:focus { outline: none; border-color: var(--uj-biru); box-shadow: 0 0 0 3px rgba(21, 103, 200, .16); }
 .uj-input-kode { text-align: center; font-size: 24px; font-weight: 800; letter-spacing: .35em; text-transform: uppercase; }
 
-.uj-fakta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin: 16px 0; }
+.uj-fakta { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 9px; margin: 16px 0; }
 .uj-fakta div { padding: 12px 8px; border-radius: 10px; border: 1px solid var(--uj-garis);
   background: #f6f7f9; text-align: center; }
 .uj-fakta b { display: block; font-size: 20px; font-weight: 800; color: #263544; }
@@ -4856,3 +4856,86 @@ a.al-mini:hover { color: var(--al-ink); }
 .cbt-koreksi input[type="number"] { width: 7rem; }
 .cbt-koreksi-catatan { flex: 1 1 16rem; }
 .cbt-koreksi-catatan input { width: 100%; }
+
+/* ---------- CBT: media, PG kompleks, dan penjodohan ---------- */
+.ck-petunjuk {
+  margin: 0 0 12px; padding: 8px 12px; border-radius: 6px;
+  background: #eef4fc; color: #2b5ba9; font-size: 12.5px; font-weight: 700;
+}
+
+.ck-media { margin: 0 0 20px; }
+.ck-media img, .ck-media video {
+  display: block; max-width: 100%; max-height: 60vh; margin: 0 auto;
+  border: 1px solid #d3d8df; border-radius: 6px; background: #f6f8fa;
+}
+/* Video sematan dijaga nisbahnya, supaya tidak melompat tinggi saat dimuat. */
+.ck-media-semat iframe {
+  display: block; width: 100%; aspect-ratio: 16 / 9; border: 0;
+  border-radius: 6px; background: #000;
+}
+.ck-media-ket { margin-top: 7px; color: #6b7684; font-size: 12px; text-align: center; line-height: 1.6; }
+
+/* Kotak centang untuk PG kompleks. BENTUKNYA berbeda dari lingkaran radio
+   dengan sengaja: itulah yang memberi tahu mahasiswa bahwa jawabannya boleh
+   lebih dari satu, sebelum ia membaca petunjuk mana pun. */
+.ck-kotak {
+  flex: 0 0 auto; margin-top: 1px; width: 19px; height: 19px; border-radius: 4px;
+  border: 2px solid #9aa4b2; background: #fff; display: grid; place-items: center;
+  font-size: 12px; font-weight: 800; color: #fff; line-height: 1;
+}
+.ck-opsi.on .ck-kotak { border-color: var(--ck-biru); background: var(--ck-biru); }
+
+/* Penjodohan */
+.ck-jodoh { display: grid; gap: 9px; }
+.ck-jodoh-baris {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center; gap: 10px;
+  padding: 10px 12px; border: 1px solid #e2e6ec; border-radius: 6px; background: #fbfcfd;
+}
+@media (max-width: 640px) {
+  .ck-jodoh-baris { grid-template-columns: auto minmax(0, 1fr); }
+  .ck-jodoh-pilih { grid-column: 1 / -1; }
+}
+.ck-jodoh-nomor {
+  flex: 0 0 auto; width: 24px; height: 24px; display: grid; place-items: center;
+  border-radius: 50%; background: var(--ck-biru); color: #fff; font-size: 12px; font-weight: 800;
+}
+.ck-jodoh-kiri { min-width: 0; color: #26313f; font-size: 14px; line-height: 1.6; }
+.ck-jodoh-pilih {
+  width: 100%; padding: 9px 11px; border: 1px solid #cfd6df; border-radius: 6px;
+  background: #fff; color: #26313f; font: inherit; font-size: 13.5px;
+}
+.ck-jodoh-pilih:focus { outline: none; border-color: var(--ck-biru); box-shadow: 0 0 0 3px rgba(43, 91, 169, .15); }
+
+/* --- Penyunting: media, kunci jamak, penjodohan --- */
+.cbt-media-edit { display: grid; gap: 8px; padding: 12px 14px; border: 1px dashed var(--line);
+  border-radius: 10px; background: var(--canvas); }
+.cbt-media-baris { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cbt-media-baris select { flex: 0 0 auto; width: 9rem; padding: 9px 11px; border: 1px solid var(--line);
+  border-radius: 9px; background: var(--white); color: var(--ink); font: inherit; font-size: 13px; }
+.cbt-media-baris input[type="text"], .cbt-media-baris > input:not([type]) {
+  flex: 1 1 18rem; min-width: 0; padding: 9px 11px; border: 1px solid var(--line);
+  border-radius: 9px; background: var(--white); color: var(--ink); font: inherit; font-size: 13px;
+}
+.cbt-media-ket-edit { width: 100%; padding: 9px 11px; border: 1px solid var(--line);
+  border-radius: 9px; background: var(--white); color: var(--ink); font: inherit; font-size: 13px; }
+.cbt-media-edit .cbt-catatan { font-size: 11.5px; }
+
+/* Huruf pilihan pada penjodohan hanya penanda, bukan tombol kunci — ia tidak
+   boleh terlihat dapat ditekan, karena kuncinya diatur di daftar pasangan. */
+.cbt-kunci-mati { display: grid; place-items: center; cursor: default; opacity: .7; }
+
+.cbt-jodoh-edit { display: flex; align-items: center; gap: 8px; }
+.cbt-jodoh-edit input { flex: 1 1 12rem; min-width: 0; padding: 9px 11px; border: 1px solid var(--line);
+  border-radius: 9px; background: var(--white); color: var(--ink); font: inherit; font-size: 13px; }
+.cbt-jodoh-edit select { flex: 1 1 10rem; min-width: 0; padding: 9px 11px; border: 1px solid var(--line);
+  border-radius: 9px; background: var(--white); color: var(--ink); font: inherit; font-size: 13px; }
+.cbt-jodoh-no { flex: 0 0 auto; width: 26px; height: 26px; display: grid; place-items: center;
+  border-radius: 50%; background: var(--navy); color: #fff; font-size: 11.5px; font-weight: 800; }
+
+.cbt-soal-media { margin: 6px 0; color: var(--muted); font-size: 11.5px; word-break: break-all; }
+.ck-media-gagal {
+  margin: 0 0 20px; padding: 11px 14px; border-radius: 6px;
+  border: 1px solid #f0c46a; background: #fdf6e6; color: #8a6212;
+  font-size: 12.5px; line-height: 1.65;
+}
