@@ -62,6 +62,11 @@ export default function UjianApp() {
   const [nomor, setNomor] = useState(0);
   const [sisa, setSisa] = useState(0);
   const [simpanan, setSimpanan] = useState<"aman" | "menyimpan" | "tertunda">("aman");
+  const [ditandai, setDitandai] = useState<number[]>([]);
+  // Soal yang pernah dibuka. Dipakai membedakan "belum dijawab" dari "belum
+  // dibuka sama sekali" pada palet nomor — pembedaan yang ada di rujukan
+  // rancangannya, dan yang membuat mahasiswa tahu sisa pekerjaannya.
+  const [dibuka, setDibuka] = useState<number[]>([]);
   const [bukaNav, setBukaNav] = useState(false);
   const [hasil, setHasil] = useState<Hasil | null>(null);
   const [pesanSelesai, setPesanSelesai] = useState("");
@@ -77,14 +82,34 @@ export default function UjianApp() {
     kunciRef.current = kunciSesi;
   }, [kunciSesi]);
 
-  // ---------- ambil kode dari alamat, supaya tautan langsung bisa dibagikan ----------
+  // ---------- kode dari alamat: tautan yang dibagikan langsung terbuka ----------
+  //
+  // Dosen menempelkan tautannya ke grup kelas; mahasiswa yang menekannya harus
+  // langsung melihat ujiannya, bukan layar kosong dengan kode yang sudah
+  // terisi tetapi masih menunggu satu ketukan lagi.
   //
   // Ditunda satu tick: membaca window saat menggambar tidak mungkin di server,
   // dan setState sinkron di badan effect memicu gambar bertingkat.
   useEffect(() => {
     const tunda = window.setTimeout(() => {
       const dariAlamat = new URLSearchParams(window.location.search).get("kode");
-      if (dariAlamat) setKode(dariAlamat.toUpperCase());
+      if (!dariAlamat) return;
+      const bersih = dariAlamat.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12);
+      setKode(bersih);
+      if (!bersih) return;
+      setSibuk(true);
+      fetch(`/api/cbt/ikut?kode=${encodeURIComponent(bersih)}`, { cache: "no-store" })
+        .then((jawab) => jawab.json())
+        .then((data) => {
+          if (data.success) {
+            setUjian(data.ujian);
+            setLayar("identitas");
+          } else {
+            setGalat(data.message || "Ujian tidak ditemukan.");
+          }
+        })
+        .catch(() => setGalat("Ujian belum dapat dibuka. Periksa sambungan internetmu."))
+        .finally(() => setSibuk(false));
     }, 0);
     return () => window.clearTimeout(tunda);
   }, []);
@@ -119,6 +144,7 @@ export default function UjianApp() {
         setUjian(isi.ujian);
         setSoal(isi.soal || []);
         setJawaban(isi.jawaban || {});
+        setDitandai(isi.ditandai || []);
         setSisa(isi.sisaDetik || 0);
         setLayar("kerja");
       })
@@ -146,12 +172,35 @@ export default function UjianApp() {
       // ikut terkumpul dan bukan tertinggal di dalam jeda pengiriman.
       const antre = Array.from(antreRef.current.entries());
       antreRef.current.clear();
+      let tertinggal = 0;
       for (const [id, isi] of antre) {
-        await fetch("/api/cbt/ikut", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ aksi: "jawab", kunciSesi: kunciRef.current, soal: id, jawaban: isi }),
-        }).catch(() => undefined);
+        try {
+          const jawabServer = await fetch("/api/cbt/ikut", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ aksi: "jawab", kunciSesi: kunciRef.current, soal: id, jawaban: isi }),
+          });
+          const data = await jawabServer.json();
+          // Lewat batas waktu bukan kegagalan: jawaban itu memang tidak lagi
+          // diterima, dan yang sudah tersimpan tetap dihitung.
+          if (!data.success && !data.habis) throw new Error("gagal");
+        } catch {
+          antreRef.current.set(id, isi);
+          tertinggal += 1;
+        }
+      }
+
+      // Jawaban yang belum sampai ke server TIDAK boleh ikut terkumpul diam-
+      // diam. Mahasiswa yang menekan "Kumpulkan" sambil melihat palet hijau
+      // berhak tahu bahwa sebagian jawabannya masih tertahan di perangkatnya.
+      if (tertinggal > 0 && !otomatis) {
+        setSimpanan("tertunda");
+        setGalat(
+          `${tertinggal} jawaban belum sampai ke server — sepertinya jaringanmu sedang terputus. ` +
+            "Jangan tutup halaman ini; tunggu sebentar lalu tekan Kumpulkan lagi.",
+        );
+        setSibuk(false);
+        return;
       }
 
       const jawab = await fetch("/api/cbt/ikut", {
@@ -177,7 +226,10 @@ export default function UjianApp() {
   // ---------- waktu habis: kumpulkan sendiri ----------
   useEffect(() => {
     if (layar !== "kerja" || sisa > 0) return;
-    void kumpulkan(true);
+    // Ditunda satu tick: pengumpulan menyetel beberapa keadaan sekaligus, dan
+    // menjalankannya sinkron di badan effect memicu gambar bertingkat.
+    const tunda = window.setTimeout(() => void kumpulkan(true), 0);
+    return () => window.clearTimeout(tunda);
   }, [layar, sisa, kumpulkan]);
 
   // ---------- catat pindah tab ----------
@@ -238,6 +290,7 @@ export default function UjianApp() {
       setUjian(data.ujian);
       setSoal(data.soal || []);
       setJawaban(data.jawaban || {});
+      setDitandai(data.ditandai || []);
       setSisa(data.sisaDetik || 0);
       setNomor(0);
       setLayar("kerja");
@@ -288,6 +341,41 @@ export default function UjianApp() {
       }
     }
     setSimpanan(gagal ? "tertunda" : "aman");
+  }
+
+  function keSoal(index: number) {
+    setNomor(index);
+    const id = soal[index]?.id;
+    if (id !== undefined) setDibuka((kini) => (kini.includes(id) ? kini : [...kini, id]));
+  }
+
+  async function tandai(id: number) {
+    const sudah = ditandai.includes(id);
+    setDitandai((kini) => (sudah ? kini.filter((n) => n !== id) : [...kini, id]));
+    try {
+      await fetch("/api/cbt/ikut", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aksi: "tandai", kunciSesi: kunciRef.current, soal: id, tandai: !sudah }),
+      });
+    } catch {
+      // Penanda tinjau pelengkap; keadaannya tersinkron pada pemuatan berikutnya.
+    }
+  }
+
+  /**
+   * Keadaan satu soal pada palet nomor.
+   *
+   * Urutannya menentukan: soal yang sudah dijawab LALU ditandai tetap terbaca
+   * "ditinjau", karena itulah yang ingin dilihat mahasiswa — daftar soal yang
+   * sengaja ia sisihkan untuk dilihat lagi sebelum mengumpulkan.
+   */
+  function keadaanSoal(id: number, index: number): "kini" | "tinjau" | "isi" | "kosong" | "belum" {
+    if (index === nomor) return "kini";
+    if (ditandai.includes(id)) return "tinjau";
+    if (String(jawaban[id] ?? "").trim()) return "isi";
+    if (dibuka.includes(id)) return "kosong";
+    return "belum";
   }
 
   const terjawab = soal.filter((s) => String(jawaban[s.id] ?? "").trim()).length;
@@ -435,98 +523,159 @@ export default function UjianApp() {
   }
 
   const isi = jawaban[soalKini.id] ?? "";
+  const jam = Math.floor(sisa / 3600);
+  const menit = Math.floor((sisa % 3600) / 60);
+  const detik = sisa % 60;
+  const dua = (n: number) => String(n).padStart(2, "0");
 
   return (
     <div className="uj uj-kerja">
-      <header className="uj-atas">
-        <div className="uj-atas-in">
-          <div className="uj-atas-kiri">
-            <b>{ujian?.judul}</b>
-            <span>{ujian?.mataKuliah}</span>
-          </div>
-          <div className={`uj-jam ${hampirHabis ? "genting" : ""}`} aria-live="polite">
-            <small>SISA WAKTU</small>
-            <b>{ejaWaktu(sisa)}</b>
-          </div>
-        </div>
-        <div className="uj-bar"><span style={{ width: `${soal.length ? (terjawab / soal.length) * 100 : 0}%` }} /></div>
-      </header>
+      <div className="uj-layar">
+        {/* ---------- KIRI: SOALNYA ---------- */}
+        <section className="uj-utama">
+          <header className="uj-judul">{ujian?.judul}</header>
 
-      <main className="uj-badan">
-        <div className="uj-soal-kepala">
-          <span className="uj-nomor">Soal {nomor + 1} <i>dari {soal.length}</i></span>
-          <span className={`uj-simpan uj-simpan-${simpanan}`}>
-            {simpanan === "aman" ? "✓ Tersimpan" : simpanan === "menyimpan" ? "Menyimpan…" : "Menyimpan ulang…"}
-          </span>
-        </div>
-
-        <article className="uj-soal">
-          <p className="uj-tanya">{soalKini.pertanyaan}</p>
-
-          {soalKini.jenis === "pg" || soalKini.jenis === "benar_salah" ? (
-            <div className="uj-pilihan">
-              {soalKini.pilihan.map((p, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  className={`uj-opsi ${isi === String(i) ? "on" : ""}`}
-                  onClick={() => jawab(soalKini.id, String(i))}
-                >
-                  <span className="uj-opsi-huruf">{String.fromCharCode(65 + i)}</span>
-                  <span className="uj-opsi-teks">{p}</span>
-                </button>
-              ))}
+          <div className="uj-isi">
+            <div className="uj-soal-kepala">
+              <h2>{ujian?.mataKuliah} — Soal {nomor + 1}</h2>
+              <span className={`uj-simpan uj-simpan-${simpanan}`}>
+                {simpanan === "aman" ? "✓ Tersimpan" : simpanan === "menyimpan" ? "Menyimpan…" : "Menyimpan ulang…"}
+              </span>
             </div>
-          ) : soalKini.jenis === "isian" ? (
-            <input
-              className="uj-input"
-              value={isi}
-              onChange={(e) => jawab(soalKini.id, e.target.value)}
-              placeholder="Tulis jawaban singkatmu"
-              autoComplete="off"
-            />
-          ) : (
-            <textarea
-              className="uj-essay"
-              value={isi}
-              onChange={(e) => jawab(soalKini.id, e.target.value)}
-              placeholder="Tulis jawabanmu di sini"
-              rows={9}
-            />
-          )}
 
-          {isi !== "" && (
-            <button type="button" className="uj-hapus" onClick={() => jawab(soalKini.id, "")}>
-              Hapus jawaban soal ini
+            <p className="uj-tanya">{soalKini.pertanyaan}</p>
+
+            {soalKini.jenis === "pg" || soalKini.jenis === "benar_salah" ? (
+              <div className="uj-pilihan">
+                {soalKini.pilihan.map((p, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    className={`uj-opsi ${isi === String(i) ? "on" : ""}`}
+                    onClick={() => jawab(soalKini.id, String(i))}
+                  >
+                    <span className="uj-kotakcek" aria-hidden="true">{isi === String(i) ? "✓" : ""}</span>
+                    <span className="uj-opsi-huruf">{String.fromCharCode(65 + i)}.</span>
+                    <span className="uj-opsi-teks">{p}</span>
+                  </button>
+                ))}
+              </div>
+            ) : soalKini.jenis === "isian" ? (
+              <input
+                className="uj-input uj-isian"
+                value={isi}
+                onChange={(e) => jawab(soalKini.id, e.target.value)}
+                placeholder="Tulis jawaban singkatmu"
+                autoComplete="off"
+              />
+            ) : (
+              <textarea
+                className="uj-essay"
+                value={isi}
+                onChange={(e) => jawab(soalKini.id, e.target.value)}
+                placeholder="Tulis jawabanmu di sini"
+                rows={10}
+              />
+            )}
+
+            {isi !== "" && (
+              <button type="button" className="uj-hapus" onClick={() => jawab(soalKini.id, "")}>
+                Hapus jawaban soal ini
+              </button>
+            )}
+
+            {galat && <p className="uj-galat" role="alert">{galat}</p>}
+          </div>
+
+          {/* Baris tombol menempel di dasar kolom, persis seperti rujukannya:
+              tinjau di kiri, jalan mundur-maju di tengah, kumpulkan di kanan
+              dan berjarak — supaya tidak tertekan ketika yang dituju "Next". */}
+          <div className="uj-aksi">
+            <button
+              type="button"
+              className={`uj-tbl uj-tbl-tinjau ${ditandai.includes(soalKini.id) ? "on" : ""}`}
+              onClick={() => void tandai(soalKini.id)}
+            >
+              {ditandai.includes(soalKini.id) ? "Batal tinjau" : "Tandai untuk ditinjau"}
             </button>
-          )}
-        </article>
-
-        {galat && <p className="uj-galat" role="alert">{galat}</p>}
-
-        <div className="uj-navigasi">
-          <button
-            type="button"
-            className="uj-btn"
-            disabled={nomor === 0 || ujian?.bisaKembali === false}
-            onClick={() => setNomor((n) => Math.max(0, n - 1))}
-          >
-            ← Sebelumnya
-          </button>
-          {nomor < soal.length - 1 ? (
-            <button type="button" className="uj-btn uj-btn-utama" onClick={() => setNomor((n) => n + 1)}>
-              Berikutnya →
+            <button
+              type="button"
+              className="uj-tbl uj-tbl-biru"
+              disabled={nomor === 0 || ujian?.bisaKembali === false}
+              onClick={() => keSoal(Math.max(0, nomor - 1))}
+            >
+              Sebelumnya
             </button>
-          ) : (
-            <button type="button" className="uj-btn uj-btn-selesai" disabled={sibuk} onClick={() => setBukaNav(true)}>
-              Periksa & kumpulkan
+            <button
+              type="button"
+              className="uj-tbl uj-tbl-biru"
+              disabled={nomor >= soal.length - 1}
+              onClick={() => keSoal(Math.min(soal.length - 1, nomor + 1))}
+            >
+              Berikutnya
             </button>
-          )}
-        </div>
-      </main>
+            <button
+              type="button"
+              className="uj-tbl uj-tbl-hijau uj-tbl-kumpul"
+              disabled={sibuk}
+              onClick={() => {
+                const kosong = soal.length - terjawab;
+                const pesan = kosong > 0
+                  ? `Masih ada ${kosong} soal yang belum dijawab. Kumpulkan sekarang?`
+                  : "Kumpulkan jawabanmu sekarang?";
+                if (window.confirm(pesan)) void kumpulkan(false);
+              }}
+            >
+              {sibuk ? "Mengumpulkan…" : "Kumpulkan Jawaban"}
+            </button>
+          </div>
 
+          <div className="uj-legenda">
+            <span><i className="uj-tit kini" /> Sedang dibuka</span>
+            <span><i className="uj-tit belum" /> Belum dibuka</span>
+            <span><i className="uj-tit isi" /> Sudah dijawab</span>
+            <span><i className="uj-tit kosong" /> Belum dijawab</span>
+            <span><i className="uj-tit tinjau" /> Ditandai</span>
+          </div>
+        </section>
+
+        {/* ---------- KANAN: WAKTU DAN PALET NOMOR ---------- */}
+        <aside className="uj-sisi">
+          <div className="uj-sisi-judul">Sisa Waktu</div>
+          <div className={`uj-jam ${hampirHabis ? "genting" : ""}`} aria-live="polite">
+            <div><b>{dua(jam)}</b><small>jam</small></div>
+            <div><b>{dua(menit)}</b><small>menit</small></div>
+            <div><b>{dua(detik)}</b><small>detik</small></div>
+          </div>
+
+          <div className="uj-sisi-judul">{ujian?.mataKuliah}</div>
+          <div className="uj-palet">
+            {soal.map((s, i) => (
+              <button
+                key={s.id}
+                type="button"
+                className={`uj-nomor ${keadaanSoal(s.id, i)}`}
+                onClick={() => keSoal(i)}
+                aria-label={`Soal ${i + 1}`}
+                aria-current={i === nomor ? "true" : undefined}
+              >
+                {i + 1}
+              </button>
+            ))}
+          </div>
+
+          <div className="uj-ringkas">
+            <b>{terjawab}</b> dari {soal.length} soal sudah dijawab
+            {ditandai.length > 0 && <span>{ditandai.length} ditandai untuk ditinjau</span>}
+          </div>
+        </aside>
+      </div>
+
+      {/* Di ponsel palet nomornya disembunyikan dan diganti satu tombol yang
+          membuka panelnya — menggulir jauh ke bawah untuk mencari nomor soal
+          berarti kehilangan tempat pada soal yang sedang dibaca. */}
       <button type="button" className="uj-tombol-nav" onClick={() => setBukaNav(true)}>
-        <b>{terjawab}/{soal.length}</b> terjawab · lihat semua soal
+        <b>{terjawab}/{soal.length}</b> terjawab · <span>{ejaWaktu(sisa)}</span> · lihat semua soal
       </button>
 
       {bukaNav && (
@@ -540,24 +689,26 @@ export default function UjianApp() {
               {terjawab} dari {soal.length} soal sudah dijawab
               {soal.length - terjawab > 0 && ` · ${soal.length - terjawab} masih kosong`}
             </p>
-            <div className="uj-grid">
-              {soal.map((s, i) => {
-                const sudah = String(jawaban[s.id] ?? "").trim().length > 0;
-                return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    className={`uj-kotak-nomor ${sudah ? "isi" : ""} ${i === nomor ? "kini" : ""}`}
-                    onClick={() => { setNomor(i); setBukaNav(false); }}
-                  >
-                    {i + 1}
-                  </button>
-                );
-              })}
+            <div className="uj-palet uj-palet-panel">
+              {soal.map((s, i) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  className={`uj-nomor ${keadaanSoal(s.id, i)}`}
+                  onClick={() => { keSoal(i); setBukaNav(false); }}
+                >
+                  {i + 1}
+                </button>
+              ))}
+            </div>
+            <div className="uj-legenda uj-legenda-panel">
+              <span><i className="uj-tit isi" /> Sudah dijawab</span>
+              <span><i className="uj-tit kosong" /> Belum dijawab</span>
+              <span><i className="uj-tit tinjau" /> Ditandai</span>
             </div>
             <button
               type="button"
-              className="uj-btn uj-btn-selesai"
+              className="uj-tbl uj-tbl-hijau"
               disabled={sibuk}
               onClick={() => {
                 const kosong = soal.length - terjawab;
@@ -567,7 +718,7 @@ export default function UjianApp() {
                 if (window.confirm(pesan)) void kumpulkan(false);
               }}
             >
-              {sibuk ? "Mengumpulkan…" : "Kumpulkan jawaban"}
+              {sibuk ? "Mengumpulkan…" : "Kumpulkan Jawaban"}
             </button>
             <button type="button" className="uj-btn uj-btn-sunyi" onClick={() => setBukaNav(false)}>
               Kembali mengerjakan

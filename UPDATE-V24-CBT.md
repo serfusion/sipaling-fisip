@@ -40,6 +40,10 @@ Aktivasi menolak tiga hal, sebelum mahasiswa telanjur duduk di depan layar:
 
 ## Mahasiswa: `/ujian`
 
+Terang, bukan gelap — mengikuti bentuk yang sudah dikenal mahasiswa dari
+aplikasi ujian lain: soal di kiri, sisa waktu dan palet nomor di kanan,
+deretan tombol di dasar kolom soal, legenda di bawahnya.
+
 Empat layar, dan tidak lebih.
 
 ```
@@ -51,8 +55,14 @@ kode ujian → nama + NIM + kode pengawas → mengerjakan → selesai
 - **Auto-save** berjalan sendiri; penandanya tenang ("✓ Tersimpan"), dan
   kegagalan jaringan ditulis "Menyimpan ulang…" berwarna kuning — bukan galat
   merah yang membuat orang berhenti mengerjakan.
-- **Daftar nomor soal** menempel di bawah layar: hijau sudah dijawab, abu
-  belum, bergaris biru yang sedang dibuka.
+- **Palet nomor soal** dengan lima keadaan yang artinya ditulis pada legenda,
+  bukan hanya diwarnai: biru sedang dibuka, hijau sudah dijawab, jingga dibuka
+  tetapi masih kosong, merah ditandai untuk ditinjau, abu belum dibuka.
+- **Tandai untuk ditinjau** — penandanya disimpan di server, jadi tidak hilang
+  ketika halaman dimuat ulang.
+- Di ponsel palet itu berpindah ke panel yang dibuka satu ketukan; menggulir
+  jauh untuk mencari nomor soal berarti kehilangan tempat pada soal yang
+  sedang dibaca.
 - **Waktu habis → dikumpulkan sendiri.**
 - Ponsel mati atau tab tertutup? Buka lagi `/ujian`, lembar yang sama kembali
   dengan sisa waktu yang terus berjalan.
@@ -122,6 +132,76 @@ Lalu buka dashboard → **Ujian Online (CBT)**.
 
 ---
 
+## Membuat soal: unduh template, isi, unggah
+
+Menambah soal satu per satu lewat formulir tetap ada, tetapi bukan lagi
+satu-satunya jalan. Empat puluh soal lewat formulir berarti empat puluh kali
+mengisi, menekan, dan menunggu.
+
+**Dashboard → CBT → buka ujiannya → Bank soal → ⇩ Template Excel / ⇩ Template Word.**
+
+Isi di komputer sendiri, lalu **⇧ Unggah soal**. Berkasnya diurai **di
+peramban Anda** — berkas soal memuat kunci jawaban, dan tidak ada alasan ia
+singgah di server sebelum Anda sendiri melihat hasil bacaannya.
+
+### Excel
+
+Sheet **Soal**, dengan kolom:
+
+```
+NO | JENIS | PERTANYAAN | PILIHAN A..E | KUNCI | BOBOT | MATERI | TINGKAT | PEMBAHASAN
+```
+
+- `JENIS` — PG, BENAR-SALAH, ISIAN, atau ESSAY. Kosong dianggap PG.
+- `KUNCI` — huruf (A/B/C/D/E) untuk PG, BENAR/SALAH, teks untuk isian
+  (beberapa kemungkinan dipisah `|`), kosong untuk essay.
+- Urutan kolom **boleh digeser** dan kolom yang tidak dipakai boleh dihapus —
+  yang dicari sistem nama kolomnya, bukan letaknya. Berkas yang bergantung
+  pada urutan akan rusak pada dokumen kedua yang diunggah orang.
+
+Sheet **Petunjuk** ikut serta, dan baris contohnya sudah benar — template
+kosong melulu membuat orang menebak bentuknya, dan tebakannya ditolak.
+
+### Word
+
+```
+1. Siapa perumus teori agenda setting?
+A. McCombs & Shaw
+B. Lasswell
+KUNCI: A
+BOBOT: 5
+```
+
+Nomor bergaya `1.`, `1)`, atau `Soal 1.` sama-sama terbaca. Pertanyaan dan
+pembahasan yang memanjang ke baris berikutnya ikut tersambung. `JENIS: ISIAN`
+atau `JENIS: ESSAY` untuk soal tanpa pilihan.
+
+### Satu baris rusak tidak menggagalkan seluruh berkas
+
+Yang sah tetap masuk; yang bermasalah ditampilkan beserta **nomor barisnya**
+dan alasannya — *"Baris 9: kunci "Z" menunjuk pilihan yang tidak ada"*. Dosen
+memperbaiki tiga baris, bukan mengunggah ulang empat puluh soal.
+
+Sebelum masuk ke bank, lima soal pertama ditampilkan lengkap dengan kuncinya
+untuk dilihat dulu.
+
+---
+
+## Bagikan: tautan dan kode
+
+Begitu bank soalnya berisi, muncul kartu **Bagikan ke mahasiswa**:
+
+- **Tautan ujian** — `https://www.sipalingfisip.web.id/ujian?kode=XXXXXX`.
+  Mahasiswa yang menekannya langsung melihat ujiannya; kodenya terisi sendiri.
+- **Kode ujian** — untuk yang lebih suka mengetik manual.
+- **Kode pengawas** — bila ujiannya memakai kode tambahan.
+- **📋 Salin pesan siap tempel untuk grup** — satu tombol yang menyalin pesan
+  lengkap: judul, mata kuliah, tautan, kode, jumlah soal, durasi, jam buka dan
+  tutup. Menyalin tautan lalu mengetik sendiri jam dan jumlah soalnya di grup
+  adalah pekerjaan yang paling sering salah ketik.
+
+---
+
 ## Yang belum dibuat
 
 Blueprint bagian 23 menyarankan menahan diri, dan saya menahannya:
@@ -140,6 +220,13 @@ Semuanya dapat ditambahkan di atas yang sudah ada tanpa membongkar tabelnya.
 
 ## Yang dijaga uji otomatis
 
+`npx tsx uji-impor-soal.ts` — **76 pemeriksaan** atas pembaca berkas soal.
+Yang dijaga terutama **kunci jawaban**: huruf, huruf kecil, `C.`, `D)`, dan
+teks jawaban yang disalin utuh semuanya diterima; yang tidak menunjuk ke mana
+pun ditolak dengan alasannya. Termasuk satu pemeriksaan yang wajib ada:
+**template yang kami sediakan sendiri harus lolos pembacanya sendiri**, dan
+soal hasilnya benar-benar dapat dinilai mesin penilai.
+
 `npx tsx uji-cbt.ts` — **83 pemeriksaan** atas aturan yang menentukan nasib
 nilai: jam buka, batas waktu, pengacakan yang dapat diulang, penilaian
 termasuk pemetaan pilihan teracak, identitas tanpa login, dan analisis.
@@ -155,6 +242,24 @@ Alurnya juga dijalankan **sungguhan** — Postgres asli, HTTP asli:
   menjadi `waktu_habis`
 - kunci sesi palsu → 401; soal di luar lembarnya → ditolak
 
-Layar mahasiswanya dijalankan di Chromium pada lebar 400px: jam terlihat,
-penanda "✓ Tersimpan" muncul, navigator menghitung "1 dari 4 soal sudah
-dijawab · 3 masih kosong", dan tidak ada gulir mendatar.
+Layar mahasiswanya dijalankan di Chromium pada 1440px dan 390px: jam mundur
+berjalan, palet menunjukkan `isi, isi, isi, isi, isi, isi, tinjau, kini,
+belum, belum` persis sesuai yang dikerjakan, penanda "✓ Tersimpan" hijau, dan
+tidak ada gulir mendatar di kedua lebar.
+
+Berkas `.docx` yang dirakit sendiri dibuka ulang dan diperiksa: zip-nya sah,
+ketiga XML-nya terurai tanpa galat, dan `file` mengenalinya sebagai
+**Microsoft Word 2007+**.
+
+### Satu bug tertangkap saat pengujian ini
+
+Indeks unik `(attempt_id, question_id)` pada `cbt_answers` semula **hanya ada
+di berkas SQL migrasi**, tidak di skema Drizzle. Basis data yang disiapkan
+dari skema saja karena itu berdiri tanpa indeksnya — dan auto-save yang
+memakai `on conflict do update` **ditolak diam-diam**: layar mahasiswa tetap
+hijau sementara servernya tidak menyimpan apa pun.
+
+Indeksnya sekarang dideklarasikan di skema, jadi kedua jalur penyiapan
+menghasilkan basis data yang sama. Dan sebagai jaring kedua, menekan
+"Kumpulkan" ketika masih ada jawaban yang belum sampai ke server tidak lagi
+lolos diam-diam — mahasiswanya diberi tahu dan diminta menunggu sebentar.

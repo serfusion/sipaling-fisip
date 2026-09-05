@@ -16,6 +16,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { JENIS_LABEL, STATUS_LABEL, type JenisSoal, type StatusUjian } from "@/lib/cbt";
+import { imporDariExcel, imporDariWord, type SoalImpor, type Aoa } from "@/lib/impor-soal";
+import { CONTOH_EXCEL, KOLOM_EXCEL, PETUNJUK_EXCEL, buatDocxTemplate } from "@/lib/template-soal";
 
 type Ujian = {
   id: number; code: string; title: string; courseName: string; className: string | null;
@@ -100,6 +102,15 @@ export default function CbtPanel({ role }: { role: string }) {
   const [peserta, setPeserta] = useState<Peserta[]>([]);
   const [statistik, setStatistik] = useState<Statistik | null>(null);
   const [analisis, setAnalisis] = useState<Analisis[]>([]);
+
+  // Impor massal: hasil bacaan berkas ditahan dulu untuk dilihat dosen
+  // sebelum benar-benar masuk. Empat puluh soal yang langsung tersimpan tanpa
+  // sempat dilihat berarti empat puluh soal yang harus diperiksa satu per satu
+  // sesudahnya.
+  const [imporSoal, setImporSoal] = useState<SoalImpor[]>([]);
+  const [imporTolak, setImporTolak] = useState<Array<{ baris: string; alasan: string }>>([]);
+  const [imporNama, setImporNama] = useState("");
+  const [tersalin, setTersalin] = useState("");
 
   const [jadwal, setJadwal] = useState({ mulai: "", selesai: "" });
   const [sibuk, setSibuk] = useState(false);
@@ -280,6 +291,131 @@ export default function CbtPanel({ role }: { role: string }) {
   }
   void koreksi;
 
+  // ---------- TEMPLATE & IMPOR MASSAL ----------
+
+  function unduh(isi: Blob, nama: string) {
+    const alamat = URL.createObjectURL(isi);
+    const tautan = document.createElement("a");
+    tautan.href = alamat;
+    tautan.download = nama;
+    tautan.click();
+    URL.revokeObjectURL(alamat);
+  }
+
+  async function unduhTemplateExcel() {
+    const XLSX = await import("xlsx");
+    const wb = XLSX.utils.book_new();
+    const soal = XLSX.utils.aoa_to_sheet([KOLOM_EXCEL, ...CONTOH_EXCEL]);
+    soal["!cols"] = [
+      { wch: 4 }, { wch: 13 }, { wch: 52 },
+      { wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 22 },
+      { wch: 26 }, { wch: 7 }, { wch: 20 }, { wch: 10 }, { wch: 40 },
+    ];
+    XLSX.utils.book_append_sheet(wb, soal, "Soal");
+    const petunjuk = XLSX.utils.aoa_to_sheet(PETUNJUK_EXCEL);
+    petunjuk["!cols"] = [{ wch: 100 }];
+    XLSX.utils.book_append_sheet(wb, petunjuk, "Petunjuk");
+    XLSX.writeFile(wb, "Template-Soal-SiPaling.xlsx");
+    setPesan("Template Excel terunduh. Isi sheet \"Soal\", lalu unggah kembali di sini.");
+  }
+
+  function unduhTemplateWord() {
+    unduh(buatDocxTemplate(), "Template-Soal-SiPaling.docx");
+    setPesan("Template Word terunduh. Tulis soalnya, lalu unggah kembali di sini.");
+  }
+
+  /**
+   * Baca berkas soal yang diunggah dosen.
+   *
+   * Seluruhnya diurai DI PERAMBAN, sama seperti pengimpor transkrip: berkas
+   * soal memuat kunci jawaban, dan tidak ada alasan ia singgah di server
+   * sebelum dosennya sendiri melihat hasil bacaannya.
+   */
+  async function bacaBerkasSoal(berkas: File) {
+    setPesan("");
+    setGalat("");
+    setImporNama(berkas.name);
+    try {
+      const nama = berkas.name.toLowerCase();
+      if (nama.endsWith(".docx")) {
+        // Modul yang sama dipakai pengimpor template surat; jenisnya sudah
+        // dikenali TypeScript lewat jalur ini, tidak lewat build browser-nya.
+        const mammoth = await import("mammoth");
+        const hasil = await mammoth.extractRawText({ arrayBuffer: await berkas.arrayBuffer() });
+        const bacaan = imporDariWord(hasil.value || "");
+        setImporSoal(bacaan.soal);
+        setImporTolak(bacaan.tolak);
+      } else if (nama.endsWith(".xlsx") || nama.endsWith(".xls") || nama.endsWith(".csv")) {
+        const XLSX = await import("xlsx");
+        const wb = XLSX.read(new Uint8Array(await berkas.arrayBuffer()), { type: "array" });
+        const sheet = wb.Sheets["Soal"] ?? wb.Sheets[wb.SheetNames[0]];
+        const aoa = XLSX.utils.sheet_to_json(sheet as Parameters<typeof XLSX.utils.sheet_to_json>[0], {
+          header: 1, defval: "", raw: false,
+        }) as Aoa;
+        const bacaan = imporDariExcel(aoa);
+        setImporSoal(bacaan.soal);
+        setImporTolak(bacaan.tolak);
+      } else {
+        throw new Error("Berkasnya harus .xlsx, .xls, .csv, atau .docx.");
+      }
+    } catch (alasan: unknown) {
+      setImporSoal([]);
+      setImporTolak([]);
+      setGalat(alasan instanceof Error ? alasan.message : "Berkas tidak dapat dibaca.");
+    }
+  }
+
+  async function terbitkanImpor() {
+    if (!terbuka || imporSoal.length === 0) return;
+    const hasil = await kirim(
+      "/api/cbt/soal",
+      "POST",
+      { ujian: terbuka.id, soal: imporSoal },
+      `${imporSoal.length} soal masuk ke bank soal.`,
+    );
+    if (!hasil) return;
+    setImporSoal([]);
+    setImporTolak([]);
+    setImporNama("");
+    await muatSoal(terbuka.id);
+    await muatUjian();
+  }
+
+  // ---------- BAGIKAN ----------
+
+  function alamatUjian(kode: string) {
+    if (typeof window === "undefined") return `/ujian?kode=${kode}`;
+    return `${window.location.origin}/ujian?kode=${kode}`;
+  }
+
+  function pesanGrup(u: Ujian) {
+    return [
+      `*${u.title}*`,
+      `${u.courseName}${u.className ? ` — Kelas ${u.className}` : ""}`,
+      "",
+      `Tautan ujian : ${alamatUjian(u.code)}`,
+      `Kode ujian   : ${u.code}`,
+      ...(u.token ? [`Kode pengawas: ${u.token}`] : []),
+      "",
+      `Jumlah soal  : ${u.questionCount || u.jumlahBank}`,
+      `Waktu        : ${u.durationMinutes} menit`,
+      ...(u.startAt ? [`Dibuka       : ${jamRapi(u.startAt)}`] : []),
+      ...(u.endAt ? [`Ditutup      : ${jamRapi(u.endAt)}`] : []),
+      "",
+      "Tidak perlu membuat akun. Buka tautannya, isi nama dan NIM, lalu mulai.",
+    ].join("\n");
+  }
+
+  function salin(teks: string, penanda: string) {
+    navigator.clipboard
+      ?.writeText(teks)
+      .then(() => {
+        setTersalin(penanda);
+        window.setTimeout(() => setTersalin(""), 2200);
+      })
+      .catch(() => setGalat("Penyalinan gagal. Salin manual dari kotaknya."));
+  }
+
   function unduhNilai() {
     if (!terbuka || peserta.length === 0) return;
     const baris = [
@@ -434,6 +570,54 @@ export default function CbtPanel({ role }: { role: string }) {
       {pesan && <div className="dsh-ok">{pesan}</div>}
       {galat && <div className="dsh-error">{galat}</div>}
 
+      {/* ---------- BAGIKAN KE MAHASISWA ---------- */}
+      {soal.length > 0 && (
+        <div className="panel cbt-bagi">
+          <div className="cbt-bagi-kepala">
+            <b>Bagikan ke mahasiswa</b>
+            <span>
+              Tempel salah satu ke grup kelas. Mahasiswa tidak perlu membuat akun — buka tautannya,
+              isi nama dan NIM, selesai.
+              {!terbuka.activatedAt && " Ujian baru dapat dimasuki setelah diaktifkan dan jam mulainya tiba."}
+            </span>
+          </div>
+
+          <div className="cbt-bagi-baris">
+            <div className="cbt-bagi-kotak">
+              <small>Tautan ujian</small>
+              <code>{alamatUjian(terbuka.code)}</code>
+            </div>
+            <button type="button" className="btn btn-light btn-mini" onClick={() => salin(alamatUjian(terbuka.code), "tautan")}>
+              {tersalin === "tautan" ? "Tersalin ✓" : "Salin tautan"}
+            </button>
+          </div>
+
+          <div className="cbt-bagi-baris">
+            <div className="cbt-bagi-kotak cbt-bagi-kode">
+              <small>Kode ujian</small>
+              <code>{terbuka.code}</code>
+            </div>
+            {terbuka.token && (
+              <div className="cbt-bagi-kotak cbt-bagi-kode">
+                <small>Kode pengawas</small>
+                <code>{terbuka.token}</code>
+              </div>
+            )}
+            <button type="button" className="btn btn-light btn-mini" onClick={() => salin(terbuka.code, "kode")}>
+              {tersalin === "kode" ? "Tersalin ✓" : "Salin kode"}
+            </button>
+          </div>
+
+          {/* Satu tombol yang menyalin pesan siap tempel. Menyalin tautan lalu
+              mengetik sendiri jam dan jumlah soalnya di grup adalah pekerjaan
+              yang paling sering salah ketik. */}
+          <button type="button" className="btn btn-primary cbt-bagi-pesan" onClick={() => salin(pesanGrup(terbuka), "pesan")}>
+            {tersalin === "pesan" ? "Pesan tersalin ✓" : "📋 Salin pesan siap tempel untuk grup"}
+          </button>
+          <pre className="cbt-bagi-pratinjau">{pesanGrup(terbuka)}</pre>
+        </div>
+      )}
+
       {/* ---------- GERBANG AKTIVASI ---------- */}
       <div className="panel cbt-aktivasi" data-aktif={terbuka.activatedAt ? "1" : undefined}>
         <div className="cbt-aktivasi-kepala">
@@ -495,8 +679,88 @@ export default function CbtPanel({ role }: { role: string }) {
             </div>
           )}
 
+          {/* ---------- IMPOR MASSAL ---------- */}
+          <div className="panel cbt-impor">
+            <div className="cbt-impor-kepala">
+              <b>Buat soal lewat Excel atau Word</b>
+              <span>
+                Unduh templatenya, isi di komputer sendiri, lalu unggah sekali untuk seluruh soal.
+                Empat puluh soal lewat formulir satuan berarti empat puluh kali mengisi dan menunggu.
+              </span>
+            </div>
+
+            <div className="cbt-impor-tombol">
+              <button type="button" className="btn btn-light" onClick={() => void unduhTemplateExcel()}>
+                ⇩ Template Excel (.xlsx)
+              </button>
+              <button type="button" className="btn btn-light" onClick={() => unduhTemplateWord()}>
+                ⇩ Template Word (.docx)
+              </button>
+              <label className={`btn btn-primary cbt-unggah ${terkunci ? "mati" : ""}`}>
+                ⇧ Unggah soal
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv,.docx"
+                  disabled={terkunci}
+                  onChange={(e) => {
+                    const berkas = e.target.files?.[0];
+                    e.target.value = "";
+                    if (berkas) void bacaBerkasSoal(berkas);
+                  }}
+                />
+              </label>
+            </div>
+
+            {(imporSoal.length > 0 || imporTolak.length > 0) && (
+              <div className="cbt-impor-hasil">
+                <div className="cbt-impor-angka">
+                  <span className="cbt-impor-ok"><b>{imporSoal.length}</b> soal terbaca</span>
+                  {imporTolak.length > 0 && (
+                    <span className="cbt-impor-gagal"><b>{imporTolak.length}</b> baris perlu diperbaiki</span>
+                  )}
+                  {imporNama && <span className="cbt-impor-nama">{imporNama}</span>}
+                </div>
+
+                {imporTolak.length > 0 && (
+                  <ul className="cbt-impor-tolak">
+                    {imporTolak.slice(0, 8).map((t, i) => (
+                      <li key={i}><b>{t.baris}</b> — {t.alasan}</li>
+                    ))}
+                    {imporTolak.length > 8 && <li>…dan {imporTolak.length - 8} lagi.</li>}
+                  </ul>
+                )}
+
+                {imporSoal.length > 0 && (
+                  <>
+                    <ol className="cbt-impor-pratinjau">
+                      {imporSoal.slice(0, 5).map((q, i) => (
+                        <li key={i}>
+                          <span className={`pill cbt-t-${q.tingkat}`}>{JENIS_LABEL[q.jenis]} · {q.bobot} poin</span>
+                          <p>{q.pertanyaan.slice(0, 110)}{q.pertanyaan.length > 110 ? "…" : ""}</p>
+                          {q.pilihan.length > 0 && (
+                            <small>Kunci: {String.fromCharCode(65 + Number(q.kunci))}. {q.pilihan[Number(q.kunci)]}</small>
+                          )}
+                          {q.jenis === "isian" && <small>Kunci: {q.kunci}</small>}
+                        </li>
+                      ))}
+                      {imporSoal.length > 5 && <li className="cbt-impor-sisa">…dan {imporSoal.length - 5} soal lagi.</li>}
+                    </ol>
+                    <div className="cbt-impor-aksi">
+                      <button type="button" className="btn btn-primary" disabled={sibuk || terkunci} onClick={() => void terbitkanImpor()}>
+                        {sibuk ? "Menyimpan…" : `Masukkan ${imporSoal.length} soal ke bank`}
+                      </button>
+                      <button type="button" className="btn btn-light" onClick={() => { setImporSoal([]); setImporTolak([]); setImporNama(""); }}>
+                        Batal
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="panel cbt-form">
-            <b className="cbt-form-judul">{sunting ? "Ubah soal" : "Tambah soal"}</b>
+            <b className="cbt-form-judul">{sunting ? "Ubah soal" : "Tambah soal satu per satu"}</b>
 
             <div className="cbt-baris">
               <label><span>Jenis</span>

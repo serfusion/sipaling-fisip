@@ -164,6 +164,7 @@ export async function POST(request: Request) {
           ujian: ringkasUjian(ujian, sekarang),
           soal: lembarUntukLayar(bank, lembar),
           jawaban: Object.fromEntries(jawaban.map((j) => [j.questionId, j.answer])),
+          ditandai: jawaban.filter((j) => j.marked).map((j) => j.questionId),
           sisaDetik: sisaDetik(berjalan.deadlineAt, sekarang),
         });
       }
@@ -274,6 +275,7 @@ export async function POST(request: Request) {
         ujian: ringkasUjian(ujian, sekarang),
         soal: lembarUntukLayar(bank, bacaLembar(attempt.paper)),
         jawaban: Object.fromEntries(jawaban.map((j) => [j.questionId, j.answer])),
+        ditandai: jawaban.filter((j) => j.marked).map((j) => j.questionId),
         sisaDetik: sisaDetik(attempt.deadlineAt, sekarang),
       });
     }
@@ -295,6 +297,27 @@ export async function POST(request: Request) {
         await db.update(cbtAttempts).set({ ...kolom, lastSeenAt: sekarang }).where(eq(cbtAttempts.id, attempt.id));
       }
       return Response.json({ success: true });
+    }
+
+    // ---------- TANDAI UNTUK DITINJAU ----------
+    if (aksi === "tandai") {
+      const questionId = Number(body.soal);
+      const lembar = bacaLembar(attempt.paper);
+      if (!lembar.some((l) => l.id === questionId)) {
+        return Response.json({ success: false, message: "Soal ini bukan bagian dari lembar Anda." }, { status: 400 });
+      }
+      const tandai = body.tandai !== false;
+      await db
+        .insert(cbtAnswers)
+        .values({ attemptId: attempt.id, questionId, answer: "", marked: tandai, updatedAt: sekarang })
+        .onConflictDoUpdate({
+          target: [cbtAnswers.attemptId, cbtAnswers.questionId],
+          // HANYA kolom penanda yang disentuh. Menulis ulang answer di sini
+          // akan menghapus jawaban yang sudah diketik mahasiswa hanya karena
+          // ia menandai soalnya untuk ditinjau.
+          set: { marked: tandai, updatedAt: sekarang },
+        });
+      return Response.json({ success: true, ditandai: tandai });
     }
 
     // ---------- AUTO-SAVE ----------

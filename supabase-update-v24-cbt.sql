@@ -96,6 +96,8 @@ CREATE TABLE IF NOT EXISTS public.cbt_answers (
   attempt_id  INTEGER     NOT NULL REFERENCES public.cbt_attempts(id) ON DELETE CASCADE,
   question_id INTEGER     NOT NULL REFERENCES public.cbt_questions(id) ON DELETE CASCADE,
   answer      TEXT        NOT NULL DEFAULT '',
+  -- Ditandai mahasiswa untuk ditinjau ulang sebelum dikumpulkan.
+  marked      BOOLEAN     NOT NULL DEFAULT FALSE,
   is_correct  BOOLEAN,
   points      INTEGER     NOT NULL DEFAULT 0,
   feedback    TEXT,
@@ -117,3 +119,7 @@ ALTER TABLE public.cbt_answers   ENABLE ROW LEVEL SECURITY;
 -- memakai service-role key. Ini penting khusus untuk cbt_questions: kolom
 -- answer_key memuat KUNCI JAWABAN, dan satu policy baca yang longgar berarti
 -- kunci itu dapat diambil langsung dari peramban mahasiswa saat ujian.
+
+-- Kolom penanda tinjau ditambahkan belakangan; baris ini membuat migrasi
+-- tetap aman dijalankan pada basis data yang tabelnya sudah berdiri lebih dulu.
+ALTER TABLE public.cbt_answers ADD COLUMN IF NOT EXISTS marked BOOLEAN NOT NULL DEFAULT FALSE;
