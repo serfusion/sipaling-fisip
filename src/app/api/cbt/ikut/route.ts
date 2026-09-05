@@ -28,8 +28,9 @@ import { explainServerError } from "@/lib/api-errors";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { blockedByMaintenance } from "@/lib/maintenance-gate";
 import {
-  batasWaktu, benihBaru, bolehMasuk, hitungNilai, nilaiJawaban, periksaMasuk,
-  sisaDetik, statusUjian, susunPaket, type Soal,
+  batasWaktu, benihBaru, bolehMasuk, hitungNilai, kunciNama, nilaiJawaban,
+  periksaGanda, periksaMasuk, rapikanPerangkat, sisaDetik, statusUjian,
+  susunPaket, type Soal,
 } from "@/lib/cbt";
 import { attemptDariKunci, bacaLembar, soalUjian, ujianDariKode, type Ujian } from "@/lib/cbt-store";
 
@@ -169,6 +170,10 @@ export async function POST(request: Request) {
         });
       }
 
+      // ---------- SATU ORANG, SATU KALI ----------
+      // Diperiksa SESUDAH jalur "lanjutkan yang masih berjalan" di atas,
+      // supaya mahasiswa yang kembali ke ujiannya sendiri tidak pernah
+      // tertahan oleh pemeriksaan yang ditujukan kepada orang lain.
       if (sudah.length >= ujian.maxAttempts) {
         return Response.json(
           {
@@ -180,6 +185,28 @@ export async function POST(request: Request) {
           },
           { status: 409 },
         );
+      }
+
+      // Nama dan perangkat diperiksa terhadap SELURUH peserta ujian ini, bukan
+      // hanya terhadap NIM yang sama. Kolomnya sengaja sedikit: daftar peserta
+      // dapat berisi ratusan baris, dan lembar soal masing-masing tidak ada
+      // gunanya di sini.
+      const nameKey = kunciNama(identitas.nama);
+      const deviceId = rapikanPerangkat(body.perangkat);
+      const semua = await db
+        .select({
+          nim: cbtAttempts.nim,
+          nameKey: cbtAttempts.nameKey,
+          deviceId: cbtAttempts.deviceId,
+          status: cbtAttempts.status,
+        })
+        .from(cbtAttempts)
+        .where(eq(cbtAttempts.examId, ujian.id));
+      const ganda = periksaGanda({ nim: identitas.nim, nameKey, deviceId }, semua, {
+        satuPerangkat: ujian.singleDevice,
+      });
+      if (!ganda.ok) {
+        return Response.json({ success: false, message: ganda.pesan }, { status: 409 });
       }
 
       const bank = await soalUjian(ujian.id);
@@ -206,6 +233,8 @@ export async function POST(request: Request) {
           examId: ujian.id,
           nim: identitas.nim,
           name: identitas.nama,
+          nameKey,
+          deviceId,
           attemptNo: sudah.length + 1,
           sessionKey: kunciSesi,
           seed: benih,

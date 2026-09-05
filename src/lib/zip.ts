@@ -56,8 +56,14 @@ function tulis(dv: DataView, pos: number, nilai: number, byte: 2 | 4) {
  * Nama berkas dikodekan UTF-8 dan bendera bit 11 dinyalakan, supaya nama
  * berhuruf non-ASCII tidak berubah menjadi karakter aneh ketika arsipnya
  * dibuka di Windows.
+ *
+ * JENIS ISINYA dapat diganti, dan itu bukan hiasan. Berkas .docx dan .xlsx
+ * pada dasarnya zip, tetapi zip yang diberi label "application/zip" akan
+ * tersimpan dan terbuka sebagai arsip di komputer penerimanya — bukan sebagai
+ * dokumen Word atau Excel. Template yang turun sebagai .zip persis itu
+ * sebabnya.
  */
-export function buatZip(isi: IsiZip[], waktu = new Date()): Blob {
+export function buatZip(isi: IsiZip[], waktu = new Date(), jenis = "application/zip"): Blob {
   const { waktu: jam, tanggal } = waktuDos(waktu);
   const potongan: BlobPart[] = [];
   const pusat: Bita[] = [];
@@ -121,7 +127,7 @@ export function buatZip(isi: IsiZip[], waktu = new Date()): Blob {
   tulis(av, 16, awalPusat, 4);
   potongan.push(akhir);
 
-  return new Blob(potongan, { type: "application/zip" });
+  return new Blob(potongan, { type: jenis });
 }
 
 /** Buang huruf yang tidak boleh ada pada nama berkas maupun map di Windows. */

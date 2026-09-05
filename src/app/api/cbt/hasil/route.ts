@@ -7,17 +7,27 @@
 // ============================================================
 import { db } from "@/db";
 import { cbtAnswers, cbtAttempts, cbtExams } from "@/db/schema";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { getCurrentProfile } from "@/lib/supabase-server";
 import { explainServerError } from "@/lib/api-errors";
-import { analisisSoal, sisaDetik, statistikNilai, statusUjian } from "@/lib/cbt";
+import {
+  analisisSoal, angkaParam, bolehCbt, bolehPantau, bolehUbah, sisaDetik,
+  statistikNilai, statusUjian,
+} from "@/lib/cbt";
 import { bacaLembar, soalUjian } from "@/lib/cbt-store";
-import { bolehCbt, miliknya } from "../ujian/route";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-async function gerbang(examId: number) {
+/**
+ * Ambil ujiannya sekaligus periksa izin pemanggilnya.
+ *
+ * MEMANTAU terbuka bagi admin — itu memang tugas mereka, dan membaca nilai
+ * tidak mengubah apa pun. MENGOREKSI essay tidak: nilai yang keluar dari
+ * koreksi adalah nilai akademik, dan yang memberikannya harus dosen pengampu
+ * ujiannya sendiri.
+ */
+async function gerbang(examId: number, izin: "pantau" | "ubah" = "pantau") {
   const profile = await getCurrentProfile();
   if (!bolehCbt(profile) || !profile) {
     return { gagal: Response.json({ success: false, message: "Menu CBT tidak tersedia untuk role Anda." }, { status: 403 }) };
@@ -25,8 +35,20 @@ async function gerbang(examId: number) {
   const baris = await db.select().from(cbtExams).where(eq(cbtExams.id, examId)).limit(1);
   const ujian = baris[0];
   if (!ujian) return { gagal: Response.json({ success: false, message: "Ujian tidak ditemukan." }, { status: 404 }) };
-  if (!miliknya(profile, ujian)) {
-    return { gagal: Response.json({ success: false, message: "Ujian ini milik dosen lain." }, { status: 403 }) };
+  const lolos = izin === "pantau" ? bolehPantau(profile, ujian) : bolehUbah(profile, ujian);
+  if (!lolos) {
+    return {
+      gagal: Response.json(
+        {
+          success: false,
+          message:
+            izin === "ubah"
+              ? "Koreksi essay hanya oleh dosen pemilik ujiannya."
+              : "Ujian ini milik dosen lain.",
+        },
+        { status: 403 },
+      ),
+    };
   }
   return { profile, ujian };
 }
@@ -34,8 +56,8 @@ async function gerbang(examId: number) {
 export async function GET(request: Request) {
   try {
     const params = new URL(request.url).searchParams;
-    const examId = Number(params.get("ujian"));
-    if (!Number.isInteger(examId)) {
+    const examId = angkaParam(params.get("ujian"));
+    if (examId === null) {
       return Response.json({ success: false, message: "Ujian tidak dikenali." }, { status: 400 });
     }
     const cek = await gerbang(examId);
@@ -44,8 +66,11 @@ export async function GET(request: Request) {
     const sekarang = new Date();
 
     // ---------- RINCIAN SATU MAHASISWA ----------
-    const attemptId = Number(params.get("attempt"));
-    if (Number.isInteger(attemptId)) {
+    // Parameter yang TIDAK dikirim harus bernilai null, bukan nol — lihat
+    // angkaParam. Tanpa itu cabang di bawah selalu diambil dan daftar peserta
+    // di bawahnya tidak pernah sempat berjalan.
+    const attemptId = angkaParam(params.get("attempt"));
+    if (attemptId !== null) {
       const baris = await db
         .select()
         .from(cbtAttempts)
@@ -108,16 +133,23 @@ export async function GET(request: Request) {
       .limit(500);
 
     const jumlahSoal = ujian.questionCount || (await soalUjian(examId)).length;
-    const semuaJawaban = await db
-      .select({
-        attemptId: cbtAnswers.attemptId,
-        questionId: cbtAnswers.questionId,
-        answer: cbtAnswers.answer,
-        isCorrect: cbtAnswers.isCorrect,
-      })
-      .from(cbtAnswers);
-    const punyaUjianIni = new Set(peserta.map((p) => p.id));
-    const jawabanUjian = semuaJawaban.filter((j) => punyaUjianIni.has(j.attemptId));
+
+    // Disaring DI BASIS DATA, bukan di sini. Sebelumnya seluruh isi tabel
+    // jawaban ditarik lalu dibuang sebagian besarnya di memori: benar hasilnya,
+    // tetapi ia tumbuh seiring seluruh ujian yang pernah ada di portal, bukan
+    // seiring ujian yang sedang dibuka.
+    const idPeserta = peserta.map((p) => p.id);
+    const jawabanUjian = idPeserta.length
+      ? await db
+          .select({
+            attemptId: cbtAnswers.attemptId,
+            questionId: cbtAnswers.questionId,
+            answer: cbtAnswers.answer,
+            isCorrect: cbtAnswers.isCorrect,
+          })
+          .from(cbtAnswers)
+          .where(inArray(cbtAnswers.attemptId, idPeserta))
+      : [];
 
     const terisi = new Map<number, number>();
     for (const j of jawabanUjian) {
@@ -175,13 +207,13 @@ export async function PATCH(request: Request) {
     const body = (await request.json()) as {
       ujian?: unknown; attempt?: unknown; soal?: unknown; poin?: unknown; catatan?: unknown;
     };
-    const examId = Number(body.ujian);
-    const attemptId = Number(body.attempt);
-    const questionId = Number(body.soal);
-    if (!Number.isInteger(examId) || !Number.isInteger(attemptId) || !Number.isInteger(questionId)) {
+    const examId = angkaParam(String(body.ujian ?? ""));
+    const attemptId = angkaParam(String(body.attempt ?? ""));
+    const questionId = angkaParam(String(body.soal ?? ""));
+    if (examId === null || attemptId === null || questionId === null) {
       return Response.json({ success: false, message: "Data koreksi tidak lengkap." }, { status: 400 });
     }
-    const cek = await gerbang(examId);
+    const cek = await gerbang(examId, "ubah");
     if ("gagal" in cek) return cek.gagal;
 
     const bank = await soalUjian(examId);

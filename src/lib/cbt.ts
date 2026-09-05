@@ -16,6 +16,23 @@
 //      Yang dikirim ke mahasiswa hanya pertanyaan dan pilihannya.
 // ============================================================
 
+/**
+ * Baca satu parameter alamat sebagai bilangan bulat, atau null.
+ *
+ * Number(null) bernilai 0, dan Number.isInteger(0) bernilai true. Karena itu
+ * `Number.isInteger(Number(params.get("x")))` LOLOS untuk parameter yang tidak
+ * dikirim sama sekali — dan itu pernah membuat daftar peserta monitoring tidak
+ * pernah tampil: ketiadaan parameter "attempt" terbaca sebagai attempt nomor
+ * nol, cabang rincian satu mahasiswa diambil, dan jawabannya selalu 404.
+ *
+ * Satu fungsi supaya kesalahan yang sama tidak lahir lagi di route berikutnya.
+ */
+export function angkaParam(nilai: string | null | undefined): number | null {
+  if (nilai === null || nilai === undefined || String(nilai).trim() === "") return null;
+  const angka = Number(nilai);
+  return Number.isInteger(angka) && angka > 0 ? angka : null;
+}
+
 export type JenisSoal = "pg" | "benar_salah" | "isian" | "essay";
 
 export const JENIS_LABEL: Record<JenisSoal, string> = {
@@ -313,6 +330,96 @@ export function rapikanToken(masukan: unknown) {
   return String(masukan ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12);
 }
 
+/**
+ * Nama yang sudah diseragamkan, untuk membandingkan dua pendaftaran.
+ *
+ * "Budi  Santoso", "budi santoso", dan "BUDI SANTOSO." adalah satu orang.
+ * Gelar dan tanda baca dibuang; yang tersisa hanya huruf dan satu spasi
+ * pemisah. Ini BUKAN pengenal yang aman dipakai sendirian — dua mahasiswa
+ * boleh saja benar-benar bernama sama — melainkan penanda yang membuat
+ * pendaftaran kedua dengan NIM berbeda tertahan untuk diperiksa manusia.
+ */
+export function kunciNama(masukan: unknown) {
+  return String(masukan ?? "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^a-z\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+}
+
+/**
+ * Penanda perangkat dari peramban mahasiswa.
+ *
+ * Dibersihkan keras, karena nilainya datang dari luar dan langsung masuk ke
+ * basis data: hanya huruf, angka, dan tanda hubung, paling panjang 64.
+ */
+export function rapikanPerangkat(masukan: unknown) {
+  return String(masukan ?? "")
+    .replace(/[^A-Za-z0-9-]/g, "")
+    .slice(0, 64);
+}
+
+export type RiwayatMasuk = {
+  nim: string;
+  nameKey: string;
+  deviceId: string;
+  status: string;
+};
+
+export type HasilGanda = { ok: true } | { ok: false; pesan: string };
+
+/**
+ * Satu orang, satu kali — diperiksa dari tiga sisi.
+ *
+ * NIM saja tidak cukup. Yang benar-benar terjadi di ruang ujian adalah dua hal
+ * lain: satu orang mendaftar ulang dengan NIM yang digeser satu angka, dan satu
+ * ponsel dipakai bergantian oleh dua orang yang duduk bersebelahan. Karena itu
+ * nama dan perangkat ikut diperiksa.
+ *
+ * Yang TIDAK diperiksa di sini adalah baris milik NIM yang sama — orang yang
+ * kembali ke ujiannya sendiri sesudah ponselnya mati bukan peserta kedua, dan
+ * jalur itu ditangani pemanggilnya sebelum fungsi ini dipakai.
+ *
+ * Perangkat hanya diperiksa bila ujiannya memintanya. Di laboratorium, satu
+ * komputer memang dipakai bergantian sepanjang hari, dan aturan yang benar di
+ * satu ruangan menjadi salah di ruangan sebelah.
+ */
+export function periksaGanda(
+  calon: { nim: string; nameKey: string; deviceId: string },
+  riwayat: RiwayatMasuk[],
+  aturan: { satuPerangkat: boolean } = { satuPerangkat: true },
+): HasilGanda {
+  const lain = riwayat.filter((r) => r.nim !== calon.nim);
+
+  if (calon.nameKey) {
+    const kembar = lain.find((r) => r.nameKey && r.nameKey === calon.nameKey);
+    if (kembar) {
+      return {
+        ok: false,
+        pesan:
+          `Nama ini sudah terdaftar pada ujian tersebut dengan NIM ${kembar.nim}. ` +
+          "Bila NIM Anda salah ketik, hubungi pengawas.",
+      };
+    }
+  }
+
+  if (aturan.satuPerangkat && calon.deviceId) {
+    const sama = lain.find((r) => r.deviceId && r.deviceId === calon.deviceId);
+    if (sama) {
+      return {
+        ok: false,
+        pesan:
+          "Perangkat ini sudah dipakai peserta lain untuk ujian tersebut. " +
+          "Gunakan perangkat Anda sendiri, atau minta pengawas membukakannya.",
+      };
+    }
+  }
+
+  return { ok: true };
+}
+
 export type HasilMasuk = { ok: true; nim: string; nama: string } | { ok: false; pesan: string };
 
 /**
@@ -429,4 +536,88 @@ export function statistikNilai(nilai: number[], passing: number): Statistik {
     tidakLulus: nilai.length - lulus,
     persenLulus: Math.round((lulus / nilai.length) * 100),
   };
+}
+
+// ---------- WEWENANG: SIAPA MEMEGANG APA ----------
+
+/**
+ * Sekeping profil, secukupnya untuk memutuskan wewenang.
+ *
+ * Sengaja BUKAN SessionProfile dari supabase-server: mengimpor jenis dari sana
+ * menarik seluruh modul sesi ke dalam berkas yang seharusnya bebas basis data,
+ * dan dengan itu hilang pula kemungkinan mengujinya. Bentuknya cocok secara
+ * struktural, jadi SessionProfile tetap dapat diberikan apa adanya.
+ */
+export type Pemakai = {
+  id: string;
+  fullName: string;
+  role: string;
+  lecturerId: number | null;
+};
+
+/** Role yang boleh memakai CBT sama sekali. Admin bagian sengaja di luar. */
+export const CBT_ROLES = ["super_admin", "admin", "dosen"];
+/** Role yang boleh MEMANTAU seluruh ujian, termasuk milik orang lain. */
+export const PEMANTAU = ["super_admin", "admin"];
+
+export function bolehCbt(profile: Pemakai | null) {
+  return Boolean(profile && CBT_ROLES.includes(profile.role));
+}
+
+export type Kepemilikan = {
+  lecturerId: number | null;
+  createdBy: string;
+  createdById: string | null;
+};
+
+/**
+ * Ujian ini miliknya sendiri?
+ *
+ * Kepemilikan ditentukan id profil pembuatnya. Semula ia dilihat dari
+ * lecturerId saja, dan itu mengunci dosen yang akun profilnya belum
+ * tersambung ke baris dosen: ia membuat ujian, lalu tidak pernah dapat
+ * membukanya lagi karena lecturerId-nya null di kedua sisi.
+ *
+ * Nama pembuat dipakai sebagai cadangan HANYA untuk baris lama yang lahir
+ * sebelum kolom created_by_id ada. Tanpa itu, semua ujian yang sudah terlanjur
+ * tersimpan menjadi ujian tanpa pemilik yang tidak dapat diaktifkan siapa pun.
+ */
+export function pemilik(profile: Pemakai, ujian: Kepemilikan) {
+  if (ujian.createdById) return ujian.createdById === profile.id;
+
+  // Mulai di sini semuanya soal baris lama. Baris dosen dipakai HANYA bila
+  // kedua sisi memilikinya; ujian lama yang lecturerId-nya kosong — dibuat
+  // ketika akun dosennya belum tersambung — jatuh ke pencocokan nama, supaya
+  // penyambungan yang datang belakangan tidak merampas ujiannya sendiri.
+  if (profile.role === "dosen" && profile.lecturerId !== null && ujian.lecturerId !== null) {
+    return ujian.lecturerId === profile.lecturerId;
+  }
+  return ujian.createdBy === profile.fullName;
+}
+
+/**
+ * Boleh MELIHAT ujian ini — daftar peserta, nilai, isi soal.
+ *
+ * Admin dan Super Admin memantau semuanya. Itu memang tugas mereka, dan
+ * memantau tidak mengubah apa pun.
+ */
+export function bolehPantau(profile: Pemakai, ujian: Kepemilikan) {
+  return PEMANTAU.includes(profile.role) || pemilik(profile, ujian);
+}
+
+/**
+ * Boleh MENGUBAH ujian ini — soal, jadwal, aktivasi.
+ *
+ * Hanya pemiliknya. Permintaan pemilik portal tegas: "admin dan super admin
+ * tidak berhak mengaktifkan dan non aktifkan, hanya dosen saja". Admin yang
+ * ingin mengadakan ujian seleksi membuatnya sendiri — dan ujian itu miliknya,
+ * jadi jalur ini tetap terbuka baginya tanpa menyentuh kelas dosen lain.
+ */
+export function bolehUbah(profile: Pemakai, ujian: Kepemilikan) {
+  return pemilik(profile, ujian);
+}
+
+/** Boleh MENGHAPUS ujian. Pemiliknya, dan admin — itu bagian tugas mereka. */
+export function bolehHapus(profile: Pemakai, ujian: Kepemilikan) {
+  return PEMANTAU.includes(profile.role) || pemilik(profile, ujian);
 }

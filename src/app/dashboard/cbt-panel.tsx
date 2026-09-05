@@ -3,12 +3,15 @@
 // ============================================================
 // PANEL CBT DI DASHBOARD — untuk Dosen, Admin, dan Super Admin
 //
-// Pembagian wewenangnya kelihatan dari layarnya, bukan hanya dijaga server:
+// Pembagian wewenangnya kelihatan dari layarnya, bukan hanya dijaga server.
+// Yang menentukan bukan PERAN melainkan KEPEMILIKAN:
 //
-//   Dosen  membuat ujian, menyusun soal, menentukan JUMLAH SOAL dan DURASI,
-//          memantau, dan mengoreksi. Ia TIDAK melihat tombol aktivasi.
-//   Admin  dan Super Admin memegang tombol itu: menyetel jam mulai dan jam
-//          selesai, lalu ujiannya terbuka sendiri pada jam tersebut.
+//   Pemilik ujian  — dosen yang membuatnya — menyusun soal, menyetel jadwal,
+//                    mengaktifkan dan menonaktifkan, serta mengoreksi essay.
+//   Admin dan Super Admin memantau seluruh ujian dan boleh menghapusnya, tetapi
+//                    TIDAK memegang tombol aktivasi ujian milik dosen lain.
+//                    Untuk ujian seleksi mereka membuatnya sendiri — dan ujian
+//                    itu milik mereka, jadi tombolnya terbuka di sana.
 //
 // Admin bagian — umum, akademik, prodi, PDDIKTI, perpustakaan, laboratorium —
 // tidak melihat menu ini sama sekali.
@@ -17,7 +20,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { JENIS_LABEL, STATUS_LABEL, type JenisSoal, type StatusUjian } from "@/lib/cbt";
 import { imporDariExcel, imporDariWord, type SoalImpor, type Aoa } from "@/lib/impor-soal";
-import { CONTOH_EXCEL, KOLOM_EXCEL, PETUNJUK_EXCEL, buatDocxTemplate } from "@/lib/template-soal";
+import { buatDocxTemplate, buatXlsxTemplate } from "@/lib/template-soal";
 
 type Ujian = {
   id: number; code: string; title: string; courseName: string; className: string | null;
@@ -26,8 +29,19 @@ type Ujian = {
   token: string | null; startAt: string | null; endAt: string | null;
   activatedAt: string | null; activatedBy: string | null;
   description: string | null; instruction: string | null; createdBy: string;
+  singleDevice: boolean;
   status: StatusUjian; jumlahBank: number;
   peserta: { total: number; berjalan: number; selesai: number };
+  /** Izin yang dihitung server untuk pemanggil ini, per ujian. */
+  milik: boolean; bolehUbah: boolean; bolehHapus: boolean;
+};
+
+/** Satu jawaban peserta, dibuka dosen untuk dibaca dan dikoreksi. */
+type Rincian = {
+  nomor: number; id: number; jenis: JenisSoal; pertanyaan: string;
+  pilihan: string[]; bobot: number; kunci: string; pembahasan: string | null;
+  jawaban: string; jawabanTeks: string;
+  benar: boolean | null; poin: number; catatan: string;
 };
 
 type Soal = {
@@ -78,7 +92,10 @@ function jamRapi(iso: string | null) {
 }
 
 export default function CbtPanel({ role }: { role: string }) {
-  const bolehAktivasi = role === "super_admin" || role === "admin";
+  // Peran hanya menentukan SEBUTAN di layar dan siapa yang melihat seluruh
+  // daftar. Izin sesungguhnya datang per ujian dari server — lihat pemilik()
+  // di src/app/api/cbt/ujian/route.ts.
+  const pemantau = role === "super_admin" || role === "admin";
 
   const [ujian, setUjian] = useState<Ujian[]>([]);
   const [muat, setMuat] = useState(true);
@@ -93,6 +110,7 @@ export default function CbtPanel({ role }: { role: string }) {
     questionCount: 20, durationMinutes: 60, passingGrade: 60, maxAttempts: 1,
     token: "", instruction: "",
     randomQuestions: true, randomOptions: true, allowBack: true, showScore: true,
+    singleDevice: true,
   });
 
   const [soal, setSoal] = useState<Soal[]>([]);
@@ -102,6 +120,12 @@ export default function CbtPanel({ role }: { role: string }) {
   const [peserta, setPeserta] = useState<Peserta[]>([]);
   const [statistik, setStatistik] = useState<Statistik | null>(null);
   const [analisis, setAnalisis] = useState<Analisis[]>([]);
+
+  // Koreksi essay: satu peserta yang sedang dibuka, beserta rincian jawabannya.
+  const [bukaPeserta, setBukaPeserta] = useState<Peserta | null>(null);
+  const [rincian, setRincian] = useState<Rincian[]>([]);
+  const [draftKoreksi, setDraftKoreksi] = useState<Record<number, { poin: string; catatan: string }>>({});
+  const [muatRincian, setMuatRincian] = useState(false);
 
   // Impor massal: hasil bacaan berkas ditahan dulu untuk dilihat dosen
   // sebelum benar-benar masuk. Empat puluh soal yang langsung tersimpan tanpa
@@ -172,6 +196,8 @@ export default function CbtPanel({ role }: { role: string }) {
     setBuka(u.id);
     setTab("soal");
     setSunting(null);
+    setBukaPeserta(null);
+    setRincian([]);
     setSoalBaru({ ...SOAL_KOSONG });
     setJadwal({ mulai: untukInput(u.startAt), selesai: untukInput(u.endAt) });
     void muatSoal(u.id);
@@ -212,27 +238,91 @@ export default function CbtPanel({ role }: { role: string }) {
     await muatUjian();
   }
 
+  /**
+   * Periksa soal di peramban, sebelum apa pun dikirim.
+   *
+   * Aturannya sengaja SAMA dengan rapikanSoal di server. Yang di server tetap
+   * berlaku dan tetap menjadi penentu; yang di sini hanya menjaga agar soal
+   * yang sudah pasti ditolak tidak sempat muncul di daftar sebagai soal yang
+   * seolah-olah tersimpan.
+   */
+  function periksaSoal(isi: typeof SOAL_KOSONG): string {
+    if (isi.pertanyaan.trim().length < 3) return "Pertanyaan belum diisi.";
+    if (isi.jenis === "pg" || isi.jenis === "benar_salah") {
+      const terisi = isi.pilihan.filter((p) => p.trim().length > 0);
+      if (terisi.length < 2) return "Pilihan jawaban minimal dua.";
+      const nomor = Number(isi.kunci);
+      if (!Number.isInteger(nomor) || nomor < 0 || nomor >= terisi.length) {
+        return "Kunci jawaban belum dipilih.";
+      }
+    }
+    if (isi.jenis === "isian" && !isi.kunci.trim()) return "Kunci jawaban isian singkat belum diisi.";
+    return "";
+  }
+
+  /**
+   * Simpan satu soal.
+   *
+   * MENAMBAH soal berjalan optimistis: soalnya muncul di daftar seketika,
+   * formulirnya langsung kosong, dan pengirimannya berjalan di belakang.
+   * Sebelumnya tombol ini menunggu tiga perjalanan ke server berturut-turut —
+   * simpan, muat ulang bank soal, muat ulang daftar ujian — dan dosen yang
+   * mengetik dua puluh soal menunggu dua puluh kali.
+   *
+   * Bila kiriman itu ternyata gagal, soalnya ditarik kembali dari daftar DAN
+   * isinya dikembalikan ke formulir. Kegagalan diam-diam yang menelan soal
+   * yang sudah diketik jauh lebih buruk daripada menunggu.
+   */
   async function simpanSoal() {
     if (!terbuka) return;
     const target = sunting;
-    const isi = target
-      ? { id: target, ...soalBaru }
-      : { ujian: terbuka.id, soal: [soalBaru] };
-    const hasil = await kirim(
-      "/api/cbt/soal",
-      target ? "PATCH" : "POST",
-      isi,
-      target ? "Soal diperbarui." : "Soal ditambahkan.",
-    );
-    if (!hasil) return;
+    const isi = { ...soalBaru, pilihan: [...soalBaru.pilihan] };
+
+    const keluhan = periksaSoal(isi);
+    if (keluhan) { setGalat(keluhan); return; }
+
+    if (target) {
+      const hasil = await kirim("/api/cbt/soal", "PATCH", { id: target, ...isi }, "Soal diperbarui.");
+      if (!hasil) return;
+      setSoalBaru({ ...SOAL_KOSONG });
+      setSunting(null);
+      await muatSoal(terbuka.id);
+      return;
+    }
+
+    // Id sementara bernilai negatif, supaya tidak mungkin bertabrakan dengan
+    // id sungguhan dari basis data dan tombol Ubah/Hapus dapat menolaknya.
+    const idSementara = -Date.now();
+    setSoal((kini) => [...kini, { id: idSementara, ...isi }]);
     setSoalBaru({ ...SOAL_KOSONG });
-    setSunting(null);
-    await muatSoal(terbuka.id);
-    await muatUjian();
+    setGalat("");
+    setPesan("Soal ditambahkan.");
+
+    try {
+      const jawab = await fetch("/api/cbt/soal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ujian: terbuka.id, soal: [isi] }),
+      });
+      const data = await jawab.json();
+      if (!jawab.ok || !data.success) throw new Error(data.message || "Soal belum tersimpan.");
+      const asli = (data.soal as Soal[] | undefined)?.[0];
+      setSoal((kini) =>
+        asli ? kini.map((x) => (x.id === idSementara ? asli : x)) : kini.filter((x) => x.id !== idSementara),
+      );
+      if (!asli) await muatSoal(terbuka.id);
+    } catch (alasan: unknown) {
+      setSoal((kini) => kini.filter((x) => x.id !== idSementara));
+      setSoalBaru(isi);
+      setPesan("");
+      setGalat(alasan instanceof Error ? alasan.message : "Soal belum tersimpan.");
+    }
   }
 
   async function hapusSoal(id: number) {
     if (!terbuka || !window.confirm("Hapus soal ini?")) return;
+    // Soal yang masih dalam perjalanan ke server belum punya id sungguhan.
+    if (id < 0) { setGalat("Soal ini masih dalam proses penyimpanan. Tunggu sebentar."); return; }
     setSibuk(true);
     try {
       const jawab = await fetch(`/api/cbt/soal?id=${id}`, { method: "DELETE" });
@@ -279,17 +369,88 @@ export default function CbtPanel({ role }: { role: string }) {
     if (hasil) await muatUjian();
   }
 
-  async function koreksi(attemptId: number, questionId: number, poin: number, catatan: string) {
+  async function hapusUjian() {
     if (!terbuka) return;
+    const setuju = window.confirm(
+      `Hapus ujian "${terbuka.title}" beserta seluruh soal dan hasilnya?\n\n` +
+        "Tindakan ini tidak dapat dibatalkan.",
+    );
+    if (!setuju) return;
+    setSibuk(true);
+    try {
+      const jawab = await fetch(`/api/cbt/ujian?id=${terbuka.id}`, { method: "DELETE" });
+      const data = await jawab.json();
+      if (!jawab.ok || !data.success) throw new Error(data.message || "Ujian belum dapat dihapus.");
+      setBuka(null);
+      setPesan("Ujian dihapus.");
+      await muatUjian();
+    } catch (alasan: unknown) {
+      setGalat(alasan instanceof Error ? alasan.message : "Ujian belum dapat dihapus.");
+    } finally {
+      setSibuk(false);
+    }
+  }
+
+  // ---------- KOREKSI ESSAY ----------
+
+  /**
+   * Buka lembar jawaban satu peserta.
+   *
+   * Jalur inilah yang membuat soal essay dapat dinilai sama sekali. Rutenya
+   * sudah ada sejak awal, tetapi tidak pernah ada layar yang memanggilnya —
+   * artinya essay yang dikerjakan mahasiswa menggantung sebagai "menunggu
+   * koreksi" selamanya, dan nilainya tidak pernah lengkap.
+   */
+  async function bukaLembar(p: Peserta) {
+    if (!terbuka) return;
+    setBukaPeserta(p);
+    setRincian([]);
+    setDraftKoreksi({});
+    setMuatRincian(true);
+    try {
+      const jawab = await fetch(`/api/cbt/hasil?ujian=${terbuka.id}&attempt=${p.id}`, { cache: "no-store" });
+      const data = await jawab.json();
+      if (!jawab.ok || !data.success) throw new Error(data.message || "Lembar jawaban tidak terbaca.");
+      const isi = (data.rincian || []) as Rincian[];
+      setRincian(isi);
+      // Kotak nilainya diisi lebih dulu dengan poin yang sudah ada, supaya
+      // dosen yang hanya membetulkan satu angka tidak perlu mengetik ulang
+      // seluruhnya.
+      setDraftKoreksi(
+        Object.fromEntries(
+          isi.filter((r) => r.jenis === "essay").map((r) => [r.id, { poin: String(r.poin ?? 0), catatan: r.catatan || "" }]),
+        ),
+      );
+    } catch (alasan: unknown) {
+      setGalat(alasan instanceof Error ? alasan.message : "Lembar jawaban tidak terbaca.");
+      setBukaPeserta(null);
+    } finally {
+      setMuatRincian(false);
+    }
+  }
+
+  async function koreksi(questionId: number, bobot: number) {
+    if (!terbuka || !bukaPeserta) return;
+    const draf = draftKoreksi[questionId];
+    const poin = Number(draf?.poin);
+    if (!Number.isFinite(poin) || poin < 0 || poin > bobot) {
+      setGalat(`Nilai untuk soal ini harus antara 0 dan ${bobot}.`);
+      return;
+    }
     const hasil = await kirim(
       "/api/cbt/hasil",
       "PATCH",
-      { ujian: terbuka.id, attempt: attemptId, soal: questionId, poin, catatan },
+      { ujian: terbuka.id, attempt: bukaPeserta.id, soal: questionId, poin, catatan: draf?.catatan ?? "" },
       "Koreksi tersimpan.",
     );
-    if (hasil) await muatHasil(terbuka.id);
+    if (!hasil) return;
+    // Ditandai selesai di layar tanpa memuat ulang seluruh lembar, lalu daftar
+    // pesertanya disegarkan supaya nilai barunya ikut terbaca.
+    setRincian((kini) =>
+      kini.map((r) => (r.id === questionId ? { ...r, benar: poin > 0, poin, catatan: draf?.catatan ?? "" } : r)),
+    );
+    await muatHasil(terbuka.id);
   }
-  void koreksi;
 
   // ---------- TEMPLATE & IMPOR MASSAL ----------
 
@@ -302,21 +463,17 @@ export default function CbtPanel({ role }: { role: string }) {
     URL.revokeObjectURL(alamat);
   }
 
-  async function unduhTemplateExcel() {
-    const XLSX = await import("xlsx");
-    const wb = XLSX.utils.book_new();
-    const soal = XLSX.utils.aoa_to_sheet([KOLOM_EXCEL, ...CONTOH_EXCEL]);
-    soal["!cols"] = [
-      { wch: 4 }, { wch: 13 }, { wch: 52 },
-      { wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 22 },
-      { wch: 26 }, { wch: 7 }, { wch: 20 }, { wch: 10 }, { wch: 40 },
-    ];
-    XLSX.utils.book_append_sheet(wb, soal, "Soal");
-    const petunjuk = XLSX.utils.aoa_to_sheet(PETUNJUK_EXCEL);
-    petunjuk["!cols"] = [{ wch: 100 }];
-    XLSX.utils.book_append_sheet(wb, petunjuk, "Petunjuk");
-    XLSX.writeFile(wb, "Template-Soal-SiPaling.xlsx");
-    setPesan("Template Excel terunduh. Isi sheet \"Soal\", lalu unggah kembali di sini.");
+  /**
+   * Dua template, dan hanya dua: .xlsx dan .docx.
+   *
+   * Keduanya dirakit sendiri di src/lib — bukan lewat SheetJS — karena edisi
+   * komunitasnya tidak dapat menulis gaya sel, dan template tanpa warna, tanpa
+   * baris kepala yang dibekukan, dan tanpa contoh yang dapat dibedakan adalah
+   * template yang salah diisi.
+   */
+  function unduhTemplateExcel() {
+    unduh(buatXlsxTemplate(), "Template-Soal-SiPaling.xlsx");
+    setPesan("Template Excel terunduh. Isi lembar \"Soal\", lalu unggah kembali di sini.");
   }
 
   function unduhTemplateWord() {
@@ -446,7 +603,7 @@ export default function CbtPanel({ role }: { role: string }) {
   if (buka === null) {
     return (
       <section>
-        <p className="section-eyebrow">{bolehAktivasi ? "DOSEN & ADMIN" : "DOSEN"}</p>
+        <p className="section-eyebrow">{pemantau ? "DOSEN & ADMIN" : "DOSEN"}</p>
         <h2 className="dsh-title">Ujian Online (CBT)</h2>
 
         {pesan && <div className="dsh-ok">{pesan}</div>}
@@ -457,9 +614,10 @@ export default function CbtPanel({ role }: { role: string }) {
             <b>Mahasiswa tidak perlu akun</b>
             <span>
               Mereka cukup membuka <code>/ujian</code>, memasukkan kode ujian, nama, dan NIM.
-              {bolehAktivasi
-                ? " Ujian baru terbuka setelah Anda aktifkan dan jam mulainya tiba."
-                : " Ujian baru terbuka setelah diaktifkan Super Admin atau Admin."}
+              {" Ujian baru terbuka setelah dosen pemiliknya mengaktifkan dan jam mulainya tiba."}
+              {pemantau
+                ? " Anda memantau seluruh ujian dan dapat menghapusnya, tetapi aktivasi ujian milik dosen lain bukan di tangan Anda — buat ujian sendiri bila perlu mengadakan seleksi."
+                : ""}
             </span>
           </div>
           <button type="button" className="btn btn-primary" onClick={() => setBuatBaru((b) => !b)}>
@@ -508,6 +666,7 @@ export default function CbtPanel({ role }: { role: string }) {
                 ["randomOptions", "Acak urutan pilihan"],
                 ["allowBack", "Boleh kembali ke soal sebelumnya"],
                 ["showScore", "Tampilkan nilai setelah selesai"],
+                ["singleDevice", "Satu perangkat hanya untuk satu peserta"],
               ] as const).map(([kunci, label]) => (
                 <label key={kunci} className="cbt-cek">
                   <input type="checkbox" checked={draf[kunci]} onChange={(e) => setDraf({ ...draf, [kunci]: e.target.checked })} />
@@ -534,6 +693,7 @@ export default function CbtPanel({ role }: { role: string }) {
                   <span className={`pill cbt-${u.status}`}>{STATUS_LABEL[u.status]}</span>
                   <code>{u.code}</code>
                 </div>
+                {!u.milik && <span className="cbt-punya-lain">Milik {u.createdBy} · Anda memantau</span>}
                 <b>{u.title}</b>
                 <span className="cbt-mk">{u.courseName}{u.className ? ` · ${u.className}` : ""}</span>
                 <div className="cbt-angka">
@@ -554,7 +714,10 @@ export default function CbtPanel({ role }: { role: string }) {
   if (!terbuka) return <div className="dempty">Ujian tidak ditemukan.</div>;
 
   // ---------- SATU UJIAN ----------
-  const terkunci = terbuka.status === "berlangsung";
+  // Dua sebab soal tidak boleh diubah, dan keduanya menutup tombol yang sama:
+  // ujiannya sedang berlangsung, atau ini bukan ujian Anda.
+  const sedangBerlangsung = terbuka.status === "berlangsung";
+  const terkunci = sedangBerlangsung || !terbuka.bolehUbah;
 
   return (
     <section>
@@ -626,15 +789,15 @@ export default function CbtPanel({ role }: { role: string }) {
             <span>
               {terbuka.activatedAt
                 ? `Dibuka sendiri ${jamRapi(terbuka.startAt)} sampai ${jamRapi(terbuka.endAt)}. Diaktifkan oleh ${terbuka.activatedBy ?? "—"}.`
-                : bolehAktivasi
+                : terbuka.bolehUbah
                   ? "Setel jam mulai dan jam selesai, lalu aktifkan. Pada jam mulainya ujian terbuka sendiri — tidak ada tombol yang perlu ditekan lagi."
-                  : "Menunggu Super Admin atau Admin mengaktifkan. Anda tetap dapat menyusun soalnya sekarang."}
+                  : `Ujian ini milik ${terbuka.createdBy}. Hanya dosen pemiliknya yang dapat menjadwalkan dan mengaktifkannya.`}
             </span>
           </div>
           <span className={`pill cbt-${terbuka.status}`}>{STATUS_LABEL[terbuka.status]}</span>
         </div>
 
-        {bolehAktivasi ? (
+        {terbuka.bolehUbah ? (
           <div className="cbt-baris cbt-jadwal-form">
             <label><span>Jam mulai</span>
               <input type="datetime-local" value={jadwal.mulai} onChange={(e) => setJadwal({ ...jadwal, mulai: e.target.value })} />
@@ -655,9 +818,20 @@ export default function CbtPanel({ role }: { role: string }) {
           </div>
         ) : (
           <p className="cbt-catatan">
-            Aktivasi ujian dipegang Super Admin dan Admin — bukan admin bagian. Kirimkan nama ujian
-            dan jam pelaksanaannya kepada mereka.
+            Jadwal dan aktivasi ujian ini dipegang dosen pemiliknya. Anda dapat memantau peserta dan
+            nilainya di tab sebelah{terbuka.bolehHapus ? ", dan menghapus ujian ini bila memang perlu" : ""}.
+            Untuk ujian seleksi, buatlah ujian sendiri — ujian yang Anda buat menjadi milik Anda,
+            beserta tombol aktivasinya.
           </p>
+        )}
+
+        {terbuka.bolehHapus && (
+          <div className="cbt-hapus-ujian">
+            <button type="button" className="btn btn-danger btn-mini" disabled={sibuk} onClick={() => void hapusUjian()}>
+              Hapus ujian ini
+            </button>
+            <span>Soal dan seluruh hasilnya ikut terhapus. Tidak dapat dibatalkan.</span>
+          </div>
         )}
       </div>
 
@@ -672,10 +846,16 @@ export default function CbtPanel({ role }: { role: string }) {
 
       {tab === "soal" ? (
         <>
-          {terkunci && (
+          {sedangBerlangsung && (
             <div className="dsh-error">
               Ujian sedang berlangsung. Soal dikunci sampai selesai — mengubahnya sekarang berarti
               sebagian mahasiswa mengerjakan ujian yang berbeda dari sebagian yang lain.
+            </div>
+          )}
+          {!terbuka.bolehUbah && !sedangBerlangsung && (
+            <div className="dsh-note">
+              Bank soal ini milik <b>{terbuka.createdBy}</b> dan hanya dapat dibaca dari sini.
+              Menyunting soal kelas dosen lain bukan wewenang yang ada pada peran Anda.
             </div>
           )}
 
@@ -690,7 +870,7 @@ export default function CbtPanel({ role }: { role: string }) {
             </div>
 
             <div className="cbt-impor-tombol">
-              <button type="button" className="btn btn-light" onClick={() => void unduhTemplateExcel()}>
+              <button type="button" className="btn btn-light" onClick={() => unduhTemplateExcel()}>
                 ⇩ Template Excel (.xlsx)
               </button>
               <button type="button" className="btn btn-light" onClick={() => unduhTemplateWord()}>
@@ -915,11 +1095,11 @@ export default function CbtPanel({ role }: { role: string }) {
               <div className="qtable-wrap">
                 <table className="qt">
                   <thead>
-                    <tr><th>Mahasiswa</th><th>Status</th><th>Progres</th><th>Nilai</th><th>Catatan</th></tr>
+                    <tr><th>Mahasiswa</th><th>Status</th><th>Progres</th><th>Nilai</th><th>Catatan</th><th /></tr>
                   </thead>
                   <tbody>
                     {peserta.map((p) => (
-                      <tr key={p.id}>
+                      <tr key={p.id} className={bukaPeserta?.id === p.id ? "cbt-baris-buka" : ""}>
                         <td><b>{p.nama}</b><small className="psn-nama">{p.nim}</small></td>
                         <td>
                           <span className={`pill cbt-p-${p.status}`}>
@@ -942,6 +1122,17 @@ export default function CbtPanel({ role }: { role: string }) {
                             <small className="psn-nama">—</small>
                           )}
                         </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="text-action"
+                            onClick={() => void bukaLembar(p)}
+                            disabled={p.status === "berjalan"}
+                            title={p.status === "berjalan" ? "Menunggu sampai dikumpulkan" : "Buka lembar jawabannya"}
+                          >
+                            {p.tertunda > 0 ? `Koreksi ${p.tertunda} essay` : "Lihat jawaban"}
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -949,6 +1140,101 @@ export default function CbtPanel({ role }: { role: string }) {
               </div>
             )}
           </div>
+
+          {/* ---------- LEMBAR JAWABAN & KOREKSI ESSAY ---------- */}
+          {bukaPeserta && (
+            <div className="panel psn-panel cbt-lembar">
+              <div className="psn-kepala">
+                <div>
+                  <b>{bukaPeserta.nama}</b>
+                  <span>
+                    {bukaPeserta.nim} · {bukaPeserta.nilai === null ? "belum dinilai" : `nilai ${bukaPeserta.nilai}`}
+                    {bukaPeserta.tertunda > 0 && ` · ${bukaPeserta.tertunda} essay menunggu koreksi`}
+                  </span>
+                </div>
+                <button type="button" className="btn btn-light btn-mini" onClick={() => { setBukaPeserta(null); setRincian([]); }}>
+                  Tutup
+                </button>
+              </div>
+
+              {muatRincian ? (
+                <div className="dempty">Memuat lembar jawaban…</div>
+              ) : rincian.length === 0 ? (
+                <div className="dempty">Lembar jawabannya kosong.</div>
+              ) : (
+                <ol className="cbt-lembar-daftar">
+                  {rincian.map((r) => {
+                    const belumDikoreksi = r.jenis === "essay" && r.benar === null;
+                    return (
+                      <li key={r.id} className={belumDikoreksi ? "cbt-perlu-koreksi" : ""}>
+                        <div className="cbt-lembar-kepala">
+                          <span className="cbt-lembar-nomor">Soal {r.nomor}</span>
+                          <span className={`pill cbt-p-${r.benar === null ? "waktu_habis" : r.benar ? "selesai" : "berjalan"}`}>
+                            {r.benar === null ? "Menunggu koreksi" : r.benar ? "Benar" : "Salah"}
+                          </span>
+                          <span className="cbt-lembar-poin">{r.poin} / {r.bobot} poin</span>
+                        </div>
+                        <p className="cbt-soal-tanya">{r.pertanyaan}</p>
+
+                        <div className="cbt-lembar-jawab">
+                          <small>Jawaban mahasiswa</small>
+                          <p>{r.jawabanTeks || <i>tidak dijawab</i>}</p>
+                        </div>
+
+                        {r.jenis !== "essay" && r.kunci !== "" && (
+                          <p className="cbt-soal-kunci">
+                            Kunci: {r.pilihan.length > 0 ? (r.pilihan[Number(r.kunci)] ?? r.kunci) : r.kunci}
+                          </p>
+                        )}
+
+                        {/* Kotak nilai hanya untuk essay, dan hanya bagi dosen
+                            pemiliknya — inilah satu-satunya jalan agar essay
+                            yang dikerjakan mahasiswa berhenti menggantung
+                            sebagai "menunggu koreksi". */}
+                        {r.jenis === "essay" && terbuka.bolehUbah && (
+                          <div className="cbt-koreksi">
+                            <label>
+                              <span>Nilai (0–{r.bobot})</span>
+                              <input
+                                type="number"
+                                min={0}
+                                max={r.bobot}
+                                value={draftKoreksi[r.id]?.poin ?? "0"}
+                                onChange={(e) =>
+                                  setDraftKoreksi((kini) => ({
+                                    ...kini,
+                                    [r.id]: { poin: e.target.value, catatan: kini[r.id]?.catatan ?? "" },
+                                  }))
+                                }
+                              />
+                            </label>
+                            <label className="cbt-koreksi-catatan">
+                              <span>Catatan untuk mahasiswa</span>
+                              <input
+                                value={draftKoreksi[r.id]?.catatan ?? ""}
+                                onChange={(e) =>
+                                  setDraftKoreksi((kini) => ({
+                                    ...kini,
+                                    [r.id]: { poin: kini[r.id]?.poin ?? "0", catatan: e.target.value },
+                                  }))
+                                }
+                                placeholder="Boleh dikosongkan"
+                              />
+                            </label>
+                            <button type="button" className="btn btn-primary btn-mini" disabled={sibuk} onClick={() => void koreksi(r.id, r.bobot)}>
+                              {sibuk ? "Menyimpan…" : "Simpan nilai"}
+                            </button>
+                          </div>
+                        )}
+
+                        {r.catatan && <p className="cbt-lembar-catatan">Catatan dosen: {r.catatan}</p>}
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
+            </div>
+          )}
 
           {analisis.some((a) => a.dijawab > 0) && (
             <div className="panel psn-panel">

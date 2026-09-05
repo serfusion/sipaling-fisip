@@ -6,34 +6,28 @@
 // PATCH  ubah ujian yang belum diaktifkan
 // DELETE hapus ujian beserta soal dan hasilnya
 //
-// Yang boleh MENGAKTIFKAN ada di /api/cbt/aktivasi, bukan di sini. Pemisahan
-// itu disengaja: dosen memegang isi ujiannya, admin memegang kapan ia terbuka.
+// Yang boleh MENGAKTIFKAN ada di /api/cbt/aktivasi, bukan di sini — dan yang
+// boleh melakukannya hanyalah PEMILIK ujiannya. Dosen yang menyusun soalnyalah
+// yang tahu kapan kelasnya siap; admin memantau, menghapus, dan boleh membuat
+// ujian sendiri (mis. seleksi) yang kemudian juga miliknya.
 // ============================================================
 import { db } from "@/db";
 import { cbtAttempts, cbtExams, cbtQuestions } from "@/db/schema";
-import { and, desc, eq, sql } from "drizzle-orm";
-import { getCurrentProfile, type SessionProfile } from "@/lib/supabase-server";
+import { and, desc, eq, or, sql } from "drizzle-orm";
+import { getCurrentProfile } from "@/lib/supabase-server";
 import { explainServerError } from "@/lib/api-errors";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
-import { kodeUjianBaru, statusUjian } from "@/lib/cbt";
+import {
+  angkaParam, bolehCbt, bolehHapus, bolehUbah, kodeUjianBaru, pemilik, PEMANTAU, statusUjian,
+} from "@/lib/cbt";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Role yang boleh memakai CBT sama sekali. Admin bagian sengaja di luar. */
-export const CBT_ROLES = ["super_admin", "admin", "dosen"];
-/** Role yang boleh MENGAKTIFKAN ujian. Lebih sempit lagi. */
-export const AKTIVATOR = ["super_admin", "admin"];
-
-export function bolehCbt(profile: SessionProfile | null) {
-  return Boolean(profile && CBT_ROLES.includes(profile.role));
-}
-
-/** Ujian ini miliknya? Admin memegang semuanya; dosen hanya miliknya sendiri. */
-export function miliknya(profile: SessionProfile, ujian: { lecturerId: number | null; createdBy: string }) {
-  if (profile.role !== "dosen") return true;
-  return profile.lecturerId !== null && ujian.lecturerId === profile.lecturerId;
-}
+// Aturan kepemilikan tinggal di src/lib/cbt.ts — bebas basis data, sehingga
+// dapat diuji tanpa menyalakan Postgres, dan diambil langsung dari sana oleh
+// rute CBT yang lain. Berkas rute sengaja tidak mengekspor apa pun selain
+// penangan dan pengaturannya.
 
 const teks = (nilai: unknown, batas: number) =>
   typeof nilai === "string" ? nilai.replace(/\s+/g, " ").trim().slice(0, batas) : "";
@@ -44,12 +38,6 @@ const angka = (nilai: unknown, bawaan: number, min: number, maks: number) => {
   return Math.max(min, Math.min(Math.round(n), maks));
 };
 
-const waktu = (nilai: unknown): Date | null => {
-  if (typeof nilai !== "string" || !nilai.trim()) return null;
-  const d = new Date(nilai);
-  return Number.isNaN(d.getTime()) ? null : d;
-};
-
 export async function GET() {
   try {
     const profile = await getCurrentProfile();
@@ -58,12 +46,16 @@ export async function GET() {
     }
 
     // Dosen hanya melihat ujiannya sendiri. Admin melihat semuanya, karena
-    // merekalah yang harus mengaktifkannya.
+    // merekalah yang memantau.
+    //
+    // Dua sisi diperiksa, bukan satu. Dosen yang profilnya belum tersambung ke
+    // baris dosen tetap harus menemukan ujian yang ia buat sendiri; sebaliknya
+    // ujian lama yang hanya membawa lecturerId tetap harus terlihat.
     const saring =
       profile.role === "dosen"
         ? profile.lecturerId === null
-          ? sql`false`
-          : eq(cbtExams.lecturerId, profile.lecturerId)
+          ? eq(cbtExams.createdById, profile.id)
+          : or(eq(cbtExams.lecturerId, profile.lecturerId), eq(cbtExams.createdById, profile.id))
         : undefined;
 
     const daftar = await db
@@ -75,6 +67,7 @@ export async function GET() {
         className: cbtExams.className,
         lecturerId: cbtExams.lecturerId,
         createdBy: cbtExams.createdBy,
+        createdById: cbtExams.createdById,
         questionCount: cbtExams.questionCount,
         durationMinutes: cbtExams.durationMinutes,
         passingGrade: cbtExams.passingGrade,
@@ -83,6 +76,7 @@ export async function GET() {
         randomOptions: cbtExams.randomOptions,
         allowBack: cbtExams.allowBack,
         showScore: cbtExams.showScore,
+        singleDevice: cbtExams.singleDevice,
         token: cbtExams.token,
         startAt: cbtExams.startAt,
         endAt: cbtExams.endAt,
@@ -120,12 +114,18 @@ export async function GET() {
     const sekarang = new Date();
     return Response.json({
       success: true,
-      bolehAktivasi: AKTIVATOR.includes(profile.role),
+      // Bukan lagi satu izin untuk seluruh halaman: izin menempel pada tiap
+      // ujian, karena satu orang dapat memiliki sebagian dan hanya memantau
+      // sisanya.
+      pemantau: PEMANTAU.includes(profile.role),
       ujian: daftar.map((u) => ({
         ...u,
         status: statusUjian({ aktif: Boolean(u.activatedAt), mulai: u.startAt, selesai: u.endAt }, sekarang),
         jumlahBank: bank.get(u.id) ?? 0,
         peserta: peserta.get(u.id) ?? { total: 0, berjalan: 0, selesai: 0 },
+        milik: pemilik(profile, u),
+        bolehUbah: bolehUbah(profile, u),
+        bolehHapus: bolehHapus(profile, u),
       })),
     });
   } catch (error: unknown) {
@@ -170,6 +170,7 @@ export async function POST(request: Request) {
             instruction: teks(body.instruction, 2000) || null,
             lecturerId: profile.role === "dosen" ? profile.lecturerId : null,
             createdBy: profile.fullName,
+            createdById: profile.id,
             createdByRole: profile.role,
             questionCount: angka(body.questionCount, 0, 0, 500),
             durationMinutes: angka(body.durationMinutes, 60, 1, 600),
@@ -179,6 +180,7 @@ export async function POST(request: Request) {
             randomOptions: body.randomOptions !== false,
             allowBack: body.allowBack !== false,
             showScore: body.showScore !== false,
+            singleDevice: body.singleDevice !== false,
             token: teks(body.token, 12).toUpperCase() || null,
           })
           .returning({ id: cbtExams.id, code: cbtExams.code });
@@ -205,16 +207,19 @@ export async function PATCH(request: Request) {
     }
 
     const body = (await request.json()) as Record<string, unknown>;
-    const id = Number(body.id);
-    if (!Number.isInteger(id)) {
+    const id = angkaParam(String(body.id ?? ""));
+    if (id === null) {
       return Response.json({ success: false, message: "Ujian tidak dikenali." }, { status: 400 });
     }
 
     const ada = await db.select().from(cbtExams).where(eq(cbtExams.id, id)).limit(1);
     const ujian = ada[0];
     if (!ujian) return Response.json({ success: false, message: "Ujian tidak ditemukan." }, { status: 404 });
-    if (!miliknya(profile, ujian)) {
-      return Response.json({ success: false, message: "Ujian ini milik dosen lain." }, { status: 403 });
+    if (!bolehUbah(profile, ujian)) {
+      return Response.json(
+        { success: false, message: "Ujian ini milik dosen lain. Anda hanya dapat memantaunya." },
+        { status: 403 },
+      );
     }
 
     // Ujian yang SEDANG berlangsung tidak boleh diubah isinya. Mengubah
@@ -242,6 +247,7 @@ export async function PATCH(request: Request) {
     if (body.randomOptions !== undefined) ubah.randomOptions = body.randomOptions !== false;
     if (body.allowBack !== undefined) ubah.allowBack = body.allowBack !== false;
     if (body.showScore !== undefined) ubah.showScore = body.showScore !== false;
+    if (body.singleDevice !== undefined) ubah.singleDevice = body.singleDevice !== false;
     if (body.token !== undefined) ubah.token = teks(body.token, 12).toUpperCase() || null;
 
     await db.update(cbtExams).set(ubah).where(eq(cbtExams.id, id));
@@ -261,15 +267,15 @@ export async function DELETE(request: Request) {
     if (!bolehCbt(profile) || !profile) {
       return Response.json({ success: false, message: "Menu CBT tidak tersedia untuk role Anda." }, { status: 403 });
     }
-    const id = Number(new URL(request.url).searchParams.get("id"));
-    if (!Number.isInteger(id)) {
+    const id = angkaParam(new URL(request.url).searchParams.get("id"));
+    if (id === null) {
       return Response.json({ success: false, message: "Ujian tidak dikenali." }, { status: 400 });
     }
 
     const ada = await db.select().from(cbtExams).where(eq(cbtExams.id, id)).limit(1);
     const ujian = ada[0];
     if (!ujian) return Response.json({ success: true });
-    if (!miliknya(profile, ujian)) {
+    if (!bolehHapus(profile, ujian)) {
       return Response.json({ success: false, message: "Ujian ini milik dosen lain." }, { status: 403 });
     }
 

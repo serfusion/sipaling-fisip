@@ -1,10 +1,14 @@
 // ============================================================
 // CBT — GERBANG AKTIVASI
 //
-// HANYA Super Admin dan Admin. Admin bagian — umum, akademik, prodi, PDDIKTI,
-// perpustakaan, laboratorium — sengaja TIDAK termasuk, dan itu permintaan
-// yang tegas: ujian yang dapat dibuka siapa saja yang kebetulan punya akses
-// dashboard bukan ujian yang terjaga.
+// HANYA PEMILIK UJIANNYA. Dosen yang menyusun soalnyalah yang membuka dan
+// menutup ujiannya sendiri, karena hanya ia yang tahu kelasnya sudah siap atau
+// belum. Admin dan Super Admin TIDAK ikut memegang tombol ini — mereka
+// memantau, menghapus, dan boleh mengadakan ujian sendiri (mis. seleksi) yang
+// kemudian juga milik mereka, jadi jalur ini tetap terbuka bagi ujian itu.
+//
+// Admin bagian — umum, akademik, prodi, PDDIKTI, perpustakaan, laboratorium —
+// sama sekali tidak menyentuh menu CBT.
 //
 // Yang diatur di sini dua hal, dan keduanya soal WAKTU:
 //
@@ -22,8 +26,7 @@ import { eq, sql } from "drizzle-orm";
 import { getCurrentProfile } from "@/lib/supabase-server";
 import { explainServerError } from "@/lib/api-errors";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
-import { statusUjian } from "@/lib/cbt";
-import { AKTIVATOR } from "../ujian/route";
+import { angkaParam, bolehCbt, bolehUbah, statusUjian } from "@/lib/cbt";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,12 +43,9 @@ export async function POST(request: Request) {
 
   try {
     const profile = await getCurrentProfile();
-    if (!profile || !AKTIVATOR.includes(profile.role)) {
+    if (!bolehCbt(profile) || !profile) {
       return Response.json(
-        {
-          success: false,
-          message: "Aktivasi ujian hanya oleh Super Admin dan Admin.",
-        },
+        { success: false, message: "Menu CBT tidak tersedia untuk role Anda." },
         { status: 403 },
       );
     }
@@ -56,14 +56,26 @@ export async function POST(request: Request) {
       mulai?: unknown;
       selesai?: unknown;
     };
-    const id = Number(body.id);
-    if (!Number.isInteger(id)) {
+    const id = angkaParam(String(body.id ?? ""));
+    if (id === null) {
       return Response.json({ success: false, message: "Ujian tidak dikenali." }, { status: 400 });
     }
 
     const ada = await db.select().from(cbtExams).where(eq(cbtExams.id, id)).limit(1);
     const ujian = ada[0];
     if (!ujian) return Response.json({ success: false, message: "Ujian tidak ditemukan." }, { status: 404 });
+
+    // Inilah gerbangnya. Bukan peran yang menentukan, melainkan kepemilikan.
+    if (!bolehUbah(profile, ujian)) {
+      return Response.json(
+        {
+          success: false,
+          message:
+            "Ujian ini hanya dapat diaktifkan dan dijadwalkan oleh dosen pemiliknya.",
+        },
+        { status: 403 },
+      );
+    }
 
     if (body.aksi === "batalkan") {
       const status = statusUjian({

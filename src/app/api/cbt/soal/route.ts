@@ -13,8 +13,9 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { getCurrentProfile } from "@/lib/supabase-server";
 import { explainServerError } from "@/lib/api-errors";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
-import { statusUjian, type JenisSoal } from "@/lib/cbt";
-import { bolehCbt, miliknya } from "../ujian/route";
+import {
+  angkaParam, bolehCbt, bolehPantau, bolehUbah, statusUjian, type JenisSoal,
+} from "@/lib/cbt";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -84,7 +85,15 @@ function rapikanSoal(m: Masukan): { ok: true; nilai: Record<string, unknown> } |
   };
 }
 
-async function ujianMilikSaya(examId: number) {
+/**
+ * Ambil ujiannya sekaligus periksa izin pemanggilnya.
+ *
+ * Dua tingkat izin, dan perbedaannya penting: MEMBACA bank soal terbuka bagi
+ * admin yang memantau, sedangkan MENGUBAHNYA hanya bagi pemilik ujiannya.
+ * Sebelumnya keduanya satu pintu, dan itu berarti setiap admin dapat menyunting
+ * soal kelas dosen mana pun.
+ */
+async function ujianMilikSaya(examId: number, izin: "pantau" | "ubah" = "ubah") {
   const profile = await getCurrentProfile();
   if (!bolehCbt(profile) || !profile) {
     return { gagal: Response.json({ success: false, message: "Menu CBT tidak tersedia untuk role Anda." }, { status: 403 }) };
@@ -92,8 +101,20 @@ async function ujianMilikSaya(examId: number) {
   const baris = await db.select().from(cbtExams).where(eq(cbtExams.id, examId)).limit(1);
   const ujian = baris[0];
   if (!ujian) return { gagal: Response.json({ success: false, message: "Ujian tidak ditemukan." }, { status: 404 }) };
-  if (!miliknya(profile, ujian)) {
-    return { gagal: Response.json({ success: false, message: "Ujian ini milik dosen lain." }, { status: 403 }) };
+  const lolos = izin === "pantau" ? bolehPantau(profile, ujian) : bolehUbah(profile, ujian);
+  if (!lolos) {
+    return {
+      gagal: Response.json(
+        {
+          success: false,
+          message:
+            izin === "ubah"
+              ? "Soal ujian ini hanya dapat diubah dosen pemiliknya."
+              : "Ujian ini milik dosen lain.",
+        },
+        { status: 403 },
+      ),
+    };
   }
   return { profile, ujian };
 }
@@ -105,11 +126,11 @@ function terkunci(ujian: { activatedAt: Date | null; startAt: Date | null; endAt
 
 export async function GET(request: Request) {
   try {
-    const examId = Number(new URL(request.url).searchParams.get("ujian"));
-    if (!Number.isInteger(examId)) {
+    const examId = angkaParam(new URL(request.url).searchParams.get("ujian"));
+    if (examId === null) {
       return Response.json({ success: false, message: "Ujian tidak dikenali." }, { status: 400 });
     }
-    const cek = await ujianMilikSaya(examId);
+    const cek = await ujianMilikSaya(examId, "pantau");
     if ("gagal" in cek) return cek.gagal;
 
     const baris = await db
@@ -147,8 +168,8 @@ export async function POST(request: Request) {
 
   try {
     const body = (await request.json()) as { ujian?: unknown; soal?: Masukan[] };
-    const examId = Number(body.ujian);
-    if (!Number.isInteger(examId)) {
+    const examId = angkaParam(String(body.ujian ?? ""));
+    if (examId === null) {
       return Response.json({ success: false, message: "Ujian tidak dikenali." }, { status: 400 });
     }
     const cek = await ujianMilikSaya(examId);
@@ -187,8 +208,30 @@ export async function POST(request: Request) {
       return Response.json({ success: false, message: ditolak[0] || "Soal tidak sah." }, { status: 400 });
     }
 
-    await db.insert(cbtQuestions).values(siap as never);
-    return Response.json({ success: true, masuk: siap.length, ditolak }, { status: 201 });
+    // Barisnya dikembalikan, bukan hanya jumlahnya. Panel dosen memasang soal
+    // barunya ke layar seketika lalu menukarnya dengan baris asli begitu
+    // jawaban ini tiba — tanpa id yang sebenarnya, ia harus memuat ulang
+    // seluruh bank soal hanya untuk satu soal yang baru ditambahkan.
+    const dibuat = await db.insert(cbtQuestions).values(siap as never).returning();
+    return Response.json(
+      {
+        success: true,
+        masuk: dibuat.length,
+        ditolak,
+        soal: dibuat.map((s) => ({
+          id: s.id,
+          jenis: s.type,
+          pertanyaan: s.question,
+          pilihan: JSON.parse(s.options || "[]") as string[],
+          kunci: s.answerKey,
+          bobot: s.points,
+          materi: s.material || "",
+          tingkat: s.difficulty,
+          pembahasan: s.explanation || "",
+        })),
+      },
+      { status: 201 },
+    );
   } catch (error: unknown) {
     console.error("simpan soal cbt", error);
     return Response.json(
@@ -201,8 +244,8 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const body = (await request.json()) as { id?: unknown } & Masukan;
-    const id = Number(body.id);
-    if (!Number.isInteger(id)) {
+    const id = angkaParam(String(body.id ?? ""));
+    if (id === null) {
       return Response.json({ success: false, message: "Soal tidak dikenali." }, { status: 400 });
     }
     const punya = await db.select().from(cbtQuestions).where(eq(cbtQuestions.id, id)).limit(1);
@@ -233,8 +276,8 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const id = Number(new URL(request.url).searchParams.get("id"));
-    if (!Number.isInteger(id)) {
+    const id = angkaParam(new URL(request.url).searchParams.get("id"));
+    if (id === null) {
       return Response.json({ success: false, message: "Soal tidak dikenali." }, { status: 400 });
     }
     const punya = await db.select().from(cbtQuestions).where(eq(cbtQuestions.id, id)).limit(1);

@@ -488,6 +488,14 @@ export const cbtExams = pgTable("cbt_exams", {
   /** Dosen pemilik ujian. Null untuk ujian yang dibuat admin sendiri. */
   lecturerId: integer("lecturer_id").references(() => lecturers.id, { onDelete: "set null" }),
   createdBy: varchar("created_by", { length: 120 }).notNull(),
+  /**
+   * Id profil pembuatnya. INILAH penentu kepemilikan.
+   *
+   * Semula kepemilikan hanya dilihat dari lecturerId, dan itu mengunci dosen
+   * yang akun profilnya belum tersambung ke baris dosen: ia dapat membuat
+   * ujian, lalu tidak pernah dapat membukanya lagi.
+   */
+  createdById: varchar("created_by_id", { length: 64 }),
   createdByRole: varchar("created_by_role", { length: 40 }).notNull(),
 
   // Ditentukan dosen.
@@ -499,6 +507,15 @@ export const cbtExams = pgTable("cbt_exams", {
   randomOptions: boolean("random_options").notNull().default(true),
   allowBack: boolean("allow_back").notNull().default(true),
   showScore: boolean("show_score").notNull().default(true),
+  /**
+   * Satu perangkat hanya untuk satu peserta.
+   *
+   * Menyala secara bawaan, karena yang paling sering terjadi adalah satu ponsel
+   * dipakai bergantian oleh dua orang yang duduk bersebelahan. Dapat dimatikan
+   * dosennya untuk ujian di laboratorium, tempat satu komputer memang dipakai
+   * bergantian sepanjang hari.
+   */
+  singleDevice: boolean("single_device").notNull().default(true),
   /** Kode tambahan yang diketik mahasiswa. Kosong berarti tanpa kode. */
   token: varchar("token", { length: 12 }),
 
@@ -542,6 +559,19 @@ export const cbtAttempts = pgTable("cbt_attempts", {
   nim: varchar("nim", { length: 20 }).notNull(),
   name: varchar("name", { length: 120 }).notNull(),
   attemptNo: integer("attempt_no").notNull().default(1),
+  /**
+   * Nama yang sudah diseragamkan, untuk mencegah satu orang mendaftar dua kali
+   * dengan NIM berbeda. "Budi  Santoso" dan "budi santoso" adalah satu nama.
+   */
+  nameKey: varchar("name_key", { length: 120 }).notNull().default(""),
+  /**
+   * Penanda perangkat, dibuat sekali di peramban mahasiswa dan disimpan di
+   * sana. Bukan sidik jari perangkat sungguhan — ia dapat dihapus dengan
+   * membersihkan data peramban — melainkan pencegah yang paling sering
+   * dibutuhkan: satu ponsel dipakai bergantian oleh dua orang di ruangan yang
+   * sama.
+   */
+  deviceId: varchar("device_id", { length: 64 }).notNull().default(""),
   /** Kunci rahasia yang dipegang peramban mahasiswa selama ujian. */
   sessionKey: varchar("session_key", { length: 64 }).notNull().unique(),
   /** Benih pengacak, supaya urutan soalnya sama tiap kali halaman dimuat. */

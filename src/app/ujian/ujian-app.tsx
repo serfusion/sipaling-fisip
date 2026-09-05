@@ -37,7 +37,40 @@ type Hasil = {
 };
 
 const KUNCI_SIMPAN = "sipaling-ujian-sesi";
+const KUNCI_PERANGKAT = "sipaling-ujian-perangkat";
 const JEDA_SIMPAN_MS = 900;
+
+/**
+ * Penanda perangkat, dibuat sekali lalu disimpan di peramban ini.
+ *
+ * BUKAN sidik jari perangkat sungguhan, dan sengaja tidak. Ia dapat dihapus
+ * dengan membersihkan data peramban, dan memang boleh — yang hendak dicegah
+ * bukan penyerang yang gigih, melainkan hal yang benar-benar terjadi di ruang
+ * ujian: satu ponsel dipakai bergantian oleh dua orang yang duduk
+ * bersebelahan.
+ *
+ * Peramban yang menolak menyimpan apa pun (mode penyamaran, kuota penuh)
+ * mengembalikan tali kosong, dan server memperlakukannya sebagai "tidak
+ * diketahui" — tidak diperiksa, bukan ditolak. Menolak ujian karena
+ * penyimpanan perambannya terkunci berarti menghukum orang yang salah.
+ */
+function penandaPerangkat() {
+  try {
+    const ada = window.localStorage.getItem(KUNCI_PERANGKAT) || "";
+    if (/^[A-Za-z0-9-]{8,64}$/.test(ada)) return ada;
+    const baru = (
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`
+    )
+      .replace(/[^A-Za-z0-9-]/g, "")
+      .slice(0, 64);
+    window.localStorage.setItem(KUNCI_PERANGKAT, baru);
+    return baru;
+  } catch {
+    return "";
+  }
+}
 
 function tanggalRapi(iso: string | null) {
   if (!iso) return "-";
@@ -63,10 +96,6 @@ export default function UjianApp() {
   const [sisa, setSisa] = useState(0);
   const [simpanan, setSimpanan] = useState<"aman" | "menyimpan" | "tertunda">("aman");
   const [ditandai, setDitandai] = useState<number[]>([]);
-  // Soal yang pernah dibuka. Dipakai membedakan "belum dijawab" dari "belum
-  // dibuka sama sekali" pada palet nomor — pembedaan yang ada di rujukan
-  // rancangannya, dan yang membuat mahasiswa tahu sisa pekerjaannya.
-  const [dibuka, setDibuka] = useState<number[]>([]);
   const [bukaNav, setBukaNav] = useState(false);
   const [hasil, setHasil] = useState<Hasil | null>(null);
   const [pesanSelesai, setPesanSelesai] = useState("");
@@ -281,7 +310,10 @@ export default function UjianApp() {
       const jawab = await fetch("/api/cbt/ikut", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ aksi: "masuk", kode: ujian?.kode, nama, nim, token }),
+        body: JSON.stringify({
+          aksi: "masuk", kode: ujian?.kode, nama, nim, token,
+          perangkat: penandaPerangkat(),
+        }),
       });
       const data = await jawab.json();
       if (!jawab.ok || !data.success) throw new Error(data.message || "Ujian belum dapat dimulai.");
@@ -345,8 +377,47 @@ export default function UjianApp() {
 
   function keSoal(index: number) {
     setNomor(index);
-    const id = soal[index]?.id;
-    if (id !== undefined) setDibuka((kini) => (kini.includes(id) ? kini : [...kini, id]));
+  }
+
+  /**
+   * Keluar tanpa mengumpulkan.
+   *
+   * Ujiannya TIDAK ditutup — attempt-nya tetap berjalan di server beserta sisa
+   * waktunya, dan mahasiswa dapat masuk lagi dengan NIM yang sama untuk
+   * menemukan lembar yang persis sama. Yang dihapus hanya ingatan peramban ini.
+   * Waktunya tetap berjalan, dan itu dikatakan terus terang di kotak
+   * konfirmasinya, bukan disembunyikan.
+   */
+  function keluar() {
+    const setuju = window.confirm(
+      "Keluar dari halaman ujian?\n\n" +
+        "Jawaban yang sudah tersimpan tidak hilang, dan kamu dapat masuk lagi dengan NIM yang " +
+        "sama. Tetapi WAKTU UJIAN TERUS BERJALAN selama kamu di luar.",
+    );
+    if (!setuju) return;
+    try { window.localStorage.removeItem(KUNCI_SIMPAN); } catch { /* diabaikan */ }
+    setKunciSesi("");
+    setSoal([]);
+    setJawaban({});
+    setDitandai([]);
+    setNomor(0);
+    setGalat("");
+    setBukaNav(false);
+    setLayar("kode");
+  }
+
+  /** Konfirmasi sebelum mengumpulkan, dengan jumlah soal yang masih kosong. */
+  function mintaKumpul() {
+    const kosong = soal.length - terjawab;
+    const ragu = ditandai.length;
+    const rincian = [
+      kosong > 0 ? `${kosong} soal belum dijawab` : null,
+      ragu > 0 ? `${ragu} soal ditandai ragu-ragu` : null,
+    ].filter(Boolean).join(" dan ");
+    const pesan = rincian
+      ? `Masih ada ${rincian}. Hentikan ujian dan kumpulkan sekarang?`
+      : "Hentikan ujian dan kumpulkan jawabanmu sekarang?";
+    if (window.confirm(pesan)) void kumpulkan(false);
   }
 
   async function tandai(id: number) {
@@ -364,18 +435,20 @@ export default function UjianApp() {
   }
 
   /**
-   * Keadaan satu soal pada palet nomor.
+   * Keadaan satu soal pada palet nomor. Tiga warna, persis seperti legendanya.
    *
-   * Urutannya menentukan: soal yang sudah dijawab LALU ditandai tetap terbaca
-   * "ditinjau", karena itulah yang ingin dilihat mahasiswa — daftar soal yang
-   * sengaja ia sisihkan untuk dilihat lagi sebelum mengumpulkan.
+   * Urutannya menentukan: soal yang sudah dijawab LALU ditandai ragu-ragu tetap
+   * terbaca oranye, karena itulah yang ingin dilihat mahasiswa — daftar soal
+   * yang sengaja ia sisihkan untuk ditengok lagi sebelum mengumpulkan.
+   *
+   * Soal yang sedang dibuka tidak mendapat warna keempat; ia diberi bingkai
+   * pada CSS-nya. Menambah satu warna lagi membuat legendanya tidak lagi
+   * terbaca sekali lihat.
    */
-  function keadaanSoal(id: number, index: number): "kini" | "tinjau" | "isi" | "kosong" | "belum" {
-    if (index === nomor) return "kini";
-    if (ditandai.includes(id)) return "tinjau";
+  function keadaanSoal(id: number): "ragu" | "isi" | "kosong" {
+    if (ditandai.includes(id)) return "ragu";
     if (String(jawaban[id] ?? "").trim()) return "isi";
-    if (dibuka.includes(id)) return "kosong";
-    return "belum";
+    return "kosong";
   }
 
   const terjawab = soal.filter((s) => String(jawaban[s.id] ?? "").trim()).length;
@@ -527,42 +600,80 @@ export default function UjianApp() {
   const menit = Math.floor((sisa % 3600) / 60);
   const detik = sisa % 60;
   const dua = (n: number) => String(n).padStart(2, "0");
+  const raguKini = ditandai.includes(soalKini.id);
+
+  const palet = soal.map((s, i) => (
+    <button
+      key={s.id}
+      type="button"
+      className={`ck-nomor ${keadaanSoal(s.id)}`}
+      onClick={() => { keSoal(i); setBukaNav(false); }}
+      aria-label={`Soal ${i + 1}`}
+      aria-current={i === nomor ? "true" : undefined}
+    >
+      {i + 1}
+    </button>
+  ));
+
+  const legenda = (
+    <ul className="ck-legenda">
+      <li><i className="ck-tit hijau" aria-hidden="true" /> Hijau = Sudah dijawab</li>
+      <li><i className="ck-tit oranye" aria-hidden="true" /> Orange = Ragu-ragu</li>
+      <li><i className="ck-tit abu" aria-hidden="true" /> Abu-abu = Belum dijawab</li>
+    </ul>
+  );
 
   return (
     <div className="uj uj-kerja">
-      <div className="uj-layar">
-        {/* ---------- KIRI: SOALNYA ---------- */}
-        <section className="uj-utama">
-          <header className="uj-judul">{ujian?.judul}</header>
+      {/* ---------- BILAH ATAS ---------- */}
+      <header className="ck-bar">
+        <div>
+          <span className="ck-bar-nama">{nama || "Peserta"}</span>
+          <span className="ck-bar-nim">{nim}</span>
+        </div>
+        <div className="ck-bar-tengah">{ujian?.judul}</div>
+        <span className={`ck-simpan ck-simpan-${simpanan}`}>
+          {simpanan === "aman" ? "✓ Tersimpan" : simpanan === "menyimpan" ? "Menyimpan…" : "Menyimpan ulang…"}
+        </span>
+        <button type="button" className="ck-logout" onClick={keluar}>Logout</button>
+      </header>
 
-          <div className="uj-isi">
-            <div className="uj-soal-kepala">
-              <h2>{ujian?.mataKuliah} — Soal {nomor + 1}</h2>
-              <span className={`uj-simpan uj-simpan-${simpanan}`}>
-                {simpanan === "aman" ? "✓ Tersimpan" : simpanan === "menyimpan" ? "Menyimpan…" : "Menyimpan ulang…"}
-              </span>
-            </div>
+      <div className="ck-layar">
+        {/* ---------- KARTU SOAL ---------- */}
+        <section className="ck-kartu">
+          <div className="ck-kartu-kepala">
+            <span className="ck-lencana ck-lencana-soal">SOAL NO. {nomor + 1}</span>
+            <span
+              className={`ck-lencana ck-lencana-waktu ${hampirHabis ? "genting" : ""}`}
+              aria-live="polite"
+            >
+              SISA WAKTU <b>{dua(jam)}:{dua(menit)}:{dua(detik)}</b>
+            </span>
+          </div>
 
-            <p className="uj-tanya">{soalKini.pertanyaan}</p>
+          <div className="ck-kartu-isi">
+            <p className="ck-tanya">{soalKini.pertanyaan}</p>
 
             {soalKini.jenis === "pg" || soalKini.jenis === "benar_salah" ? (
-              <div className="uj-pilihan">
+              <div className="ck-opsi-daftar" role="radiogroup" aria-label={`Pilihan jawaban soal ${nomor + 1}`}>
                 {soalKini.pilihan.map((p, i) => (
                   <button
                     key={i}
                     type="button"
-                    className={`uj-opsi ${isi === String(i) ? "on" : ""}`}
+                    role="radio"
+                    aria-checked={isi === String(i)}
+                    className={`ck-opsi ${isi === String(i) ? "on" : ""}`}
                     onClick={() => jawab(soalKini.id, String(i))}
                   >
-                    <span className="uj-kotakcek" aria-hidden="true">{isi === String(i) ? "✓" : ""}</span>
-                    <span className="uj-opsi-huruf">{String.fromCharCode(65 + i)}.</span>
-                    <span className="uj-opsi-teks">{p}</span>
+                    <span className="ck-bulat" aria-hidden="true"><i /></span>
+                    <span className="ck-opsi-huruf">{String.fromCharCode(65 + i)}.</span>
+                    <span className="ck-opsi-teks">{p}</span>
                   </button>
                 ))}
               </div>
             ) : soalKini.jenis === "isian" ? (
               <input
-                className="uj-input uj-isian"
+                className="ck-isian"
                 value={isi}
                 onChange={(e) => jawab(soalKini.id, e.target.value)}
                 placeholder="Tulis jawaban singkatmu"
@@ -570,7 +681,7 @@ export default function UjianApp() {
               />
             ) : (
               <textarea
-                className="uj-essay"
+                className="ck-essay"
                 value={isi}
                 onChange={(e) => jawab(soalKini.id, e.target.value)}
                 placeholder="Tulis jawabanmu di sini"
@@ -579,148 +690,88 @@ export default function UjianApp() {
             )}
 
             {isi !== "" && (
-              <button type="button" className="uj-hapus" onClick={() => jawab(soalKini.id, "")}>
+              <button type="button" className="ck-hapus" onClick={() => jawab(soalKini.id, "")}>
                 Hapus jawaban soal ini
               </button>
             )}
 
-            {galat && <p className="uj-galat" role="alert">{galat}</p>}
+            {galat && <p className="ck-galat" role="alert">{galat}</p>}
           </div>
 
-          {/* Baris tombol menempel di dasar kolom, persis seperti rujukannya:
-              tinjau di kiri, jalan mundur-maju di tengah, kumpulkan di kanan
-              dan berjarak — supaya tidak tertekan ketika yang dituju "Next". */}
-          <div className="uj-aksi">
+          <div className="ck-kartu-kaki">
             <button
               type="button"
-              className={`uj-tbl uj-tbl-tinjau ${ditandai.includes(soalKini.id) ? "on" : ""}`}
-              onClick={() => void tandai(soalKini.id)}
-            >
-              {ditandai.includes(soalKini.id) ? "Batal tinjau" : "Tandai untuk ditinjau"}
-            </button>
-            <button
-              type="button"
-              className="uj-tbl uj-tbl-biru"
+              className="ck-tbl ck-biru ck-mundur"
               disabled={nomor === 0 || ujian?.bisaKembali === false}
               onClick={() => keSoal(Math.max(0, nomor - 1))}
             >
-              Sebelumnya
+              ‹ SOAL SEBELUMNYA
             </button>
             <button
               type="button"
-              className="uj-tbl uj-tbl-biru"
+              className={`ck-tbl ck-ragu ${raguKini ? "on" : ""}`}
+              aria-pressed={raguKini}
+              onClick={() => void tandai(soalKini.id)}
+            >
+              {raguKini ? "✓ RAGU-RAGU" : "RAGU-RAGU"}
+            </button>
+            <button
+              type="button"
+              className="ck-tbl ck-biru ck-maju"
               disabled={nomor >= soal.length - 1}
               onClick={() => keSoal(Math.min(soal.length - 1, nomor + 1))}
             >
-              Berikutnya
+              SOAL SELANJUTNYA ›
             </button>
-            <button
-              type="button"
-              className="uj-tbl uj-tbl-hijau uj-tbl-kumpul"
-              disabled={sibuk}
-              onClick={() => {
-                const kosong = soal.length - terjawab;
-                const pesan = kosong > 0
-                  ? `Masih ada ${kosong} soal yang belum dijawab. Kumpulkan sekarang?`
-                  : "Kumpulkan jawabanmu sekarang?";
-                if (window.confirm(pesan)) void kumpulkan(false);
-              }}
-            >
-              {sibuk ? "Mengumpulkan…" : "Kumpulkan Jawaban"}
-            </button>
-          </div>
-
-          <div className="uj-legenda">
-            <span><i className="uj-tit kini" /> Sedang dibuka</span>
-            <span><i className="uj-tit belum" /> Belum dibuka</span>
-            <span><i className="uj-tit isi" /> Sudah dijawab</span>
-            <span><i className="uj-tit kosong" /> Belum dijawab</span>
-            <span><i className="uj-tit tinjau" /> Ditandai</span>
           </div>
         </section>
 
-        {/* ---------- KANAN: WAKTU DAN PALET NOMOR ---------- */}
-        <aside className="uj-sisi">
-          <div className="uj-sisi-judul">Sisa Waktu</div>
-          <div className={`uj-jam ${hampirHabis ? "genting" : ""}`} aria-live="polite">
-            <div><b>{dua(jam)}</b><small>jam</small></div>
-            <div><b>{dua(menit)}</b><small>menit</small></div>
-            <div><b>{dua(detik)}</b><small>detik</small></div>
+        {/* ---------- PANEL NOMOR SOAL ---------- */}
+        <aside className="ck-sisi">
+          <div className="ck-panel">
+            <div className="ck-panel-kepala">NOMOR SOAL</div>
+            <div className="ck-grid">{palet}</div>
+            {legenda}
+            <p className="ck-ringkas">
+              <b>{terjawab}</b> dari <b>{soal.length}</b> soal sudah dijawab
+              {ditandai.length > 0 && <> · <b>{ditandai.length}</b> ditandai ragu-ragu</>}
+            </p>
           </div>
 
-          <div className="uj-sisi-judul">{ujian?.mataKuliah}</div>
-          <div className="uj-palet">
-            {soal.map((s, i) => (
-              <button
-                key={s.id}
-                type="button"
-                className={`uj-nomor ${keadaanSoal(s.id, i)}`}
-                onClick={() => keSoal(i)}
-                aria-label={`Soal ${i + 1}`}
-                aria-current={i === nomor ? "true" : undefined}
-              >
-                {i + 1}
-              </button>
-            ))}
-          </div>
-
-          <div className="uj-ringkas">
-            <b>{terjawab}</b> dari {soal.length} soal sudah dijawab
-            {ditandai.length > 0 && <span>{ditandai.length} ditandai untuk ditinjau</span>}
+          {/* Tombol berhenti berdiri di kartunya sendiri, terpisah dan berjarak
+              dari tombol jalan — sekali tertekan, ujiannya tidak dapat dibuka
+              kembali. */}
+          <div className="ck-panel ck-panel-henti">
+            <button type="button" className="ck-henti" disabled={sibuk} onClick={mintaKumpul}>
+              {sibuk ? "MENGUMPULKAN…" : "HENTIKAN UJIAN"}
+            </button>
+            <p className="ck-henti-catatan">
+              Jawabanmu dikumpulkan dan ujian ditutup. Tidak dapat dibuka lagi.
+            </p>
           </div>
         </aside>
       </div>
 
-      {/* Di ponsel palet nomornya disembunyikan dan diganti satu tombol yang
-          membuka panelnya — menggulir jauh ke bawah untuk mencari nomor soal
-          berarti kehilangan tempat pada soal yang sedang dibaca. */}
-      <button type="button" className="uj-tombol-nav" onClick={() => setBukaNav(true)}>
-        <b>{terjawab}/{soal.length}</b> terjawab · <span>{ejaWaktu(sisa)}</span> · lihat semua soal
+      {/* ---------- DI PONSEL: LACI NOMOR SOAL ---------- */}
+      <button type="button" className="ck-bilah-hp" onClick={() => setBukaNav(true)}>
+        <b>{terjawab}/{soal.length} terjawab</b>
+        <span>{ejaWaktu(sisa)}</span>
+        <span>NOMOR SOAL ▲</span>
       </button>
 
       {bukaNav && (
-        <div className="uj-tirai" role="dialog" aria-label="Daftar soal">
-          <div className="uj-panel">
-            <div className="uj-panel-kepala">
-              <b>Daftar soal</b>
-              <button type="button" className="uj-tutup" onClick={() => setBukaNav(false)} aria-label="Tutup">✕</button>
+        <div className="ck-tirai" role="dialog" aria-label="Nomor soal">
+          <div className="ck-laci">
+            <div className="ck-laci-kepala">
+              <b>NOMOR SOAL</b>
+              <button type="button" className="ck-tutup" onClick={() => setBukaNav(false)} aria-label="Tutup">✕</button>
             </div>
-            <p className="uj-panel-info">
-              {terjawab} dari {soal.length} soal sudah dijawab
-              {soal.length - terjawab > 0 && ` · ${soal.length - terjawab} masih kosong`}
-            </p>
-            <div className="uj-palet uj-palet-panel">
-              {soal.map((s, i) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  className={`uj-nomor ${keadaanSoal(s.id, i)}`}
-                  onClick={() => { keSoal(i); setBukaNav(false); }}
-                >
-                  {i + 1}
-                </button>
-              ))}
-            </div>
-            <div className="uj-legenda uj-legenda-panel">
-              <span><i className="uj-tit isi" /> Sudah dijawab</span>
-              <span><i className="uj-tit kosong" /> Belum dijawab</span>
-              <span><i className="uj-tit tinjau" /> Ditandai</span>
-            </div>
-            <button
-              type="button"
-              className="uj-tbl uj-tbl-hijau"
-              disabled={sibuk}
-              onClick={() => {
-                const kosong = soal.length - terjawab;
-                const pesan = kosong > 0
-                  ? `Masih ada ${kosong} soal yang belum dijawab. Kumpulkan sekarang?`
-                  : "Kumpulkan jawabanmu sekarang?";
-                if (window.confirm(pesan)) void kumpulkan(false);
-              }}
-            >
-              {sibuk ? "Mengumpulkan…" : "Kumpulkan Jawaban"}
+            <div className="ck-grid">{palet}</div>
+            {legenda}
+            <button type="button" className="ck-henti" disabled={sibuk} onClick={mintaKumpul}>
+              {sibuk ? "MENGUMPULKAN…" : "HENTIKAN UJIAN"}
             </button>
-            <button type="button" className="uj-btn uj-btn-sunyi" onClick={() => setBukaNav(false)}>
+            <button type="button" className="ck-laci-kembali" onClick={() => setBukaNav(false)}>
               Kembali mengerjakan
             </button>
           </div>

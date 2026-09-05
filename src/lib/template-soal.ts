@@ -11,9 +11,13 @@
 // yang bentuknya tidak pernah berubah tidak sepadan harganya.
 // ============================================================
 import { buatZip, type Bita } from "@/lib/zip";
+import { buatXlsx, GAYA, hurufKolom, type Baris } from "@/lib/template-xlsx";
 import { KOLOM_EXCEL } from "@/lib/impor-soal";
 
 export { KOLOM_EXCEL };
+
+export const MIME_DOCX =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 /** Tiga baris contoh yang sudah benar, supaya bentuknya tidak perlu ditebak. */
 export const CONTOH_EXCEL: Array<Array<string | number>> = [
@@ -130,10 +134,97 @@ export function buatDocxTemplate(baris: string[] = NASKAH_WORD): Blob {
     '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
     "</Relationships>";
 
-  return buatZip([
-    { nama: "[Content_Types].xml", data: enc(jenisIsi) },
-    { nama: "_rels/.rels", data: enc(hubungan) },
-    { nama: "word/document.xml", data: enc(dokumen) },
+  // Jenis isinya HARUS jenis Word, bukan "application/zip". Sebuah .docx
+  // memang zip, tetapi zip yang berlabel zip akan tersimpan sebagai arsip di
+  // komputer dosennya — dan itulah sebab template Word sebelumnya turun
+  // sebagai .zip.
+  return buatZip(
+    [
+      { nama: "[Content_Types].xml", data: enc(jenisIsi) },
+      { nama: "_rels/.rels", data: enc(hubungan) },
+      { nama: "word/document.xml", data: enc(dokumen) },
+    ],
+    new Date(),
+    MIME_DOCX,
+  );
+}
+
+// ---------- EXCEL BERHIAS ----------
+
+/**
+ * Rakit template Excel yang sudah berhias.
+ *
+ * Bukan sekadar tabel mentah: judul berlatar biru, baris kepala yang dibekukan
+ * dan disaring, empat contoh berlatar abu supaya jelas ia contoh dan bukan
+ * soal, lalu satu lembar Petunjuk di sebelahnya.
+ *
+ * Contohnya diberi warna berbeda dengan sengaja. Template yang contohnya tidak
+ * dapat dibedakan dari isian membuat empat baris contoh ikut terunggah sebagai
+ * soal ujian sungguhan — dan itu baru ketahuan ketika mahasiswa membacanya.
+ */
+export function buatXlsxTemplate(): Blob {
+  const kolomTerakhir = hurufKolom(KOLOM_EXCEL.length);
+
+  const baris: Baris[] = [
+    {
+      tinggi: 30,
+      sel: KOLOM_EXCEL.map((_, i) =>
+        i === 0 ? { nilai: "TEMPLATE SOAL UJIAN — SiPaling FISIP", gaya: GAYA.judul } : { nilai: "", gaya: GAYA.judul },
+      ),
+    },
+    {
+      tinggi: 20,
+      sel: KOLOM_EXCEL.map((_, i) =>
+        i === 0
+          ? {
+              nilai:
+                "Hapus empat baris contoh berwarna abu di bawah, lalu isi soal Anda sendiri. " +
+                "Petunjuk lengkap ada pada lembar sebelah.",
+              gaya: GAYA.anak,
+            }
+          : { nilai: "", gaya: GAYA.anak },
+      ),
+    },
+    { tinggi: 34, sel: KOLOM_EXCEL.map((k) => ({ nilai: k, gaya: GAYA.kepala })) },
+    ...CONTOH_EXCEL.map((c) => ({
+      sel: KOLOM_EXCEL.map((_, i) => ({
+        nilai: c[i] ?? "",
+        gaya: i === 0 || i === 9 ? GAYA.contohTengah : GAYA.contoh,
+      })),
+    })),
+    // Dua puluh baris kosong yang sudah bergaris, supaya dosen langsung
+    // mengetik ke dalam tabel dan bukan ke ruang kosong di bawahnya.
+    ...Array.from({ length: 20 }, () => ({
+      sel: KOLOM_EXCEL.map((_, i) => ({
+        nilai: "",
+        gaya: i === 0 || i === 9 ? GAYA.isiTengah : GAYA.isi,
+      })),
+    })),
+  ];
+
+  const petunjuk: Baris[] = [
+    { tinggi: 30, sel: [{ nilai: "PETUNJUK PENGISIAN TEMPLATE SOAL", gaya: GAYA.petunjukJudul }] },
+    { sel: [{ nilai: "", gaya: GAYA.petunjukIsi }] },
+    ...PETUNJUK_EXCEL.slice(2).map((p) => ({
+      sel: [{ nilai: p[0] ?? "", gaya: /^[A-Z ]+$/.test(p[0] ?? "") ? GAYA.petunjukTebal : GAYA.petunjukIsi }],
+    })),
+  ];
+
+  return buatXlsx([
+    {
+      nama: "Soal",
+      baris,
+      lebar: [5, 14, 52, 22, 22, 22, 22, 22, 26, 8, 20, 11, 40],
+      beku: 3,
+      saring: `A3:${kolomTerakhir}3`,
+      gabung: [`A1:${kolomTerakhir}1`, `A2:${kolomTerakhir}2`],
+    },
+    {
+      nama: "Petunjuk",
+      baris: petunjuk,
+      lebar: [104],
+      gabung: ["A1:A1"],
+    },
   ]);
 }
 
