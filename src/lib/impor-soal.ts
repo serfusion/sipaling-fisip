@@ -234,8 +234,15 @@ export function bacaKunci(
   return { ok: false, alasan: `kunci "${isi}" tidak cocok dengan pilihan mana pun` };
 }
 
-/** Rakit satu soal dari bagian-bagiannya, atau tolak dengan alasan. */
-function rakit(
+/**
+ * Rakit satu soal dari bagian-bagiannya, atau tolak dengan alasan.
+ *
+ * DIEKSPOR, dan itu disengaja: soal yang dibuat AI melewati gerbang yang
+ * PERSIS SAMA dengan soal yang diunggah dosen dari Excel atau Word. Membuat
+ * jalur pemeriksaan kedua khusus untuk AI berarti dua tempat yang harus sama
+ * selamanya — dan yang kedua akan tertinggal pada perubahan berikutnya.
+ */
+export function rakitSoal(
   bagian: {
     jenis: unknown; pertanyaan: unknown; pilihan: string[]; kunci: unknown;
     bobot: unknown; materi: unknown; tingkat: unknown; pembahasan: unknown;
@@ -347,7 +354,7 @@ export function imporDariExcel(aoa: Aoa): HasilImpor {
     // kesalahan siapa pun.
     if (!pertanyaan) continue;
 
-    const hasil = rakit({
+    const hasil = rakitSoal({
       jenis: ambil(kJenis),
       pertanyaan,
       pilihan: kPilihan.map((k) => teks(ambil(k))),
@@ -431,7 +438,7 @@ export function imporDariWord(mentah: string): HasilImpor {
           ? kunciBerdaftar(kini.kunci) ? "pg_kompleks" : "pg"
           : kini.kunci ? "isian" : "essay";
 
-    const hasil = rakit({
+    const hasil = rakitSoal({
       jenis: kini.jenis || tebakan,
       pertanyaan: kini.pertanyaan.join(" ").trim(),
       pilihan: kini.pilihan,

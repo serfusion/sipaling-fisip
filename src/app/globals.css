@@ -4939,3 +4939,19 @@ a.al-mini:hover { color: var(--al-ink); }
   border: 1px solid #f0c46a; background: #fdf6e6; color: #8a6212;
   font-size: 12.5px; line-height: 1.65;
 }
+
+/* --- Buat soal dengan AI --- */
+.cbt-ai { margin-bottom: 14px; border-left: 3px solid #7c3aed; }
+.cbt-ai-kabar {
+  margin: 10px 0 0; padding: 10px 13px; border-radius: 9px;
+  border: 1px solid rgba(124, 58, 237, .28); background: #f6f2fe;
+  color: #5b21b6; font-size: 12.5px; line-height: 1.65;
+}
+.cbt-ai-atur { margin-top: 12px; }
+.cbt-ai-jenis { display: grid; gap: 7px; margin: 12px 0; }
+.cbt-ai .cbt-lebar { margin-bottom: 12px; }
+.cbt-ai .cbt-lebar textarea {
+  width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px;
+  background: var(--white); color: var(--ink); font: inherit; font-size: 13px; line-height: 1.6;
+  resize: vertical;
+}

@@ -23,6 +23,8 @@ import {
   type JenisSoal, type Media, type Pasangan, type StatusUjian,
 } from "@/lib/cbt";
 import { imporDariExcel, imporDariWord, type SoalImpor, type Aoa } from "@/lib/impor-soal";
+import { sarikanDokumen, type HasilSari } from "@/lib/sari-dokumen";
+import { JENIS_AI, MAKS_SOAL } from "@/lib/ai-soal";
 import { buatDocxTemplate, buatXlsxTemplate } from "@/lib/template-soal";
 
 type Ujian = {
@@ -166,6 +168,20 @@ export default function CbtPanel({ role }: { role: string }) {
   const [jadwal, setJadwal] = useState({ mulai: "", selesai: "" });
   const [sibuk, setSibuk] = useState(false);
 
+  // ---------- BUAT SOAL DENGAN AI ----------
+  const [aiSiap, setAiSiap] = useState<boolean | null>(null);
+  const [aiPenyedia, setAiPenyedia] = useState<string[]>([]);
+  const [sari, setSari] = useState<HasilSari | null>(null);
+  const [sariNama, setSariNama] = useState("");
+  const [aiSibuk, setAiSibuk] = useState(false);
+  const [aiKabar, setAiKabar] = useState("");
+  const [aiAtur, setAiAtur] = useState({
+    jumlah: 10,
+    jenis: ["pg"] as JenisSoal[],
+    tingkat: "campuran" as "campuran" | "mudah" | "sedang" | "sulit",
+    arahan: "",
+  });
+
   const muatUjian = useCallback(async () => {
     try {
       const jawab = await fetch("/api/cbt/ujian", { cache: "no-store" });
@@ -184,6 +200,23 @@ export default function CbtPanel({ role }: { role: string }) {
     const tunda = window.setTimeout(() => void muatUjian(), 0);
     return () => window.clearTimeout(tunda);
   }, [muatUjian]);
+
+  // Ditanyakan sekali di awal: menu AI yang tampil lengkap lalu menjawab
+  // "belum ada kunci" sesudah dosen mengunggah dokumen dan menunggu satu menit
+  // adalah cara paling buruk menyampaikan kabar itu.
+  useEffect(() => {
+    const tunda = window.setTimeout(() => {
+      fetch("/api/cbt/ai-soal", { cache: "no-store" })
+        .then((jawab) => jawab.json())
+        .then((data) => {
+          if (!data.success) return;
+          setAiSiap(Boolean(data.siap));
+          setAiPenyedia(data.tersedia || []);
+        })
+        .catch(() => setAiSiap(false));
+    }, 0);
+    return () => window.clearTimeout(tunda);
+  }, []);
 
   // Monitoring ujian yang sedang berlangsung menyegar sendiri: dosen yang
   // harus menekan tombol muat ulang tiap menit tidak sedang memantau apa pun.
@@ -598,6 +631,89 @@ export default function CbtPanel({ role }: { role: string }) {
     }
   }
 
+  // ---------- BUAT SOAL DENGAN AI ----------
+
+  /**
+   * Sarikan dokumen yang diunggah dosen — SELURUHNYA di peramban.
+   *
+   * Yang berangkat ke server nanti hanya teksnya. Bahan ujian adalah bahan
+   * yang belum diujikan; ia tidak perlu singgah di tempat lain hanya untuk
+   * dijadikan soal.
+   */
+  async function bacaBahanAi(berkas: File) {
+    setAiKabar("");
+    setGalat("");
+    setSari(null);
+    setSariNama(berkas.name);
+    setAiSibuk(true);
+    try {
+      const hasil = await sarikanDokumen(berkas);
+      if (hasil.kata < 120) {
+        throw new Error(
+          `Hanya ${hasil.kata} kata yang terbaca dari berkas ini. ` +
+            "Bila ini PDF hasil pindaian, teksnya berupa gambar dan belum dapat dibaca — " +
+            "pakai dokumen aslinya.",
+        );
+      }
+      setSari(hasil);
+      // Jumlah soal disarankan dari panjang naskahnya, bukan dibiarkan pada
+      // angka bawaan yang mungkin jauh melampaui isinya.
+      const wajar = Math.max(1, Math.min(Math.floor(hasil.kata / 60), MAKS_SOAL));
+      setAiAtur((kini) => ({ ...kini, jumlah: Math.min(kini.jumlah, wajar) || wajar }));
+      setAiKabar(
+        `${hasil.kata.toLocaleString("id-ID")} kata terbaca` +
+          (hasil.bagian > 0 ? ` dari ${hasil.bagian} ${hasil.jenis === "pptx" ? "salindia" : "halaman"}` : "") +
+          `. Sekitar ${wajar} soal masih wajar dari naskah sepanjang ini.`,
+      );
+    } catch (alasan: unknown) {
+      setSariNama("");
+      setGalat(alasan instanceof Error ? alasan.message : "Dokumen tidak dapat dibaca.");
+    } finally {
+      setAiSibuk(false);
+    }
+  }
+
+  async function buatSoalAi() {
+    if (!terbuka || !sari) return;
+    setAiSibuk(true);
+    setGalat("");
+    setPesan("");
+    try {
+      const jawab = await fetch("/api/cbt/ai-soal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ujian: terbuka.id,
+          teks: sari.teks,
+          jumlah: aiAtur.jumlah,
+          jenis: aiAtur.jenis,
+          tingkat: aiAtur.tingkat,
+          materi: terbuka.courseName,
+          arahan: aiAtur.arahan,
+        }),
+      });
+      const data = await jawab.json();
+      if (!jawab.ok || !data.success) {
+        if (Array.isArray(data.tolak) && data.tolak.length > 0) setImporTolak(data.tolak);
+        throw new Error(data.message || "Soal belum dapat dibuat.");
+      }
+      // Hasilnya masuk ke pratinjau impor yang sudah ada — bukan langsung ke
+      // bank soal. Dosen yang memutuskan, dan ia melihatnya lebih dulu.
+      setImporSoal(data.soal || []);
+      setImporTolak(data.tolak || []);
+      setImporNama(`Dibuat AI dari ${sariNama}`);
+      setAiKabar(
+        `${(data.soal || []).length} soal dibuat` +
+          (data.kurang > 0 ? `, ${data.kurang} kurang dari yang diminta` : "") +
+          `. Periksa dulu di bawah, lalu masukkan ke bank soal.`,
+      );
+    } catch (alasan: unknown) {
+      setGalat(alasan instanceof Error ? alasan.message : "Soal belum dapat dibuat.");
+    } finally {
+      setAiSibuk(false);
+    }
+  }
+
   async function terbitkanImpor() {
     if (!terbuka || imporSoal.length === 0) return;
     const hasil = await kirim(
@@ -934,6 +1050,130 @@ export default function CbtPanel({ role }: { role: string }) {
               Menyunting soal kelas dosen lain bukan wewenang yang ada pada peran Anda.
             </div>
           )}
+
+          {/* ---------- BUAT SOAL DENGAN AI ---------- */}
+          <div className="panel cbt-ai">
+            <div className="cbt-impor-kepala">
+              <b>✨ Buat soal dengan AI</b>
+              <span>
+                Unggah bahan ajar — Word, PowerPoint, atau PDF — lalu biarkan soalnya disusun dari
+                isi dokumen itu. Dokumennya dibaca di komputer Anda sendiri; yang dikirim ke server
+                hanya teksnya. Soal yang keluar TIDAK langsung masuk bank: Anda memeriksanya dulu.
+              </span>
+            </div>
+
+            {aiSiap === false ? (
+              <p className="cbt-catatan">
+                Pembuat soal AI belum tersambung ke model mana pun. Pasang <code>ANTHROPIC_API_KEY</code>
+                {" "}(Claude) atau <code>GEMINI_API_KEY</code> pada environment Vercel, lalu deploy ulang.
+                Menu lain tetap berjalan tanpa itu.
+              </p>
+            ) : (
+              <>
+                <div className="cbt-impor-tombol">
+                  <label className={`btn btn-primary cbt-unggah ${terkunci || aiSibuk ? "mati" : ""}`}>
+                    {aiSibuk && !sari ? "Membaca…" : "⇧ Unggah bahan (.docx / .pptx / .pdf)"}
+                    <input
+                      type="file"
+                      accept=".docx,.pptx,.pdf"
+                      disabled={terkunci || aiSibuk}
+                      onChange={(e) => {
+                        const berkas = e.target.files?.[0];
+                        e.target.value = "";
+                        if (berkas) void bacaBahanAi(berkas);
+                      }}
+                    />
+                  </label>
+                  {sariNama && <span className="cbt-impor-nama">{sariNama}</span>}
+                  {aiPenyedia.length > 0 && (
+                    <span className="cbt-impor-nama">
+                      model: {aiPenyedia.includes("claude") ? "Claude" : "Gemini"}
+                    </span>
+                  )}
+                </div>
+
+                {aiKabar && <p className="cbt-ai-kabar">{aiKabar}</p>}
+
+                {sari && (
+                  <>
+                    <div className="cbt-baris cbt-ai-atur">
+                      <label><span>Jumlah soal</span>
+                        <input
+                          type="number" min={1} max={MAKS_SOAL} value={aiAtur.jumlah}
+                          onChange={(e) => setAiAtur({ ...aiAtur, jumlah: Number(e.target.value) })}
+                        />
+                      </label>
+                      <label><span>Tingkat kesulitan</span>
+                        <select
+                          value={aiAtur.tingkat}
+                          onChange={(e) => setAiAtur({ ...aiAtur, tingkat: e.target.value as typeof aiAtur.tingkat })}
+                        >
+                          <option value="campuran">Campuran (30% mudah, 50% sedang, 20% sulit)</option>
+                          <option value="mudah">Mudah semua</option>
+                          <option value="sedang">Sedang semua</option>
+                          <option value="sulit">Sulit semua</option>
+                        </select>
+                      </label>
+                    </div>
+
+                    <div className="cbt-ai-jenis">
+                      <span className="cbt-opsi-judul">Jenis soal yang dibuat</span>
+                      <div className="cbt-sakelar">
+                        {JENIS_AI.map((j) => (
+                          <label key={j} className="cbt-cek">
+                            <input
+                              type="checkbox"
+                              checked={aiAtur.jenis.includes(j)}
+                              onChange={(e) =>
+                                setAiAtur({
+                                  ...aiAtur,
+                                  jenis: e.target.checked
+                                    ? [...aiAtur.jenis, j]
+                                    // Minimal satu jenis harus tersisa; tanpa itu
+                                    // permintaannya kosong dan model menebak sendiri.
+                                    : aiAtur.jenis.length > 1
+                                      ? aiAtur.jenis.filter((x) => x !== j)
+                                      : aiAtur.jenis,
+                                })
+                              }
+                            />
+                            <span>{JENIS_LABEL[j]}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <label className="cbt-lebar"><span>Arahan tambahan (opsional)</span>
+                      <textarea
+                        rows={2} value={aiAtur.arahan}
+                        onChange={(e) => setAiAtur({ ...aiAtur, arahan: e.target.value })}
+                        placeholder="Mis. fokus pada bab 2 dan 3; hindari soal hafalan tahun."
+                      />
+                    </label>
+
+                    <div className="cbt-impor-aksi">
+                      <button
+                        type="button" className="btn btn-primary"
+                        disabled={aiSibuk || terkunci}
+                        onClick={() => void buatSoalAi()}
+                      >
+                        {aiSibuk ? "Menyusun soal… (bisa satu menit)" : `✨ Buat ${aiAtur.jumlah} soal`}
+                      </button>
+                      <button type="button" className="btn btn-light" onClick={() => {
+                        setSari(null); setSariNama(""); setAiKabar("");
+                      }}>
+                        Ganti bahan
+                      </button>
+                    </div>
+                    <p className="cbt-catatan">
+                      Soal buatan mesin tetap perlu dibaca dosennya. Yang paling sering keliru bukan
+                      tata bahasanya, melainkan kunci jawaban pada soal yang tampak benar.
+                    </p>
+                  </>
+                )}
+              </>
+            )}
+          </div>
 
           {/* ---------- IMPOR MASSAL ---------- */}
           <div className="panel cbt-impor">
