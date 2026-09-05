@@ -19,12 +19,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  JENIS_LABEL, MEDIA_KOSONG, SEMUA_JENIS, STATUS_LABEL, uraiKunciJamak,
+  ejaWaktu, JENIS_LABEL, MEDIA_KOSONG, SEMUA_JENIS, STATUS_LABEL, uraiKunciJamak,
   type JenisSoal, type Media, type Pasangan, type StatusUjian,
 } from "@/lib/cbt";
 import { imporDariExcel, imporDariWord, type SoalImpor, type Aoa } from "@/lib/impor-soal";
 import { sarikanDokumen, type HasilSari } from "@/lib/sari-dokumen";
 import { JENIS_AI, MAKS_SOAL } from "@/lib/ai-soal";
+import {
+  beritaAcaraHtml, laporanPesertaHtml, naskahSoalHtml,
+  type PesertaCetak, type UjianCetak,
+} from "@/lib/cetak-cbt";
 import { buatDocxTemplate, buatXlsxTemplate } from "@/lib/template-soal";
 
 type Ujian = {
@@ -58,8 +62,19 @@ type Soal = {
 type Peserta = {
   id: number; nim: string; nama: string; status: string; terjawab: number;
   nilai: number | null; tertunda: number; sisaDetik: number;
+  /** Detik sejak peramban peserta terakhir menyapa. null = belum pernah. */
+  diamDetik: number | null;
   keluarFullscreen: number; pindahTab: number; mulai: string; kumpul: string | null;
 };
+
+/**
+ * Sesudah berapa lama diam seorang peserta dianggap TERPUTUS.
+ *
+ * Perambannya menyapa tiap sepuluh detik; enam kali lipat dari itu memberi
+ * kelonggaran untuk jaringan kampus yang tersendat tanpa membuat papan pantau
+ * lambat menyadari layar yang benar-benar mati.
+ */
+const AMBANG_TERPUTUS = 60;
 
 type Analisis = {
   id: number; pertanyaan: string; dijawab: number; benar: number;
@@ -156,6 +171,9 @@ export default function CbtPanel({ role }: { role: string }) {
   const [draftKoreksi, setDraftKoreksi] = useState<Record<number, { poin: string; catatan: string }>>({});
   const [muatRincian, setMuatRincian] = useState(false);
 
+  // Berita acara: dua keterangan yang hanya diketahui pengawasnya sendiri.
+  const [acara, setAcara] = useState({ pengawas: "", ruang: "", catatan: "" });
+
   // Impor massal: hasil bacaan berkas ditahan dulu untuk dilihat dosen
   // sebelum benar-benar masuk. Empat puluh soal yang langsung tersimpan tanpa
   // sempat dilihat berarti empat puluh soal yang harus diperiksa satu per satu
@@ -218,11 +236,12 @@ export default function CbtPanel({ role }: { role: string }) {
     return () => window.clearTimeout(tunda);
   }, []);
 
-  // Monitoring ujian yang sedang berlangsung menyegar sendiri: dosen yang
-  // harus menekan tombol muat ulang tiap menit tidak sedang memantau apa pun.
+  // Monitoring ujian yang sedang berlangsung menyegar sendiri tiap sepuluh
+  // detik: dosen yang harus menekan tombol muat ulang tiap menit tidak sedang
+  // memantau apa pun.
   useEffect(() => {
     if (buka === null || tab !== "pantau") return;
-    const jam = setInterval(() => void muatHasil(buka), 15_000);
+    const jam = setInterval(() => void muatHasil(buka), 10_000);
     return () => clearInterval(jam);
   }, [buka, tab]);
 
@@ -730,6 +749,102 @@ export default function CbtPanel({ role }: { role: string }) {
     await muatUjian();
   }
 
+  // ---------- LEMBAR CETAK ----------
+
+  /**
+   * Buka satu berkas cetak pada jendelanya sendiri.
+   *
+   * Cara yang sama dipakai surat tugas dan laporan antrean di portal ini, jadi
+   * dosennya sudah mengenalnya: tekan Cetak, lalu pilih "Simpan sebagai PDF".
+   */
+  function bukaCetak(html: string) {
+    const jendela = window.open("", "_blank");
+    if (!jendela) {
+      setGalat("Popup diblokir peramban. Izinkan popup untuk situs ini, lalu coba lagi.");
+      return;
+    }
+    jendela.document.write(html);
+    jendela.document.close();
+  }
+
+  function keteranganUjian(): UjianCetak | null {
+    if (!terbuka) return null;
+    return {
+      judul: terbuka.title,
+      mataKuliah: terbuka.courseName,
+      kelas: terbuka.className,
+      kode: terbuka.code,
+      durasi: terbuka.durationMinutes,
+      jumlahSoal: terbuka.questionCount || soal.length,
+      instruksi: terbuka.instruction,
+      mulai: terbuka.startAt,
+      selesai: terbuka.endAt,
+    };
+  }
+
+  function cetakNaskah(denganKunci: boolean) {
+    const info = keteranganUjian();
+    if (!info || soal.length === 0) {
+      setGalat("Bank soalnya masih kosong — belum ada yang dapat dicetak.");
+      return;
+    }
+    if (denganKunci) {
+      const setuju = window.confirm(
+        "Berkas ini memuat KUNCI JAWABAN dan hanya untuk pengawas.\n\n" +
+          "Jangan sampai tercetak bersama naskah mahasiswa. Lanjutkan?",
+      );
+      if (!setuju) return;
+    }
+    bukaCetak(naskahSoalHtml(info, soal, { denganKunci }));
+  }
+
+  function cetakBeritaAcara() {
+    const info = keteranganUjian();
+    if (!info) return;
+    bukaCetak(
+      beritaAcaraHtml(info, {
+        pengawas: acara.pengawas,
+        ruang: acara.ruang,
+        catatan: acara.catatan,
+        hadir: peserta.length,
+        terdaftar: peserta.length,
+        selesai: peserta.filter((p) => p.status !== "berjalan").length,
+        berjalan: peserta.filter((p) => p.status === "berjalan").length,
+        pelanggaran: peserta.reduce((n, p) => n + p.pindahTab + p.keluarFullscreen, 0),
+        peserta: peserta.map((p) => ({
+          nim: p.nim, nama: p.nama, status: p.status,
+          pindahTab: p.pindahTab, keluarFullscreen: p.keluarFullscreen,
+        })),
+      }),
+    );
+  }
+
+  function cetakLaporanPeserta() {
+    const info = keteranganUjian();
+    if (!info || !bukaPeserta || !terbuka) return;
+    const orang: PesertaCetak = {
+      nim: bukaPeserta.nim, nama: bukaPeserta.nama, nilai: bukaPeserta.nilai,
+      benar: rincian.filter((r) => r.benar === true).length,
+      sebagian: rincian.filter((r) => r.benar === false && r.poin > 0).length,
+      salah: rincian.filter((r) => r.benar === false && r.poin <= 0).length,
+      kosong: rincian.filter((r) => !r.jawabanTeks).length,
+      tertunda: bukaPeserta.tertunda,
+      mulai: bukaPeserta.mulai, kumpul: bukaPeserta.kumpul,
+      pindahTab: bukaPeserta.pindahTab, keluarFullscreen: bukaPeserta.keluarFullscreen,
+    };
+    bukaCetak(
+      laporanPesertaHtml(
+        info, orang,
+        rincian.map((r) => ({
+          nomor: r.nomor, jenis: r.jenis, pertanyaan: r.pertanyaan,
+          jawabanTeks: r.jawabanTeks, benar: r.benar, poin: r.poin, bobot: r.bobot,
+          catatan: r.catatan,
+        })),
+        terbuka.passingGrade,
+      ),
+    );
+  }
+
   // ---------- BAGIKAN ----------
 
   function alamatUjian(kode: string) {
@@ -970,6 +1085,33 @@ export default function CbtPanel({ role }: { role: string }) {
             {tersalin === "pesan" ? "Pesan tersalin ✓" : "📋 Salin pesan siap tempel untuk grup"}
           </button>
           <pre className="cbt-bagi-pratinjau">{pesanGrup(terbuka)}</pre>
+        </div>
+      )}
+
+      {/* ---------- CETAK NASKAH SOAL (CADANGAN) ---------- */}
+      {soal.length > 0 && (
+        <div className="panel cbt-cetak">
+          <div className="cbt-impor-kepala">
+            <b>🖨 Cetak naskah soal</b>
+            <span>
+              Cadangan tercetak untuk keadaan darurat — listrik padam, jaringan mati, atau
+              laboratorium tidak dapat dipakai. Tekan Cetak pada jendela yang terbuka, lalu pilih
+              <b> Simpan sebagai PDF</b> bila ingin berkasnya saja.
+            </span>
+          </div>
+          <div className="cbt-impor-tombol">
+            <button type="button" className="btn btn-primary" onClick={() => cetakNaskah(false)}>
+              Naskah untuk mahasiswa
+            </button>
+            <button type="button" className="btn btn-light" onClick={() => cetakNaskah(true)}>
+              Naskah + kunci (pengawas)
+            </button>
+          </div>
+          <p className="cbt-catatan">
+            Naskah untuk mahasiswa TIDAK memuat kunci jawaban, pembahasan, maupun rambu penilaian
+            essay — sudah termasuk lembar identitas dan ruang menulis. Soal yang memakai gambar atau
+            video ditandai, karena medianya tidak dapat ikut tercetak.
+          </p>
         </div>
       )}
 
@@ -1554,11 +1696,26 @@ export default function CbtPanel({ role }: { role: string }) {
             <div className="psn-kepala">
               <div>
                 <b>Peserta</b>
-                <span>Menyegar sendiri tiap 15 detik selama tab ini terbuka.</span>
+                <span>
+                  Menyegar sendiri tiap 10 detik selama tab ini terbuka.
+                  {(() => {
+                    const putus = peserta.filter(
+                      (p) => p.status === "berjalan" && p.diamDetik !== null && p.diamDetik > AMBANG_TERPUTUS,
+                    ).length;
+                    return putus > 0
+                      ? ` ${putus} peserta tampak terputus — layarnya tidak menyapa lebih dari semenit.`
+                      : "";
+                  })()}
+                </span>
               </div>
-              <button type="button" className="btn btn-light btn-mini" onClick={() => void unduhNilai()} disabled={peserta.length === 0}>
-                ⇩ Unduh nilai (CSV)
-              </button>
+              <span className="cbt-pantau-aksi">
+                <button type="button" className="btn btn-light btn-mini" onClick={() => void unduhNilai()} disabled={peserta.length === 0}>
+                  ⇩ Unduh nilai (CSV)
+                </button>
+                <button type="button" className="btn btn-light btn-mini" onClick={() => cetakBeritaAcara()} disabled={peserta.length === 0}>
+                  🖨 Berita acara
+                </button>
+              </span>
             </div>
 
             {peserta.length === 0 ? (
@@ -1567,7 +1724,7 @@ export default function CbtPanel({ role }: { role: string }) {
               <div className="qtable-wrap">
                 <table className="qt">
                   <thead>
-                    <tr><th>Mahasiswa</th><th>Status</th><th>Progres</th><th>Nilai</th><th>Catatan</th><th /></tr>
+                    <tr><th>Mahasiswa</th><th>Status</th><th>Progres</th><th>Sisa waktu</th><th>Nilai</th><th>Catatan</th><th /></tr>
                   </thead>
                   <tbody>
                     {peserta.map((p) => (
@@ -1577,8 +1734,18 @@ export default function CbtPanel({ role }: { role: string }) {
                           <span className={`pill cbt-p-${p.status}`}>
                             {p.status === "berjalan" ? "Mengerjakan" : p.status === "waktu_habis" ? "Waktu habis" : "Selesai"}
                           </span>
+                          {p.status === "berjalan" && p.diamDetik !== null && p.diamDetik > AMBANG_TERPUTUS && (
+                            <small className="cbt-putus">⚠ terputus {Math.round(p.diamDetik / 60)} menit</small>
+                          )}
                         </td>
                         <td>{p.terjawab}/{terbuka.questionCount || soal.length}</td>
+                        <td>
+                          {p.status === "berjalan" ? (
+                            <span className={p.sisaDetik <= 300 ? "cbt-genting" : ""}>{ejaWaktu(p.sisaDetik)}</span>
+                          ) : (
+                            <small className="psn-nama">—</small>
+                          )}
+                        </td>
                         <td>
                           {p.nilai === null ? "—" : <b>{p.nilai}</b>}
                           {p.tertunda > 0 && <small className="psn-nama">{p.tertunda} essay menunggu</small>}
@@ -1613,6 +1780,33 @@ export default function CbtPanel({ role }: { role: string }) {
             )}
           </div>
 
+          {/* ---------- BERITA ACARA ---------- */}
+          {peserta.length > 0 && (
+            <div className="panel cbt-acara">
+              <div className="cbt-impor-kepala">
+                <b>Berita acara pelaksanaan</b>
+                <span>
+                  Angka kehadiran dan daftar pelanggaran diambil sendiri dari sistem. Tiga isian di
+                  bawah hanya diketahui pengawasnya, jadi ia yang menuliskannya.
+                </span>
+              </div>
+              <div className="cbt-baris">
+                <label><span>Nama pengawas</span>
+                  <input value={acara.pengawas} onChange={(e) => setAcara({ ...acara, pengawas: e.target.value })} placeholder="Nama lengkap pengawas" />
+                </label>
+                <label><span>Ruang / moda</span>
+                  <input value={acara.ruang} onChange={(e) => setAcara({ ...acara, ruang: e.target.value })} placeholder="Lab Komputer 2 — kosongkan bila daring" />
+                </label>
+              </div>
+              <label className="cbt-lebar"><span>Catatan kejadian selama ujian</span>
+                <textarea rows={2} value={acara.catatan} onChange={(e) => setAcara({ ...acara, catatan: e.target.value })} placeholder="Mis. listrik padam 5 menit pukul 09.20; dua mahasiswa terlambat masuk." />
+              </label>
+              <button type="button" className="btn btn-primary" onClick={() => cetakBeritaAcara()}>
+                🖨 Buat berita acara
+              </button>
+            </div>
+          )}
+
           {/* ---------- LEMBAR JAWABAN & KOREKSI ESSAY ---------- */}
           {bukaPeserta && (
             <div className="panel psn-panel cbt-lembar">
@@ -1624,9 +1818,14 @@ export default function CbtPanel({ role }: { role: string }) {
                     {bukaPeserta.tertunda > 0 && ` · ${bukaPeserta.tertunda} essay menunggu koreksi`}
                   </span>
                 </div>
-                <button type="button" className="btn btn-light btn-mini" onClick={() => { setBukaPeserta(null); setRincian([]); }}>
-                  Tutup
-                </button>
+                <span className="cbt-pantau-aksi">
+                  <button type="button" className="btn btn-light btn-mini" onClick={() => cetakLaporanPeserta()} disabled={rincian.length === 0}>
+                    🖨 Cetak laporan
+                  </button>
+                  <button type="button" className="btn btn-light btn-mini" onClick={() => { setBukaPeserta(null); setRincian([]); }}>
+                    Tutup
+                  </button>
+                </span>
               </div>
 
               {muatRincian ? (

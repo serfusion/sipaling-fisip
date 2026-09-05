@@ -318,6 +318,17 @@ export async function POST(request: Request) {
       return Response.json({ success: false, message: "Ujian ini sudah dikumpulkan." }, { status: 409 });
     }
 
+    // ---------- DENYUT ----------
+    // Peramban mahasiswa menyapa tiap sepuluh detik. Dua gunanya, dan
+    // dua-duanya penting: papan pantau dosen dapat membedakan "sedang
+    // mengerjakan" dari "layarnya mati sejak sepuluh menit lalu", dan sisa
+    // waktu yang berlaku — yang dihitung SERVER — dikembalikan untuk
+    // meluruskan jam di perambannya.
+    if (aksi === "denyut") {
+      await db.update(cbtAttempts).set({ lastSeenAt: sekarang }).where(eq(cbtAttempts.id, attempt.id));
+      return Response.json({ success: true, sisaDetik: sisaDetik(attempt.deadlineAt, sekarang) });
+    }
+
     // ---------- CATAT PELANGGARAN ----------
     if (aksi === "langgar") {
       const jenis = String(body.jenis || "");

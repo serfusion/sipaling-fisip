@@ -53,6 +53,21 @@ const KUNCI_PERANGKAT = "sipaling-ujian-perangkat";
 const JEDA_SIMPAN_MS = 900;
 
 /**
+ * Denyut auto-simpan: sepuluh detik sekali, apa pun yang sedang terjadi.
+ *
+ * Jeda 900 milidetik di atas menyimpan sesudah mengetik BERHENTI SEJENAK, dan
+ * itu menutup hampir semua keadaan — kecuali satu yang justru paling mahal:
+ * mahasiswa yang mengetik essay tanpa jeda selama sepuluh menit tidak pernah
+ * memicunya sekali pun, karena jedanya disetel ulang pada tiap ketukan. Denyut
+ * ini yang menutupnya.
+ *
+ * Ia juga mengambil ulang SISA WAKTU dari server. Jam peramban dapat meleset,
+ * dan laptop yang tutup lalu dibuka lagi melanjutkan hitungan mundurnya dari
+ * tempat ia tertidur — sedangkan batas waktu yang berlaku ada di server.
+ */
+const DENYUT_MS = 10_000;
+
+/**
  * Penanda perangkat, dibuat sekali lalu disimpan di peramban ini.
  *
  * BUKAN sidik jari perangkat sungguhan, dan sengaja tidak. Ia dapat dihapus
@@ -204,6 +219,7 @@ export default function UjianApp() {
     }, 1000);
     return () => clearInterval(jam);
   }, [layar]);
+
 
   const kumpulkan = useCallback(async (otomatis: boolean) => {
     if (!kunciRef.current) return;
@@ -420,6 +436,41 @@ export default function UjianApp() {
     }
     setSimpanan(gagal ? "tertunda" : "aman");
   }
+
+  // ---------- denyut: simpan berkala dan luruskan jamnya ----------
+  useEffect(() => {
+    if (layar !== "kerja") return;
+    const denyut = setInterval(() => {
+      if (!kunciRef.current) return;
+      // Ada yang tertahan di antrean → kirim. Tidak ada → tetap menyapa server
+      // sekali, supaya papan pantau dosen tahu layar ini masih hidup dan sisa
+      // waktunya ikut diluruskan.
+      if (antreRef.current.size > 0) {
+        void kirimAntrean();
+        return;
+      }
+      fetch("/api/cbt/ikut", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aksi: "denyut", kunciSesi: kunciRef.current }),
+      })
+        .then((jawab) => jawab.json())
+        .then((data) => {
+          if (typeof data?.sisaDetik === "number") setSisa(data.sisaDetik);
+        })
+        .catch(() => {
+          // Jaringan sedang putus. Tidak ada yang perlu dikabarkan: jawaban
+          // yang belum terkirim masih ada di antrean, dan denyut berikutnya
+          // akan mencobanya lagi.
+        });
+    }, DENYUT_MS);
+    return () => clearInterval(denyut);
+    // Bergantung pada layar saja. kirimAntrean dibuat ulang pada tiap gambar,
+    // dan memasukkannya ke daftar membuat denyutnya disetel ulang terus-menerus
+    // sehingga tidak pernah benar-benar berdenyut. Isinya aman dipegang dari
+    // gambar pertama: yang dibacanya hanya ref dan penyetel keadaan, dan
+    // keduanya tidak pernah basi.
+  }, [layar]);
 
   function keSoal(index: number) {
     setNomor(index);

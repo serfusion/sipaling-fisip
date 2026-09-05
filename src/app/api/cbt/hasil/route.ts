@@ -175,6 +175,13 @@ export async function GET(request: Request) {
         nilai: p.score,
         tertunda: p.pending,
         sisaDetik: p.status === "berjalan" ? sisaDetik(p.deadlineAt, sekarang) : 0,
+        // Berapa detik sejak perambannya terakhir menyapa. Inilah yang
+        // membedakan "sedang mengerjakan" dari "layarnya mati sejak sepuluh
+        // menit lalu" — dua keadaan yang pada papan pantau tampak sama persis
+        // bila hanya statusnya yang dibaca.
+        diamDetik: p.lastSeenAt
+          ? Math.max(0, Math.round((sekarang.getTime() - p.lastSeenAt.getTime()) / 1000))
+          : null,
         keluarFullscreen: p.leftFullscreen,
         pindahTab: p.switchedTab,
         mulai: p.startedAt.toISOString(),

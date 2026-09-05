@@ -4955,3 +4955,20 @@ a.al-mini:hover { color: var(--al-ink); }
   background: var(--white); color: var(--ink); font: inherit; font-size: 13px; line-height: 1.6;
   resize: vertical;
 }
+
+/* --- Lembar cetak CBT --- */
+.cbt-cetak { margin-bottom: 14px; border-left: 3px solid #64748b; }
+.cbt-acara { margin-bottom: 14px; border-left: 3px solid #0891b2; }
+.cbt-acara .cbt-baris { margin-bottom: 10px; }
+.cbt-acara .cbt-lebar { display: grid; gap: 5px; margin-bottom: 12px; }
+.cbt-acara .cbt-lebar span {
+  color: var(--muted); font-size: 10.5px; font-weight: 800;
+  letter-spacing: .05em; text-transform: uppercase;
+}
+.cbt-acara textarea, .cbt-acara input {
+  width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px;
+  background: var(--white); color: var(--ink); font: inherit; font-size: 13px; line-height: 1.6;
+}
+.cbt-pantau-aksi { display: flex; flex-wrap: wrap; gap: 8px; }
+.cbt-putus { display: block; margin-top: 2px; color: #b45309; font-size: 10.5px; font-weight: 700; }
+.cbt-genting { color: #b91c1c; font-weight: 800; }
