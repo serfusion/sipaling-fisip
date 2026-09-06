@@ -152,10 +152,26 @@ export async function POST(request: Request) {
       // Attempt yang masih berjalan dikembalikan apa adanya. Mahasiswa yang
       // ponselnya mati lalu masuk lagi harus menemukan lembar yang SAMA,
       // dengan sisa waktu yang terus berjalan — bukan ujian baru yang kosong.
-      const sudah = await db
+      const seluruhnya = await db
         .select()
         .from(cbtAttempts)
         .where(and(eq(cbtAttempts.examId, ujian.id), eq(cbtAttempts.nim, identitas.nim)));
+
+      // JATAH PERCOBAAN BERLAKU PER JENDELA UJIAN, bukan seumur hidup ujian.
+      //
+      // Ketika dosen memperbarui jamnya — ujian susulan, ujian ulang, atau
+      // jadwal yang digeser karena listrik padam — yang ia buka adalah
+      // pelaksanaan yang BARU. Percobaan dari jendela sebelumnya tidak boleh
+      // ikut menghabiskan jatahnya; kalau ikut, ujian yang sudah dijadwalkan
+      // ulang tetap menolak seluruh mahasiswa yang pernah masuk, dan dosen
+      // tidak punya jalan lain selain menghapus hasil lamanya.
+      //
+      // Batasnya jam mulai yang sedang berlaku. Mahasiswa tidak dapat masuk
+      // sebelum jam itu (lihat bolehMasuk di atas), jadi setiap percobaan yang
+      // dimulai sesudahnya pasti milik pelaksanaan ini.
+      const sudah = ujian.startAt
+        ? seluruhnya.filter((a) => a.startedAt.getTime() >= (ujian.startAt as Date).getTime())
+        : seluruhnya;
 
       const berjalan = sudah.find((a) => a.status === "berjalan");
       if (berjalan) {
@@ -203,10 +219,20 @@ export async function POST(request: Request) {
           nameKey: cbtAttempts.nameKey,
           deviceId: cbtAttempts.deviceId,
           status: cbtAttempts.status,
+          startedAt: cbtAttempts.startedAt,
         })
         .from(cbtAttempts)
         .where(eq(cbtAttempts.examId, ujian.id));
-      const ganda = periksaGanda({ nim: identitas.nim, nameKey, deviceId }, semua, {
+
+      // Disaring ke jendela yang sedang berlaku, dengan alasan yang sama
+      // seperti jatah percobaan di atas: satu komputer laboratorium yang
+      // dipakai kemarin tidak boleh memblokir orang lain pada pelaksanaan hari
+      // ini, dan nama yang sudah terdaftar pada ujian yang sudah lewat bukan
+      // pendaftaran ganda.
+      const sesiIni = ujian.startAt
+        ? semua.filter((a) => a.startedAt.getTime() >= (ujian.startAt as Date).getTime())
+        : semua;
+      const ganda = periksaGanda({ nim: identitas.nim, nameKey, deviceId }, sesiIni, {
         satuPerangkat: ujian.singleDevice,
       });
       if (!ganda.ok) {
@@ -239,7 +265,11 @@ export async function POST(request: Request) {
           name: identitas.nama,
           nameKey,
           deviceId,
-          attemptNo: sudah.length + 1,
+          // Nomor percobaan dihitung dari SELURUH riwayat, bukan dari jendela
+          // ini saja. Indeks unik (ujian, nim, nomor) menolak nomor yang
+          // terpakai, dan memulai lagi dari 1 pada pelaksanaan berikutnya akan
+          // menabrak baris lama — persis pada saat mahasiswa menekan Mulai.
+          attemptNo: seluruhnya.reduce((n, a) => Math.max(n, a.attemptNo), 0) + 1,
           sessionKey: kunciSesi,
           seed: benih,
           paper: JSON.stringify(lembar),
@@ -254,7 +284,11 @@ export async function POST(request: Request) {
           .select()
           .from(cbtAttempts)
           .where(and(eq(cbtAttempts.examId, ujian.id), eq(cbtAttempts.nim, identitas.nim)));
-        const hidup = ulang.find((a) => a.status === "berjalan");
+        const hidup = ulang.find(
+          (a) =>
+            a.status === "berjalan" &&
+            (!ujian.startAt || a.startedAt.getTime() >= (ujian.startAt as Date).getTime()),
+        );
         if (!hidup) {
           return Response.json({ success: false, message: "Ujian belum dapat dimulai. Coba lagi." }, { status: 500 });
         }
