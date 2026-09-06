@@ -4312,35 +4312,84 @@ a.al-mini:hover { color: var(--al-ink); }
    panel yang dibuka satu ketukan.
    ====================================================================== */
 .uj {
-  --uj-latar: #e6e6e6;
-  --uj-kertas: #fdfdfd;
-  --uj-kepala: #ececec;
-  --uj-garis: #d6d6d6;
+  --uj-kertas: #ffffff;
+  --uj-kepala: #eef1f7;
+  --uj-garis: #dde3ec;
   --uj-tinta: #333f4d;
-  --uj-samar: #7b8794;
-  --uj-biru: #1567c8;
+  --uj-samar: #6f7b8a;
+  --uj-biru: #1f57c3;
+  --uj-nila: #1e2d6b;
+  --uj-emas: #f5c542;
   --uj-hijau: #2e7d32;
   --uj-jingga: #e08e0b;
   --uj-merah: #a71d1d;
   min-height: 100dvh;
-  background: var(--uj-latar);
   color: var(--uj-tinta);
   font-size: 15px;
   line-height: 1.6;
 }
 
-/* --- Kartu masuk (kode, identitas, selesai) --- */
-.uj:not(.uj-kerja) { display: grid; place-items: center; padding: 22px 16px 40px; }
+/* --- Kartu masuk (kode, identitas, selesai) ---
+
+   Latarnya BERJENAMA, bukan abu-abu rata seperti sebelumnya. Bukan demi
+   cantik: layar-layar inilah yang dibuka mahasiswa dari tautan yang beredar
+   di grup kelas, dan halaman kelabu polos tidak mengatakan apa pun tentang
+   dari mana ia datang — persis keadaan yang membuat orang ragu mengisikan
+   nama dan NIM-nya. Yang di atasnya tetap kartu putih terang, karena yang
+   dibaca di sana adalah nama, NIM, dan lama waktu ujian.
+
+   Jala tipis dan dua cahaya samar dirakit sebagai lapisan latar, bukan
+   elemen semu, supaya tidak ada satu pun kotak tambahan yang dapat menutupi
+   isinya ketika halaman digulir. */
+.uj:not(.uj-kerja) {
+  display: grid; justify-items: center; align-content: center;
+  padding: clamp(20px, 5vw, 48px) 16px 44px;
+  background-color: #1b2652;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, .045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, .045) 1px, transparent 1px),
+    radial-gradient(38rem 28rem at 84% -8%, rgba(104, 140, 246, .38), transparent 62%),
+    radial-gradient(32rem 26rem at 2% 104%, rgba(245, 197, 66, .16), transparent 58%),
+    linear-gradient(158deg, #26356f 0%, #1b2652 56%, #131a3c 100%);
+  background-size: 46px 46px, 46px 46px, auto, auto, auto;
+}
 .uj-kotak {
-  width: 100%; max-width: 30rem; padding: 26px 22px;
-  border: 1px solid var(--uj-garis); border-radius: 14px; background: var(--uj-kertas);
-  box-shadow: 0 10px 30px rgba(15, 23, 42, .10);
+  position: relative; width: 100%; max-width: 30rem;
+  padding: clamp(24px, 4.5vw, 32px) clamp(20px, 4vw, 28px) 26px;
+  border: 1px solid rgba(255, 255, 255, .5); border-radius: 20px; background: var(--uj-kertas);
+  box-shadow: 0 30px 60px -26px rgba(8, 14, 40, .68), 0 2px 8px rgba(8, 14, 40, .18);
+  overflow: hidden;
+}
+/* Garis warna setipis empat piksel di tepi atas kartu. Ia yang membuat kartu
+   putih terbaca sebagai bagian dari situsnya, bukan kotak yang kebetulan
+   mengambang di sana. */
+.uj-kotak::before {
+  content: ""; position: absolute; inset: 0 0 auto; height: 4px;
+  background: linear-gradient(90deg, var(--uj-nila), #4a68d8 46%, var(--uj-emas));
 }
 .uj-lencana {
-  display: inline-block; margin-bottom: 10px; padding: 5px 11px; border-radius: 999px;
-  border: 1px solid rgba(21, 103, 200, .3); background: rgba(21, 103, 200, .09);
+  display: inline-block; margin-bottom: 10px; padding: 5px 12px; border-radius: 999px;
+  border: 1px solid rgba(31, 87, 195, .28); background: rgba(31, 87, 195, .08);
   color: var(--uj-biru); font-size: 10.5px; font-weight: 800; letter-spacing: .12em;
 }
+
+/* --- Kepala jenama di atas kartu ---
+
+   Satu baris pada latar gelap, di luar kartunya. Layar ini kerap dibuka dari
+   tautan yang diteruskan berkali-kali sampai pengirim aslinya tidak lagi
+   kelihatan; nama sistemnya harus ada di layar sebelum ada yang mengetikkan
+   NIM-nya. */
+.uj-kop {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+  width: 100%; max-width: 30rem; color: #fff;
+}
+.uj-kop-lambang {
+  width: 38px; height: 38px; display: grid; place-items: center; border-radius: 12px;
+  background: rgba(255, 255, 255, .14); border: 1px solid rgba(255, 255, 255, .22);
+  font-size: 19px; line-height: 1;
+}
+.uj-kop-teks b { display: block; font-size: 15px; font-weight: 800; letter-spacing: -.01em; }
+.uj-kop-teks span { display: block; font-size: 11px; opacity: .74; }
 .uj-kotak h1 { margin: 0 0 8px; font-size: clamp(21px, 5.4vw, 27px); line-height: 1.25; color: #263544; }
 .uj-kelas { margin: -4px 0 10px; color: var(--uj-samar); font-size: 13px; }
 .uj-lead { margin: 0 0 18px; color: var(--uj-samar); font-size: 13.5px; }
@@ -4349,22 +4398,33 @@ a.al-mini:hover { color: var(--al-ink); }
   font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
 }
 .uj-input {
-  width: 100%; padding: 13px 15px; border-radius: 9px;
-  border: 1px solid #c4ccd6; background: #fff; color: var(--uj-tinta); font: inherit; font-size: 15px;
+  width: 100%; padding: 13px 15px; border-radius: 11px;
+  border: 1px solid #ccd4e0; background: #fbfcfe; color: var(--uj-tinta);
+  font: inherit; font-size: 15px; transition: border-color .14s, box-shadow .14s, background .14s;
 }
 .uj-input::placeholder { color: #a8b2bd; }
-.uj-input:focus { outline: none; border-color: var(--uj-biru); box-shadow: 0 0 0 3px rgba(21, 103, 200, .16); }
-.uj-input-kode { text-align: center; font-size: 24px; font-weight: 800; letter-spacing: .35em; text-transform: uppercase; }
+.uj-input:focus {
+  outline: none; background: #fff; border-color: var(--uj-biru);
+  box-shadow: 0 0 0 3px rgba(31, 87, 195, .16);
+}
+/* Kotak kode ujian dibuat sebesar mungkin tanpa keluar dari kartunya: ia
+   diketik dari layar depan kelas, kerap oleh orang yang membaca kodenya dari
+   papan tulis dan mengetik tanpa menunduk ke ponselnya. */
+.uj-input-kode {
+  text-align: center; font-size: clamp(22px, 6.5vw, 26px); font-weight: 800;
+  letter-spacing: .3em; text-indent: .3em; text-transform: uppercase;
+  background: linear-gradient(180deg, #f5f8fe, #eef3fc); border-color: #c3d0e8;
+}
 
 .uj-fakta { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 9px; margin: 16px 0; }
-.uj-fakta div { padding: 12px 8px; border-radius: 10px; border: 1px solid var(--uj-garis);
-  background: #f6f7f9; text-align: center; }
+.uj-fakta div { padding: 12px 8px; border-radius: 12px; border: 1px solid var(--uj-garis);
+  background: linear-gradient(180deg, #fafbfe, #f1f4fa); text-align: center; }
 .uj-fakta b { display: block; font-size: 20px; font-weight: 800; color: #263544; }
 .uj-fakta span { display: block; margin-top: 2px; color: var(--uj-samar); font-size: 10.5px;
   font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
 
-.uj-instruksi { margin: 14px 0; padding: 13px 15px; border-radius: 10px;
-  border: 1px solid var(--uj-garis); background: #f6f7f9; }
+.uj-instruksi { margin: 14px 0; padding: 13px 15px; border-radius: 12px;
+  border: 1px solid var(--uj-garis); background: linear-gradient(180deg, #fafbfe, #f1f4fa); }
 .uj-instruksi b { display: block; margin-bottom: 5px; font-size: 12.5px; }
 .uj-instruksi p { margin: 0; color: var(--uj-samar); font-size: 13px; white-space: pre-line; }
 
@@ -4379,15 +4439,19 @@ a.al-mini:hover { color: var(--al-ink); }
 
 .uj-btn {
   display: block; width: 100%; margin-top: 12px; padding: 13px 16px;
-  border-radius: 9px; border: 1px solid #c4ccd6; background: #fff; color: var(--uj-tinta);
+  border-radius: 11px; border: 1px solid #ccd4e0; background: #fff; color: var(--uj-tinta);
   font: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer;
-  transition: background .15s, border-color .15s, transform .06s;
+  transition: background .15s, border-color .15s, transform .06s, box-shadow .15s;
 }
 .uj-btn:hover:not(:disabled) { background: #f1f4f8; border-color: #9fb0c4; }
 .uj-btn:active:not(:disabled) { transform: translateY(1px); }
 .uj-btn:disabled { opacity: .55; cursor: default; }
-.uj-btn-utama { border-color: var(--uj-biru); background: var(--uj-biru); color: #fff; }
-.uj-btn-utama:hover:not(:disabled) { background: #1258ad; border-color: #1258ad; }
+.uj-btn-utama {
+  border-color: transparent; color: #fff;
+  background: linear-gradient(100deg, var(--uj-nila) 0%, var(--uj-biru) 70%, #2f6ad2 100%);
+  box-shadow: 0 12px 24px -14px rgba(30, 45, 107, .85);
+}
+.uj-btn-utama:hover:not(:disabled) { filter: brightness(1.08); }
 .uj-btn-mulai { margin-top: 18px; padding: 16px; font-size: 16px; font-weight: 800; letter-spacing: .06em; }
 .uj-btn-sunyi { border-color: transparent; background: none; color: var(--uj-samar); font-weight: 600; }
 
@@ -4397,7 +4461,7 @@ a.al-mini:hover { color: var(--al-ink); }
   display: grid; place-items: center; font-size: 30px; font-weight: 800;
   background: #e7f4e8; border: 1px solid #a9d5ac; color: var(--uj-hijau);
 }
-.uj-nilai { margin: 16px 0; padding: 18px; border-radius: 12px; border: 1px solid var(--uj-garis); }
+.uj-nilai { margin: 16px 0; padding: 18px; border-radius: 14px; border: 1px solid var(--uj-garis); }
 .uj-nilai b { display: block; font-size: 46px; font-weight: 800; line-height: 1; }
 .uj-nilai span { display: block; margin-top: 6px; font-size: 12.5px; font-weight: 700; }
 .uj-nilai.lulus { border-color: #a9d5ac; background: #eef7ef; color: var(--uj-hijau); }
@@ -4431,17 +4495,29 @@ a.al-mini:hover { color: var(--al-ink); }
    abu-abu belum dijawab — dan artinya DITULIS pada legenda di bawahnya, bukan
    hanya diwarnai: yang sulit membedakan warna tetap dapat membacanya.
    ------------------------------------------------------------------ */
-.uj-kerja { --ck-biru: #2b5ba9; --ck-biru-tua: #1f4586; --ck-hijau: #2e9e4f;
-  --ck-oranye: #ef8c1c; --ck-abu: #c9ced6; --ck-merah: #d2372f;
-  min-height: 100dvh; padding: 0 0 96px; background: #eceff3; }
+/* Layar mengerjakan tetap TERANG. Yang dibaca di sini soal ujian selama satu
+   jam penuh, dan latar gelap yang cantik pada tangkapan layar adalah latar
+   yang melelahkan pada menit keempat puluh. Yang berubah hanya rasanya:
+   kelabu rata diganti kanvas bergradasi tipis, sehingga kartu soal putih
+   benar-benar terbaca sebagai kartu yang terangkat. */
+.uj-kerja { --ck-biru: #2b5ba9; --ck-biru-tua: #1f4586; --ck-nila: #1e2d6b;
+  --ck-hijau: #2e9e4f; --ck-oranye: #ef8c1c; --ck-abu: #c9ced6; --ck-merah: #d2372f;
+  min-height: 100dvh; padding: 0 0 96px;
+  background-color: #eaeef6;
+  background-image:
+    radial-gradient(46rem 26rem at 50% -6rem, rgba(43, 91, 169, .16), transparent 68%),
+    linear-gradient(180deg, #f2f5fb 0%, #e7ecf5 100%);
+}
 
 /* --- bilah atas: nama peserta dan tombol keluar --- */
 .ck-bar {
   position: sticky; top: 0; z-index: 5;
   display: flex; align-items: center; gap: 12px;
   padding: 11px clamp(12px, 3vw, 26px);
-  background: var(--ck-biru); color: #fff;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, .18);
+  background: linear-gradient(100deg, var(--ck-nila) 0%, var(--ck-biru) 62%, #3169bd 100%);
+  color: #fff;
+  border-bottom: 2px solid rgba(245, 197, 66, .55);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, .22);
 }
 .ck-bar-nama { display: block; font-size: 14px; font-weight: 800; line-height: 1.25; }
 .ck-bar-nim { display: block; font-size: 11.5px; opacity: .82; }
@@ -4471,8 +4547,9 @@ a.al-mini:hover { color: var(--al-ink); }
 /* --- kartu soal --- */
 .ck-kartu {
   display: flex; flex-direction: column; min-height: 28rem;
-  border: 1px solid #d3d8df; border-radius: 6px; background: #fff;
-  box-shadow: 0 1px 4px rgba(15, 23, 42, .07); overflow: hidden;
+  border: 1px solid #dbe2ec; border-radius: 14px; background: #fff;
+  box-shadow: 0 14px 34px -20px rgba(23, 37, 92, .45), 0 1px 3px rgba(15, 23, 42, .06);
+  overflow: hidden;
 }
 /* Di layar lebar kartunya dibuat setinggi layar. Kartu pendek yang mengambang
    di tengah halaman kosong membuat tombol "soal selanjutnya" berpindah tempat
@@ -4487,10 +4564,11 @@ a.al-mini:hover { color: var(--al-ink); }
 
 .ck-kartu-kepala {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 11px 14px; border-bottom: 1px solid #e2e6ec; background: #f6f8fa;
+  padding: 11px 14px; border-bottom: 1px solid #e4e9f1;
+  background: linear-gradient(180deg, #f7f9fd 0%, #eef2f9 100%);
 }
 .ck-lencana {
-  padding: 6px 13px; border-radius: 4px; color: #fff;
+  padding: 6px 14px; border-radius: 999px; color: #fff;
   font-size: 12px; font-weight: 800; letter-spacing: .04em;
 }
 .ck-lencana-soal { background: var(--ck-biru); }
@@ -4541,10 +4619,11 @@ a.al-mini:hover { color: var(--al-ink); }
 /* --- tiga tombol di dasar kartu: mundur, ragu-ragu, maju --- */
 .ck-kartu-kaki {
   display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center;
-  padding: 13px 14px; border-top: 1px solid #e2e6ec; background: #f6f8fa;
+  padding: 13px 14px; border-top: 1px solid #e4e9f1;
+  background: linear-gradient(180deg, #f7f9fd 0%, #eef2f9 100%);
 }
 .ck-tbl {
-  padding: 11px 16px; border: none; border-radius: 5px; color: #fff;
+  padding: 11px 18px; border: none; border-radius: 8px; color: #fff;
   font: inherit; font-size: 12.5px; font-weight: 800; letter-spacing: .03em; cursor: pointer;
   transition: filter .12s, transform .06s;
 }
@@ -4571,18 +4650,20 @@ a.al-mini:hover { color: var(--al-ink); }
 
 /* --- panel nomor soal --- */
 .ck-panel {
-  border: 1px solid #d3d8df; border-radius: 6px; background: #fff;
-  box-shadow: 0 1px 4px rgba(15, 23, 42, .07); overflow: hidden;
+  border: 1px solid #dbe2ec; border-radius: 14px; background: #fff;
+  box-shadow: 0 14px 34px -22px rgba(23, 37, 92, .40), 0 1px 3px rgba(15, 23, 42, .05);
+  overflow: hidden;
 }
 .ck-panel + .ck-panel { margin-top: 14px; }
 .ck-panel-kepala {
-  padding: 11px 14px; border-bottom: 1px solid #e2e6ec; background: var(--ck-biru);
+  padding: 11px 14px; border-bottom: 1px solid #e2e6ec;
+  background: linear-gradient(100deg, var(--ck-nila), var(--ck-biru));
   color: #fff; font-size: 12px; font-weight: 800; letter-spacing: .07em; text-align: center;
 }
 .ck-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; padding: 14px; }
 .ck-nomor {
   aspect-ratio: 1 / 1; display: grid; place-items: center;
-  border: 1px solid transparent; border-radius: 4px; background: var(--ck-abu);
+  border: 1px solid transparent; border-radius: 7px; background: var(--ck-abu);
   color: #3f4854; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer;
 }
 .ck-nomor:hover { filter: brightness(1.06); }
@@ -4605,7 +4686,7 @@ a.al-mini:hover { color: var(--al-ink); }
 
 .ck-panel-henti { padding: 14px; text-align: center; }
 .ck-henti {
-  width: 100%; padding: 13px 16px; border: none; border-radius: 5px;
+  width: 100%; padding: 13px 16px; border: none; border-radius: 8px;
   background: var(--ck-merah); color: #fff; font: inherit; font-size: 13px;
   font-weight: 800; letter-spacing: .05em; cursor: pointer;
 }
@@ -4783,23 +4864,57 @@ a.al-mini:hover { color: var(--al-ink); }
 .cbt-analisis-teks i { color: #b45309; font-style: normal; font-size: 11px; font-weight: 800; }
 
 /* --- Bagikan ke mahasiswa --- */
-.cbt-bagi { margin-bottom: 14px; border-left: 3px solid var(--primary, #1567c8); }
-.cbt-bagi-kepala b { display: block; color: var(--navy); font-size: 13.5px; }
-.cbt-bagi-kepala span { display: block; margin: 4px 0 12px; max-width: 46rem;
+/* --- Tautan ujian & kode QR ---
+
+   QR di kiri, alamat dan kode di kanan, tombol berbagi di bawahnya. Di layar
+   sempit QR-nya berpindah ke atas dan mengecil: dosen yang membuka panel ini
+   dari ponsel sedang menempel tautan ke grup, bukan memindai QR-nya sendiri. */
+.cbt-tautan {
+  margin-bottom: 14px; border-left: 3px solid var(--primary, #1567c8);
+  background-image: linear-gradient(140deg, rgba(21, 101, 216, .05), rgba(21, 101, 216, 0) 42%);
+}
+.cbt-tautan-kepala b { display: block; color: var(--navy); font-size: 13.5px; }
+.cbt-tautan-kepala span { display: block; margin: 4px 0 12px; max-width: 46rem;
   color: var(--muted); font-size: 12px; line-height: 1.65; }
-.cbt-bagi-baris { display: flex; flex-wrap: wrap; align-items: end; gap: 9px; margin-bottom: 9px; }
-.cbt-bagi-kotak { flex: 1 1 16rem; min-width: 0; padding: 9px 12px;
+.cbt-tautan-ingat {
+  margin: 0 0 12px; padding: 9px 13px; border-radius: 9px;
+  border: 1px solid rgba(245, 158, 11, .45); background: #fffbeb;
+  color: #92400e; font-size: 12px; line-height: 1.65;
+}
+
+.cbt-tautan-isi { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.cbt-tautan-kanan { flex: 1 1 22rem; min-width: 0; }
+
+.cbt-qr {
+  flex: 0 0 auto; width: 10.5rem; display: grid; gap: 7px; justify-items: center;
+  padding: 12px; border: 1px solid var(--line); border-radius: 14px;
+  background: var(--white); box-shadow: var(--shadow);
+}
+.cbt-qr-gambar { width: 100%; aspect-ratio: 1; }
+.cbt-qr-gambar svg { width: 100%; height: 100%; display: block; }
+.cbt-qr-teks { color: var(--muted); font-size: 10.5px; font-weight: 700; text-align: center; }
+.cbt-qr-tunggu {
+  width: 100%; aspect-ratio: 1; display: grid; place-items: center;
+  border-radius: 10px; background: var(--canvas); color: var(--muted); font-size: 11.5px;
+}
+@media (max-width: 620px) { .cbt-qr { width: 8.5rem; } }
+
+.cbt-tautan-baris { display: flex; flex-wrap: wrap; align-items: end; gap: 9px; margin-bottom: 9px; }
+.cbt-tautan-kotak { flex: 1 1 16rem; min-width: 0; padding: 9px 12px;
   border: 1px solid var(--line); border-radius: 9px; background: var(--canvas); }
-.cbt-bagi-kotak small { display: block; color: var(--muted); font-size: 10px;
+.cbt-tautan-kotak small { display: block; color: var(--muted); font-size: 10px;
   font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
-.cbt-bagi-kotak code { display: block; margin-top: 3px; color: var(--navy);
+.cbt-tautan-kotak code { display: block; margin-top: 3px; color: var(--navy);
   font-size: 12.5px; word-break: break-all; }
 /* Kode ujian dibacakan di depan kelas dan disalin huruf demi huruf. */
-.cbt-bagi-kode { flex: 0 1 12rem; }
-.cbt-bagi-kode code { font-size: 19px; font-weight: 800; letter-spacing: .2em; }
-.cbt-bagi-pesan { margin-top: 4px; }
-.cbt-bagi-pratinjau {
-  margin: 10px 0 0; padding: 12px 14px; max-height: 15rem; overflow: auto;
+.cbt-tautan-kode { flex: 0 1 12rem; }
+.cbt-tautan-kode code { font-size: 19px; font-weight: 800; letter-spacing: .2em; }
+.cbt-tautan-pesan { margin-top: 4px; width: 100%; }
+.cbt-tautan-aksi { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
+/* Tautan WhatsApp berbentuk <a>, jadi ia tidak ikut mewarisi perataan tombol. */
+.cbt-tautan-aksi a { display: inline-flex; align-items: center; text-decoration: none; }
+.cbt-tautan-pratinjau {
+  margin: 12px 0 0; padding: 12px 14px; max-height: 15rem; overflow: auto;
   border: 1px solid var(--line); border-radius: 9px; background: var(--canvas);
   color: var(--muted); font-size: 11.5px; line-height: 1.7; white-space: pre-wrap;
 }
@@ -5085,106 +5200,185 @@ a.al-mini:hover { color: var(--al-ink); }
 /* ======================================================================
    SITUS CBT — halaman depan
 
-   Dua kolom seperti rujukan rancangannya: jenama di kiri dengan latar biru
-   penuh, pintu masuk di kanan pada latar putih. Di ponsel keduanya bertumpuk,
-   dan kolom jenama menyusut menjadi kepala yang ringkas — mahasiswa yang
-   membuka dari HP lima menit sebelum ujian tidak perlu menggulir melewati
-   daftar keunggulan untuk menemukan kotak kodenya.
+   Dua kolom: jenama di kiri pada latar nila penuh, pintu masuk di kanan. Di
+   ponsel keduanya bertumpuk, dan kolom jenama menyusut menjadi kepala yang
+   ringkas — mahasiswa yang membuka dari HP lima menit sebelum ujian tidak
+   perlu menggulir melewati daftar keunggulan untuk menemukan kotak kodenya.
+
+   KOLOM KANANNYA BUKAN PUTIH POLOS. Yang berdiri di sana adalah kartu, dan
+   kartu hanya terbaca sebagai kartu bila ada sesuatu di belakangnya: kanvas
+   biru sangat muda, satu cahaya samar di sudut, dan garis warna setipis empat
+   piksel pada tepi atas kartunya. Halaman putih rata dengan kotak putih di
+   tengahnya tidak punya kedalaman sama sekali — dan itu justru bentuk yang
+   paling sering dipakai halaman phishing.
    ====================================================================== */
 .cbtd {
   --cbtd-biru: #2b3f8f;
   --cbtd-biru-tua: #1e2d6b;
+  --cbtd-emas: #f5c542;
   min-height: 100dvh;
   display: grid;
   grid-template-columns: 1fr;
-  background: #fff;
   color: #26313f;
 }
 @media (min-width: 900px) { .cbtd { grid-template-columns: 46% 54%; } }
 
+/* ---------- KIRI: JENAMA ---------- */
 .cbtd-kiri {
   position: relative; overflow: hidden;
   display: flex; flex-direction: column; justify-content: center;
   padding: clamp(28px, 5vw, 64px);
-  background: linear-gradient(150deg, var(--cbtd-biru) 0%, var(--cbtd-biru-tua) 100%);
   color: #fff;
+  background-color: var(--cbtd-biru-tua);
+  background-image:
+    radial-gradient(38rem 30rem at 88% 2%, rgba(118, 156, 255, .34), transparent 62%),
+    radial-gradient(30rem 26rem at -4% 100%, rgba(245, 197, 66, .18), transparent 58%),
+    linear-gradient(150deg, #32458f 0%, var(--cbtd-biru-tua) 56%, #151d47 100%);
 }
-/* Dua bulatan samar, seperti pada rujukannya. Murni hiasan, jadi ia tidak
-   pernah dibacakan pembaca layar. */
-.cbtd-kiri::before, .cbtd-kiri::after {
-  content: ""; position: absolute; border-radius: 50%;
-  background: rgba(255, 255, 255, .055); pointer-events: none;
+/* Jala tipis, dipudarkan ke tepi supaya tidak menjadi kotak-kotak yang
+   berdiri sendiri. Murni hiasan, jadi ia tidak pernah dibacakan pembaca
+   layar. */
+.cbtd-kiri::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, .055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, .055) 1px, transparent 1px);
+  background-size: 48px 48px;
+  -webkit-mask-image: radial-gradient(90% 80% at 26% 24%, #000 0%, transparent 76%);
+  mask-image: radial-gradient(90% 80% at 26% 24%, #000 0%, transparent 76%);
 }
-.cbtd-kiri::before { width: 30rem; height: 30rem; top: -9rem; right: -11rem; }
-.cbtd-kiri::after { width: 20rem; height: 20rem; bottom: -8rem; right: 3rem; }
-.cbtd-kiri > * { position: relative; }
+/* Satu bulatan cahaya besar di sudut kanan atas. */
+.cbtd-kiri::after {
+  content: ""; position: absolute; width: 26rem; height: 26rem; top: -9rem; right: -8rem;
+  border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 255, 255, .10) 0%, transparent 68%);
+}
+.cbtd-kiri > * { position: relative; z-index: 1; }
 
 .cbtd-lambang {
-  width: 54px; height: 54px; display: grid; place-items: center; margin-bottom: 20px;
-  border-radius: 14px; background: rgba(255, 255, 255, .16); font-size: 26px;
+  width: 56px; height: 56px; display: grid; place-items: center; margin-bottom: 20px;
+  border-radius: 17px; font-size: 26px;
+  background: linear-gradient(150deg, rgba(255, 255, 255, .24), rgba(245, 197, 66, .18));
+  border: 1px solid rgba(255, 255, 255, .28);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .34), 0 10px 24px -12px rgba(0, 0, 0, .6);
 }
-.cbtd-kiri h1 { margin: 0 0 8px; font-size: clamp(28px, 4.4vw, 40px); font-weight: 800; line-height: 1.1; }
+.cbtd-kiri h1 {
+  margin: 0 0 8px; font-size: clamp(28px, 4.4vw, 42px); font-weight: 800;
+  line-height: 1.08; letter-spacing: -.02em;
+}
+.cbtd-kiri h1 i { font-style: normal; color: var(--cbtd-emas); }
 .cbtd-sub { margin: 0 0 26px; font-size: 14px; line-height: 1.65; opacity: .9; max-width: 30rem; }
 .cbtd-nilai { display: grid; gap: 11px; margin: 0; padding: 0; list-style: none; max-width: 30rem; }
-.cbtd-nilai li { position: relative; padding-left: 28px; font-size: 13.5px; line-height: 1.6; opacity: .95; }
+.cbtd-nilai li { position: relative; padding-left: 30px; font-size: 13.5px; line-height: 1.6; opacity: .95; }
 .cbtd-nilai li::before {
   content: "✓"; position: absolute; left: 0; top: -1px;
-  width: 19px; height: 19px; display: grid; place-items: center;
-  border-radius: 50%; background: rgba(255, 255, 255, .2); font-size: 11px; font-weight: 800;
+  width: 20px; height: 20px; display: grid; place-items: center;
+  border-radius: 50%; background: var(--cbtd-emas); color: #1a2454;
+  font-size: 11px; font-weight: 800;
 }
-.cbtd-kaki-kiri { margin: 30px 0 0; font-size: 12px; opacity: .75; }
-.cbtd-kaki-kiri a { color: #fff; text-decoration: underline; }
+.cbtd-kaki-kiri { margin: 30px 0 0; font-size: 12px; opacity: .78; }
+.cbtd-kaki-kiri a { color: var(--cbtd-emas); text-decoration: underline; }
 @media (max-width: 899px) {
-  .cbtd-kiri { padding: 26px 20px 24px; }
+  .cbtd-kiri { padding: 26px 20px 28px; }
   /* Daftar keunggulan disembunyikan di ponsel: yang membuka dari HP lima menit
      sebelum ujian sedang mencari kotak kode, bukan alasan memakai sistem ini. */
   .cbtd-nilai, .cbtd-kaki-kiri { display: none; }
-  .cbtd-lambang { width: 42px; height: 42px; font-size: 21px; margin-bottom: 12px; }
+  .cbtd-lambang { width: 44px; height: 44px; font-size: 21px; margin-bottom: 12px; border-radius: 14px; }
   .cbtd-sub { margin-bottom: 0; }
 }
 
-.cbtd-kanan { display: grid; place-items: center; padding: clamp(24px, 5vw, 56px); }
-.cbtd-kotak { width: 100%; max-width: 25rem; }
-.cbtd-kotak h2 { margin: 0 0 6px; font-size: 26px; font-weight: 800; color: #1b2434; }
+/* ---------- KANAN: PINTU MASUK ---------- */
+.cbtd-kanan {
+  display: grid; place-items: center; padding: clamp(24px, 5vw, 56px);
+  background-color: #e9eefa;
+  background-image:
+    linear-gradient(rgba(43, 63, 143, .04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(43, 63, 143, .04) 1px, transparent 1px),
+    radial-gradient(44rem 30rem at 108% -12%, rgba(43, 63, 143, .20), transparent 62%),
+    radial-gradient(30rem 24rem at -10% 112%, rgba(245, 197, 66, .20), transparent 58%),
+    linear-gradient(180deg, #f3f6fd 0%, #e5ebf8 100%);
+  background-size: 48px 48px, 48px 48px, auto, auto, auto;
+}
+.cbtd-kotak {
+  position: relative; width: 100%; max-width: 25.5rem;
+  padding: clamp(26px, 4vw, 34px) clamp(20px, 3.4vw, 30px) 26px;
+  border: 1px solid rgba(30, 45, 107, .10); border-radius: 20px; background: #fff;
+  box-shadow: 0 28px 60px -30px rgba(23, 37, 92, .55), 0 2px 6px rgba(23, 37, 92, .06);
+  overflow: hidden;
+}
+.cbtd-kotak::before {
+  content: ""; position: absolute; inset: 0 0 auto; height: 4px;
+  background: linear-gradient(90deg, var(--cbtd-biru-tua), #4a68d8 46%, var(--cbtd-emas));
+}
+.cbtd-kotak h2 { margin: 0 0 6px; font-size: 26px; font-weight: 800; color: #1b2434; letter-spacing: -.01em; }
 .cbtd-lead { margin: 0 0 20px; color: #6b7684; font-size: 13.5px; }
 
 .cbtd-tab {
   display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 22px;
-  padding: 4px; border: 1px solid #e2e6ec; border-radius: 10px; background: #f6f8fa;
+  padding: 4px; border: 1px solid #e2e6ef; border-radius: 12px; background: #f4f6fb;
 }
 .cbtd-tab button {
-  padding: 10px 8px; border: 0; border-radius: 7px; background: none;
+  padding: 10px 8px; border: 0; border-radius: 9px; background: none;
   color: #6b7684; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: background .14s, color .14s, box-shadow .14s;
 }
-.cbtd-tab button.on { background: #fff; color: var(--cbtd-biru); box-shadow: 0 1px 3px rgba(15, 23, 42, .12); }
+.cbtd-tab button.on {
+  background: #fff; color: var(--cbtd-biru);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .14), 0 0 0 1px rgba(43, 63, 143, .08);
+}
 
 .cbtd-kotak label {
   display: block; margin-bottom: 7px; color: #3f4854; font-size: 12.5px; font-weight: 700;
 }
 .cbtd-input {
-  width: 100%; padding: 13px 15px; border: 1px solid #cfd6df; border-radius: 8px;
-  background: #fff; color: #26313f; font: inherit; font-size: 15px;
+  width: 100%; padding: 13px 15px; border: 1px solid #ccd4e4; border-radius: 11px;
+  background: #fbfcfe; color: #26313f; font: inherit; font-size: 15px;
+  transition: border-color .14s, box-shadow .14s, background .14s;
 }
 .cbtd-input::placeholder { color: #aeb6c0; letter-spacing: normal; }
-.cbtd-input:focus { outline: none; border-color: var(--cbtd-biru); box-shadow: 0 0 0 3px rgba(43, 63, 143, .15); }
-.cbtd-input-kode { text-align: center; font-size: 25px; font-weight: 800; letter-spacing: .32em; text-transform: uppercase; }
+.cbtd-input:focus {
+  outline: none; background: #fff; border-color: var(--cbtd-biru);
+  box-shadow: 0 0 0 3px rgba(43, 63, 143, .15);
+}
+/* Kode ujian: satu-satunya hal yang diketik di layar ini, jadi ia yang paling
+   besar. Sela hurufnya menambah ruang di ujung kanan, dan text-indent
+   membayarnya kembali supaya teksnya benar-benar di tengah. */
+.cbtd-input-kode {
+  text-align: center; font-size: clamp(22px, 6.5vw, 26px); font-weight: 800;
+  letter-spacing: .3em; text-indent: .3em; text-transform: uppercase;
+  background: linear-gradient(180deg, #f5f8fe, #eef3fc); border-color: #c3d0e8;
+}
 
 .cbtd-bantu { margin: 10px 0 0; color: #6b7684; font-size: 12px; line-height: 1.65; }
 .cbtd-galat {
-  margin: 12px 0 0; padding: 10px 13px; border-radius: 8px;
+  margin: 12px 0 0; padding: 10px 13px; border-radius: 10px;
   border: 1px solid #edb4b4; background: #fdeeee; color: #8f2222; font-size: 12.5px; line-height: 1.6;
 }
 .cbtd-btn {
-  display: block; width: 100%; margin-top: 18px; padding: 14px 16px; border: 0; border-radius: 8px;
-  background: var(--cbtd-biru); color: #fff; font: inherit; font-size: 14.5px; font-weight: 800;
-  text-align: center; cursor: pointer; transition: filter .12s;
+  display: block; width: 100%; margin-top: 18px; padding: 14px 16px; border: 0; border-radius: 11px;
+  background: linear-gradient(100deg, var(--cbtd-biru-tua) 0%, var(--cbtd-biru) 66%, #3a55b8 100%);
+  color: #fff; font: inherit; font-size: 14.5px; font-weight: 800;
+  text-align: center; cursor: pointer;
+  box-shadow: 0 14px 26px -15px rgba(30, 45, 107, .9);
+  transition: filter .14s, transform .06s;
 }
 .cbtd-btn:hover:not(:disabled) { filter: brightness(1.1); }
+.cbtd-btn:active:not(:disabled) { transform: translateY(1px); }
 .cbtd-btn:disabled { opacity: .55; cursor: default; }
 .cbtd-btn-tautan { text-decoration: none; }
 .cbtd-versi { margin: 26px 0 6px; color: #9aa4af; font-size: 11px; text-align: center; }
 .cbtd-kredit-kiri { margin: 12px 0 0; font-size: 11px; line-height: 1.6; opacity: .7; }
 @media (max-width: 860px) { .cbtd-kredit-kiri { display: none; } }
+
+/* Tautan kembali ke portal, hanya di ponsel: yang menggantikannya di layar
+   lebar ada di kolom kiri, dan kolom kiri itulah yang disembunyikan di sini. */
+.cbtd-kaki-kanan { display: none; }
+@media (max-width: 899px) {
+  .cbtd-kaki-kanan {
+    display: block; margin: 16px 0 0; color: #7b8494; font-size: 11.5px; text-align: center;
+  }
+  .cbtd-kaki-kanan a { color: var(--cbtd-biru); font-weight: 700; text-decoration: none; }
+}
 
 /* --- Kredit situs CBT ---
 

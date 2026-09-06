@@ -122,7 +122,33 @@ function tanggalRapi(iso: string | null) {
   });
 }
 
-export default function UjianApp() {
+/**
+ * Kepala jenama di atas kartu, pada latar gelap.
+ *
+ * Layar-layar ini dibuka dari tautan yang diteruskan berkali-kali sampai
+ * pengirim aslinya tidak lagi kelihatan. Nama sistemnya harus ada di layar
+ * SEBELUM ada yang mengetikkan nama dan NIM-nya ke dalamnya — halaman yang
+ * meminta identitas tanpa menyebut dirinya sendiri adalah bentuk yang persis
+ * dipakai halaman penipuan.
+ */
+function KopCbt() {
+  return (
+    <div className="uj-kop">
+      <span className="uj-kop-lambang" aria-hidden="true">📝</span>
+      <span className="uj-kop-teks">
+        <b>SiPaling CBT</b>
+        <span>Ujian Berbasis Komputer · FISIP</span>
+      </span>
+    </div>
+  );
+}
+
+/**
+ * @param kodeAwal Kode ujian yang sudah diketahui dari alamatnya, mis. dari
+ *   tautan pendek /cbt/u/K7M2QX. Kosong berarti kodenya dicari pada
+ *   query string, seperti tautan lama /cbt/ujian?kode=K7M2QX.
+ */
+export default function UjianApp({ kodeAwal = "" }: { kodeAwal?: string } = {}) {
   const [layar, setLayar] = useState<"kode" | "identitas" | "kerja" | "selesai">("kode");
   const [kode, setKode] = useState("");
   const [ujian, setUjian] = useState<Ujian | null>(null);
@@ -163,7 +189,11 @@ export default function UjianApp() {
   // dan setState sinkron di badan effect memicu gambar bertingkat.
   useEffect(() => {
     const tunda = window.setTimeout(() => {
-      const dariAlamat = new URLSearchParams(window.location.search).get("kode");
+      // Dua bentuk tautan, dan keduanya harus mendarat sama: yang pendek
+      // (/cbt/u/KODE, kodenya sudah dibaca server dan diberikan sebagai prop)
+      // dan yang lama (?kode=KODE, yang sudah terlanjur beredar di grup kelas
+      // dan tidak boleh mati).
+      const dariAlamat = kodeAwal || new URLSearchParams(window.location.search).get("kode");
       if (!dariAlamat) return;
       const bersih = dariAlamat.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12);
       setKode(bersih);
@@ -183,7 +213,7 @@ export default function UjianApp() {
         .finally(() => setSibuk(false));
     }, 0);
     return () => window.clearTimeout(tunda);
-  }, []);
+  }, [kodeAwal]);
 
   // ---------- pulihkan sesi yang tertunda ----------
   //
@@ -583,6 +613,7 @@ export default function UjianApp() {
   if (layar === "kode") {
     return (
       <div className="uj">
+        <KopCbt />
         <div className="uj-kotak">
           <span className="uj-lencana">UJIAN ONLINE</span>
           <h1>Masuk ke ujianmu</h1>
@@ -618,6 +649,7 @@ export default function UjianApp() {
     const sudahTutup = ujian.status === "selesai";
     return (
       <div className="uj">
+        <KopCbt />
         <div className="uj-kotak">
           <span className="uj-lencana">{ujian.mataKuliah}</span>
           <h1>{ujian.judul}</h1>
@@ -695,6 +727,7 @@ export default function UjianApp() {
   if (layar === "selesai") {
     return (
       <div className="uj">
+        <KopCbt />
         <div className="uj-kotak uj-kotak-selesai">
           <div className="uj-ceklis" aria-hidden="true">✓</div>
           <h1>Selesai</h1>
@@ -743,6 +776,7 @@ export default function UjianApp() {
   if (!soalKini) {
     return (
       <div className="uj">
+        <KopCbt />
         <div className="uj-kotak"><p className="uj-lead">Menyiapkan soal…</p></div>
       </div>
     );

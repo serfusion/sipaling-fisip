@@ -51,7 +51,9 @@ export default function MasukCbt() {
       {/* ---------- KIRI: JENAMA ---------- */}
       <aside className="cbtd-kiri">
         <div className="cbtd-lambang" aria-hidden="true">📝</div>
-        <h1>SiPaling CBT</h1>
+        {/* Dua kata, dan yang kedua diberi warna emas. Judul satu warna pada
+            latar biru penuh terbaca sebagai blok, bukan sebagai nama. */}
+        <h1>SiPaling <i>CBT</i></h1>
         <p className="cbtd-sub">
           Ujian Berbasis Komputer, Fakultas Ilmu Sosial dan Ilmu Politik
         </p>
@@ -130,6 +132,12 @@ export default function MasukCbt() {
           )}
 
           <p className="cbtd-versi">Sistem Ujian Berbasis Komputer</p>
+          {/* Kolom kiri — beserta tautan kembali ke portal di dalamnya —
+              disembunyikan di ponsel. Tautannya dimunculkan lagi di sini
+              supaya yang salah membuka CBT tidak terkurung di dalamnya. */}
+          <p className="cbtd-kaki-kanan">
+            Bagian dari <Link href="/">SiPaling FISIP</Link>
+          </p>
           <KreditCbt />
         </div>
       </main>

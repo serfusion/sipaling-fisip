@@ -17,7 +17,7 @@
 // tidak melihat menu ini sama sekali.
 // ============================================================
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   ejaWaktu, JENIS_LABEL, MEDIA_KOSONG, SEMUA_JENIS, STATUS_LABEL, uraiKunciJamak,
   type JenisSoal, type Media, type Pasangan, type StatusUjian,
@@ -26,11 +26,17 @@ import { imporDariExcel, imporDariWord, type SoalImpor, type Aoa } from "@/lib/i
 import { sarikanDokumen, type HasilSari } from "@/lib/sari-dokumen";
 import { JENIS_AI, MAKS_SOAL } from "@/lib/ai-soal";
 import {
-  beritaAcaraHtml, laporanPesertaHtml, naskahSoalHtml,
+  beritaAcaraHtml, laporanPesertaHtml, naskahSoalHtml, posterTautanHtml,
   type PesertaCetak, type UjianCetak,
 } from "@/lib/cetak-cbt";
+import {
+  pesanGrupUjian, tautanRingkas, tautanUjian, tautanWhatsApp,
+} from "@/lib/tautan-cbt";
 import { buatDocxTemplate, buatXlsxTemplate } from "@/lib/template-soal";
 import { KREDIT_CBT } from "../cbt/kredit";
+
+/** Langganan kosong yang stabil — kemampuan peramban tidak berubah selama halaman terbuka. */
+const TANPA_LANGGANAN = () => () => {};
 
 type Ujian = {
   id: number; code: string; title: string; courseName: string; className: string | null;
@@ -339,6 +345,39 @@ export default function CbtPanel({ role }: { role: string }) {
   const [imporNama, setImporNama] = useState("");
   const [tersalin, setTersalin] = useState("");
 
+  /**
+   * Tautan resmi ujian beserta kode QR-nya, dirakit server.
+   *
+   * Kenapa server dan bukan `window.location.origin` seperti dulu: peramban
+   * dosen tahu ia sedang membuka domain utama, tetapi tidak tahu apakah CBT
+   * dipasang pada subdomainnya sendiri. Yang tahu hanya environment. Tautan
+   * yang salah domain tidak pernah ketahuan di sini — ia ketahuan sesudah
+   * tersalin ke grup kelas.
+   *
+   * Id ujiannya ikut disimpan supaya QR ujian yang baru saja ditutup tidak
+   * sempat tampil sekejap pada ujian yang berikutnya dibuka.
+   */
+  const [tautan, setTautan] = useState<{ id: number; alamat: string; qrSvg: string; qrPng: string } | null>(null);
+
+  /**
+   * Peramban ini punya lembar berbagi bawaan sistem?
+   *
+   * Di ponsel hampir selalu, di peramban meja hampir tidak pernah — dan tombol
+   * yang tampil lalu tidak melakukan apa-apa lebih buruk daripada tombol yang
+   * tidak ada.
+   *
+   * Dibaca lewat useSyncExternalStore, bukan langsung saat menggambar:
+   * `navigator` tidak ada di server, jadi membacanya begitu saja menghasilkan
+   * gambar server tanpa tombol dan gambar peramban dengan tombol — dan React
+   * membuang seluruh hasilnya karena keduanya tidak cocok. Cabang ketiganya
+   * itulah yang menjawab sisi server.
+   */
+  const bisaBagikan = useSyncExternalStore(
+    TANPA_LANGGANAN,
+    () => typeof navigator !== "undefined" && typeof navigator.share === "function",
+    () => false,
+  );
+
   const [jadwal, setJadwal] = useState({ mulai: "", selesai: "" });
 
   // Pengaturan ujian yang sedang dibuka. Terlipat sampai diminta, tetapi
@@ -499,6 +538,25 @@ export default function CbtPanel({ role }: { role: string }) {
     }
   }
 
+  /**
+   * Ambil tautan dan QR ujian ini.
+   *
+   * Gagalnya sengaja diam: panel tetap menampilkan tautan susunan peramban,
+   * yang benar untuk pemasangan tanpa subdomain — yang hilang hanya QR-nya.
+   * Pita merah di puncak panel karena satu gambar tidak terambil akan membuat
+   * dosen mengira ujiannya bermasalah.
+   */
+  async function muatTautan(id: number) {
+    try {
+      const jawab = await fetch(`/api/cbt/tautan?ujian=${id}`, { cache: "no-store" });
+      const data = await jawab.json();
+      if (!data.success) return;
+      setTautan({ id, alamat: data.tautan, qrSvg: data.qrSvg, qrPng: data.qrPng });
+    } catch {
+      // Diabaikan; lihat alasannya di atas.
+    }
+  }
+
   async function muatHasil(id: number) {
     try {
       const jawab = await fetch(`/api/cbt/hasil?ujian=${id}`, { cache: "no-store" });
@@ -524,8 +582,10 @@ export default function CbtPanel({ role }: { role: string }) {
     setSetel(setelanUjian(u));
     setBukaSetel(false);
     setAksi({});
+    setTautan(null);
     void muatSoal(u.id);
     void muatHasil(u.id);
+    void muatTautan(u.id);
   }
 
   /**
@@ -1226,30 +1286,64 @@ export default function CbtPanel({ role }: { role: string }) {
 
   // ---------- BAGIKAN ----------
 
-  function alamatUjian(kode: string) {
-    if (typeof window === "undefined") return `/ujian?kode=${kode}`;
-    return `${window.location.origin}/ujian?kode=${kode}`;
+  /**
+   * Alamat ujian yang dibagikan ke mahasiswa.
+   *
+   * Yang dipakai adalah tautan susunan SERVER bila sudah tiba — hanya server
+   * yang tahu apakah CBT dipasang pada subdomainnya sendiri. Selama jawabannya
+   * belum datang, disusun di peramban dengan penyusun yang sama persis, jadi
+   * bentuknya tidak pernah berganti-ganti di depan mata dosen.
+   */
+  function alamatUjian(u: Ujian) {
+    if (tautan && tautan.id === u.id) return tautan.alamat;
+    return tautanUjian(u.code, typeof window === "undefined" ? "" : window.location.origin);
   }
 
   function pesanGrup(u: Ujian) {
-    return [
-      `*${u.title}*`,
-      `${u.courseName}${u.className ? ` · Kelas ${u.className}` : ""}`,
-      "",
-      `Tautan ujian : ${alamatUjian(u.code)}`,
-      `Kode ujian   : ${u.code}`,
-      ...(u.token ? [`Kode pengawas: ${u.token}`] : []),
-      "",
-      `Jumlah soal  : ${u.questionCount || u.jumlahBank}`,
-      `Waktu        : ${u.durationMinutes} menit`,
-      ...(u.startAt ? [`Dibuka       : ${jamRapi(u.startAt)}`] : []),
-      ...(u.endAt ? [`Ditutup      : ${jamRapi(u.endAt)}`] : []),
-      "",
-      "Tidak perlu membuat akun. Buka tautannya, isi nama dan NIM, lalu mulai.",
-      "Lama pengerjaannya tertulis di layar sebelum tombol Mulai Ujian ditekan.",
-      "",
+    return pesanGrupUjian(
+      {
+        kode: u.code, judul: u.title, mataKuliah: u.courseName, kelas: u.className,
+        token: u.token, jumlahSoal: u.questionCount || u.jumlahBank,
+        durasi: u.durationMinutes, mulai: u.startAt, selesai: u.endAt,
+      },
+      alamatUjian(u),
       KREDIT_CBT,
-    ].join("\n");
+    );
+  }
+
+  async function bagikanTautan(u: Ujian) {
+    try {
+      await navigator.share({ title: u.title, text: pesanGrup(u), url: alamatUjian(u) });
+    } catch {
+      // Dibatalkan pengguna, atau ditolak perambannya. Bukan galat.
+    }
+  }
+
+  /** Unduh QR sebagai PNG — untuk ditempel ke grup, slide, atau lembar soal. */
+  function unduhQr(u: Ujian) {
+    if (!tautan || tautan.id !== u.id) return;
+    const berkas = document.createElement("a");
+    berkas.href = tautan.qrPng;
+    berkas.download = `qr-ujian-${u.code}.png`;
+    berkas.click();
+    kabari("qr", "oke", "✓ QR terunduh", 3400);
+  }
+
+  /**
+   * Poster satu halaman: QR besar, alamat, dan kode ujian berdampingan.
+   *
+   * Ketiganya sekaligus, karena di ruang ujian selalu ada yang tidak menerima
+   * pesan grup, yang kameranya tidak mau memindai, dan yang sudah membuka
+   * layar depan CBT dan hanya butuh kodenya.
+   */
+  function cetakPoster(u: Ujian) {
+    if (!tautan || tautan.id !== u.id) {
+      kabari("poster", "gagal", "✕ QR belum siap", 5000);
+      return;
+    }
+    const info = keteranganUjian();
+    if (!info) return;
+    bukaCetak(posterTautanHtml(info, { tautan: tautan.alamat, qrSvg: tautan.qrSvg }), "poster");
   }
 
   function salin(teks: string, penanda: string) {
@@ -1421,50 +1515,101 @@ export default function CbtPanel({ role }: { role: string }) {
       {pesan && <div className="dsh-ok">{pesan}</div>}
       {galat && <div className="dsh-error">{galat}</div>}
 
-      {/* ---------- BAGIKAN KE MAHASISWA ---------- */}
+      {/* ---------- TAUTAN & QR UNTUK MAHASISWA ----------
+
+          Empat cara masuk yang sama, berdampingan, karena di ruang ujian
+          selalu ada keempat keadaannya: yang memindai QR, yang menekan tautan
+          dari grup, yang mengetik alamatnya karena salinannya gagal terkirim,
+          dan yang sudah membuka layar depan CBT dan hanya butuh kodenya. */}
       {soal.length > 0 && (
-        <div className="panel cbt-bagi">
-          <div className="cbt-bagi-kepala">
-            <b>Bagikan ke mahasiswa</b>
+        <div className="panel cbt-tautan">
+          <div className="cbt-tautan-kepala">
+            <b>🔗 Tautan ujian &amp; kode QR</b>
             <span>
-              Tempel salah satu ke grup kelas. Mahasiswa tidak perlu membuat akun.
-              {!terbuka.activatedAt && " Ujian baru dapat dimasuki setelah diaktifkan dan jam mulainya tiba."}
+              Bagikan salah satunya ke kelas. Mahasiswa tidak perlu membuat akun maupun kata sandi.
             </span>
           </div>
 
-          <div className="cbt-bagi-baris">
-            <div className="cbt-bagi-kotak">
-              <small>Tautan ujian</small>
-              <code>{alamatUjian(terbuka.code)}</code>
-            </div>
-            <button type="button" className="btn btn-light btn-mini" onClick={() => salin(alamatUjian(terbuka.code), "tautan")}>
-              {tersalin === "tautan" ? "Tersalin ✓" : "Salin tautan"}
-            </button>
-          </div>
+          {!terbuka.activatedAt && (
+            <p className="cbt-tautan-ingat">
+              Ujian ini <b>belum diaktifkan</b>. Tautannya sudah boleh dibagikan sekarang, tetapi
+              baru terbuka setelah diaktifkan dan jam mulainya tiba.
+            </p>
+          )}
 
-          <div className="cbt-bagi-baris">
-            <div className="cbt-bagi-kotak cbt-bagi-kode">
-              <small>Kode ujian</small>
-              <code>{terbuka.code}</code>
+          <div className="cbt-tautan-isi">
+            {/* --- QR --- */}
+            <div className="cbt-qr">
+              {tautan && tautan.id === terbuka.id ? (
+                <>
+                  <div
+                    className="cbt-qr-gambar"
+                    aria-label={`Kode QR ujian ${terbuka.code}`}
+                    dangerouslySetInnerHTML={{ __html: tautan.qrSvg }}
+                  />
+                  <span className="cbt-qr-teks">Pindai untuk langsung masuk</span>
+                </>
+              ) : (
+                <div className="cbt-qr-tunggu">Menyiapkan QR…</div>
+              )}
             </div>
-            {terbuka.token && (
-              <div className="cbt-bagi-kotak cbt-bagi-kode">
-                <small>Kode pengawas</small>
-                <code>{terbuka.token}</code>
+
+            {/* --- Alamat, kode, kode pengawas --- */}
+            <div className="cbt-tautan-kanan">
+              <div className="cbt-tautan-baris">
+                <div className="cbt-tautan-kotak">
+                  <small>Tautan ujian</small>
+                  <code>{tautanRingkas(alamatUjian(terbuka))}</code>
+                </div>
+                <button type="button" className="btn btn-light btn-mini" onClick={() => salin(alamatUjian(terbuka), "tautan")}>
+                  {tersalin === "tautan" ? "Tersalin ✓" : "Salin"}
+                </button>
               </div>
-            )}
-            <button type="button" className="btn btn-light btn-mini" onClick={() => salin(terbuka.code, "kode")}>
-              {tersalin === "kode" ? "Tersalin ✓" : "Salin kode"}
-            </button>
+
+              <div className="cbt-tautan-baris">
+                <div className="cbt-tautan-kotak cbt-tautan-kode">
+                  <small>Kode ujian</small>
+                  <code>{terbuka.code}</code>
+                </div>
+                {terbuka.token && (
+                  <div className="cbt-tautan-kotak cbt-tautan-kode">
+                    <small>Kode pengawas</small>
+                    <code>{terbuka.token}</code>
+                  </div>
+                )}
+                <button type="button" className="btn btn-light btn-mini" onClick={() => salin(terbuka.code, "kode")}>
+                  {tersalin === "kode" ? "Tersalin ✓" : "Salin"}
+                </button>
+              </div>
+
+              {/* Satu tombol yang menyalin pesan siap tempel. Menyalin tautan
+                  lalu mengetik sendiri jam dan jumlah soalnya di grup adalah
+                  pekerjaan yang paling sering salah ketik. */}
+              <button type="button" className="btn btn-primary cbt-tautan-pesan" onClick={() => salin(pesanGrup(terbuka), "pesan")}>
+                {tersalin === "pesan" ? "Pesan tersalin ✓" : "📋 Salin pesan siap tempel untuk grup"}
+              </button>
+
+              <div className="cbt-tautan-aksi">
+                <a
+                  className="btn btn-light btn-mini"
+                  href={tautanWhatsApp(pesanGrup(terbuka))}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  💬 Kirim lewat WhatsApp
+                </a>
+                {bisaBagikan && (
+                  <button type="button" className="btn btn-light btn-mini" onClick={() => void bagikanTautan(terbuka)}>
+                    📤 Bagikan…
+                  </button>
+                )}
+                <Tbl kabar={aksi.poster} dasar="btn btn-light btn-mini" diam="🖨 Cetak poster QR" onClick={() => cetakPoster(terbuka)} />
+                <Tbl kabar={aksi.qr} dasar="btn btn-light btn-mini" diam="⬇ Unduh QR (PNG)" onClick={() => unduhQr(terbuka)} />
+              </div>
+            </div>
           </div>
 
-          {/* Satu tombol yang menyalin pesan siap tempel. Menyalin tautan lalu
-              mengetik sendiri jam dan jumlah soalnya di grup adalah pekerjaan
-              yang paling sering salah ketik. */}
-          <button type="button" className="btn btn-primary cbt-bagi-pesan" onClick={() => salin(pesanGrup(terbuka), "pesan")}>
-            {tersalin === "pesan" ? "Pesan tersalin ✓" : "📋 Salin pesan siap tempel untuk grup"}
-          </button>
-          <pre className="cbt-bagi-pratinjau">{pesanGrup(terbuka)}</pre>
+          <pre className="cbt-tautan-pratinjau">{pesanGrup(terbuka)}</pre>
         </div>
       )}
 

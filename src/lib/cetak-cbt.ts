@@ -393,3 +393,112 @@ Catatan ini penanda, bukan putusan.</p>` : ""}
 
   return bungkus(`Laporan: ${peserta.nama}`, isi);
 }
+
+// ---------- 4. POSTER TAUTAN & KODE QR ----------
+
+export type PosterTautan = {
+  tautan: string;
+  /** Kode QR sebagai untai SVG, sudah jadi. Dirakit di server. */
+  qrSvg: string;
+};
+
+/**
+ * Poster satu halaman untuk ditempel di pintu ruang ujian atau ditayangkan
+ * lewat proyektor.
+ *
+ * Ia menjawab satu keadaan yang selalu terjadi dan selalu memakan sepuluh
+ * menit pertama ujian: mahasiswa yang tidak menerima pesan grup, salah ketik
+ * alamat, atau ponselnya tidak dapat menempel-salin. Yang tercetak karena itu
+ * ADA TIGA, berdampingan — QR untuk yang memindai, alamat untuk yang
+ * mengetik, dan kode ujian untuk yang sudah berada di layar depan CBT.
+ *
+ * Alamatnya ditulis tanpa "https://": tujuh huruf yang sama pada setiap
+ * alamat di dunia tidak menolong siapa pun yang sedang mengetik dari jarak
+ * lima meter.
+ *
+ * Fungsi murni seperti tetangganya di berkas ini — QR-nya diterima jadi,
+ * bukan dirakit di sini, supaya lembar cetak tetap bebas pustaka.
+ */
+export function posterTautanHtml(ujian: UjianCetak, poster: PosterTautan): string {
+  const alamatPendek = poster.tautan.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  const gaya = `
+  @page { size: A4 portrait; margin: 14mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+         color: #16233c; background: #fff; }
+  .bilah { background: #1e2d6b; color: #fff; padding: 10px 16px; display: flex; gap: 12px;
+           align-items: center; justify-content: space-between; font-size: 13px; }
+  .bilah button { padding: 7px 15px; border: 0; border-radius: 6px; background: #fff;
+                  color: #1e2d6b; font: inherit; font-weight: 700; cursor: pointer; }
+  .lembar { padding: 6mm 0; text-align: center; }
+  .kepala { border-bottom: 3px solid #2b3f8f; padding-bottom: 10px; margin-bottom: 8mm; }
+  .kepala .kecil { margin: 0; font-size: 11pt; letter-spacing: .18em; color: #5a6478;
+                   text-transform: uppercase; font-weight: 700; }
+  .kepala h1 { margin: 6px 0 2px; font-size: 25pt; line-height: 1.15; }
+  .kepala p { margin: 3px 0 0; font-size: 13pt; color: #46506a; }
+  .qr { width: 74mm; height: 74mm; margin: 0 auto 6mm; padding: 5mm; border: 2px solid #d8dEEA;
+        border-radius: 14px; }
+  .qr svg { width: 100%; height: 100%; display: block; }
+  .ajakan { margin: 0 0 6mm; font-size: 14pt; font-weight: 700; color: #2b3f8f; }
+  .kotak { display: flex; gap: 5mm; justify-content: center; margin-bottom: 6mm; }
+  .kotak div { flex: 1 1 0; max-width: 78mm; padding: 5mm 4mm; border: 2px solid #d8dEEA;
+               border-radius: 12px; background: #f6f8fc; }
+  .kotak small { display: block; font-size: 9.5pt; font-weight: 800; letter-spacing: .12em;
+                 color: #5a6478; text-transform: uppercase; }
+  .kotak b { display: block; margin-top: 3mm; font-size: 20pt; letter-spacing: .16em; color: #1e2d6b; }
+  .kotak .alamat { font-size: 13pt; letter-spacing: 0; word-break: break-all; }
+  .fakta { display: flex; flex-wrap: wrap; gap: 3mm; justify-content: center; margin-bottom: 6mm;
+           font-size: 11.5pt; color: #46506a; }
+  /* nowrap: tanpa ini "90 menit" pecah menjadi dua baris di dalam pilnya
+     sendiri, dan pil setinggi dua baris berdiri sendirian di antara yang
+     setinggi satu baris. */
+  .fakta span { padding: 2mm 5mm; border-radius: 999px; background: #eef2fb; white-space: nowrap; }
+  .langkah { max-width: 130mm; margin: 0 auto; text-align: left; font-size: 11.5pt; line-height: 1.7; }
+  .langkah > b { display: block; margin-bottom: 2mm; }
+  .langkah ol { margin: 0; padding-left: 6mm; }
+  .kaki { margin-top: 8mm; padding-top: 4mm; border-top: 1px solid #ccd4e4;
+          font-size: 9.5pt; color: #6b7488; }
+  @media print { .sembunyi-cetak { display: none !important; } }
+`;
+
+  const jadwal: string[] = [`${lolos(String(ujian.durasi))} menit`, `${lolos(String(ujian.jumlahSoal))} soal`];
+  if (ujian.mulai) jadwal.push(`Dibuka ${lolos(tanggalPanjang(ujian.mulai))}`);
+  if (ujian.selesai) jadwal.push(`Ditutup ${lolos(tanggalPanjang(ujian.selesai))}`);
+
+  return `<!DOCTYPE html><html lang="id"><head><meta charset="utf-8">
+<title>Poster ujian: ${lolos(ujian.judul)}</title><style>${gaya}</style></head><body>
+<div class="bilah sembunyi-cetak">
+  <span>Tempel di pintu ruang ujian, atau tayangkan lewat proyektor.</span>
+  <button type="button" onclick="window.print()">Cetak / Simpan PDF</button>
+</div>
+<div class="lembar">
+  <div class="kepala">
+    <p class="kecil">Ujian Berbasis Komputer · FISIP</p>
+    <h1>${lolos(ujian.judul)}</h1>
+    <p>${lolos(ujian.mataKuliah)}${ujian.kelas ? ` · Kelas ${lolos(ujian.kelas)}` : ""}</p>
+  </div>
+
+  <p class="ajakan">Pindai untuk langsung masuk ujian</p>
+  <div class="qr">${poster.qrSvg}</div>
+
+  <div class="kotak">
+    <div><small>Atau buka alamat</small><b class="alamat">${lolos(alamatPendek)}</b></div>
+    <div><small>Kode ujian</small><b>${lolos(ujian.kode)}</b></div>
+  </div>
+
+  <div class="fakta">${jadwal.map((t) => `<span>${t}</span>`).join("")}</div>
+
+  <div class="langkah">
+    <b>Langkahnya</b>
+    <ol>
+      <li>Pindai kode QR di atas, atau ketik alamatnya pada peramban.</li>
+      <li>Isi nama lengkap dan NIM sesuai daftar hadir.</li>
+      <li>Periksa lama pengerjaannya di layar, lalu tekan <b>Mulai Ujian</b>.</li>
+    </ol>
+  </div>
+
+  <p class="kaki">Tidak perlu membuat akun dan tidak perlu kata sandi.
+  Jawaban tersimpan otomatis; sisa waktu dihitung di server.</p>
+</div>
+</body></html>`;
+}
