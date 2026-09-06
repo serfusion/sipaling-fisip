@@ -30,6 +30,7 @@ import {
   type PesertaCetak, type UjianCetak,
 } from "@/lib/cetak-cbt";
 import { buatDocxTemplate, buatXlsxTemplate } from "@/lib/template-soal";
+import { asalCbt } from "@/lib/situs-cbt";
 import { KREDIT_CBT } from "../cbt/kredit";
 
 type Ujian = {
@@ -1226,9 +1227,22 @@ export default function CbtPanel({ role }: { role: string }) {
 
   // ---------- BAGIKAN ----------
 
+  /**
+   * Tautan yang dibagikan dosen ke grup kelas.
+   *
+   * Sejak CBT pindah, tautan ini menunjuk ke SUBDOMAIN CBT, bukan ke domain
+   * portal tempat dashboard ini dibuka. Bedanya bukan kosmetik: yang membuka
+   * tautan itu mahasiswa, dan yang mereka lihat pertama kali sebaiknya sudah
+   * situs ujiannya sendiri — tanpa singgah dulu ke pengalihan.
+   *
+   * Bila subdomainnya tidak dikenali — pengembangan lokal, pratayang
+   * penyebaran — alamatnya kembali memakai asal yang sedang dibuka, sehingga
+   * tautannya tetap dapat dicoba di sana.
+   */
   function alamatUjian(kode: string) {
     if (typeof window === "undefined") return `/ujian?kode=${kode}`;
-    return `${window.location.origin}/ujian?kode=${kode}`;
+    const asal = asalCbt(window.location.host) || window.location.origin;
+    return `${asal}/ujian?kode=${kode}`;
   }
 
   function pesanGrup(u: Ujian) {

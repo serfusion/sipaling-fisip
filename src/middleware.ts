@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { rencanaRute } from "@/lib/situs-cbt";
 
 // PERLINDUNGAN CSRF UNTUK SELURUH API
 //
@@ -69,52 +70,61 @@ function hostOf(value: string) {
   }
 }
 
-/**
- * Tuan rumah yang melayani situs CBT, mis. "cbt.sipalingfisip.web.id".
- *
- * Kosong berarti CBT hanya dijangkau lewat /cbt pada domain utama, dan itu
- * tetap berjalan penuh — subdomain hanyalah tambahan.
- */
-function hostCbt() {
-  return (process.env.CBT_HOST || "").trim().toLowerCase();
-}
+// ============================================================
+// DUA SITUS, SATU PENYEBARAN
+//
+// CBT sudah pindah ke subdomainnya sendiri. Sejak itu tuan rumah pada
+// permintaanlah yang menentukan situs mana yang dilayani, dan seluruh
+// aturannya tinggal di src/lib/situs-cbt.ts — sebagai fungsi murni yang
+// dapat diuji tanpa menyalakan server. Yang tersisa di sini hanyalah
+// menerjemahkan rencananya menjadi jawaban HTTP.
+//
+// Pengalihannya SEMENTARA (307), bukan permanen. Pengalihan permanen
+// mengendap di peramban mahasiswa sampai cache-nya dibuang, dan bila nama
+// subdomainnya ternyata perlu dikoreksi, yang mengendap itu tidak dapat
+// ditarik kembali di tengah musim ujian.
+// ============================================================
 
-/**
- * Layani subdomain CBT pada akarnya.
- *
- * Permintaan ke cbt.<domain>/ dituliskan ulang menjadi /cbt, sehingga CBT
- * tampil sebagai situs tersendiri — beda alamat, beda jenama — tanpa perlu
- * penyebaran kedua. Yang DILEWATKAN apa adanya: /api, /_next, dan berkas
- * statis, karena ketiganya dipakai bersama kedua situs.
- *
- * Ini penulisan ulang, bukan pengalihan: alamat di bilah peramban tetap
- * subdomainnya, dan itu memang yang diinginkan.
- */
-function rewriteCbt(request: NextRequest): NextResponse | null {
-  const target = hostCbt();
-  if (!target) return null;
-
-  const host = (request.headers.get("host") || "").toLowerCase().split(":")[0];
-  if (host !== target) return null;
-
-  const { pathname } = request.nextUrl;
-  if (
-    pathname.startsWith("/api/") ||
-    pathname.startsWith("/_next/") ||
-    pathname === "/favicon.ico" ||
-    pathname.startsWith("/cbt")
-  ) {
-    return null;
-  }
+function antarKeSitusnya(request: NextRequest): NextResponse | null {
+  const rencana = rencanaRute(request.headers.get("host"), request.nextUrl.pathname);
+  if (rencana.tindakan === "lewat") return null;
 
   const alamat = request.nextUrl.clone();
-  alamat.pathname = pathname === "/" ? "/cbt" : `/cbt${pathname}`;
-  return NextResponse.rewrite(alamat);
+  alamat.pathname = rencana.pathname;
+
+  if (rencana.tindakan === "tulis-ulang") return NextResponse.rewrite(alamat);
+
+  if (rencana.host) {
+    // Pindah tuan rumah. Subdomain sungguhan selalu dilayani lewat HTTPS, dan
+    // porta dibuang supaya alamat yang terkirim bersih.
+    alamat.protocol = "https:";
+    alamat.host = rencana.host;
+    alamat.port = "";
+  } else {
+    // Tetap di tuan rumah yang sama — hanya jalurnya yang dirapikan.
+    //
+    // Tuan rumahnya diambil dari header Host, BUKAN dari alamat internal
+    // permintaan. Di balik Vercel keduanya berbeda: yang internal menunjuk
+    // ke mesin yang melayani, dan mengirimkannya sebagai pengalihan berarti
+    // menyuruh peramban mahasiswa membuka alamat yang tidak dapat ia capai.
+    const tuanRumah = (request.headers.get("host") || "").split(",")[0].trim();
+    if (tuanRumah) {
+      alamat.host = tuanRumah;
+      // Menyetel host tanpa porta TIDAK menghapus porta yang sudah ada, dan
+      // porta internal yang ikut terbawa akan menjadi alamat yang tidak
+      // dapat dibuka dari luar. Yang dipakai porta dari header Host saja.
+      if (!tuanRumah.includes(":")) alamat.port = "";
+    }
+
+    const maju = (request.headers.get("x-forwarded-proto") || "").split(",")[0].trim();
+    if (maju) alamat.protocol = `${maju}:`;
+  }
+  return NextResponse.redirect(alamat, 307);
 }
 
 export function middleware(request: NextRequest) {
-  const keCbt = rewriteCbt(request);
-  if (keCbt) return keCbt;
+  const keSitusnya = antarKeSitusnya(request);
+  if (keSitusnya) return keSitusnya;
 
   // Perlindungan CSRF tetap HANYA untuk /api, sama seperti sebelum daftar
   // jalurnya diperluas demi subdomain CBT. Memperluasnya diam-diam ke seluruh
