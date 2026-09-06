@@ -5297,3 +5297,132 @@ a.al-mini:hover { color: var(--al-ink); }
   .kel-box { padding: 13px; }
   .kel-chip { min-width: 130px; }
 }
+
+/* --- Pratinjau media pada penyunting soal --- */
+.cbt-media-pratinjau { display: grid; gap: 7px; }
+.cbt-media-pratinjau img {
+  display: block; max-width: 100%; max-height: 13rem; margin: 0 auto;
+  border: 1px solid var(--line); border-radius: 9px; background: var(--white);
+}
+.cbt-media-gagal-edit {
+  margin: 0; padding: 9px 12px; border-radius: 9px;
+  border: 1px solid rgba(245, 158, 11, .5); background: #fffbeb;
+  color: #92400e; font-size: 11.5px; line-height: 1.65;
+}
+
+/* ---------- Layar ujian di dalam rangka halaman depan ----------
+
+   Kotak putih pada kolom kanan sudah diberi lebar dan jarak oleh .cbtd-kotak,
+   jadi isian lama (.uj-*) tinggal menyesuaikan ukurannya saja — bukan ditulis
+   ulang. Yang diubah hanya yang memang berbeda: ukuran huruf, jarak antar
+   unsur, dan tombol yang kini memakai bentuk .cbtd-btn. */
+.cbtd-lencana {
+  /* Kolom kiri berupa flex tegak, dan anaknya melar penuh secara bawaan —
+     lencana selebar kolom tidak lagi terbaca sebagai lencana. */
+  align-self: flex-start;
+  display: inline-block; margin-bottom: 14px; padding: 5px 12px;
+  border-radius: 999px; background: rgba(255, 255, 255, .18);
+  font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+}
+.cbtd-kotak h2 { margin: 0 0 6px; font-size: 24px; font-weight: 800; color: #1b2434; }
+
+.uj-dalam-rangka { display: block; }
+.uj-dalam-rangka label {
+  display: block; margin: 14px 0 7px; color: #3f4854; font-size: 12.5px; font-weight: 700;
+}
+.uj-dalam-rangka .uj-input {
+  width: 100%; padding: 13px 15px; border: 1px solid #cfd6df; border-radius: 8px;
+  background: #fff; color: #26313f; font: inherit; font-size: 15px;
+}
+.uj-dalam-rangka .uj-input:focus {
+  outline: none; border-color: #2b3f8f; box-shadow: 0 0 0 3px rgba(43, 63, 143, .15);
+}
+.uj-dalam-rangka .uj-input-kode {
+  text-align: center; font-size: 22px; font-weight: 800; letter-spacing: .3em; text-transform: uppercase;
+}
+.uj-dalam-rangka .uj-btn-utama,
+.uj-dalam-rangka .uj-btn-mulai {
+  display: block; width: 100%; margin-top: 18px; padding: 14px 16px; border: 0; border-radius: 8px;
+  background: #2b3f8f; color: #fff; font: inherit; font-size: 14.5px; font-weight: 800;
+  letter-spacing: .04em; text-align: center; cursor: pointer;
+}
+.uj-dalam-rangka .uj-btn-utama:disabled { opacity: .55; cursor: default; }
+.uj-dalam-rangka .uj-btn-sunyi {
+  display: block; width: 100%; margin-top: 12px; padding: 10px; border: 0; background: none;
+  color: #6b7684; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;
+}
+.uj-dalam-rangka .uj-fakta { margin: 0 0 14px; }
+.uj-dalam-rangka .uj-galat, .uj-dalam-rangka .uj-kabar,
+.uj-dalam-rangka .uj-instruksi, .uj-dalam-rangka .uj-waktu { margin: 14px 0; }
+.uj-dalam-rangka .uj-catatan { margin-top: 12px; font-size: 12px; line-height: 1.65; }
+.uj-dalam-rangka .uj-kaki { margin-top: 18px; }
+.uj-dalam-rangka.uj-kotak-selesai { text-align: center; }
+.uj-dalam-rangka .uj-ceklis { margin: 0 auto 12px; }
+
+/* ======================================================================
+   DASHBOARD DIBESARKAN — supaya terbaca dosen yang matanya sudah lelah
+
+   Ukuran lama di sini turun sampai 8,5px pada kepala tabel dan 9px pada
+   keterangan baris. Angka sekecil itu masih "muat", tetapi muat bukan ukuran
+   yang benar: yang membacanya dosen yang mengajar sejak pagi, kerap tanpa
+   kacamata baca, dan sering dari laptop yang layarnya sudah pudar.
+   Panel CBT justru yang paling kecil di antara semuanya.
+
+   Ditulis sebagai satu blok di AKHIR berkas, bukan disebar dengan mengubah
+   angka aslinya satu per satu. Dengan begitu skala barunya terbaca sekaligus
+   di satu tempat, dan bila suatu saat perlu dikembalikan, yang dihapus cukup
+   blok ini.
+   ====================================================================== */
+
+/* --- Kerangka dashboard --- */
+.dsh .nav button { font-size: 13.5px; padding: 10px 11px; }
+.dsh .nav .ic { font-size: 15px; width: 19px; }
+.dsh .nav .badge { font-size: 10.5px; }
+.dsh-title { font-size: clamp(20px, 3.2vw, 25px); }
+.dsh .panel-kicker, .dsh .section-eyebrow { font-size: 11.5px; letter-spacing: .1em; }
+.dsh .panel-footnote { font-size: 12px; }
+.dsh-ok, .dsh-error { font-size: 13px; padding: 9px 12px; }
+.dsh-note { font-size: 13.5px; }
+.dempty { font-size: 13.5px; }
+
+/* --- Tabel: yang paling sering dibaca, dan yang paling kecil --- */
+table.qt th { font-size: 11px; letter-spacing: .04em; padding: 10px 12px; }
+table.qt td { font-size: 13px; padding: 12px 12px; }
+table.qt td b { font-size: 13.5px; }
+table.qt td small { font-size: 11.5px; }
+
+/* --- Panel CBT --- */
+.cbt-kepala b, .cbt-form-judul, .cbt-aktivasi-kepala b,
+.cbt-bagi-kepala b, .cbt-impor-kepala b { font-size: 15px; }
+.cbt-kepala span, .cbt-aktivasi-kepala span,
+.cbt-bagi-kepala span, .cbt-impor-kepala span { font-size: 13px; line-height: 1.7; }
+.cbt-form label span, .cbt-baris label span { font-size: 11.5px; }
+.cbt-form input, .cbt-form select, .cbt-form textarea,
+.cbt-baris input, .cbt-baris select { font-size: 14px; padding: 10px 12px; }
+.cbt-catatan { font-size: 12.5px; }
+.cbt-cek span { font-size: 13px !important; }
+.cbt-cek small { font-size: 12px; }
+.cbt-opsi-judul { font-size: 12px; }
+.cbt-kartu > b { font-size: 15.5px; }
+.cbt-mk, .cbt-angka, .cbt-jadwal, .cbt-sub { font-size: 13px; }
+.cbt-kartu-atas code { font-size: 12.5px; }
+.cbt-soal-tanya { font-size: 14.5px; }
+.cbt-soal-opsi li { font-size: 13.5px; }
+.cbt-soal-kunci { font-size: 13px; }
+.cbt-analisis-teks b, .cbt-analisis-teks span { font-size: 13px; }
+.cbt-impor-angka { font-size: 13.5px; }
+.cbt-bagi-kotak small { font-size: 11px; }
+.cbt-bagi-kotak code { font-size: 13.5px; }
+.cbt-langgar, .cbt-putus { font-size: 11.5px; }
+.cbt-lipat-tanda, .cbt-lipat-sunyi { font-size: 11.5px; }
+.cbt-tab button { font-size: 13.5px; padding: 10px 16px; }
+.cbt-lembar-nomor, .cbt-lembar-poin { font-size: 13px; }
+.cbt-lembar-jawab p { font-size: 13.5px; }
+.cbt-koreksi label span { font-size: 11.5px; }
+.cbt-koreksi input { font-size: 14px; }
+.pill { font-size: 11.5px; }
+
+/* Tombol di dashboard ikut dinaikkan; tombol yang kecilnya tidak sepadan
+   dengan tulisannya justru membuat halaman terasa timpang. */
+.dsh .btn { font-size: 13.5px; }
+.dsh .btn-mini { font-size: 12.5px; padding: 8px 13px; }

@@ -362,6 +362,18 @@ export default function CbtPanel({ role }: { role: string }) {
    */
   const [lipatCetak, setLipatCetak] = useState(false);
   const [bukaMedia, setBukaMedia] = useState(false);
+  /**
+   * Apakah pratinjau medianya berhasil dimuat.
+   *
+   * Disimpan bersama TAUTANNYA, bukan sebagai ya/tidak belaka: satu tautan
+   * yang gagal tidak boleh membuat tautan berikutnya ikut dinyatakan gagal.
+   * Kekeliruan itulah yang membuat gambar soal berhenti tampil di layar
+   * mahasiswa, dan ia berulang dengan mudah bila ditulis sebagai boolean.
+   */
+  const [mediaDiperiksa, setMediaDiperiksa] = useState({ url: "", hasil: "" });
+  const mediaTermuat = mediaDiperiksa.url === soalBaru.media.url ? mediaDiperiksa.hasil : "";
+  const setMediaTermuat = (hasil: string) =>
+    setMediaDiperiksa({ url: soalBaru.media.url, hasil });
 
   /**
    * KABAR PADA TOMBOLNYA SENDIRI, satu per tombol.
@@ -1317,11 +1329,9 @@ export default function CbtPanel({ role }: { role: string }) {
           <div>
             <b>Mahasiswa tidak perlu akun</b>
             <span>
-              Mereka cukup membuka <code>/ujian</code>, memasukkan kode ujian, nama, dan NIM.
-              {" Ujian baru terbuka setelah dosen pemiliknya mengaktifkan dan jam mulainya tiba."}
-              {pemantau
-                ? " Anda memantau seluruh ujian dan dapat menghapusnya, tetapi aktivasi ujian milik dosen lain bukan di tangan Anda. Buat ujian sendiri bila perlu mengadakan seleksi."
-                : ""}
+              Cukup kode ujian, nama, dan NIM. Ujian terbuka sendiri pada jam yang disetel
+              dosen pemiliknya.
+              {pemantau ? " Anda memantau dan boleh menghapus, tetapi aktivasi ada pada pemiliknya." : ""}
             </span>
           </div>
           <button type="button" className="btn btn-primary" onClick={() => setBuatBaru((b) => !b)}>
@@ -1495,9 +1505,8 @@ export default function CbtPanel({ role }: { role: string }) {
           {lipatCetak && (
             <div className="cbt-lipat-isi">
               <p className="cbt-catatan">
-                Cadangan tercetak untuk keadaan darurat: listrik padam, jaringan mati, atau
-                laboratorium tidak dapat dipakai. Tekan Cetak pada jendela yang terbuka, lalu pilih
-                <b> Simpan sebagai PDF</b> bila ingin berkasnya saja.
+                Cadangan untuk listrik padam atau jaringan mati. Pada jendela yang terbuka, tekan
+                Cetak lalu pilih <b>Simpan sebagai PDF</b>.
               </p>
               <div className="cbt-impor-tombol">
                 <Tbl kabar={aksi.naskah} diam="Naskah untuk mahasiswa" onClick={() => cetakNaskah(false)} />
@@ -1509,9 +1518,8 @@ export default function CbtPanel({ role }: { role: string }) {
                 />
               </div>
               <p className="cbt-catatan">
-                Naskah untuk mahasiswa TIDAK memuat kunci jawaban, pembahasan, maupun rambu penilaian
-                essay, dan sudah termasuk lembar identitas serta ruang menulis. Soal yang memakai
-                gambar atau video ditandai, karena medianya tidak dapat ikut tercetak.
+                Naskah mahasiswa tanpa kunci jawaban, sudah termasuk lembar identitas dan ruang
+                menulis. Soal bermedia ditandai.
               </p>
             </div>
           )}
@@ -1832,8 +1840,7 @@ export default function CbtPanel({ role }: { role: string }) {
                       </button>
                     </div>
                     <p className="cbt-catatan">
-                      Soal buatan mesin tetap perlu dibaca dosennya. Yang paling sering keliru bukan
-                      tata bahasanya, melainkan kunci jawaban pada soal yang tampak benar.
+                      Periksa kunci jawabannya — itu yang paling sering keliru pada soal buatan mesin.
                     </p>
                   </>
                 )}
@@ -1846,10 +1853,7 @@ export default function CbtPanel({ role }: { role: string }) {
           <div className="panel cbt-impor">
             <div className="cbt-impor-kepala">
               <b>Buat soal lewat Excel atau Word</b>
-              <span>
-                Unduh templatenya, isi di komputer sendiri, lalu unggah sekali untuk seluruh soal.
-                Empat puluh soal lewat formulir satuan berarti empat puluh kali mengisi dan menunggu.
-              </span>
+              <span>Unduh template, isi di komputer, unggah sekali untuk seluruh soal.</span>
             </div>
 
             <div className="cbt-impor-tombol">
@@ -2001,11 +2005,33 @@ export default function CbtPanel({ role }: { role: string }) {
                   placeholder="Keterangan gambar/video (opsional)"
                 />
               )}
+              {/* ---------- PRATINJAU ----------
+                  Dosen melihat SEKARANG apa yang akan dilihat mahasiswa. Tanpa
+                  ini, tautan yang salah ketik atau berkas yang tidak dapat
+                  dibaca umum baru ketahuan ketika ujian sudah berjalan — dan
+                  saat itu tidak ada lagi yang dapat diperbaiki. */}
+              {bukaMedia && soalBaru.media.jenis === "gambar" && soalBaru.media.url.trim() !== "" && (
+                <div className="cbt-media-pratinjau">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={soalBaru.media.url}
+                    alt="Pratinjau media soal"
+                    onLoad={() => setMediaTermuat("ya")}
+                    onError={() => setMediaTermuat("tidak")}
+                  />
+                  {mediaTermuat === "tidak" && (
+                    <p className="cbt-media-gagal-edit">
+                      Gambar ini <b>tidak dapat dimuat</b>. Bila berkasnya baru diunggah, bucket
+                      Storage-nya kemungkinan belum publik; bila ini tautan dari luar, periksa
+                      penulisannya. Mahasiswa akan melihat kotak kosong.
+                    </p>
+                  )}
+                </div>
+              )}
               {bukaMedia && (
                 <p className="cbt-catatan">
-                  Gambar maksimal 5 MB, video 50 MB. Video panjang lebih baik ditempel sebagai tautan
-                  YouTube atau Google Drive, sebab tautan sematan tidak punya batas ukuran dan tidak
-                  memakan kuota penyimpanan.
+                  Gambar maks 5 MB, video 50 MB. Video panjang lebih baik ditempel sebagai tautan
+                  YouTube atau Drive.
                 </p>
               )}
             </div>
@@ -2349,10 +2375,7 @@ export default function CbtPanel({ role }: { role: string }) {
             <div className="panel cbt-acara">
               <div className="cbt-impor-kepala">
                 <b>Berita acara pelaksanaan</b>
-                <span>
-                  Angka kehadiran dan daftar pelanggaran diambil sendiri dari sistem. Tiga isian di
-                  bawah hanya diketahui pengawasnya, jadi ia yang menuliskannya.
-                </span>
+                <span>Kehadiran dan pelanggaran diambil dari sistem. Isi tiga kolom di bawah.</span>
               </div>
               <div className="cbt-baris">
                 <label><span>Nama pengawas</span>

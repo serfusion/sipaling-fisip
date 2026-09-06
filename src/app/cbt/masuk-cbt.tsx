@@ -116,8 +116,7 @@ export default function MasukCbt({ portal = "" }: { portal?: string }) {
               />
               <p className="cbtd-bantu">
                 Kode diberikan dosen Anda, biasanya lewat grup kelas. Nama dan NIM diisi pada
-                langkah berikutnya, bersama <b>lama waktu ujiannya</b> — jadi Anda sempat bersiap
-                sebelum menekan Mulai Ujian.
+                langkah berikutnya.
               </p>
               {galat && <p className="cbtd-galat" role="alert">{galat}</p>}
               <button type="button" className="cbtd-btn" disabled={sibuk} onClick={() => void lanjut()}>

@@ -60,9 +60,28 @@ function alamatSemat(url: string): string | null {
 }
 
 export default function MediaSoal({ media }: { media: Media }) {
-  const [gagal, setGagal] = useState(false);
+  /**
+   * Tautan mana yang gagal dimuat — BUKAN sekadar "ada yang gagal".
+   *
+   * Dahulu di sini ada boolean, dan itu keliru dengan cara yang tidak terlihat
+   * sampai ujian berjalan. Komponen ini menempati kedudukan yang sama di pohon
+   * React untuk SELURUH soal, sehingga React memakai ulang satu wadah keadaan
+   * yang sama ketika mahasiswa berpindah nomor. Satu gambar yang gagal — tautan
+   * dosen yang telanjur mati, atau jaringan yang tersendat sedetik — mengunci
+   * boolean itu, dan sejak saat itu SETIAP gambar berikutnya ikut dinyatakan
+   * tidak dapat dimuat meskipun sebenarnya baik-baik saja.
+   *
+   * Video sematan tidak pernah memicunya, sebab <iframe> tidak mengeluarkan
+   * peristiwa error. Itulah sebabnya gejalanya tampak aneh: video jalan,
+   * gambar tidak.
+   *
+   * Dengan menyimpan TAUTANNYA, kegagalan hanya berlaku bagi tautan itu
+   * sendiri, dan berpindah soal otomatis memulihkannya.
+   */
+  const [urlGagal, setUrlGagal] = useState("");
 
   if (!media || !media.jenis || !media.url) return null;
+  const gagal = urlGagal !== "" && urlGagal === media.url;
 
   const keterangan = media.keterangan ? (
     <figcaption className="ck-media-ket">{media.keterangan}</figcaption>
@@ -92,7 +111,7 @@ export default function MediaSoal({ media }: { media: Media }) {
           src={media.url}
           alt={media.keterangan || "Gambar soal"}
           loading="lazy"
-          onError={() => setGagal(true)}
+          onError={() => setUrlGagal(media.url)}
         />
         {keterangan}
       </figure>
@@ -117,7 +136,7 @@ export default function MediaSoal({ media }: { media: Media }) {
 
   return (
     <figure className="ck-media">
-      <video src={media.url} controls preload="metadata" playsInline onError={() => setGagal(true)}>
+      <video src={media.url} controls preload="metadata" playsInline onError={() => setUrlGagal(media.url)}>
         Peramban ini tidak dapat memutar videonya.
       </video>
       {keterangan}

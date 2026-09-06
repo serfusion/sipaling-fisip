@@ -22,6 +22,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { jawabanKosong, uraiJodoh, type JenisSoal, type Media } from "@/lib/cbt";
 import KreditCbt from "../kredit";
 import MediaSoal from "./media-soal";
+import RangkaUjian from "./rangka-ujian";
 
 type Ujian = {
   kode: string; judul: string; mataKuliah: string; kelas: string | null;
@@ -582,33 +583,32 @@ export default function UjianApp() {
   // ---------- LAYAR: KODE ----------
   if (layar === "kode") {
     return (
-      <div className="uj">
-        <div className="uj-kotak">
-          <span className="uj-lencana">UJIAN ONLINE</span>
-          <h1>Masuk ke ujianmu</h1>
-          <p className="uj-lead">
-            Tidak perlu membuat akun dan tidak perlu kata sandi. Masukkan kode ujian yang diberikan
-            dosenmu.
-          </p>
-          <label htmlFor="uj-kode">Kode Ujian</label>
-          <input
-            id="uj-kode"
-            className="uj-input uj-input-kode"
-            value={kode}
-            onChange={(e) => setKode(e.target.value.toUpperCase())}
-            onKeyDown={(e) => { if (e.key === "Enter") void cekKode(); }}
-            placeholder="XXXXXX"
-            autoComplete="off"
-            inputMode="text"
-          />
-          {galat && <p className="uj-galat" role="alert">{galat}</p>}
-          <button type="button" className="uj-btn uj-btn-utama" disabled={sibuk} onClick={() => void cekKode()}>
-            {sibuk ? "Memeriksa…" : "Lanjut"}
-          </button>
-          <p className="uj-kaki">SiPaling FISIP · Sistem Pelayanan Akademik Lingkungan FISIP</p>
-          <KreditCbt rapat />
-        </div>
-      </div>
+      <RangkaUjian
+        judul="SiPaling CBT"
+        sub="Ujian Berbasis Komputer — Fakultas Ilmu Sosial dan Ilmu Politik"
+      >
+        <h2>Masuk ke ujianmu</h2>
+        <p className="cbtd-lead">
+          Tidak perlu membuat akun dan tidak perlu kata sandi. Masukkan kode ujian yang diberikan
+          dosenmu.
+        </p>
+        <label htmlFor="uj-kode">Kode Ujian</label>
+        <input
+          id="uj-kode"
+          className="cbtd-input cbtd-input-kode"
+          value={kode}
+          onChange={(e) => setKode(e.target.value.toUpperCase())}
+          onKeyDown={(e) => { if (e.key === "Enter") void cekKode(); }}
+          placeholder="XXXXXX"
+          autoComplete="off"
+          inputMode="text"
+        />
+        {galat && <p className="cbtd-galat" role="alert">{galat}</p>}
+        <button type="button" className="cbtd-btn" disabled={sibuk} onClick={() => void cekKode()}>
+          {sibuk ? "Memeriksa…" : "Lanjut"}
+        </button>
+        <KreditCbt rapat />
+      </RangkaUjian>
     );
   }
 
@@ -617,12 +617,18 @@ export default function UjianApp() {
     const belumBuka = ujian.status === "terjadwal";
     const sudahTutup = ujian.status === "selesai";
     return (
-      <div className="uj">
-        <div className="uj-kotak">
-          <span className="uj-lencana">{ujian.mataKuliah}</span>
-          <h1>{ujian.judul}</h1>
-          {ujian.kelas && <p className="uj-kelas">Kelas {ujian.kelas}</p>}
-
+      <RangkaUjian
+        lencana={ujian.mataKuliah}
+        judul={ujian.judul}
+        sub={ujian.kelas ? `Kelas ${ujian.kelas}` : "Ujian Berbasis Komputer FISIP"}
+        poin={[
+          `${ujian.jumlahSoal || "Beberapa"} soal, dikerjakan ${ejaMenit(ujian.durasi)}.`,
+          "Waktu baru berjalan setelah tombol Mulai Ujian ditekan.",
+          "Jawaban tersimpan otomatis tiap sepuluh detik.",
+          "Jaringan sempat terputus tidak menghapus pekerjaanmu.",
+        ]}
+      >
+        <div className="uj-dalam-rangka">
           <div className="uj-fakta">
             <div><b>{ujian.jumlahSoal || "-"}</b><span>soal</span></div>
             <div className="uj-fakta-waktu"><b>{ujian.durasi}</b><span>menit</span></div>
@@ -687,17 +693,25 @@ export default function UjianApp() {
           </button>
           <KreditCbt rapat />
         </div>
-      </div>
+      </RangkaUjian>
     );
   }
 
   // ---------- LAYAR: SELESAI ----------
   if (layar === "selesai") {
     return (
-      <div className="uj">
-        <div className="uj-kotak uj-kotak-selesai">
+      <RangkaUjian
+        judul="Ujian selesai"
+        sub={ujian ? `${ujian.judul} — ${ujian.mataKuliah}` : "Terima kasih sudah mengerjakan."}
+        poin={[
+          "Jawabanmu sudah tersimpan di server.",
+          "Halaman ini boleh ditutup.",
+          "Nilai essay menunggu koreksi dosen bila ada.",
+        ]}
+      >
+        <div className="uj-dalam-rangka uj-kotak-selesai">
           <div className="uj-ceklis" aria-hidden="true">✓</div>
-          <h1>Selesai</h1>
+          <h2>Selesai</h2>
           <p className="uj-lead">{pesanSelesai}</p>
 
           {hasil ? (
@@ -735,16 +749,16 @@ export default function UjianApp() {
           <p className="uj-kaki">Terima kasih. Halaman ini boleh ditutup.</p>
           <KreditCbt rapat />
         </div>
-      </div>
+      </RangkaUjian>
     );
   }
 
   // ---------- LAYAR: MENGERJAKAN ----------
   if (!soalKini) {
     return (
-      <div className="uj">
-        <div className="uj-kotak"><p className="uj-lead">Menyiapkan soal…</p></div>
-      </div>
+      <RangkaUjian judul="SiPaling CBT" sub="Menyiapkan soal…">
+        <p className="cbtd-lead">Menyiapkan soal…</p>
+      </RangkaUjian>
     );
   }
 

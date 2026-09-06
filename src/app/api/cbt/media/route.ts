@@ -149,6 +149,47 @@ export async function POST(request: Request) {
     }
 
     const { data } = storage.storage.from(BUCKET_MEDIA).getPublicUrl(jalur);
+
+    // ---------- DIBUKTIKAN, BUKAN DIANGGAP ----------
+    //
+    // getPublicUrl hanya MERANGKAI alamat; ia tidak pernah menghubungi
+    // Storage, dan karena itu selalu berhasil — termasuk ketika bucket-nya
+    // ternyata tidak publik. Akibatnya kegagalan bergeser ke tempat yang
+    // paling buruk: unggahan tampak berhasil di layar dosen, lalu gambarnya
+    // tidak muncul di layar mahasiswa saat ujian sudah berjalan.
+    //
+    // Satu permintaan HEAD di sini memindahkan kegagalan itu kembali ke
+    // tempatnya — di depan dosen, sebelum ujian dimulai, dengan keterangan
+    // apa yang harus diperbaiki.
+    let terjangkau = false;
+    try {
+      const coba = await fetch(data.publicUrl, { method: "HEAD", cache: "no-store" });
+      terjangkau = coba.ok;
+    } catch {
+      // Jaringan server bermasalah. Tidak dianggap gagal: berkasnya sudah
+      // masuk, dan menolak unggahan yang sebenarnya sah lebih merugikan
+      // daripada melewatkan satu pemeriksaan.
+      terjangkau = true;
+    }
+
+    if (!terjangkau) {
+      // Berkasnya dibuang lagi supaya tidak menumpuk sebagai sampah yang
+      // tidak pernah dapat dibaca siapa pun.
+      await storage.storage.from(BUCKET_MEDIA).remove([jalur]).catch(() => undefined);
+      return Response.json(
+        {
+          success: false,
+          message:
+            `Berkasnya terunggah, tetapi bucket "${BUCKET_MEDIA}" TIDAK dapat dibaca umum — ` +
+            "gambarnya akan kosong di layar mahasiswa. Buka Supabase → Storage → " +
+            `bucket "${BUCKET_MEDIA}" → aktifkan "Public bucket", atau jalankan ` +
+            "supabase-update-v26-cbt-lanjutan.sql. Sementara itu, tempelkan tautan gambar " +
+            "dari luar sebagai gantinya.",
+        },
+        { status: 502 },
+      );
+    }
+
     return Response.json({
       success: true,
       url: data.publicUrl,
