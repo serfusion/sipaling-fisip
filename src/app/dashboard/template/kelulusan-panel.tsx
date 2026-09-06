@@ -25,7 +25,7 @@ import { useMemo, useState, type ChangeEvent } from "react";
 import {
   JENIS_KELUAR, KOLOM_KELULUSAN, NAMA_LEMBAR_PDDIKTI, PRODI_PDDIKTI,
   bacaLembarYudisium, barisKeAoa, nomorSkDariLembar, periksaBaris,
-  semesterKeluar, semesterTahunAjaran,
+  semesterKeluar, semesterTahunKalender,
   type BarisKelulusan,
 } from "./kelulusan-parse";
 import type { Aoa } from "./transkrip-parse";
@@ -239,8 +239,12 @@ export default function KelulusanModule() {
   /* ---------- semester: dua bacaan yang sama-sama dipakai orang ---------- */
 
   const tanggalContoh = baris.find((b) => b.tanggalKeluar)?.tanggalKeluar || "";
-  const semesterKalender = tanggalContoh ? semesterKeluar(tanggalContoh) : "";
-  const semesterAjaran = tanggalContoh ? semesterTahunAjaran(tanggalContoh) : "";
+  // Bawaannya kode TAHUN AJARAN — itu yang dipakai PDDIKTI FISIP. Kode tahun
+  // kalender tetap disebutkan supaya operator yang memakainya tidak perlu
+  // menghitung sendiri.
+  const semesterOtomatis = tanggalContoh ? semesterKeluar(tanggalContoh) : "";
+  const semesterKalender = tanggalContoh ? semesterTahunKalender(tanggalContoh) : "";
+  const tahunAjaran = semesterOtomatis ? `${semesterOtomatis.slice(0, 4)}/${Number(semesterOtomatis.slice(0, 4)) + 1}` : "";
   const semesterBeragam = useMemo(
     () => new Set(baris.map((b) => b.semester).filter(Boolean)).size > 1,
     [baris],
@@ -309,18 +313,19 @@ export default function KelulusanModule() {
             <input
               value={semesterPaksa}
               onChange={(e) => ubahSemesterPaksa(e.target.value)}
-              placeholder={semesterKalender || "otomatis dari tanggal"}
+              placeholder={semesterOtomatis || "otomatis dari tanggal"}
               inputMode="numeric"
             />
             <small>
-              Kosong = dihitung sendiri dari tanggal tiap baris.
-              {semesterKalender && (
+              Kosong = dihitung sendiri dari tanggal tiap baris, memakai kode <b>tahun ajaran</b>.
+              {semesterOtomatis && (
                 <>
-                  {" "}Untuk berkas ini: <b>{semesterKalender}</b>.
-                  {semesterAjaran !== semesterKalender && (
+                  {" "}Untuk berkas ini: <b>{semesterOtomatis}</b>
+                  {tahunAjaran && <> — {semesterOtomatis.endsWith("2") ? "genap" : "ganjil"} TA {tahunAjaran}</>}.
+                  {semesterKalender !== semesterOtomatis && (
                     <>
-                      {" "}Bila PDDIKTI unit Anda memakai kode <b>tahun ajaran</b>, nilainya{" "}
-                      <button type="button" className="kel-tautan" onClick={() => ubahSemesterPaksa(semesterAjaran)}>{semesterAjaran}</button>.
+                      {" "}Bila unit Anda memakai kode <b>tahun kalender</b>, nilainya{" "}
+                      <button type="button" className="kel-tautan" onClick={() => ubahSemesterPaksa(semesterKalender)}>{semesterKalender}</button>.
                     </>
                   )}
                 </>

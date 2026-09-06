@@ -72,17 +72,26 @@ Dua penjagaan kecil yang sengaja ada:
 
 ## 2. Semester Keluar dihitung, bukan diketik ulang
 
-Genap berjalan Februari–Juli, ganjil Agustus–Januari. Yudisium Juni dan Juli
-2026 karena itu menjadi **`20262`** — 2026, semester genap.
+Kodenya memakai **tahun ajaran**: tahun yang ditulis adalah tahun *awal*
+tahun ajarannya, bukan tahun pada tanggal yudisiumnya. Yudisium Juni dan Juli
+2026 jatuh pada semester genap TA 2025/2026, jadi kodenya **`20252`** — bukan
+`20262`. Selisih satu angka itu menentukan pada periode mana seluruh angkatan
+tercatat keluar.
 
-Januari memakai tahun sebelumnya, karena ia ekor semester ganjil yang dimulai
-Agustus lalu: 15 Januari 2026 adalah `20251`, bukan `20261`.
+```
+Agustus–Desember tahun Y  → ganjil TA Y/(Y+1)      → 20261  (Sep 2026)
+Januari tahun Y           → ekor ganjil TA (Y-1)/Y → 20251  (Jan 2026)
+Februari–Juli tahun Y     → genap TA (Y-1)/Y       → 20252  (Jun 2026)
+```
 
-Sebagian operator PDDIKTI memakai kode **tahun ajaran**, yang untuk genap
-2025/2026 berbunyi `20252`. Nilai itu tidak dipilihkan diam-diam: keduanya
-disebutkan di layar dan yang satunya dapat dipasang dengan satu ketukan.
-Kolom Semester Keluar juga dapat diketik sendiri — satu nilai untuk seluruh
-berkas.
+Januari memakai tahun ajaran sebelumnya karena ia ekor semester ganjil yang
+dimulai Agustus lalu. Pada semester ganjil kedua bacaan kebetulan bertemu di
+angka yang sama; keduanya hanya berselisih pada semester genap.
+
+Operator yang memakai kode **tahun kalender** (Juni 2026 = `20262`) tidak
+perlu menghitung sendiri: nilainya disebutkan di layar dan dapat dipasang
+dengan satu ketukan. Kolom Semester Keluar juga dapat diketik sendiri — satu
+nilai untuk seluruh berkas.
 
 Bila satu berkas ternyata melintasi dua semester, layarnya mengatakannya,
 bukan mendiamkannya.
@@ -95,7 +104,7 @@ bukan mendiamkannya.
 | Nama | kolom `NAMA MAHASISWA` |
 | Jenis Keluar | pilihan di layar; `1 Lulus` untuk lembar yudisium, `0`–`6` untuk dropout |
 | Tanggal keluar | `TGL YUDISIUM`, per baris (lihat bagian 1) |
-| Semester Keluar | dihitung dari tanggal itu |
+| Semester Keluar | dihitung dari tanggal itu, kode tahun ajaran |
 | Nomor SK | terangkat sendiri dari kop `Lampiran SK No. …` |
 | **Tanggal SK** | **diketik admin sesuai suratnya** — memang tidak ada di berkas fakultas |
 | IP Kumulatif | kolom `IPK`, dua angka di belakang koma: `3.8` → `3.80` |
@@ -134,9 +143,9 @@ Unduhannya dapat digabung atau dipisah per prodi, karena sebagian operator
 mengunggahnya satu prodi sekali jalan:
 
 ```
-Kelulusan-PDDIKTI-20262.xlsx          363 baris
-Kelulusan-PDDIKTI-70201-20262.xlsx    292 baris (Ilmu Komunikasi)
-Kelulusan-PDDIKTI-65201-20262.xlsx     71 baris (Ilmu Pemerintahan)
+Kelulusan-PDDIKTI-20252.xlsx          363 baris
+Kelulusan-PDDIKTI-70201-20252.xlsx    292 baris (Ilmu Komunikasi)
+Kelulusan-PDDIKTI-65201-20252.xlsx     71 baris (Ilmu Pemerintahan)
 ```
 
 Ada pula **template kosong** — sepuluh kolom lengkap dengan warna dan
@@ -173,7 +182,7 @@ Terbuka untuk `admin_pddikti`, `admin`, dan `super_admin`.
 | `src/app/dashboard/template/template-app.tsx` | tab & hak akses `admin_pddikti` |
 | `src/app/dashboard/dashboard-app.tsx` | kartu template menggantikan yang kosong |
 | `src/app/globals.css` | gaya layar `kel-*` |
-| `uji-kelulusan-pddikti.ts` | baru — 61 pemeriksaan |
+| `uji-kelulusan-pddikti.ts` | baru — 65 pemeriksaan |
 
 ## Menguji
 
@@ -181,7 +190,7 @@ Terbuka untuk `admin_pddikti`, `admin`, dan `super_admin`.
 npx tsx uji-kelulusan-pddikti.ts
 ```
 
-61 pemeriksaan: pembacaan tanggal (termasuk yang harus ditolak), semester,
+65 pemeriksaan: pembacaan tanggal (termasuk yang harus ditolak), semester,
 IPK, pembacaan lembar sungguhan, pemeriksaan kolom wajib, dan berkas hasilnya
 dibaca ulang oleh pembaca Excel sungguhan — bukan sekadar dipastikan
 "berbentuk zip".

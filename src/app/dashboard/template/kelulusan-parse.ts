@@ -169,33 +169,49 @@ function seriExcel(seri: number): string | null {
 }
 
 /**
- * Kode "Semester Keluar" dari tanggal lulus: tahun + 1 (ganjil) / 2 (genap).
+ * Kode "Semester Keluar" dari tanggal lulus — versi TAHUN AJARAN, yang
+ * dipakai PDDIKTI FISIP.
  *
- * Perkuliahan genap berjalan Februari–Juli, ganjil Agustus–Januari. Januari
- * memakai tahun SEBELUMNYA karena ia ekor semester ganjil yang dimulai
- * Agustus lalu — 15 Januari 2026 adalah ganjil 2025, bukan ganjil 2026.
+ * Tahunnya adalah tahun AWAL tahun ajarannya, bukan tahun pada tanggalnya.
+ * Yudisium Juni 2026 jatuh pada semester genap tahun ajaran 2025/2026, jadi
+ * kodenya "20252" — bukan "20262". Perbedaan satu angka ini menentukan pada
+ * periode mana seluruh angkatan tercatat keluar.
  *
- * Untuk Juni/Juli 2026 hasilnya "20262", persis seperti yang diminta.
- * Sebagian operator PDDIKTI memakai kode TAHUN AJARAN (genap 2025/2026 =
- * "20252"); nilai itu tersedia lewat semesterTahunAjaran() dan dapat dipilih
- * di layar, bukan diputuskan diam-diam di sini.
+ *   Agustus–Desember tahun Y  → ganjil TA Y/(Y+1)      → `${Y}1`
+ *   Januari tahun Y           → ekor ganjil TA (Y-1)/Y → `${Y-1}1`
+ *   Februari–Juli tahun Y     → genap TA (Y-1)/Y       → `${Y-1}2`
+ *
+ * Sebagian operator memakai kode TAHUN KALENDER (Juni 2026 = "20262"); nilai
+ * itu tersedia lewat semesterTahunKalender() dan dapat dipasang di layar,
+ * bukan diputuskan diam-diam di sini.
  */
 export function semesterKeluar(iso: string): string {
-  const cocok = /^(\d{4})-(\d{2})-\d{2}$/.exec(iso);
-  if (!cocok) return "";
-  const tahun = Number(cocok[1]);
-  const bulan = Number(cocok[2]);
-  if (bulan === 1) return `${tahun - 1}1`;
-  if (bulan >= 2 && bulan <= 7) return `${tahun}2`;
-  return `${tahun}1`;
+  const musim = musimKuliah(iso);
+  if (!musim) return "";
+  return musim.genap ? `${musim.tahun - 1}2` : `${musim.tahunGanjil}1`;
 }
 
-/** Kode semester versi tahun ajaran: genap 2025/2026 → "20252". */
-export function semesterTahunAjaran(iso: string): string {
-  const kode = semesterKeluar(iso);
-  if (!kode) return "";
-  const tahun = Number(kode.slice(0, 4));
-  return kode.endsWith("2") ? `${tahun - 1}2` : `${tahun}1`;
+/** Kode semester versi tahun kalender: yudisium Juni 2026 → "20262". */
+export function semesterTahunKalender(iso: string): string {
+  const musim = musimKuliah(iso);
+  if (!musim) return "";
+  return musim.genap ? `${musim.tahun}2` : `${musim.tahunGanjil}1`;
+}
+
+/**
+ * Musim perkuliahan pada satu tanggal.
+ *
+ * Genap berjalan Februari–Juli, ganjil Agustus–Januari. Januari adalah ekor
+ * semester ganjil yang dimulai Agustus tahun sebelumnya — karena itu
+ * `tahunGanjil`-nya mundur satu, dan kedua kode di atas sama-sama memakainya.
+ */
+function musimKuliah(iso: string): { tahun: number; genap: boolean; tahunGanjil: number } | null {
+  const cocok = /^(\d{4})-(\d{2})-\d{2}$/.exec(iso);
+  if (!cocok) return null;
+  const tahun = Number(cocok[1]);
+  const bulan = Number(cocok[2]);
+  const genap = bulan >= 2 && bulan <= 7;
+  return { tahun, genap, tahunGanjil: bulan === 1 ? tahun - 1 : tahun };
 }
 
 /* ---------- membaca lembar yudisium ---------- */

@@ -12,7 +12,7 @@ import * as XLSX from "xlsx";
 import {
   KOLOM_KELULUSAN, NAMA_LEMBAR_PDDIKTI,
   bacaLembarYudisium, barisKeAoa, nomorSkDariLembar, periksaBaris,
-  prodiDariLembar, rapikanIpk, semesterKeluar, semesterTahunAjaran, tanggalPddikti,
+  prodiDariLembar, rapikanIpk, semesterKeluar, semesterTahunKalender, tanggalPddikti,
   type BarisKelulusan,
 } from "@/app/dashboard/template/kelulusan-parse";
 import { buatXlsxKelulusan } from "@/lib/kelulusan-xlsx";
@@ -58,14 +58,24 @@ function jalan() {
   cek("teks kosong ditolak", tanggalPddikti("   ") === null);
   cek("NIM tidak diam-diam menjadi tanggal", tanggalPddikti("2270201090") === null, String(tanggalPddikti("2270201090")));
 
-  console.log("\n== SEMESTER KELUAR ==");
-  cek("Juni 2026 → 20262 (genap)", semesterKeluar("2026-06-07") === "20262", semesterKeluar("2026-06-07"));
-  cek("Juli 2026 → 20262 (genap)", semesterKeluar("2026-07-24") === "20262");
-  cek("Februari 2026 → 20262 (awal genap)", semesterKeluar("2026-02-03") === "20262");
-  cek("September 2026 → 20261 (ganjil)", semesterKeluar("2026-09-01") === "20261");
-  cek("Januari 2026 → 20251 (ekor ganjil tahun lalu)", semesterKeluar("2026-01-15") === "20251", semesterKeluar("2026-01-15"));
-  cek("versi tahun ajaran: genap 2025/2026 → 20252", semesterTahunAjaran("2026-06-07") === "20252", semesterTahunAjaran("2026-06-07"));
-  cek("versi tahun ajaran: ganjil tetap 20261", semesterTahunAjaran("2026-09-01") === "20261");
+  // Bawaannya kode TAHUN AJARAN: tahun AWAL tahun ajaran, bukan tahun pada
+  // tanggalnya. Yudisium Juni 2026 = genap TA 2025/2026 = 20252.
+  console.log("\n== SEMESTER KELUAR (bawaan: tahun ajaran) ==");
+  cek("Juni 2026 → 20252 (genap TA 2025/2026)", semesterKeluar("2026-06-07") === "20252", semesterKeluar("2026-06-07"));
+  cek("Juli 2026 → 20252", semesterKeluar("2026-07-24") === "20252", semesterKeluar("2026-07-24"));
+  cek("Februari 2026 → 20252 (awal genap)", semesterKeluar("2026-02-03") === "20252");
+  cek("September 2026 → 20261 (ganjil TA 2026/2027)", semesterKeluar("2026-09-01") === "20261");
+  cek("Desember 2026 → 20261", semesterKeluar("2026-12-20") === "20261");
+  cek("Januari 2026 → 20251 (ekor ganjil TA 2025/2026)", semesterKeluar("2026-01-15") === "20251", semesterKeluar("2026-01-15"));
+  cek("tanggal ngawur → kosong, bukan tebakan", semesterKeluar("bukan tanggal") === "");
+
+  console.log("\n== SEMESTER KELUAR (pilihan: tahun kalender) ==");
+  cek("Juni 2026 → 20262", semesterTahunKalender("2026-06-07") === "20262", semesterTahunKalender("2026-06-07"));
+  cek("ganjil sama pada kedua bacaan", semesterTahunKalender("2026-09-01") === "20261");
+  cek("Januari 2026 tetap 20251 pada kedua bacaan", semesterTahunKalender("2026-01-15") === "20251");
+  cek("keduanya hanya berselisih pada semester genap",
+      semesterTahunKalender("2026-06-07") !== semesterKeluar("2026-06-07")
+      && semesterTahunKalender("2026-09-01") === semesterKeluar("2026-09-01"));
 
   console.log("\n== IPK ==");
   cek("3.8 → 3.80", rapikanIpk(3.8) === "3.80", rapikanIpk(3.8));
@@ -82,7 +92,8 @@ function jalan() {
   cek("TGL YUDISIUM per baris, bukan satu untuk semua",
       hasil.baris[0].tanggalKeluar === "2026-06-07" && hasil.baris[1].tanggalKeluar === "2026-07-24",
       `${hasil.baris[0].tanggalKeluar} / ${hasil.baris[1].tanggalKeluar}`);
-  cek("semester ikut per baris", hasil.baris[0].semester === "20262" && hasil.baris[1].semester === "20262");
+  cek("semester ikut per baris", hasil.baris[0].semester === "20252" && hasil.baris[1].semester === "20252",
+      `${hasil.baris[0].semester} / ${hasil.baris[1].semester}`);
   cek("IPK dipetakan ke IP Kumulatif", hasil.baris[1].ipk === "3.80", hasil.baris[1].ipk);
   cek("Kode Prodi dari kolomnya", hasil.baris[0].kodeProdi === "70201", hasil.baris[0].kodeProdi);
   cek("Jenis Keluar bawaan Lulus", hasil.baris[0].jenisKeluar === "1");
@@ -144,7 +155,7 @@ function jalan() {
         aoa[0].join("|") === KOLOM_KELULUSAN.map((k) => k.judul).join("|"), aoa[0].join("|"));
     cek("dua baris data ikut tertulis", aoa.length === 3, String(aoa.length));
     cek("baris pertama lengkap sepuluh kolom",
-        aoa[1].join("|") === "2270201090|ALDINA PRATIWI|1|2026-06-07|20262|003/KEP/III.3.AU/F/FISIP/2026|2026-08-01|3.74||70201",
+        aoa[1].join("|") === "2270201090|ALDINA PRATIWI|1|2026-06-07|20252|003/KEP/III.3.AU/F/FISIP/2026|2026-08-01|3.74||70201",
         aoa[1].join("|"));
 
     // NIM & kode prodi tetap teks. Kalau salah satunya tersimpan sebagai
