@@ -28,9 +28,9 @@ import { explainServerError } from "@/lib/api-errors";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { blockedByMaintenance } from "@/lib/maintenance-gate";
 import {
-  batasWaktu, benihBaru, bolehMasuk, hitungNilai, kunciNama, nilaiJawaban,
-  periksaGanda, periksaMasuk, rapikanPerangkat, sisaDetik, statusUjian,
-  susunPaket, type Soal,
+  attemptHidup, attemptPelaksanaanIni, batasWaktu, benihBaru, bolehMasuk, hitungNilai,
+  kunciNama, nilaiJawaban, periksaGanda, periksaMasuk, rapikanPerangkat, sisaDetik,
+  statusUjian, susunPaket, type Soal,
 } from "@/lib/cbt";
 import { attemptDariKunci, bacaLembar, soalUjian, ujianDariKode, type Ujian } from "@/lib/cbt-store";
 
@@ -157,23 +157,30 @@ export async function POST(request: Request) {
         .from(cbtAttempts)
         .where(and(eq(cbtAttempts.examId, ujian.id), eq(cbtAttempts.nim, identitas.nim)));
 
-      // JATAH PERCOBAAN BERLAKU PER JENDELA UJIAN, bukan seumur hidup ujian.
+      // JATAH PERCOBAAN BERLAKU PER PELAKSANAAN, bukan seumur hidup ujian.
       //
-      // Ketika dosen memperbarui jamnya — ujian susulan, ujian ulang, atau
-      // jadwal yang digeser karena listrik padam — yang ia buka adalah
-      // pelaksanaan yang BARU. Percobaan dari jendela sebelumnya tidak boleh
-      // ikut menghabiskan jatahnya; kalau ikut, ujian yang sudah dijadwalkan
-      // ulang tetap menolak seluruh mahasiswa yang pernah masuk, dan dosen
-      // tidak punya jalan lain selain menghapus hasil lamanya.
+      // Ketika dosen membuka kembali ujian yang sudah tutup — ujian susulan,
+      // ujian ulang, atau jadwal yang digeser karena listrik padam — yang ia
+      // mulai adalah pelaksanaan yang BARU. Percobaan dari pelaksanaan
+      // sebelumnya tidak boleh ikut menghabiskan jatahnya; kalau ikut, ujian
+      // yang sudah dijadwalkan ulang tetap menolak seluruh mahasiswa yang
+      // pernah masuk, dan dosen tidak punya jalan lain selain menghapus hasil
+      // lamanya.
       //
-      // Batasnya jam mulai yang sedang berlaku. Mahasiswa tidak dapat masuk
-      // sebelum jam itu (lihat bolehMasuk di atas), jadi setiap percobaan yang
-      // dimulai sesudahnya pasti milik pelaksanaan ini.
-      const sudah = ujian.startAt
-        ? seluruhnya.filter((a) => a.startedAt.getTime() >= (ujian.startAt as Date).getTime())
-        : seluruhnya;
+      // Batasnya JAM AKTIVASI, bukan jam mulai. Jam mulai tidak cukup: untuk
+      // membuka ujian saat itu juga, dosen justru menyetel jam mulai mundur ke
+      // pagi hari, sehingga percobaan lama hari itu tetap berada di dalam
+      // jendelanya dan mahasiswanya tetap tertolak. Jam aktivasi hanya maju
+      // ketika ujiannya memang dibuka kembali — lihat pelaksanaanBaru di
+      // src/app/api/cbt/aktivasi/route.ts.
+      const sudah = attemptPelaksanaanIni(seluruhnya, ujian);
 
-      const berjalan = sudah.find((a) => a.status === "berjalan");
+      // Lembar yang masih hidup dicari dari SELURUH riwayat, bukan dari
+      // saringan di atas. Mahasiswa yang sedang mengerjakan ketika dosennya
+      // menambah waktu harus menemukan lembarnya kembali beserta sisa
+      // waktunya; disaring lebih dulu, ia justru mendapat lembar baru yang
+      // kosong dan jawaban yang sudah diketiknya seolah hilang.
+      const berjalan = attemptHidup(seluruhnya, sekarang);
       if (berjalan) {
         const bank = await soalUjian(ujian.id);
         const lembar = bacaLembar(berjalan.paper);
@@ -224,14 +231,12 @@ export async function POST(request: Request) {
         .from(cbtAttempts)
         .where(eq(cbtAttempts.examId, ujian.id));
 
-      // Disaring ke jendela yang sedang berlaku, dengan alasan yang sama
+      // Disaring ke pelaksanaan yang sedang berlaku, dengan alasan yang sama
       // seperti jatah percobaan di atas: satu komputer laboratorium yang
       // dipakai kemarin tidak boleh memblokir orang lain pada pelaksanaan hari
       // ini, dan nama yang sudah terdaftar pada ujian yang sudah lewat bukan
       // pendaftaran ganda.
-      const sesiIni = ujian.startAt
-        ? semua.filter((a) => a.startedAt.getTime() >= (ujian.startAt as Date).getTime())
-        : semua;
+      const sesiIni = attemptPelaksanaanIni(semua, ujian);
       const ganda = periksaGanda({ nim: identitas.nim, nameKey, deviceId }, sesiIni, {
         satuPerangkat: ujian.singleDevice,
       });
@@ -284,11 +289,7 @@ export async function POST(request: Request) {
           .select()
           .from(cbtAttempts)
           .where(and(eq(cbtAttempts.examId, ujian.id), eq(cbtAttempts.nim, identitas.nim)));
-        const hidup = ulang.find(
-          (a) =>
-            a.status === "berjalan" &&
-            (!ujian.startAt || a.startedAt.getTime() >= (ujian.startAt as Date).getTime()),
-        );
+        const hidup = attemptHidup(ulang, sekarang);
         if (!hidup) {
           return Response.json({ success: false, message: "Ujian belum dapat dimulai. Coba lagi." }, { status: 500 });
         }

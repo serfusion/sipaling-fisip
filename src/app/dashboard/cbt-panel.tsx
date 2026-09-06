@@ -855,7 +855,25 @@ export default function CbtPanel({ role }: { role: string }) {
             pesan: "Ujian diaktifkan. Ia akan terbuka sendiri pada jam mulainya.",
           },
     );
-    if (hasil) await muatUjian();
+    if (!hasil) return;
+
+    // Menyimpan jadwal dapat berarti dua hal yang sangat berbeda bagi
+    // mahasiswa, dan dosennya berhak tahu yang mana. Ujian yang sudah tutup
+    // lalu dijadwalkan ulang adalah PELAKSANAAN BARU — jatah percobaan
+    // kembali, jadi yang sudah pernah mengerjakan boleh masuk lagi. Menambah
+    // waktu di tengah ujian bukan; yang sudah mengumpulkan tetap tidak dapat
+    // mengulang. Tanpa kalimat ini dosennya hanya membaca "Jadwal diperbarui"
+    // dan menebak sendiri.
+    if (perbarui) {
+      setPesan(
+        hasil.pelaksanaanBaru
+          ? "Jadwal diperbarui, dan ini dihitung sebagai pelaksanaan baru: " +
+            "mahasiswa yang sudah pernah mengerjakan boleh masuk lagi."
+          : "Jam ujian diperbarui. Ujian yang sedang berjalan diteruskan — " +
+            "mahasiswa yang sudah mengumpulkan tidak dapat mengerjakan ulang.",
+      );
+    }
+    await muatUjian();
   }
 
   async function batalkanAktivasi() {

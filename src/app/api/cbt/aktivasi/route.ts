@@ -13,7 +13,8 @@
 // Yang diatur di sini dua hal, dan keduanya soal WAKTU:
 //
 //   mulai / selesai  — jendela ujiannya
-//   activatedAt      — izin yang membuat jendela itu berlaku
+//   activatedAt      — izin yang membuat jendela itu berlaku, sekaligus
+//                      penanda PELAKSANAAN KE BERAPA ujian ini sedang berjalan
 //
 // Sesudah keduanya terisi, tidak ada lagi tombol yang harus ditekan siapa pun.
 // Disetel pukul sepuluh, terbuka sendiri pukul sepuluh — karena orang yang
@@ -26,7 +27,7 @@ import { eq, sql } from "drizzle-orm";
 import { getCurrentProfile } from "@/lib/supabase-server";
 import { explainServerError } from "@/lib/api-errors";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
-import { angkaParam, bolehCbt, bolehUbah, statusUjian } from "@/lib/cbt";
+import { angkaParam, bolehCbt, bolehUbah, pelaksanaanBaru, statusUjian } from "@/lib/cbt";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -154,13 +155,32 @@ export async function POST(request: Request) {
     }
 
     const sekarang = new Date();
+
+    // JAM AKTIVASI ADALAH BATAS ANTARPELAKSANAAN, jadi ia tidak selalu
+    // disegarkan. Menyimpan jadwal pada ujian yang SEDANG BERLANGSUNG bukan
+    // membuka pelaksanaan baru — itu pembetulan jam di tengah jalan, biasanya
+    // menambah waktu karena listriknya sempat padam. Kalau jam aktivasinya
+    // ikut maju, seluruh mahasiswa yang sudah mengumpulkan pagi itu mendadak
+    // punya jatah percobaan baru dan dapat mengerjakan ulang.
+    //
+    // Sebaliknya, ujian yang sudah tutup lalu dijadwalkan ulang memang
+    // pelaksanaan yang baru — ujian susulan, ujian ulang — dan di situlah jam
+    // aktivasinya harus maju supaya jatah mahasiswanya kembali. Tanpa itu,
+    // memperbarui jadwal tidak menolong siapa pun: ujiannya terbuka, tetapi
+    // setiap mahasiswa yang pernah masuk tetap ditolak.
+    const statusSebelumnya = statusUjian(
+      { aktif: Boolean(ujian.activatedAt), mulai: ujian.startAt, selesai: ujian.endAt },
+      sekarang,
+    );
+    const babakBaru = pelaksanaanBaru(statusSebelumnya);
+
     await db
       .update(cbtExams)
       .set({
         startAt: mulai,
         endAt: selesai,
-        activatedAt: sekarang,
-        activatedBy: profile.fullName,
+        activatedAt: babakBaru ? sekarang : ujian.activatedAt,
+        activatedBy: babakBaru ? profile.fullName : ujian.activatedBy,
         updatedAt: sekarang,
       })
       .where(eq(cbtExams.id, id));
@@ -170,7 +190,10 @@ export async function POST(request: Request) {
       status: statusUjian({ aktif: true, mulai, selesai }, sekarang),
       mulai: mulai.toISOString(),
       selesai: selesai.toISOString(),
-      olehSiapa: profile.fullName,
+      olehSiapa: babakBaru ? profile.fullName : (ujian.activatedBy ?? profile.fullName),
+      // Dipakai layar dosen untuk memilih kalimatnya: jadwal yang dibetulkan
+      // di tengah ujian tidak boleh dilaporkan sebagai "ujian dibuka kembali".
+      pelaksanaanBaru: babakBaru,
     });
   } catch (error: unknown) {
     console.error("aktivasi ujian cbt", error);

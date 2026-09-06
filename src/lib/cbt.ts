@@ -166,6 +166,85 @@ export function bolehMasuk(u: UjianWaktu, sekarang: Date = new Date()) {
   return statusUjian(u, sekarang) === "berlangsung";
 }
 
+// ============================================================
+// PELAKSANAAN — SEKALI UJIAN INI BENAR-BENAR DIJALANKAN
+//
+// Satu ujian dapat dijalankan lebih dari sekali: ujian susulan, ujian ulang,
+// atau jadwal yang digeser karena listrik padam. Yang tersimpan di basis data
+// hanyalah SATU baris ujian dengan satu jendela jam, jadi tanpa penanda
+// tambahan seluruh percobaan dari tahun ajaran lalu masih menempel pada ujian
+// yang sama — dan menghabiskan jatah mahasiswa pada pelaksanaan hari ini.
+//
+// Penandanya activatedAt. Ia disetel ulang ketika dosen membuka ujian yang
+// SEDANG TIDAK BERLANGSUNG, dan sengaja DIBIARKAN ketika ia hanya memperpanjang
+// jam ujian yang sedang berjalan. Perbedaan itu yang penting:
+//
+//   ujian sudah tutup, dijadwalkan ulang  -> pelaksanaan baru, jatah kembali
+//   ujian sedang berjalan, jamnya digeser -> pelaksanaan yang sama, jatah tetap
+//
+// Kalau yang kedua ikut dianggap baru, tiga puluh mahasiswa yang sudah
+// mengumpulkan pagi itu dapat masuk lagi dan mengerjakan ulang hanya karena
+// dosennya menambah sepuluh menit.
+// ============================================================
+
+/** Ujian, dilihat dari sisi "sejak kapan pelaksanaan yang sekarang berlaku". */
+export type Pelaksanaan = { activatedAt: Date | null };
+
+/**
+ * Apakah menyimpan jadwal sekarang berarti MEMULAI pelaksanaan yang baru.
+ *
+ * Jawabannya diambil dari keadaan ujian SEBELUM jadwal barunya disimpan:
+ * selama ia sedang berlangsung, yang terjadi adalah pembetulan jam, bukan
+ * pembukaan ujian yang baru.
+ */
+export function pelaksanaanBaru(statusSebelumnya: StatusUjian): boolean {
+  return statusSebelumnya !== "berlangsung";
+}
+
+/** Detik nol pelaksanaan yang sedang berlaku. Belum diaktifkan berarti 0. */
+export function batasPelaksanaan(ujian: Pelaksanaan): number {
+  return ujian.activatedAt ? ujian.activatedAt.getTime() : 0;
+}
+
+/**
+ * Percobaan yang termasuk pelaksanaan yang sekarang.
+ *
+ * Dipakai untuk menghitung jatah percobaan dan untuk memeriksa nama/perangkat
+ * ganda. Keduanya soal "siapa yang sudah masuk HARI INI", bukan "siapa yang
+ * pernah masuk sejak ujian ini dibuat".
+ */
+export function attemptPelaksanaanIni<T extends { startedAt: Date }>(
+  riwayat: T[],
+  ujian: Pelaksanaan,
+): T[] {
+  const batas = batasPelaksanaan(ujian);
+  return riwayat.filter((a) => a.startedAt.getTime() >= batas);
+}
+
+/**
+ * Percobaan yang masih benar-benar hidup: berstatus berjalan DAN batas
+ * waktunya belum lewat.
+ *
+ * Dicari dari SELURUH riwayat, bukan dari pelaksanaan yang sekarang saja.
+ * Mahasiswa yang sedang mengerjakan ketika dosennya menekan "Perbarui jadwal"
+ * harus menemukan lembar yang sama beserta sisa waktunya; kalau ia disaring
+ * lebih dulu, layarnya berganti menjadi ujian baru yang kosong dan jawaban
+ * yang sudah ia ketik seolah hilang.
+ *
+ * Yang berstatus berjalan tetapi waktunya sudah habis TIDAK dihitung hidup.
+ * Baris seperti itu tertinggal dari mahasiswa yang perambannya tertutup sebelum
+ * sempat mengumpulkan, dan membukanya kembali berarti memberi tambahan waktu
+ * kepada orang yang jam ujiannya sudah lewat.
+ */
+export function attemptHidup<T extends { status: string; deadlineAt: Date }>(
+  riwayat: T[],
+  sekarang: Date = new Date(),
+): T | undefined {
+  return riwayat.find(
+    (a) => a.status === "berjalan" && a.deadlineAt.getTime() > sekarang.getTime(),
+  );
+}
+
 /**
  * Kapan attempt ini harus berakhir.
  *
