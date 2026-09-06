@@ -17,11 +17,16 @@
 // ============================================================
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { adalahHostCbt } from "@/lib/situs-cbt";
 import KreditCbt, { KREDIT_CBT } from "./kredit";
 
-export default function MasukCbt() {
+/**
+ * @param portal Asal portal, mis. "https://www.sipalingfisip.web.id", untuk
+ *   tautan yang keluar dari situs CBT. Kosong berarti halaman ini memang
+ *   sedang dibuka di portal, dan alamat relatif sudah benar.
+ */
+export default function MasukCbt({ portal = "" }: { portal?: string }) {
   const router = useRouter();
   const [pintu, setPintu] = useState<"siswa" | "guru">("siswa");
   const [kode, setKode] = useState("");
@@ -39,7 +44,13 @@ export default function MasukCbt() {
       const jawab = await fetch(`/api/cbt/ikut?kode=${encodeURIComponent(isi)}`, { cache: "no-store" });
       const data = await jawab.json();
       if (!jawab.ok || !data.success) throw new Error(data.message || "Ujian tidak ditemukan.");
-      router.push(`/cbt/ujian?kode=${encodeURIComponent(isi)}`);
+      // Di subdomain, layar ujian beralamat /ujian; di domain portal ia masih
+      // /cbt/ujian. Yang dipilih di sini alamat yang memang berlaku pada tuan
+      // rumah yang sedang dibuka, supaya perpindahannya satu langkah saja —
+      // tanpa singgah di pengalihan, yang pada jaringan kampus yang tersendat
+      // terasa seperti tombol yang tidak menjawab.
+      const jalur = adalahHostCbt(window.location.host) ? "/ujian" : "/cbt/ujian";
+      router.push(`${jalur}?kode=${encodeURIComponent(isi)}`);
     } catch (alasan: unknown) {
       setGalat(alasan instanceof Error ? alasan.message : "Ujian tidak ditemukan.");
       setSibuk(false);
@@ -62,7 +73,7 @@ export default function MasukCbt() {
           <li>Nyaman dikerjakan dari ponsel maupun komputer.</li>
         </ul>
         <p className="cbtd-kaki-kiri">
-          Bagian dari <Link href="/">SiPaling FISIP</Link>
+          Bagian dari <a href={`${portal}/`}>SiPaling FISIP</a>
         </p>
         <p className="cbtd-kredit-kiri">{KREDIT_CBT}</p>
       </aside>
@@ -119,9 +130,9 @@ export default function MasukCbt() {
                 Dosen dan admin memakai akun portal yang sama dengan layanan akademik. Menu CBT ada
                 di dalam dashboard, pada bagian Ujian Online.
               </p>
-              <Link href="/login" className="cbtd-btn cbtd-btn-tautan">
+              <a href={`${portal}/login`} className="cbtd-btn cbtd-btn-tautan">
                 Masuk ke dashboard
-              </Link>
+              </a>
               <p className="cbtd-bantu">
                 Belum punya akun? Hubungi Super Admin fakultas. Menu CBT hanya terbuka untuk dosen,
                 Admin, dan Super Admin. Bukan admin bagian.
