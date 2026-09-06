@@ -1076,7 +1076,15 @@ export default function DashboardApp({
       href: undefined,
     });
   }
-  if (["admin_pddikti", "admin_perpustakaan", "admin_laboratorium"].includes(profile.role)) {
+  if (["super_admin", "admin", "admin_pddikti"].includes(profile.role)) {
+    templateCards.push({
+      icon: "🎓",
+      title: "Input Kelulusan & Dropout",
+      desc: "Impor Excel yudisium fakultas → tanggal lulus & semester keluar terisi per mahasiswa → Excel siap unggah PDDIKTI.",
+      href: "/dashboard/template?jenis=kelulusan",
+    });
+  }
+  if (["admin_perpustakaan", "admin_laboratorium"].includes(profile.role)) {
     templateCards.push({ icon: "＋", title: "Template unit Anda", desc: "Pola yang sama dengan Transkrip/Surat. Template unit ini akan ditambahkan berikutnya.", href: undefined });
   }
 

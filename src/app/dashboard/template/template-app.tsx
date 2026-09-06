@@ -13,6 +13,7 @@ import {
   TEMPLATE_SHEET_BIO, TEMPLATE_SHEET_NILAI,
   isTemplateWorkbook, parseTemplateBio, parseTemplateNilai,
 } from "./transkrip-template";
+import KelulusanModule from "./kelulusan-panel";
 
 type Role =
   | "super_admin"
@@ -35,6 +36,8 @@ type SessionProfile = {
 
 const TRANSKRIP_ROLES: Role[] = ["super_admin", "admin", "admin_akademik"];
 const SURAT_ROLES: Role[] = ["super_admin", "admin", "admin_umum"];
+// Input Kelulusan & Dropout PDDIKTI — pekerjaan Layanan PDDIKTI, bukan Akademik.
+const KELULUSAN_ROLES: Role[] = ["super_admin", "admin", "admin_pddikti"];
 const UMUM_DRIVE_URL = process.env.NEXT_PUBLIC_UMUM_TEMPLATE_DRIVE_URL || "";
 
 const PRODI = [
@@ -52,25 +55,29 @@ function fmtIPK(value: number) {
 
 /* ---------- komponen utama ---------- */
 
-type Jenis = "transkrip" | LetterSlug;
+type Jenis = "transkrip" | "kelulusan" | LetterSlug;
 const LETTER_SLUGS: LetterSlug[] = ["surat-aktif", "izin-penelitian", "pkl"];
 
 export default function TemplateApp({ profile, initialJenis, initialArsip }: { profile: SessionProfile | null; initialJenis?: string; initialArsip?: string }) {
   useAutoLogout(Boolean(profile));
   const canTranskrip = Boolean(profile && TRANSKRIP_ROLES.includes(profile.role));
   const canSurat = Boolean(profile && SURAT_ROLES.includes(profile.role));
+  const canKelulusan = Boolean(profile && KELULUSAN_ROLES.includes(profile.role));
   const normalizedInitial: Jenis | null =
     initialJenis === "surat" || initialJenis === "surat-aktif" ? "surat-aktif"
       : initialJenis === "izin-penelitian" ? "izin-penelitian"
         : initialJenis === "pkl" ? "pkl"
           : initialJenis === "transkrip-en" ? "transkrip-en"
             : initialJenis === "transkrip" ? "transkrip"
-              : null;
+              : initialJenis === "kelulusan" ? "kelulusan"
+                : null;
   const defaultJenis: Jenis =
     (normalizedInitial === "transkrip" || normalizedInitial === "transkrip-en") && canTranskrip ? normalizedInitial
-      : normalizedInitial && normalizedInitial !== "transkrip" && normalizedInitial !== "transkrip-en" && canSurat ? normalizedInitial
-        : canTranskrip ? "transkrip"
-          : "surat-aktif";
+      : normalizedInitial === "kelulusan" && canKelulusan ? "kelulusan"
+        : normalizedInitial && normalizedInitial !== "transkrip" && normalizedInitial !== "transkrip-en" && normalizedInitial !== "kelulusan" && canSurat ? normalizedInitial
+          : canTranskrip ? "transkrip"
+            : canKelulusan ? "kelulusan"
+              : "surat-aktif";
   const [jenis, setJenis] = useState<Jenis>(defaultJenis);
 
   if (!profile) {
@@ -87,13 +94,13 @@ export default function TemplateApp({ profile, initialJenis, initialArsip }: { p
     );
   }
 
-  if (!canTranskrip && !canSurat) {
+  if (!canTranskrip && !canSurat && !canKelulusan) {
     return (
       <div className="dsh">
         <main className="dsh-locked">
           <section className="panel dsh-locked-card">
             <h2>Template unit Anda belum tersedia</h2>
-            <p>Modul template saat ini berisi Transkrip Nilai (Admin Akademik) dan Surat Aktif Kuliah (Admin Umum). Template untuk unit {profile.role.replace("admin_", "").replace("_", " ")} akan ditambahkan dengan pola yang sama.</p>
+            <p>Modul template saat ini berisi Transkrip Nilai (Admin Akademik), Surat Aktif Kuliah (Admin Umum), dan Input Kelulusan &amp; Dropout (Admin PDDIKTI). Template untuk unit {profile.role.replace("admin_", "").replace("_", " ")} akan ditambahkan dengan pola yang sama.</p>
             <Link href="/dashboard" className="btn btn-primary">← Kembali ke Dashboard</Link>
           </section>
         </main>
@@ -113,6 +120,9 @@ export default function TemplateApp({ profile, initialJenis, initialArsip }: { p
           {canTranskrip && (
             <button type="button" className={jenis === "transkrip-en" ? "on" : ""} onClick={() => setJenis("transkrip-en")}>Transkrip (ID+EN)</button>
           )}
+          {canKelulusan && (
+            <button type="button" className={jenis === "kelulusan" ? "on" : ""} onClick={() => setJenis("kelulusan")}>Input Kelulusan &amp; Dropout</button>
+          )}
           {canSurat && LETTER_SLUGS.map((slug) => (
             <button type="button" key={slug} className={jenis === slug ? "on" : ""} onClick={() => setJenis(slug)}>{LETTER_TITLES[slug]}</button>
           ))}
@@ -120,7 +130,8 @@ export default function TemplateApp({ profile, initialJenis, initialArsip }: { p
       </header>
       {jenis === "transkrip" && canTranskrip ? <TranskripModule lang="id" arsipAwal={initialArsip} key="tk-id" />
         : jenis === "transkrip-en" && canTranskrip ? <TranskripModule lang="en" arsipAwal={initialArsip} key="tk-en" />
-          : <LetterModule slug={jenis === "transkrip" || jenis === "transkrip-en" ? "surat-aktif" : jenis} key={jenis} />}
+          : jenis === "kelulusan" && canKelulusan ? <KelulusanModule key="kelulusan" />
+            : <LetterModule slug={jenis === "transkrip" || jenis === "transkrip-en" || jenis === "kelulusan" ? "surat-aktif" : jenis} key={jenis} />}
     </div>
   );
 }

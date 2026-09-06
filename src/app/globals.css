@@ -5196,3 +5196,104 @@ a.al-mini:hover { color: var(--al-ink); }
   text-align: center; letter-spacing: .01em;
 }
 .cbt-kredit-rapat { margin-top: 12px; }
+
+/* ============================================================
+   TEMPLATE "Input Kelulusan & Dropout" — Admin PDDIKTI
+
+   Tabelnya bisa berisi ratusan wisudawan sekaligus, jadi layarnya sengaja
+   satu lajur penuh, bukan dua lajur seperti Transkrip: yang perlu dilihat
+   admin di sini adalah barisnya, bukan pratinjau dokumen.
+
+   Merah dan hijau pada judul kolom BUKAN hiasan. Keduanya disalin dari
+   template PDDIKTI, dan artinya tetap: merah wajib diisi, hijau boleh
+   kosong. Warna yang sama dipakai di layar dan di berkas yang diunduh
+   supaya admin tidak perlu menghafal dua bahasa.
+   ============================================================ */
+.kel-wrap { max-width: 1480px; margin: 0 auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; }
+.kel-box { background: #fff; border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 16px 18px; }
+.kel-h2 { display: flex; align-items: center; gap: 9px; margin: 0 0 6px; color: var(--navy); font-size: 14.5px; font-weight: 800; }
+.kel-no {
+  flex: 0 0 auto; width: 22px; height: 22px; border-radius: 999px; background: var(--navy); color: #fff;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 800;
+}
+.kel-p { margin: 0 0 10px; color: #475569; font-size: 11.5px; line-height: 1.6; }
+.kel-p-kecil { font-size: 10.5px; color: #64748b; }
+.kel-berkas { margin: 8px 0 0; color: #334155; font-size: 11px; }
+.kel-kosong { margin: 6px 0; color: #94a3b8; font-size: 11.5px; text-align: center; padding: 18px 0; }
+.kel-baris-tombol { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.kel-baris-rapat { gap: 6px; margin-top: 2px; }
+.kel-unduh { margin: 12px 0 6px; }
+.kel-tautan {
+  border: 0; background: none; padding: 0; color: var(--primary); font: inherit; font-weight: 800;
+  text-decoration: underline; cursor: pointer;
+}
+
+/* --- acuan sepuluh kolom PDDIKTI --- */
+.kel-acuan { margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 12px; }
+.kel-acuan-daftar { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.kel-acuan-daftar li { display: flex; align-items: flex-start; gap: 10px; }
+.kel-acuan-isi { color: #475569; font-size: 10.5px; line-height: 1.55; white-space: pre-line; }
+.kel-chip {
+  flex: 0 0 auto; min-width: 190px; border-radius: 7px; padding: 4px 9px;
+  font-size: 10.5px; font-weight: 800; line-height: 1.3;
+}
+.kel-chip-wajib { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+.kel-chip-bebas { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+.kel-tanda { font-size: 8.5px; font-weight: 800; border-radius: 5px; padding: 1px 5px; margin-left: 5px; }
+.kel-tanda-bebas { background: #dcfce7; color: #166534; }
+
+/* --- isian seragam --- */
+.kel-isian { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.kel-isian label { display: flex; flex-direction: column; gap: 4px; color: #334155; font-size: 10px; font-weight: 800; }
+.kel-isian input, .kel-isian select {
+  border: 1px solid #cbd5e1; border-radius: 8px; height: 34px; padding: 0 9px;
+  font-size: 11.5px; font-family: inherit; background: #fff; outline: none;
+}
+.kel-isian input:focus, .kel-isian select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(21, 101, 216, .12); }
+.kel-isian small { color: #64748b; font-size: 9.5px; font-weight: 600; line-height: 1.5; }
+
+/* --- ringkasan & saringan --- */
+.kel-ringkas { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.kel-angka { background: #f1f5f9; color: #475569; border-radius: 8px; padding: 5px 10px; font-size: 11px; font-weight: 700; }
+.kel-angka b { font-size: 13px; }
+.kel-angka-ok { background: #f0fdf4; color: #166534; }
+.kel-angka-salah { background: #fef2f2; color: #991b1b; }
+.kel-masalah ul { margin: 6px 0 0; padding-left: 18px; }
+.kel-masalah li { margin-bottom: 2px; }
+.kel-saring { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 8px; }
+.kel-saring input[type="text"], .kel-saring input:not([type]), .kel-saring select {
+  border: 1px solid #cbd5e1; border-radius: 8px; height: 32px; padding: 0 9px; font-size: 11px; outline: none; background: #fff;
+}
+.kel-centang { display: inline-flex; align-items: center; gap: 5px; color: #475569; font-size: 10.5px; font-weight: 700; }
+.kel-hitung { margin-left: auto; color: #64748b; font-size: 10.5px; font-weight: 700; }
+
+/* --- tabel --- */
+.kel-tabel-bungkus { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+.kel-tabel { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 1180px; font-size: 10.5px; }
+.kel-tabel th {
+  position: sticky; top: 0; z-index: 2; text-align: left; padding: 7px 8px;
+  font-size: 9.5px; font-weight: 800; white-space: nowrap; border-bottom: 1px solid var(--line);
+}
+.kel-tabel th:first-child { background: #f1f5f9; color: #475569; }
+.kel-th-wajib { background: #fee2e2; color: #991b1b; }
+.kel-th-bebas { background: #dcfce7; color: #166534; }
+.kel-tabel td { padding: 3px 5px; border-bottom: 1px solid #eef2f7; vertical-align: middle; }
+.kel-tabel tr:last-child td { border-bottom: 0; }
+.kel-td-no { color: #94a3b8; font-size: 9.5px; text-align: right; padding-right: 7px; cursor: help; }
+.kel-tabel input, .kel-tabel select {
+  width: 100%; min-width: 88px; border: 1px solid transparent; border-radius: 6px; height: 28px;
+  padding: 0 6px; font-size: 10.5px; font-family: inherit; background: transparent; outline: none;
+}
+.kel-tabel input:hover, .kel-tabel select:hover { border-color: #dbe3ee; background: #fff; }
+.kel-tabel input:focus, .kel-tabel select:focus { border-color: var(--primary); background: #fff; box-shadow: 0 0 0 2px rgba(21, 101, 216, .12); }
+.kel-tabel .kel-in-sempit { min-width: 74px; }
+.kel-tabel .kel-in-lebar { min-width: 176px; }
+.kel-tr-rusak { background: #fff7f7; }
+.kel-tr-rusak .kel-td-no { color: #dc2626; font-weight: 800; }
+.kel-halaman { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 10px; color: #64748b; font-size: 10.5px; font-weight: 700; }
+
+@media (max-width: 720px) {
+  .kel-wrap { padding: 12px; }
+  .kel-box { padding: 13px; }
+  .kel-chip { min-width: 130px; }
+}
