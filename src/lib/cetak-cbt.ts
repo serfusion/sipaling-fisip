@@ -84,6 +84,18 @@ const GAYA = `
   .garis { border-bottom: 1px dotted #444; height: 1.6em; }
   .kunci { font-weight: bold; }
   .media-catatan { font-style: italic; font-size: 10.5pt; color: #333; }
+  /* Gambar soal ikut tercetak. Tingginya dibatasi supaya satu gambar potret
+     tidak mendorong soal berikutnya ke halaman lain sendirian, dan
+     break-inside dijaga supaya gambar tidak terpotong di batas kertas. */
+  .media-gambar { margin: 6pt 0 8pt; page-break-inside: avoid; break-inside: avoid; }
+  .media-gambar img { max-width: 100%; max-height: 70mm; object-fit: contain; }
+  .media-gambar figcaption { font-size: 10pt; font-style: italic; color: #333; margin-top: 3pt; }
+  /* Video tidak dapat dicetak. Yang tercetak alamatnya, dalam huruf lebar
+     supaya angka nol dan huruf O tidak tertukar saat diketik ulang. */
+  .media-tautan { margin: 6pt 0 8pt; padding: 6pt 8pt; border: 1pt solid #bbb; border-radius: 4pt; }
+  .media-tautan b { display: block; font-size: 10.5pt; }
+  .media-url { display: block; font-family: "Courier New", monospace; font-size: 9.5pt; word-break: break-all; }
+  .media-tautan figcaption { font-size: 10pt; font-style: italic; color: #333; margin-top: 3pt; }
   .kaki { margin-top: 22px; font-size: 10pt; text-align: center; color: #333;
           border-top: 1px solid #999; padding-top: 8px; }
   table.nilai { width: 100%; border-collapse: collapse; font-size: 11pt; }
@@ -217,13 +229,33 @@ export function naskahSoalHtml(
     .map((s) => {
       const bagian: string[] = [`<p class="tanya">${lolos(s.pertanyaan)}</p>`];
 
-      // Media tidak dapat dicetak sebagai gambar dari sini, jadi keberadaannya
-      // disebutkan — supaya pengawas tahu soal ini pincang tanpa layarnya.
+      // ---------- MEDIA IKUT TERCETAK ----------
+      //
+      // Dulu di sini hanya tertulis "[Soal ini disertai gambar, tidak
+      // tercetak]", dan itu membuat naskah cadangan menjadi tidak terpakai
+      // persis pada saat ia dibutuhkan: listrik padam, proyektor mati, dan
+      // soal yang bergantung pada gambarnya tidak dapat dikerjakan siapa pun.
+      //
+      // GAMBAR dicetak apa adanya. VIDEO tidak dapat dicetak, jadi yang
+      // tercetak alamatnya, lengkap dan dapat diketik ulang, beserta kode QR
+      // pada poster ujian bila pengajar menyiapkannya.
       if (s.media?.jenis && s.media.url) {
-        bagian.push(
-          `<p class="media-catatan">[Soal ini disertai ${s.media.jenis}` +
-            `${s.media.keterangan ? `: ${lolos(s.media.keterangan)}` : ""}, tidak tercetak]</p>`,
-        );
+        const alamat = lolos(s.media.url);
+        const keterangan = s.media.keterangan
+          ? `<figcaption>${lolos(s.media.keterangan)}</figcaption>`
+          : "";
+        if (s.media.jenis === "gambar") {
+          bagian.push(
+            `<figure class="media-gambar"><img src="${alamat}" alt="${
+              lolos(s.media.keterangan || "Gambar soal")
+            }" />${keterangan}</figure>`,
+          );
+        } else {
+          bagian.push(
+            `<figure class="media-tautan"><b>Video soal</b>` +
+              `<span class="media-url">${alamat}</span>${keterangan}</figure>`,
+          );
+        }
       }
 
       if (s.jenis === "penjodohan") {
@@ -404,7 +436,7 @@ export function beritaAcaraHtml(ujian: UjianCetak, acara: BeritaAcara): string {
     : `<table class="nilai">
         <tr><th>NIM / No.</th><th>Nama</th><th>Integritas</th><th>Pindah tab</th><th>Keluar layar penuh</th><th>Keterangan</th></tr>
         ${urut.map((p) => `<tr><td>${lolos(p.nim)}</td><td>${lolos(p.nama)}</td>
-          <td>${typeof p.integritas === "number" ? `${p.integritas}/100` : "—"}</td>
+          <td>${typeof p.integritas === "number" ? `${p.integritas}/100` : "-"}</td>
           <td>${p.pindahTab}×</td><td>${p.keluarFullscreen}×</td>
           <td>${p.dihentikan ? lolos(p.dihentikan) : "-"}</td></tr>`).join("")}
       </table>

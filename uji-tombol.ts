@@ -19,7 +19,8 @@ import {
   PESAN_TOMBOL, periksaTombol, type GolonganTombol, type Isyarat,
 } from "./src/lib/tombol-terlarang";
 import {
-  INSIDEN_BERAT, SEMUA_INSIDEN, aturanMode, harusDipaksa, type JenisInsiden,
+  INSIDEN_BERAT, SEMUA_INSIDEN, aturanMode, harusDipaksa, pesanTeguran,
+  type JenisInsiden,
 } from "./src/lib/pengawasan";
 
 let lulus = 0;
@@ -246,13 +247,13 @@ for (const t of CONTOH) {
     p.insiden === null || SEMUA_INSIDEN.includes(p.insiden), String(p.insiden));
 }
 
-console.log("=== TIGA KALI, LALU DIKUMPULKAN ===\n");
+console.log("=== LIMA KALI, LALU DIKUMPULKAN ===\n");
 
-// Inilah yang diminta apa adanya: tiga ketukan terlarang mengakhiri ujian
-// sertifikasi. Diperiksa lewat jalan yang sama dengan yang dilalui ujian
-// sungguhan — putusan tombol → insiden → hitungan → harusDipaksa — supaya
-// perubahan pada salah satu dari ketiganya tertangkap di sini, bukan pada
-// ujian orang.
+// Lima ketukan terlarang mengakhiri ujiannya, dan pesertanya tidak pernah
+// diberi tahu angka itu. Diperiksa lewat jalan yang sama dengan yang dilalui
+// ujian sungguhan — putusan tombol → insiden → hitungan → harusDipaksa —
+// supaya perubahan pada salah satu dari ketiganya tertangkap di sini, bukan
+// pada ujian orang.
 function hitungKetukan(ketukan: Isyarat[]): Record<string, number> {
   const hitungan: Record<string, number> = {};
   for (const t of ketukan) {
@@ -265,14 +266,33 @@ function hitungKetukan(ketukan: Isyarat[]): Record<string, number> {
 const f12 = { key: "F12", code: "F12" };
 const prtsc = { key: "PrintScreen", code: "PrintScreen" };
 const ctrlP = { key: "p", code: "KeyP", ctrlKey: true };
+const ctrlS = { key: "s", code: "KeyS", ctrlKey: true };
+const ctrlU = { key: "u", code: "KeyU", ctrlKey: true };
 
-sama("sertifikasi memang tiga", aturanMode("sertifikasi").batasPaksa, 3);
-benar("dua kali F12 belum memutus",
-  !harusDipaksa("sertifikasi", hitungKetukan([f12, f12]) as never));
-benar("tiga kali F12 memutus",
-  harusDipaksa("sertifikasi", hitungKetukan([f12, f12, f12]) as never));
-benar("tiga ketukan berbeda juga memutus",
-  harusDipaksa("sertifikasi", hitungKetukan([f12, prtsc, ctrlP]) as never));
+sama("sertifikasi memang lima", aturanMode("sertifikasi").batasPaksa, 5);
+benar("empat kali F12 belum memutus",
+  !harusDipaksa("sertifikasi", hitungKetukan([f12, f12, f12, f12]) as never));
+benar("lima kali F12 memutus",
+  harusDipaksa("sertifikasi", hitungKetukan([f12, f12, f12, f12, f12]) as never));
+benar("lima ketukan berbeda juga memutus",
+  harusDipaksa("sertifikasi", hitungKetukan([f12, prtsc, ctrlP, ctrlS, ctrlU]) as never));
+
+// Dan teguran yang muncul pada tiap ketukan menyebut nomornya, tanpa pernah
+// menyebut bahwa lima adalah ujungnya. Diperiksa dari rentetan ketukan
+// sungguhan, bukan dari angka yang diketik tangan.
+const rentetan = [f12, prtsc, ctrlP, ctrlS];
+let sudah = 0;
+for (const t of rentetan) {
+  const putusan = periksaTombol(t);
+  if (!putusan?.insiden) continue;
+  sudah += 1;
+  const kata = pesanTeguran(putusan.insiden, sudah);
+  benar(`teguran ketukan ke-${sudah} menyebut nomornya`,
+    kata.judul.includes(`ke-${sudah}`), kata.judul);
+  benar(`teguran ketukan ke-${sudah} tidak menyebut batasnya`,
+    !/\b5\b|lima|sisa|tinggal/i.test(`${kata.judul} ${kata.sebab}`),
+    JSON.stringify(kata));
+}
 // Yang tidak dicatat tidak pernah mengakhiri ujian siapa pun, berapa pun
 // banyaknya.
 const banyakF5 = Array.from({ length: 20 }, () => ({ key: "F5", code: "F5" }));

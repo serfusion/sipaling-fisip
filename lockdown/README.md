@@ -1,4 +1,4 @@
-# Aplikasi Ujian Terkunci
+# Exam Browser
 
 Dua aplikasi kecil yang menjalankan halaman ujian CBT di dalam jendela yang
 **sistem operasinya sendiri menolak untuk ditangkap layar**.
@@ -164,7 +164,7 @@ peringatan itu muncul persis pada pagi hari ujian.
 
 1. Jalankan `supabase-update-v30-kunci-layar.sql` sekali di SQL Editor Supabase.
 2. Buka ujiannya di dashboard → **Pengaturan** → centang
-   **"Wajib lewat Aplikasi Ujian Terkunci"**.
+   **"Wajib lewat aplikasi Exam Browser"**.
 3. Bagikan tautan unduhan aplikasinya ke kelas **sehari sebelumnya**, bukan pagi
    hari ujian.
 

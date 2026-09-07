@@ -21,7 +21,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { jawabanKosong, uraiJodoh, type JenisSoal, type Media } from "@/lib/cbt";
 import {
-  ajakanAplikasi, bacaKlien, kunciSistem, pesanKunciLayar,
+  bacaKlien, kunciSistem,
   type JembatanKlien,
 } from "@/lib/kunci-layar";
 import { aturanMode, rapikanMode, type JenisInsiden } from "@/lib/pengawasan";
@@ -32,6 +32,7 @@ import { usePenjaga } from "./penjaga";
 import RangkaUjian from "./rangka-ujian";
 import TandaAir from "./tanda-air";
 import Tirai from "./tirai";
+import Teguran, { type IsiTeguran } from "./teguran";
 
 type Ujian = {
   kode: string; judul: string; mataKuliah: string; kelas: string | null;
@@ -48,7 +49,7 @@ type Ujian = {
    * dipegang Admin dan dapat dimatikan pada ujian sertifikasi mana pun.
    */
   kamera?: boolean;
-  /** Ujian ini hanya boleh dikerjakan lewat Aplikasi Ujian Terkunci. */
+  /** Ujian ini hanya boleh dikerjakan lewat aplikasi Exam Browser. */
   wajibAplikasi?: boolean;
 };
 
@@ -124,7 +125,7 @@ function penandaPerangkat() {
 /**
  * Perangkat peserta beserta kunci aplikasinya, untuk disertakan ke server.
  *
- * Dibaca dari objek jembatan yang disuntikkan Aplikasi Ujian Terkunci ke
+ * Dibaca dari objek jembatan yang disuntikkan aplikasi Exam Browser ke
  * halaman ini, lalu dari User-Agent-nya bila jembatannya tidak ada. Di peramban
  * biasa keduanya kosong, dan itu jawaban yang benar — bukan kegagalan.
  *
@@ -183,6 +184,15 @@ export default function UjianApp() {
   const [ditandai, setDitandai] = useState<number[]>([]);
   const [hasil, setHasil] = useState<Hasil | null>(null);
   const [pesanSelesai, setPesanSelesai] = useState("");
+  /**
+   * Teguran yang sedang menutup soal, atau null.
+   *
+   * Ia TIDAK menghilang sendiri — satu-satunya jalan keluarnya tombol di
+   * dalamnya. Peringatan yang menghilang sendiri sesudah beberapa detik dapat
+   * ditunggu sambil tetap menekan tombol berikutnya; yang menuntut satu
+   * ketukan tidak bisa.
+   */
+  const [teguran, setTeguran] = useState<IsiTeguran | null>(null);
 
   const antreRef = useRef<Map<number, string>>(new Map());
   const jamKirimRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -235,6 +245,15 @@ export default function UjianApp() {
         );
         setHasil(null);
         setLayar("selesai");
+      }
+      // Pelanggaran yang ikut menghitung mundur mendapat kotak yang menutup
+      // soal dan harus diakui; yang ringan cukup pita yang menghilang sendiri.
+      // Pita dikosongkan untuk yang berat supaya keduanya tidak muncul
+      // sekaligus — pita di belakang kotak hanya menambah kata yang tidak
+      // terbaca siapa pun.
+      if (data?.keras) {
+        setTeguran({ jenis, nomor: Number(data.nomor) || 0 });
+        return "";
       }
       return typeof data?.pesan === "string" ? data.pesan : "";
     } catch {
@@ -759,52 +778,23 @@ export default function UjianApp() {
 
           {ujian.instruksi && <div className="uj-instruksi"><b>Instruksi</b><p>{ujian.instruksi}</p></div>}
 
-          {/* ---------- KUNCI TANGKAPAN LAYAR ----------
-              Dikatakan SEBELUM tombol Mulai ditekan, dan kalimatnya berbeda
-              menurut perangkatnya.
+          {/* ---------- PENGAWASAN TIDAK DIUMUMKAN ----------
+              Dulu di sini ada kotak "Tangkapan layar diawasi" beserta ajakan
+              memakai aplikasi terkunci. Keduanya dibuang atas permintaan
+              pemilik sistem, dan alasannya masuk akal: layar yang mengumumkan
+              apa saja yang diawasi juga mengumumkan apa saja yang TIDAK
+              diawasi, dan itu peta bagi orang yang mencari celahnya.
 
-              Bedanya bukan basa-basi. "Tangkapan layar diblokir" pada peramban
-              biasa akan diuji peserta pertama dalam lima detik, dan begitu
-              terbukti tidak benar, seluruh peringatan lain di layar ini ikut
-              kehilangan wibawanya — termasuk yang sungguh-sungguh ditegakkan.
-
-              Hanya muncul pada ujian yang memang menjaganya: mode Biasa untuk
-              kuis harian tidak perlu membuka layarnya dengan peringatan. */}
-          {(aturan.jagaTangkapanLayar || ujian.wajibAplikasi) && (
-            <div className={`uj-kunci ${kunciSistem(penjaga.klien) ? "uj-kunci-sistem" : ""}`}>
-              <span className="uj-kunci-ikon" aria-hidden="true">
-                {kunciSistem(penjaga.klien) ? "🔒" : "👁"}
-              </span>
-              <div>
-                <b>
-                  {kunciSistem(penjaga.klien)
-                    ? "Tangkapan layar dikunci sistem"
-                    : "Tangkapan layar diawasi"}
-                </b>
-                <span>{pesanKunciLayar(penjaga.klien)}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Ujian yang MEWAJIBKAN aplikasi, dibuka dari peramban. Dikatakan di
-              sini, bukan sesudah tombol Mulai ditekan: peserta yang baru
-              mengetahuinya sesudah menekan Mulai sudah duduk di ruang ujian
-              dengan waktu berjalan, dan yang tersisa baginya hanya memasang
-              aplikasi di tengah ujian. */}
+              Yang tersisa satu-satunya: peserta yang ujiannya mewajibkan Exam
+              Browser tetap harus diberi tahu sebelum menekan Mulai. Bukan
+              pengumuman pengawasan melainkan syarat masuk, dan menyembunyikan
+              syarat masuk hanya membuat orang duduk di ruang ujian dengan
+              waktu berjalan sementara ujiannya tidak dapat dibuka. */}
           {ujian.wajibAplikasi && !kunciSistem(penjaga.klien) && (
             <div className="uj-kabar uj-kabar-tutup">
-              <b>Ujian ini harus dikerjakan lewat Aplikasi Ujian Terkunci.</b> Peramban biasa
-              tidak dapat menolak tangkapan layar, jadi ujian ini tidak dapat dimulai dari sini.
-              Unduh aplikasinya dari tautan yang diberikan pengajarmu, buka, lalu masukkan kode
-              ujian yang sama.
+              <b>Ujian ini hanya dapat dibuka lewat aplikasi Exam Browser.</b> Unduh dari
+              tautan yang diberikan pengajarmu, lalu masukkan kode ujian yang sama.
             </div>
-          )}
-
-          {/* Ujian yang belum mewajibkannya cukup diberi tahu, tanpa
-              menghalangi. Ajakannya kosong sendiri bila pesertanya memang sudah
-              memakai aplikasinya. */}
-          {aturan.jagaTangkapanLayar && ajakanAplikasi(penjaga.klien, ujian.wajibAplikasi === true) && (
-            <p className="uj-catatan">{ajakanAplikasi(penjaga.klien, ujian.wajibAplikasi === true)}</p>
           )}
 
           {belumBuka && (
@@ -836,8 +826,7 @@ export default function UjianApp() {
                 {sibuk ? "Menyiapkan…" : "MULAI UJIAN"}
               </button>
               <p className="uj-catatan">
-                Waktu {ejaMenit(ujian.durasi)} mulai berjalan begitu tombol ini ditekan. Jawabanmu
-                tersimpan otomatis, jadi kalau jaringan sempat terputus, pekerjaanmu tidak hilang.
+                Waktu {ejaMenit(ujian.durasi)} mulai berjalan begitu tombol ini ditekan. Jawaban tersimpan otomatis.
               </p>
             </>
           )}
@@ -856,7 +845,7 @@ export default function UjianApp() {
     return (
       <RangkaUjian
         judul="Ujian selesai"
-        sub={ujian ? `${ujian.judul} — ${ujian.mataKuliah}` : "Terima kasih sudah mengerjakan."}
+        sub={ujian ? `${ujian.judul} · ${ujian.mataKuliah}` : "Terima kasih sudah mengerjakan."}
         poin={[
           "Jawabanmu sudah tersimpan di server.",
           "Halaman ini boleh ditutup.",
@@ -979,7 +968,7 @@ export default function UjianApp() {
           ke dalam gambar — dan yang bocor persis bagian yang dijaga.
 
           Ia TIDAK menggagalkan tangkapan layar; ia mengosongkan isinya. Yang
-          benar-benar menolak adalah Aplikasi Ujian Terkunci di lockdown/,
+          benar-benar menolak adalah aplikasi Exam Browser di lockdown/,
           tempat sistem operasinya sendiri yang menolak. */}
       {penjaga.tirai && (
         <Tirai
@@ -999,7 +988,27 @@ export default function UjianApp() {
         />
       )}
 
-      {/* ---------- PITA PERINGATAN ---------- */}
+      {/* ---------- KOTAK TEGURAN ----------
+          Di ATAS tirai, dan itu disengaja. Keduanya dapat muncul bersamaan —
+          menekan PrintScreen memasang tirai sekaligus melahirkan teguran, dan
+          keluar dari layar penuh memasang tirai yang menetap. Yang harus
+          terbaca lebih dulu adalah tegurannya; tiraïnya menunggu di belakang
+          dan masih ada begitu tegurannya diakui.
+
+          Hanya selama peserta benar-benar mengerjakan. Teguran yang tertinggal
+          di atas halaman hasil membuat peserta mengira ujiannya belum
+          berakhir. */}
+      {layar === "kerja" && teguran && (
+        <Teguran
+          isi={teguran}
+          peserta={{ nama, nim, kode: ujian?.kode ?? "" }}
+          tutup={() => setTeguran(null)}
+        />
+      )}
+
+      {/* ---------- PITA PERINGATAN ----------
+          Sisa yang ringan saja — klik kanan, jendela kehilangan fokus. Yang
+          berat sudah menjadi kotak teguran di atas. */}
       {penjaga.peringatan && (
         <div className="uj-jaga" role="status">{penjaga.peringatan}</div>
       )}

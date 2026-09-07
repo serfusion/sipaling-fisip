@@ -142,7 +142,7 @@ export default function KelulusanModule() {
         text:
           `${kumpulan.length} mahasiswa terbaca dari ${catatanLembar.length} lembar (${catatanLembar.join(", ")}). ` +
           (skTerbaca ? `Nomor SK "${skTerbaca}" terangkat dari kop lembar. ` : "") +
-          (rusak ? `${rusak} baris masih perlu diperbaiki — lihat tabel di bawah. ` : "Semua baris lengkap. ") +
+          (rusak ? `${rusak} baris masih perlu diperbaiki. Lihat tabel di bawah. ` : "Semua baris lengkap. ") +
           (gagalLembar.length ? `Dilewati: ${gagalLembar.join(" · ")}. ` : "") +
           "Berkasnya dibaca di peramban Anda, tidak diunggah ke mana pun.",
       });
@@ -227,13 +227,13 @@ export default function KelulusanModule() {
     );
     setPesan({
       kind: "ok",
-      text: `${pilihan.length} baris terunduh${kodeProdi ? ` untuk prodi ${kodeProdi}` : ""}. Unggah berkas ini apa adanya ke PDDIKTI — kolom dan urutannya sudah sesuai template.`,
+      text: `${pilihan.length} baris terunduh${kodeProdi ? ` untuk prodi ${kodeProdi}` : ""}. Unggah berkas ini apa adanya ke PDDIKTI. kolom dan urutannya sudah sesuai template.`,
     });
   }
 
   function unduhKosong() {
     unduh(buatXlsxKelulusan(KOLOM_KELULUSAN, [], NAMA_LEMBAR_PDDIKTI), "Template-Kelulusan-PDDIKTI-kosong.xlsx");
-    setPesan({ kind: "ok", text: "Template kosong terunduh — sepuluh kolom PDDIKTI lengkap dengan warna dan catatannya." });
+    setPesan({ kind: "ok", text: "Template kosong terunduh. Sepuluh kolom PDDIKTI lengkap dengan warna dan catatannya." });
   }
 
   /* ---------- semester: dua bacaan yang sama-sama dipakai orang ---------- */
@@ -256,7 +256,7 @@ export default function KelulusanModule() {
       <section className="panel kel-box">
         <h2 className="kel-h2"><span className="kel-no">1</span> Unggah Excel yudisium dari fakultas</h2>
         <p className="kel-p">
-          Berkas apa adanya dari fakultas — kop lampiran SK, judul prodi, dan blok tanda tangan boleh ikut.
+          Berkas apa adanya dari fakultas. Kop lampiran SK dan blok tanda tangan boleh ikut.
           Semua lembar di dalamnya dibaca sekaligus, jadi ILKOM dan ILPEM cukup satu kali unggah.
           Kolom yang dicari: <b>NIM</b>, <b>NAMA MAHASISWA</b>, <b>TGL YUDISIUM</b>, <b>IPK</b>, dan <b>KODE PRODI</b> bila ada.
         </p>
@@ -321,7 +321,7 @@ export default function KelulusanModule() {
               {semesterOtomatis && (
                 <>
                   {" "}Untuk berkas ini: <b>{semesterOtomatis}</b>
-                  {tahunAjaran && <> — {semesterOtomatis.endsWith("2") ? "genap" : "ganjil"} TA {tahunAjaran}</>}.
+                  {tahunAjaran && <>, {semesterOtomatis.endsWith("2") ? "genap" : "ganjil"} TA {tahunAjaran}</>}.
                   {semesterKalender !== semesterOtomatis && (
                     <>
                       {" "}Bila unit Anda memakai kode <b>tahun kalender</b>, nilainya{" "}
@@ -342,13 +342,13 @@ export default function KelulusanModule() {
           <label>
             Tanggal SK <span className="kel-tanda kel-tanda-bebas">boleh kosong</span>
             <input type="date" value={tanggalSk} onChange={(e) => ubahTanggalSk(e.target.value)} />
-            <small>Diketik sesuai surat keputusannya — tanggal ini tidak ada di berkas fakultas.</small>
+            <small>Diketik sesuai surat keputusannya. Tanggal ini tidak ada di berkas fakultas.</small>
           </label>
 
           <label>
             Kode Prodi cadangan
             <select value={prodiCadangan} onChange={(e) => ubahProdiCadangan(e.target.value)}>
-              <option value="">— tidak dipakai —</option>
+              <option value="">(tidak dipakai)</option>
               {PRODI_PDDIKTI.map((p) => <option key={p.kode} value={p.kode}>{p.kode} · {p.nama}</option>)}
             </select>
             <small>Hanya mengisi baris yang kode prodinya kosong. Yang datang dari berkas tidak ditimpa.</small>
@@ -367,7 +367,7 @@ export default function KelulusanModule() {
         {semesterBeragam && (
           <div className="dsh-error">
             Berkas ini berisi lebih dari satu semester keluar. Itu wajar bila yudisiumnya melintasi pergantian
-            semester — periksa kolom Semester pada tabel di bawah, atau ketik satu nilai di kolom Semester Keluar
+            semester. Periksa kolom Semester pada tabel di bawah, atau ketik satu nilai di kolom Semester Keluar
             supaya seragam.
           </div>
         )}
@@ -393,7 +393,7 @@ export default function KelulusanModule() {
                 <b>tidak ikut</b> ke berkas hasil sampai diperbaiki:
                 <ul>
                   {masalah.slice(0, 8).map((m) => (
-                    <li key={m.id}>{m.nim || "(NIM kosong)"} {m.nama && `· ${m.nama}`} — {m.sebab}</li>
+                    <li key={m.id}>{m.nim || "(NIM kosong)"} {m.nama && `· ${m.nama}`}: {m.sebab}</li>
                   ))}
                 </ul>
                 {masalah.length > 8 && <span>…dan {masalah.length - 8} lainnya. Nyalakan saringan &quot;hanya yang bermasalah&quot; di bawah.</span>}

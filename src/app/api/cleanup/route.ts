@@ -1,10 +1,12 @@
 import { db } from "@/db";
-import { appSettings, revisionUploads, serviceRequests } from "@/db/schema";
+import { appSettings, cbtQuestions, revisionUploads, serviceRequests } from "@/db/schema";
 import { and, eq, isNotNull, lt, or, sql } from "drizzle-orm";
 import { getSupabaseSecretKey, getSupabaseUrl } from "@/lib/supabase-config";
 import { DOCUMENT_BUCKET } from "@/lib/document-storage";
 import { createClient } from "@supabase/supabase-js";
 import { explainServerError } from "@/lib/api-errors";
+import { HARI_SIMPAN_MEDIA, jalurDariSoal, sapuMedia } from "@/lib/media-cbt";
+import { BUCKET_MEDIA, daftarMedia, hapusMedia } from "@/lib/media-simpan";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -91,10 +93,48 @@ export async function GET(request: Request) {
       rowsCleaned += 1;
     }
 
+    // --- MEDIA SOAL CBT YANG YATIM ---
+    //
+    // Gambar dan video soal punya umur simpannya sendiri: SATU BULAN, bukan
+    // setahun seperti lampiran layanan di atas. Alasannya bukan aturan
+    // akademik melainkan tagihan penyimpanan, dan yang disapu di sini hanya
+    // berkas yang sudah tidak ditunjuk soal mana pun.
+    //
+    // Yang MASIH ditunjuk soal dibiarkan, walau umurnya setahun. Bank soal
+    // disusun sekali lalu dipakai ulang tiap semester; gambar yang hilang
+    // sendiri sesudah sebulan berarti naskah ujian yang kosong pada hari
+    // pelaksanaan tanpa seorang pun tahu sebabnya. Yang menginginkan aturan
+    // sekeras itu menyalakan CBT_SAPU_SEMUA_MEDIA=1, dan menanggung akibatnya.
+    let mediaCbtDeleted = 0;
+    try {
+      const isiBucket = await daftarMedia();
+      if (isiBucket.length > 0) {
+        const soalAda = await db
+          .select({ mediaUrl: cbtQuestions.mediaUrl })
+          .from(cbtQuestions)
+          .where(isNotNull(cbtQuestions.mediaUrl));
+        const dipakai = jalurDariSoal(soalAda, BUCKET_MEDIA);
+        const buang = sapuMedia(isiBucket, dipakai, Date.now(), {
+          hari: HARI_SIMPAN_MEDIA,
+          sapuSemua: process.env.CBT_SAPU_SEMUA_MEDIA === "1",
+        });
+        // Dipotong per seratus: satu perintah hapus dengan ribuan nama
+        // ditolak Storage, dan yang ditolak adalah SELURUH daftarnya.
+        for (let i = 0; i < buang.length; i += 100) {
+          mediaCbtDeleted += await hapusMedia(buang.slice(i, i + 100));
+        }
+      }
+    } catch (galat) {
+      // Tidak pernah menggagalkan pembersihan yang lain. Bucket CBT boleh
+      // saja belum ada di pemasangan yang tidak memakai CBT sama sekali.
+      console.error("sapu media cbt", galat);
+    }
+
     const summary = {
       ranAt: new Date().toISOString(),
       cutoff: cutoff.toISOString(),
       filesDeleted,
+      mediaCbtDeleted,
       rowsCleaned,
       note: rowsCleaned >= BATCH * 2 ? "Masih ada sisa, akan dilanjutkan pada jadwal berikutnya." : "Selesai.",
     };

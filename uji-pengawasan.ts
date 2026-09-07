@@ -8,8 +8,10 @@
 
 import {
   BOBOT_INSIDEN, INSIDEN_BERAT, INSIDEN_LABEL, MODE_KETERANGAN, MODE_LABEL,
-  SEMUA_INSIDEN, SEMUA_MODE, aturanMode, berat, harusDipaksa, jumlahBerat,
-  kameraMenyala, pesanPeringatan, rapikanInsiden, rapikanMode, skorIntegritas,
+  INSIDEN_TEGUR, SEMUA_INSIDEN, SEMUA_MODE, aturanMode, berat, harusDipaksa,
+  jumlahBerat,
+  kameraMenyala, pesanPeringatan, pesanTeguran, rapikanInsiden, rapikanMode,
+  skorIntegritas,
   tandaAir, tingkatIntegritas, type JenisInsiden,
 } from "./src/lib/pengawasan";
 import { bolehSaklarKamera, PEMANTAU } from "./src/lib/cbt";
@@ -53,29 +55,39 @@ sama("biasa: tidak pernah memaksa", biasa.batasPaksa, 0);
 sama("ketat: layar penuh", ketat.layarPenuh, true);
 sama("ketat: salin dikunci", ketat.kunciSalin, true);
 sama("ketat: tanda air menyala", ketat.tandaAir, true);
-// Inilah garis pemisah antara UAS dan uji sertifikasi. Keduanya kini memutus,
-// tetapi tidak pada angka yang sama: yang sertifikatnya berlaku di luar kampus
-// dijaga paling ketat.
+// Keduanya memutus pada LIMA. Yang membedakan Ketat dari Sertifikasi bukan
+// ambangnya melainkan apa yang diawasi — kamera, layar kedua, dan alat
+// pengembang hanya ada di mode sertifikasi.
 sama("ketat: memaksa pada lima", ketat.batasPaksa, 5);
 sama("ketat: lingkungan belum dijaga", ketat.jagaLingkungan, false);
 
 sama("sertifikasi: menjaga lingkungan", sertifikasi.jagaLingkungan, true);
-// TIGA, apa adanya. Angka ini diminta pemilik sistem dan menjadi janji yang
-// tertulis di MODE_KETERANGAN — mengubahnya diam-diam membuat keterangan yang
-// dibaca pengajar saat memilih mode menjadi bohong.
-sama("sertifikasi: memaksa pada tiga", sertifikasi.batasPaksa, 3);
-benar("sertifikasi lebih ketat daripada ketat", sertifikasi.batasPaksa < ketat.batasPaksa,
-  `sertifikasi ${sertifikasi.batasPaksa}, ketat ${ketat.batasPaksa}`);
-// Yang membuat ambang serendah itu tetap adil bukan angkanya, melainkan siapa
-// yang menghitung mundur. Kalau blur pernah masuk INSIDEN_BERAT, tiga
-// notifikasi sistem sudah cukup mengakhiri ujian sertifikasi orang.
+sama("sertifikasi: memaksa pada lima", sertifikasi.batasPaksa, 5);
+// Yang membuat ambang itu tetap adil bukan angkanya, melainkan siapa yang
+// menghitung mundur. Kalau blur pernah masuk INSIDEN_BERAT, lima notifikasi
+// sistem sudah cukup mengakhiri ujian orang, dan tidak satu pun di antaranya
+// perbuatan pesertanya.
 benar("blur di luar hitungan mundur", !INSIDEN_BERAT.includes("blur"));
-benar("klik kanan di luar hitungan mundur", !INSIDEN_BERAT.includes("klik_kanan"));
-// Keterangan mode yang dibaca pengajar harus menyebut angkanya sendiri.
+benar("wajah hilang di luar hitungan mundur", !INSIDEN_BERAT.includes("wajah_hilang"));
+benar("orang lain di luar hitungan mundur", !INSIDEN_BERAT.includes("orang_lain"));
+// Klik kanan dan salin IKUT. Keduanya sudah dicegah, jadi yang tercatat bukan
+// perbuatan yang berhasil melainkan percobaan yang diulang.
+benar("klik kanan ikut menghitung mundur", INSIDEN_BERAT.includes("klik_kanan"));
+benar("menyalin ikut menghitung mundur", INSIDEN_BERAT.includes("salin"));
+// Keterangan mode dibaca PENGAJAR di panel, bukan peserta di layar ujian —
+// jadi di sini angkanya justru harus disebut. Pengajar yang memilih mode
+// tanpa tahu ujiannya dapat berakhir sendiri akan terkejut oleh ujiannya
+// sendiri.
 benar("keterangan sertifikasi menyebut ambangnya",
-  /tiga/i.test(MODE_KETERANGAN.sertifikasi), MODE_KETERANGAN.sertifikasi);
+  /lima/i.test(MODE_KETERANGAN.sertifikasi), MODE_KETERANGAN.sertifikasi);
 benar("keterangan ketat menyebut ambangnya",
   /lima/i.test(MODE_KETERANGAN.ketat), MODE_KETERANGAN.ketat);
+// Dan tetap pendek. Keterangan mode dibaca sambil memilih, bukan dipelajari:
+// yang panjang tidak terbaca sama sekali.
+for (const m of SEMUA_MODE) {
+  benar(`keterangan ${m} tetap singkat`, MODE_KETERANGAN[m].length <= 110,
+    `${MODE_KETERANGAN[m].length} aksara`);
+}
 sama("sertifikasi: layar penuh", sertifikasi.layarPenuh, true);
 sama("sertifikasi: salin dikunci", sertifikasi.kunciSalin, true);
 sama("sertifikasi: tanda air menyala", sertifikasi.tandaAir, true);
@@ -103,7 +115,7 @@ benar("blur paling ringan bersama klik kanan",
 
 // Dan yang tidak disengaja tidak boleh ikut menghitung mundur ke pemutusan.
 benar("blur BUKAN pelanggaran berat", !berat("blur"));
-benar("klik kanan BUKAN pelanggaran berat", !berat("klik_kanan"));
+benar("klik kanan kini pelanggaran berat", berat("klik_kanan"));
 benar("layar kedua bukan pelanggaran berat", !berat("layar_kedua"),
   "layar kedua adalah keadaan, bukan perbuatan berulang");
 benar("tempel adalah pelanggaran berat", berat("tempel"));
@@ -135,7 +147,7 @@ console.log("=== PENGUMPULAN PAKSA ===\n");
 
 const banyak: Record<string, number> = { tab: 3, fullscreen: 3, tempel: 3 };
 sama("berat dijumlahkan", jumlahBerat(banyak as never), 9);
-sama("yang ringan tidak ikut", jumlahBerat({ blur: 9, klik_kanan: 9 }), 0);
+sama("yang ringan tidak ikut", jumlahBerat({ blur: 9, wajah_hilang: 9 }), 0);
 
 // Mode biasa TIDAK PERNAH memutus, berapa pun catatannya. Kuis harian yang
 // berakhir sendiri karena pesertanya berpindah tab tiga kali adalah kerugian
@@ -148,21 +160,21 @@ benar("sertifikasi memaksa saat batasnya lewat", harusDipaksa("sertifikasi", ban
 
 // Yang tidak disengaja tidak memutus apa-apa, pada mode mana pun.
 benar("blur berkali-kali tidak memutus sertifikasi",
-  !harusDipaksa("sertifikasi", { blur: 50, klik_kanan: 50 }));
+  !harusDipaksa("sertifikasi", { blur: 50, wajah_hilang: 50 }));
 benar("blur berkali-kali tidak memutus ketat",
-  !harusDipaksa("ketat", { blur: 50, klik_kanan: 50 }));
+  !harusDipaksa("ketat", { blur: 50, wajah_hilang: 50 }));
 
-// Persis di ambangnya, dari kedua sisi. Inilah yang dijanjikan kepada peserta
-// lewat "Sisa N kali lagi", jadi selisih satu di sini adalah janji yang
-// dilanggar.
-benar("dua pelanggaran berat belum memutus sertifikasi",
-  !harusDipaksa("sertifikasi", { tab: 2 }));
-benar("tiga pelanggaran berat memutus sertifikasi", harusDipaksa("sertifikasi", { tab: 3 }));
-benar("tiga pelanggaran campuran juga memutus",
-  harusDipaksa("sertifikasi", { tangkap: 1, devtools: 1, tempel: 1 }));
-benar("empat pelanggaran berat belum memutus ketat",
-  !harusDipaksa("ketat", { tab: 4 }));
-benar("lima pelanggaran berat memutus ketat", harusDipaksa("ketat", { tab: 5 }));
+// Persis di ambangnya, dari kedua sisi, pada kedua mode yang memutus.
+// Selisih satu di sini adalah ujian orang yang berakhir satu ketukan terlalu
+// cepat — dan tidak dapat dibatalkan.
+for (const m of ["ketat", "sertifikasi"] as const) {
+  benar(`${m}: empat pelanggaran berat belum memutus`, !harusDipaksa(m, { tab: 4 }));
+  benar(`${m}: lima pelanggaran berat memutus`, harusDipaksa(m, { tab: 5 }));
+}
+benar("lima pelanggaran campuran juga memutus",
+  harusDipaksa("sertifikasi", { tangkap: 2, devtools: 1, tempel: 1, tab: 1 }));
+benar("empat pelanggaran campuran belum memutus",
+  !harusDipaksa("sertifikasi", { tangkap: 2, devtools: 1, tempel: 1 }));
 
 console.log("=== PERINGATAN KEPADA PESERTA ===\n");
 
@@ -170,33 +182,90 @@ console.log("=== PERINGATAN KEPADA PESERTA ===\n");
 // siapa pun.
 const p1 = pesanPeringatan("sertifikasi", "tab", { tab: 1 });
 benar("menyebut perbuatannya", p1.includes("Pindah tab"), p1);
-benar("menyebut sisa kesempatan", p1.includes("Sisa 2"), p1);
+benar("menyebut sudah berapa kali", /ke-1\b/.test(p1), p1);
 
-// Sisa yang disebut harus SELALU sama dengan sisa yang sebenarnya, pada tiap
-// mode dan tiap angka. Peringatan yang mengatakan "sisa 2" lalu memutus pada
-// yang berikutnya lebih buruk daripada tidak memperingatkan sama sekali.
+// ---------- BATASNYA TIDAK PERNAH BOCOR ----------
+//
+// Inilah yang membuat ancamannya bekerja, dan sekali bocor ia tidak dapat
+// ditarik kembali: peserta yang tahu batasnya membelanjakan jatahnya dengan
+// tenang sampai satu ketukan sebelum habis, dan seluruh penjagaan berubah
+// menjadi anggaran. Diperiksa pada TIAP mode dan TIAP angka, karena satu
+// kalimat yang terlewat sudah cukup.
+const KATA_BOCOR = /sisa|tersisa|tinggal|batas(?:nya)? \d|dari \d|\bdari lima\b/i;
+for (const m of SEMUA_MODE) {
+  const batas = aturanMode(m).batasPaksa;
+  for (let sudah = 1; sudah <= Math.max(batas, 3) + 2; sudah += 1) {
+    const pesan = pesanPeringatan(m, "tab", { tab: sudah });
+    benar(`${m}/${sudah}: tidak membocorkan batasnya`, !KATA_BOCOR.test(pesan), pesan);
+    // Dan angka batasnya sendiri tidak pernah muncul sebagai angka telanjang.
+    if (batas > 0 && sudah !== batas) {
+      benar(`${m}/${sudah}: angka batas tidak tertulis`,
+        !new RegExp(`\\b${batas}\\b`).test(pesan), pesan);
+    }
+  }
+}
+
+// Yang tetap dikatakan: perbuatannya, nomornya, dan bahwa ujiannya dapat
+// berakhir. Ancaman yang kabur bukan alasan untuk menjadi ancaman yang tidak
+// jujur.
 for (const m of ["ketat", "sertifikasi"] as const) {
   const batas = aturanMode(m).batasPaksa;
   for (let sudah = 1; sudah < batas; sudah += 1) {
     const pesan = pesanPeringatan(m, "tab", { tab: sudah });
-    benar(`${m}: sisa sesudah ${sudah} pelanggaran benar`,
-      pesan.includes(`Sisa ${batas - sudah} kali`), pesan);
+    benar(`${m}: menyebut pelanggaran ke-${sudah}`,
+      new RegExp(`ke-${sudah}\\b`).test(pesan), pesan);
+    benar(`${m}: mengancam tanpa peringatan lagi`,
+      /tanpa peringatan lagi/i.test(pesan), pesan);
   }
   const habis = pesanPeringatan(m, "tab", { tab: batas });
-  benar(`${m}: saat batasnya lewat tidak menyebut sisa lagi`,
-    habis.includes("dikumpulkan otomatis") && !habis.includes("Sisa"), habis);
+  benar(`${m}: saat batasnya lewat, mengatakan apa yang terjadi`,
+    habis.includes("dikumpulkan otomatis"), habis);
 }
-
-const p2 = pesanPeringatan("sertifikasi", "tab", { tab: 5 });
-benar("saat batasnya lewat, mengatakan apa yang terjadi",
-  p2.includes("dikumpulkan otomatis") && !p2.includes("Sisa"), p2);
 
 const p3 = pesanPeringatan("biasa", "tab", { tab: 1 });
 benar("mode biasa tidak mengancam yang tidak akan terjadi",
-  !p3.includes("Sisa") && !p3.includes("otomatis"), p3);
+  !p3.includes("ke-1") && !p3.includes("otomatis"), p3);
+benar("mode biasa tetap mencatat", p3.includes("dilaporkan ke pengawas"), p3);
 
-const p4 = pesanPeringatan("sertifikasi", "klik_kanan", { klik_kanan: 3 });
-benar("pelanggaran ringan tidak dihitung mundur", !p4.includes("Sisa"), p4);
+const p4 = pesanPeringatan("sertifikasi", "blur", { blur: 3 });
+benar("pelanggaran ringan tidak dihitung mundur", !/ke-\d/.test(p4), p4);
+benar("pelanggaran ringan tidak diancam", !/tanpa peringatan lagi/i.test(p4), p4);
+
+console.log("=== KOTAK TEGURAN ===\n");
+
+// Kotak yang menutup soal dan harus diakui. Isinya diperiksa dengan aturan
+// yang sama: menyebut nomornya, tidak pernah menyebut batasnya.
+for (let n = 1; n <= 8; n += 1) {
+  const t = pesanTeguran("tangkap", n);
+  benar(`teguran ke-${n} menyebut nomornya`, t.judul === `Pelanggaran ke-${n}`, t.judul);
+  benar(`teguran ke-${n} tidak membocorkan batas`,
+    !KATA_BOCOR.test(`${t.judul} ${t.sebab}`), JSON.stringify(t));
+}
+const tg = pesanTeguran("tangkap", 2);
+benar("teguran menyebut perbuatannya", tg.sebab === INSIDEN_TEGUR.tangkap, tg.sebab);
+// Empat perbuatan yang paling sering dicoba harus berbunyi persis "Terdeteksi
+// ...", karena itulah kalimat yang menghentikan tangan orang.
+for (const j of ["tangkap", "tab", "klik_kanan", "salin"] as const) {
+  benar(`teguran ${j} berbunyi "Terdeteksi ..."`,
+    INSIDEN_TEGUR[j].startsWith("Terdeteksi "), INSIDEN_TEGUR[j]);
+}
+// Isinya HANYA dua: nomornya dan perbuatannya. Kotak ini muncul di tengah
+// ujian pada orang yang sedang panik, dan dua baris penjelas yang harus
+// dibaca lebih dulu justru membuat angkanya terlewat. Kalau suatu hari ada
+// yang menambahkan paragraf lagi ke sini, uji ini yang menahannya.
+benar("teguran hanya membawa nomor dan perbuatannya",
+  Object.keys(tg).sort().join(",") === "judul,sebab", JSON.stringify(tg));
+benar("teguran tetap singkat", `${tg.judul} ${tg.sebab}`.length <= 70,
+  `${tg.judul} ${tg.sebab}`);
+// Nomor nol tidak boleh menghasilkan "Pelanggaran ke-0".
+benar("nomor yang hilang tidak menjadi ke-0",
+  !pesanTeguran("tangkap", 0).judul.includes("ke-0"), pesanTeguran("tangkap", 0).judul);
+// Tiap jenis insiden punya sebab yang dapat dibaca — kotak yang berkata
+// "undefined" adalah kotak yang tidak dipercaya siapa pun.
+for (const j of SEMUA_INSIDEN) {
+  const t = pesanTeguran(j, 1);
+  benar(`teguran ${j} punya sebab terbaca`, (t.sebab ?? "").length > 3, t.sebab);
+}
 
 console.log("=== SAKLAR KAMERA ===\n");
 

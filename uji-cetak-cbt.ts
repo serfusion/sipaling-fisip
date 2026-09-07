@@ -72,7 +72,34 @@ cek("pilihan ganda tercetak berhuruf", naskah.includes("A. McCombs &amp; Shaw"))
 cek("pilihan penjodohan tetap ditawarkan", naskah.includes("D. Lasswell"));
 cek("PG kompleks diberi keterangan jawaban jamak", naskah.includes("Jawaban boleh lebih dari satu"));
 cek("essay diberi ruang menulis", (naskah.match(/class="garis"/g) || []).length >= 6);
-cek("soal bermedia ditandai tidak tercetak", naskah.includes("tidak tercetak"));
+// ---------- MEDIA IKUT TERCETAK ----------
+//
+// Dulu naskah cadangan hanya menulis "[Soal ini disertai gambar, tidak
+// tercetak]", dan itu membuatnya tidak terpakai persis pada saat ia
+// dibutuhkan: listrik padam, proyektor mati, dan soal yang bergantung pada
+// gambarnya tidak dapat dikerjakan siapa pun.
+cek("gambar soal benar-benar tercetak", naskah.includes('src="https://x.test/poster.png"'));
+cek("gambarnya membawa keterangannya", naskah.includes("Poster kampanye"));
+cek("gambar tidak lagi diakui tidak tercetak", !naskah.includes("tidak tercetak"));
+// Gambar potret yang tidak dibatasi tingginya mendorong soal berikutnya ke
+// halaman lain sendirian, dan yang terpotong di batas kertas tidak terbaca.
+cek("tinggi gambar dibatasi", /\.media-gambar img[\s\S]{0,120}max-height/.test(naskah));
+cek("gambar tidak terpotong di batas kertas",
+  /\.media-gambar \{[\s\S]{0,140}page-break-inside:\s*avoid/.test(naskah));
+
+// Video TIDAK dapat dicetak. Yang tercetak alamatnya, utuh dan dapat diketik
+// ulang; menuliskan "video, tidak tercetak" saja tidak menolong siapa pun.
+const naskahVideo = naskahSoalHtml(ujian, [{
+  ...soal[0],
+  media: { jenis: "video", url: "https://x.test/rekaman.mp4", keterangan: "Rekaman debat" },
+}]);
+cek("alamat video tercetak utuh", naskahVideo.includes("https://x.test/rekaman.mp4"));
+cek("video disebut apa adanya", naskahVideo.includes("Video soal"));
+cek("alamatnya berhuruf lebar supaya nol dan O tidak tertukar",
+  /\.media-url[\s\S]{0,120}monospace/.test(naskahVideo));
+// Video tidak boleh dicoba dipasang sebagai gambar.
+cek("video tidak dipasang sebagai gambar",
+  !naskahVideo.includes('<img src="https://x.test/rekaman.mp4"'));
 cek("ada tempat nama dan nomor peserta",
   naskah.includes("Nama") && naskah.includes("Nomor Peserta"));
 cek("instruksi pengajar ikut", naskah.includes("Tidak boleh membuka catatan"));

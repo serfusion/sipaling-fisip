@@ -541,7 +541,7 @@ export const cbtExams = pgTable("cbt_exams", {
    */
   cameraOn: boolean("camera_on").notNull().default(true),
   /**
-   * Ujian ini HANYA boleh dikerjakan lewat Aplikasi Ujian Terkunci.
+   * Ujian ini HANYA boleh dikerjakan lewat aplikasi Exam Browser.
    *
    * Inilah satu-satunya saklar di seluruh sistem yang benar-benar dapat
    * menolak tangkapan layar, dan ia menolaknya bukan dengan kode melainkan
@@ -557,6 +557,16 @@ export const cbtExams = pgTable("cbt_exams", {
    * tangkapan layar yang lolos pada kuis harian.
    */
   requireLockdown: boolean("require_lockdown").notNull().default(false),
+  /**
+   * Perangkat mana yang wajib memakai Exam Browser: "semua", "android", atau
+   * "windows". Hanya berarti bila requireLockdown menyala.
+   *
+   * Ada karena ruang ujian tidak seragam. Kelas yang seluruhnya memakai
+   * ponsel tidak perlu menolak peserta yang datang dengan aplikasi Windows,
+   * dan laboratorium yang seluruhnya memakai PC tidak perlu menyuruh
+   * pesertanya memasang aplikasi Android.
+   */
+  lockdownDevice: varchar("lockdown_device", { length: 16 }).notNull().default("semua"),
   /** Kode tambahan yang diketik mahasiswa. Kosong berarti tanpa kode. */
   token: varchar("token", { length: 12 }),
 

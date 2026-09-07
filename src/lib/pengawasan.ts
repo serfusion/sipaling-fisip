@@ -21,9 +21,13 @@
 //      bocor menunjuk satu orang, dan orang itu tahu ia tertulis di sana.
 //   4. MENGAKHIRI   — dan inilah yang sebenarnya bergigi. Halaman tidak dapat
 //      menahan tangan peserta, tetapi ujiannya ADA DI SINI, dan yang ada di
-//      sini dapat ditutup. Beberapa kali perbuatan yang menuntut tangan —
-//      tiga pada ujian sertifikasi — dan ujiannya dikumpulkan paksa oleh
-//      server, bukan oleh halaman yang dapat dimatikan peserta.
+//      sini dapat ditutup. Lima kali perbuatan yang menuntut tangan, dan
+//      ujiannya dikumpulkan paksa oleh server — bukan oleh halaman yang dapat
+//      dimatikan peserta.
+//      Angka lima itu TIDAK PERNAH dikatakan kepada pesertanya. Teguran yang
+//      muncul menyebut sudah berapa kali ia melanggar, tidak pernah tinggal
+//      berapa kali lagi, sehingga tidak ada jatah yang dapat dihabiskan
+//      dengan tenang sampai satu ketukan sebelum batasnya.
 //
 // Nomor tiga dan empat yang sebenarnya bekerja pada ujian sertifikasi.
 // Pencegahan yang berhasil bukan yang menutup rapat, melainkan yang membuat
@@ -48,18 +52,9 @@ export const MODE_LABEL: Record<ModePengawasan, string> = {
 };
 
 export const MODE_KETERANGAN: Record<ModePengawasan, string> = {
-  biasa:
-    "Kuis dan latihan. Pindah tab tetap dicatat, selebihnya dibiarkan — " +
-    "peserta boleh menyalin soal untuk dibaca ulang.",
-  ketat:
-    "UTS dan UAS. Layar penuh diwajibkan dan soal ditutup selama peserta di " +
-    "luarnya, salin-tempel dan tombol alat pengembang dimatikan, identitas " +
-    "peserta tercetak samar di seluruh layarnya, dan ujian dikumpulkan paksa " +
-    "sesudah lima pelanggaran berat.",
-  sertifikasi:
-    "Uji sertifikasi profesi dan OSCE. Seluruh penjagaan mode Ketat, ditambah " +
-    "kamera pengawas serta pemeriksaan layar kedua dan alat pengembang, dan " +
-    "ujian dikumpulkan paksa sesudah TIGA pelanggaran berat.",
+  biasa: "Kuis dan latihan. Hanya mencatat.",
+  ketat: "UTS dan UAS. Layar penuh, salin-tempel mati, tanda air. Berhenti otomatis di pelanggaran kelima.",
+  sertifikasi: "Sertifikasi dan OSCE. Mode Ketat plus kamera pengawas. Berhenti otomatis di pelanggaran kelima.",
 };
 
 /**
@@ -127,18 +122,20 @@ export function aturanMode(mode: ModePengawasan): AturanPengawasan {
     return {
       layarPenuh: true, kunciSalin: true, tandaAir: true,
       jagaTangkapanLayar: true, jagaLingkungan: true,
-      // TIGA. Angkanya diminta pemilik sistem ini apa adanya: menekan tombol
-      // terlarang tiga kali mengakhiri ujiannya.
+      // LIMA, dan angkanya TIDAK PERNAH dikatakan kepada peserta. Lihat
+      // pesanPeringatan di bawah — teguran yang muncul menyebut sudah berapa
+      // kali, bukan tinggal berapa kali lagi, dan itu bukan kelalaian
+      // melainkan seluruh maksudnya.
       //
-      // Yang membuat angka sekecil itu aman bukan angkanya melainkan daftar
+      // Yang membuat lima tetap adil bukan angkanya melainkan daftar
       // INSIDEN_BERAT di bawah: blur, klik kanan, wajah hilang, dan orang lain
-      // TIDAK ikut menghitung. Yang tiga kali itu semuanya perbuatan yang
+      // TIDAK ikut menghitung. Yang lima kali itu semuanya perbuatan yang
       // menuntut tangan — menekan PrintScreen, menekan F12, berpindah tab,
       // menempel ke kolom jawaban, menutup lensa kamera. Notifikasi sistem
       // yang muncul sendiri merebut fokus dan hanya menghasilkan `blur`, dan
       // blur tidak pernah membawa siapa pun satu langkah pun lebih dekat ke
       // sini.
-      batasPaksa: 3,
+      batasPaksa: 5,
       peringatanLayar: true,
       kamera: true,
       jatahAi: 12,
@@ -148,12 +145,10 @@ export function aturanMode(mode: ModePengawasan): AturanPengawasan {
     return {
       layarPenuh: true, kunciSalin: true, tandaAir: true,
       jagaTangkapanLayar: true, jagaLingkungan: false,
-      // Lima, bukan tiga seperti Sertifikasi. UTS dan UAS dikerjakan ratusan
-      // peserta sekaligus di jaringan kampus yang tidak selalu baik, dan
-      // ambang yang sama galaknya dengan ujian sertifikasi akan memutus ujian
-      // orang yang halamannya tersembunyi sendiri karena hal-hal di luar
-      // kuasanya. Yang menuntut ambang paling ketat adalah ujian yang
-      // sertifikatnya berlaku di luar kampus — dan itu mode di atas.
+      // Sama dengan Sertifikasi: lima, dan sama-sama tidak pernah disebutkan
+      // kepada peserta. Yang membedakan kedua mode ini bukan ambangnya
+      // melainkan apa yang diawasi — kamera, layar kedua, dan alat pengembang
+      // hanya ada di mode di atas.
       batasPaksa: 5, peringatanLayar: true,
       kamera: false, jatahAi: 0,
     };
@@ -264,16 +259,23 @@ export const BOBOT_INSIDEN: Record<JenisInsiden, number> = {
  */
 export const INSIDEN_BERAT: JenisInsiden[] = [
   "tab", "fullscreen", "tangkap", "tempel", "devtools",
+  // Klik kanan dan menyalin ikut menghitung mundur. Keduanya dicegah, jadi
+  // yang tercatat bukan perbuatan yang berhasil melainkan percobaan yang
+  // diulang, dan mengulangnya lima kali bukan kebiasaan tangan.
+  "klik_kanan", "salin",
   // Menutup lensa, membekukan gambar, dan mematikan kamera ikut, karena
-  // ketiganya menghapus pengawasannya sendiri — dibiarkan berulang, sisa
+  // ketiganya menghapus pengawasannya sendiri. Dibiarkan berulang, sisa
   // penjagaan tidak ada artinya.
   "kamera_tertutup", "kamera_beku", "kamera_mati",
-  // "wajah_hilang" dan "orang_lain" sengaja TIDAK ikut. Yang pertama terlalu
-  // sering terjadi tanpa maksud; yang kedua datang dari pembacaan model, dan
-  // menghentikan ujian sertifikasi orang atas dasar tebakan model — tanpa
-  // seorang pun melihat gambarnya lebih dulu — adalah hal yang tidak boleh
-  // dilakukan sistem ini. Keduanya tetap dicatat dan tetap menurunkan skor;
-  // yang memutuskan penguji.
+  // "blur" sengaja TIDAK ikut: satu notifikasi sistem yang muncul sendiri
+  // sudah merebut fokus, dan itu di luar kuasa peserta.
+  //
+  // "wajah_hilang" dan "orang_lain" juga tidak. Yang pertama terlalu sering
+  // terjadi tanpa maksud; yang kedua datang dari pembacaan model, dan
+  // menghentikan ujian orang atas dasar tebakan model, tanpa seorang pun
+  // melihat gambarnya lebih dulu, adalah hal yang tidak boleh dilakukan
+  // sistem ini. Keduanya tetap dicatat dan tetap menurunkan skor; yang
+  // memutuskan penguji.
 ];
 
 export function berat(jenis: JenisInsiden) {
@@ -340,12 +342,21 @@ export function harusDipaksa(mode: ModePengawasan, hitungan: HitunganInsiden): b
 }
 
 /**
- * Peringatan yang dibacakan kepada peserta, beserta sisa kesempatannya.
+ * Teguran yang dibacakan kepada peserta.
  *
- * Sisa kesempatan ikut disebut dengan sengaja. Peringatan yang tidak
- * mengatakan "tinggal dua lagi" tidak mengubah perilaku siapa pun; yang
- * menyebutkannya membuat peserta berhenti sebelum terlambat — dan itu tujuan
- * seluruh penjagaan ini, bukan menangkap sebanyak-banyaknya.
+ * Ia menyebut SUDAH BERAPA KALI, tidak pernah TINGGAL BERAPA KALI LAGI, dan
+ * pergantian itu disengaja.
+ *
+ * Peringatan yang mengatakan "sisa dua lagi" memberi tahu peserta persis
+ * berapa banyak yang masih boleh ia lakukan. Yang terjadi berikutnya dapat
+ * ditebak: ia menghabiskan jatahnya dengan tenang dan berhenti satu ketukan
+ * sebelum batasnya, dan seluruh penjagaan berubah menjadi anggaran yang
+ * dibelanjakan. Angka yang tidak diketahui tidak dapat dianggarkan — yang
+ * tersisa baginya hanya berhenti.
+ *
+ * Yang tetap dikatakan apa adanya: perbuatannya, jumlahnya sampai sekarang,
+ * dan bahwa ujiannya dapat berakhir tanpa peringatan lagi. Ancaman yang
+ * kabur bukan alasan untuk menjadi ancaman yang tidak jujur.
  */
 export function pesanPeringatan(
   mode: ModePengawasan,
@@ -355,9 +366,74 @@ export function pesanPeringatan(
   const dasar = `${INSIDEN_LABEL[jenis]} tercatat dan dilaporkan ke pengawas.`;
   const batas = aturanMode(mode).batasPaksa;
   if (batas <= 0 || !berat(jenis)) return dasar;
-  const sisa = batas - jumlahBerat(hitungan);
-  if (sisa <= 0) return `${dasar} Batas pelanggaran terlampaui — ujian dikumpulkan otomatis.`;
-  return `${dasar} Sisa ${sisa} kali lagi sebelum ujian dikumpulkan otomatis.`;
+  const nomor = jumlahBerat(hitungan);
+  if (nomor >= batas) {
+    return `${dasar} Batas pelanggaran terlampaui. Ujian dikumpulkan otomatis.`;
+  }
+  return (
+    `${dasar} Ini pelanggaran berat ke-${nomor} kamu pada ujian ini. ` +
+    "Ujian dapat dihentikan dan dikumpulkan otomatis tanpa peringatan lagi."
+  );
+}
+
+// ------------------------------------------------------------
+// TEGURAN DI LAYAR
+// ------------------------------------------------------------
+
+/**
+ * Isi kotak teguran yang menutup soal ketika peserta melanggar.
+ *
+ * Bentuknya kotak yang harus diakui, bukan pita yang menghilang sendiri, dan
+ * itu keputusan yang disengaja: pita di tepi layar berhenti dibaca pada
+ * pelanggaran kedua, sedangkan kotak yang menutup soal dan menuntut satu
+ * ketukan tidak dapat diabaikan. Ia juga menutup soalnya selama terbuka —
+ * pada percobaan tangkapan layar, itu bukan efek samping.
+ *
+ * DUA hal saja yang ada di dalamnya, dan dua yang sengaja tidak:
+ *
+ *   ADA    - perbuatannya, disebut apa adanya.
+ *   ADA    - pelanggaran ke berapa. Angka yang naik terus, tanpa ujung yang
+ *            terlihat, adalah yang membuat orang berhenti.
+ *   TIDAK  - berapa batasnya. Peserta yang tahu batasnya membelanjakan
+ *            jatahnya sampai satu ketukan sebelum habis; yang tidak tahu
+ *            tidak punya jatah untuk dibelanjakan.
+ *   TIDAK  - kalimat penjelas apa pun. Kotak ini muncul di tengah ujian pada
+ *            orang yang sedang panik, dan dua baris yang harus dibaca lebih
+ *            dulu justru membuat angkanya terlewat. Yang menghentikan tangan
+ *            orang adalah nomor yang naik, bukan paragraf di bawahnya.
+ */
+export type Teguran = { judul: string; sebab: string };
+
+/**
+ * Kalimat "Terdeteksi ..." di kepala kotak teguran.
+ *
+ * Terpisah dari INSIDEN_LABEL karena keduanya menjawab pertanyaan yang
+ * berbeda. INSIDEN_LABEL menamai baris di lembar pengawasan yang dibaca
+ * penguji; yang di bawah ini dibaca peserta pada saat ia baru saja berbuat,
+ * dan harus berbunyi seperti sesuatu yang menangkapnya.
+ */
+export const INSIDEN_TEGUR: Record<JenisInsiden, string> = {
+  tangkap: "Terdeteksi percobaan tangkapan layar",
+  tab: "Terdeteksi membuka tab atau aplikasi lain",
+  klik_kanan: "Terdeteksi klik kanan",
+  salin: "Terdeteksi menyalin naskah soal",
+  tempel: "Terdeteksi menempel ke kolom jawaban",
+  devtools: "Terdeteksi membuka alat pengembang",
+  fullscreen: "Terdeteksi keluar dari layar penuh",
+  layar_kedua: "Terdeteksi layar kedua",
+  blur: "Terdeteksi berpindah dari layar ujian",
+  kamera_mati: "Terdeteksi kamera dimatikan",
+  kamera_tertutup: "Terdeteksi lensa kamera tertutup",
+  kamera_beku: "Terdeteksi gambar kamera tidak berubah",
+  wajah_hilang: "Terdeteksi tidak ada orang di depan kamera",
+  orang_lain: "Terdeteksi orang lain di depan kamera",
+};
+
+export function pesanTeguran(jenis: JenisInsiden, nomor: number): Teguran {
+  return {
+    judul: nomor > 0 ? `Pelanggaran ke-${nomor}` : "Pelanggaran tercatat",
+    sebab: INSIDEN_TEGUR[jenis],
+  };
 }
 
 // ------------------------------------------------------------
