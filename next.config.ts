@@ -60,6 +60,30 @@ const csp = [
   "upgrade-insecure-requests",
 ].join("; ");
 
+/**
+ * Perangkat keras yang dimatikan untuk SELURUH portal.
+ *
+ * Kamera ikut dimatikan di sini, dan dibuka kembali HANYA pada layar ujian
+ * (lihat headers() di bawah). Membukanya di seluruh portal jauh lebih mudah
+ * ditulis dan salah: satu-satunya halaman yang benar-benar membutuhkan kamera
+ * adalah layar ujian pada mode Sertifikasi, dan setiap halaman lain yang ikut
+ * mendapat izinnya adalah permukaan tambahan yang tidak ada gunanya.
+ */
+const IZIN_PERANGKAT =
+  "camera=(), microphone=(), geolocation=(), payment=(), usb=(), " +
+  "magnetometer=(), gyroscope=(), browsing-topics=()";
+
+/**
+ * Sama seperti di atas, kecuali kamera diizinkan untuk asal ini sendiri.
+ *
+ * Ini BUKAN pemberian akses: peramban tetap meminta izin peserta lewat
+ * dialognya sendiri, dan peserta tetap dapat menolak. Yang dibuka hanyalah
+ * kemungkinan untuk bertanya — tanpa baris ini, getUserMedia ditolak peramban
+ * sebelum dialognya sempat muncul, dan yang terlihat di layar peserta hanya
+ * "kamera tidak aktif" tanpa keterangan apa pun.
+ */
+const IZIN_PERANGKAT_UJIAN = IZIN_PERANGKAT.replace("camera=()", "camera=(self)");
+
 const securityHeaders = [
   { key: "Content-Security-Policy", value: csp },
   // Paksa HTTPS selama 2 tahun, termasuk subdomain.
@@ -72,7 +96,7 @@ const securityHeaders = [
   // Matikan perangkat keras yang tidak dipakai portal ini.
   {
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), browsing-topics=()",
+    value: IZIN_PERANGKAT,
   },
   // Isolasi jendela; 'allow-popups' dipertahankan karena cetak surat memakai window.open.
   { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
@@ -89,6 +113,21 @@ const nextConfig: NextConfig = {
       {
         source: "/:path*",
         headers: securityHeaders,
+      },
+      // Layar ujian, dan HANYA layar ujian. Aturan yang datang belakangan
+      // menimpa nilai Permissions-Policy dari aturan menyeluruh di atas;
+      // seluruh header keamanan lainnya tetap berlaku apa adanya.
+      //
+      // Dua jalur, karena halamannya memang dapat dicapai lewat keduanya:
+      // /cbt/ujian pada domain utama, dan /ujian pada subdomain CBT yang
+      // ditulis ulang middleware.
+      {
+        source: "/ujian",
+        headers: [{ key: "Permissions-Policy", value: IZIN_PERANGKAT_UJIAN }],
+      },
+      {
+        source: "/cbt/ujian",
+        headers: [{ key: "Permissions-Policy", value: IZIN_PERANGKAT_UJIAN }],
       },
       {
         // Jawaban API tidak boleh singgah di cache peramban maupun CDN:

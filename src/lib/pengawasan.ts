@@ -76,6 +76,20 @@ export type AturanPengawasan = {
    * 0 berarti tidak pernah dipaksa — hanya dicatat.
    */
   batasPaksa: number;
+  /** Kamera peserta dinyalakan dan diawasi selama ujian. */
+  kamera: boolean;
+  /**
+   * Berapa kali paling banyak satu peserta boleh diperiksa MODEL selama satu
+   * ujian.
+   *
+   * Ada dan sengaja kecil, karena batas ini adalah batas UANG. Tanpa ia,
+   * satu ujian empat puluh peserta selama sembilan puluh menit dapat
+   * menghasilkan ribuan panggilan model, dan tagihannya baru terlihat pada
+   * akhir bulan. Yang murah dikerjakan di perangkat peserta lebih dulu
+   * (lihat src/lib/awas-kamera.ts); jatah ini hanya untuk yang benar-benar
+   * meragukan.
+   */
+  jatahAi: number;
   /** Peringatan di layar tiap kali ada pelanggaran. */
   peringatanLayar: boolean;
 };
@@ -90,6 +104,8 @@ export function aturanMode(mode: ModePengawasan): AturanPengawasan {
       // hal itu jauh lebih merugikan daripada satu peserta curang yang lolos.
       batasPaksa: 5,
       peringatanLayar: true,
+      kamera: true,
+      jatahAi: 12,
     };
   }
   if (mode === "ketat") {
@@ -97,12 +113,14 @@ export function aturanMode(mode: ModePengawasan): AturanPengawasan {
       layarPenuh: true, kunciSalin: true, tandaAir: true,
       jagaTangkapanLayar: true, jagaLingkungan: false,
       batasPaksa: 0, peringatanLayar: true,
+      kamera: false, jatahAi: 0,
     };
   }
   return {
     layarPenuh: false, kunciSalin: false, tandaAir: false,
     jagaTangkapanLayar: false, jagaLingkungan: false,
     batasPaksa: 0, peringatanLayar: false,
+    kamera: false, jatahAi: 0,
   };
 }
 
@@ -123,11 +141,21 @@ export type JenisInsiden =
   | "tangkap"      // menekan tombol tangkapan layar
   | "klik_kanan"   // membuka menu klik kanan
   | "devtools"     // alat pengembang peramban terbuka
-  | "layar_kedua"; // terdeteksi lebih dari satu layar
+  | "layar_kedua"  // terdeteksi lebih dari satu layar
+  // ---------- DARI KAMERA ----------
+  // Tiga yang pertama dikenali di perangkat peserta tanpa model sama sekali,
+  // dan karena itu tidak berbiaya. Dua yang terakhir menuntut model, dan
+  // hanya dipanggil ketika yang murah sudah tidak dapat memutuskan.
+  | "kamera_mati"      // izin kamera dicabut atau perangkatnya dilepas
+  | "kamera_tertutup"  // lensa tertutup: gambarnya gelap merata
+  | "kamera_beku"      // gambarnya tidak berubah sama sekali — foto, bukan orang
+  | "wajah_hilang"     // tidak ada orang di depan layar
+  | "orang_lain";      // lebih dari satu orang, atau orang yang berbeda
 
 export const SEMUA_INSIDEN: JenisInsiden[] = [
   "tab", "fullscreen", "blur", "salin", "tempel",
   "tangkap", "klik_kanan", "devtools", "layar_kedua",
+  "kamera_mati", "kamera_tertutup", "kamera_beku", "wajah_hilang", "orang_lain",
 ];
 
 export const INSIDEN_LABEL: Record<JenisInsiden, string> = {
@@ -140,6 +168,11 @@ export const INSIDEN_LABEL: Record<JenisInsiden, string> = {
   klik_kanan: "Membuka menu klik kanan",
   devtools: "Alat pengembang terbuka",
   layar_kedua: "Terdeteksi layar kedua",
+  kamera_mati: "Kamera dimatikan atau izinnya dicabut",
+  kamera_tertutup: "Lensa kamera tertutup",
+  kamera_beku: "Gambar kamera tidak berubah",
+  wajah_hilang: "Tidak ada orang di depan kamera",
+  orang_lain: "Terdeteksi orang lain di depan kamera",
 };
 
 export function rapikanInsiden(masukan: unknown): JenisInsiden | null {
@@ -157,10 +190,21 @@ export function rapikanInsiden(masukan: unknown): JenisInsiden | null {
  * kehilangan fokus karena notifikasi, dan klik kanan karena kebiasaan.
  */
 export const BOBOT_INSIDEN: Record<JenisInsiden, number> = {
+  // Menutup lensa dan membekukan gambar adalah perbuatan yang tidak mungkin
+  // terjadi tanpa maksud, dan keduanya menghapus seluruh pengawasan sekaligus.
+  kamera_tertutup: 35,
+  kamera_beku: 35,
+  kamera_mati: 30,
   devtools: 30,
+  orang_lain: 30,
   tempel: 25,
   tangkap: 20,
   layar_kedua: 15,
+  // Lebih ringan daripada dugaan orang, dan itu disengaja. Peserta menunduk
+  // membaca soal di kertas buram, membetulkan posisi duduk, atau kameranya
+  // menyorot dahi saja — ketiganya menghasilkan "wajah hilang" yang sama
+  // sekali bukan kecurangan.
+  wajah_hilang: 8,
   tab: 10,
   fullscreen: 10,
   salin: 8,
@@ -178,6 +222,16 @@ export const BOBOT_INSIDEN: Record<JenisInsiden, number> = {
  */
 export const INSIDEN_BERAT: JenisInsiden[] = [
   "tab", "fullscreen", "tangkap", "tempel", "devtools",
+  // Menutup lensa, membekukan gambar, dan mematikan kamera ikut, karena
+  // ketiganya menghapus pengawasannya sendiri — dibiarkan berulang, sisa
+  // penjagaan tidak ada artinya.
+  "kamera_tertutup", "kamera_beku", "kamera_mati",
+  // "wajah_hilang" dan "orang_lain" sengaja TIDAK ikut. Yang pertama terlalu
+  // sering terjadi tanpa maksud; yang kedua datang dari pembacaan model, dan
+  // menghentikan ujian sertifikasi orang atas dasar tebakan model — tanpa
+  // seorang pun melihat gambarnya lebih dulu — adalah hal yang tidak boleh
+  // dilakukan sistem ini. Keduanya tetap dicatat dan tetap menurunkan skor;
+  // yang memutuskan penguji.
 ];
 
 export function berat(jenis: JenisInsiden) {

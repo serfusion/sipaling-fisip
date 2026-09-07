@@ -643,6 +643,20 @@ export const cbtAttempts = pgTable("cbt_attempts", {
   rightClicks: integer("right_clicks").notNull().default(0),
   devtoolsOpens: integer("devtools_opens").notNull().default(0),
   secondScreens: integer("second_screens").notNull().default(0),
+  // ---------- DARI KAMERA ----------
+  cameraOff: integer("camera_off").notNull().default(0),
+  cameraCovered: integer("camera_covered").notNull().default(0),
+  cameraFrozen: integer("camera_frozen").notNull().default(0),
+  faceMissing: integer("face_missing").notNull().default(0),
+  otherPerson: integer("other_person").notNull().default(0),
+  /**
+   * Berapa kali attempt ini sudah diperiksa MODEL.
+   *
+   * Batasnya ditegakkan di sini, bukan di peramban, karena batas ini adalah
+   * batas UANG: peramban peserta dapat disuruh mengirim seribu cuplikan, dan
+   * yang membayarnya pemilik portal.
+   */
+  aiChecks: integer("ai_checks").notNull().default(0),
   /**
    * Skor integritas 0–100, dihitung ulang tiap kali ada insiden.
    *
@@ -689,6 +703,15 @@ export const cbtIncidents = pgTable("cbt_incidents", {
   at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
   /** Keterangan singkat, mis. nomor soal yang sedang terbuka. */
   detail: varchar("detail", { length: 200 }),
+  /**
+   * Nama berkas cuplikan kamera di bucket cbt-bukti, bila ada.
+   *
+   * Hanya terisi pada insiden yang MEMANG bermasalah. Cuplikan yang bersih
+   * dibuang begitu selesai diperiksa dan tidak pernah menyentuh penyimpanan —
+   * menyimpan wajah ratusan orang selama berbulan-bulan demi kemungkinan
+   * sengketa yang mungkin tidak pernah datang bukan pilihan yang benar.
+   */
+  evidence: varchar("evidence", { length: 200 }),
 }, (t) => [
   index("idx_cbt_incidents_attempt").on(t.attemptId, t.at),
 ]);

@@ -82,7 +82,11 @@ type Peserta = {
 };
 
 /** Satu baris garis waktu pengawasan. */
-type Jejak = { jenis: string; jam: string; detail: string };
+type Jejak = {
+  jenis: string; jam: string; detail: string;
+  /** Alamat cuplikan kamera berumur pendek. null bila tidak ada buktinya. */
+  bukti?: string | null;
+};
 
 /**
  * Sesudah berapa lama diam seorang peserta dianggap TERPUTUS.
@@ -304,6 +308,18 @@ function GarisWaktu({ jejak, mulai }: { jejak: Jejak[]; mulai: string }) {
               {j.detail && <i> — {j.detail}</i>}
             </span>
             {rapat && <span className="cbt-jejak-rapat">beruntun</span>}
+            {j.bukti && (
+              // Cuplikan kamera pada saat kejadian. Inilah satu-satunya hal
+              // yang membuat catatan "terdeteksi orang lain" dapat dipercaya
+              // maupun dibantah — angka dan kalimat saja tidak dapat diperiksa
+              // siapa pun, dan bacaan model tanpa gambarnya hanya tebakan yang
+              // ditulis rapi.
+              <a className="cbt-jejak-bukti" href={j.bukti} target="_blank" rel="noreferrer">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={j.bukti} alt={`Cuplikan kamera menit ke-${menit}`} loading="lazy" />
+                <span>Lihat</span>
+              </a>
+            )}
           </li>
         );
       })}

@@ -135,7 +135,8 @@ function lembarUntukLayar(bank: Soal[], lembar: Array<{ id: number; peta: number
  */
 type KolomHitung =
   | "switchedTab" | "leftFullscreen" | "blurCount" | "copyAttempts" | "pasteAttempts"
-  | "screenshotAttempts" | "rightClicks" | "devtoolsOpens" | "secondScreens";
+  | "screenshotAttempts" | "rightClicks" | "devtoolsOpens" | "secondScreens"
+  | "cameraOff" | "cameraCovered" | "cameraFrozen" | "faceMissing" | "otherPerson";
 
 const KOLOM_INSIDEN: Record<JenisInsiden, KolomHitung> = {
   tab: "switchedTab",
@@ -147,6 +148,11 @@ const KOLOM_INSIDEN: Record<JenisInsiden, KolomHitung> = {
   klik_kanan: "rightClicks",
   devtools: "devtoolsOpens",
   layar_kedua: "secondScreens",
+  kamera_mati: "cameraOff",
+  kamera_tertutup: "cameraCovered",
+  kamera_beku: "cameraFrozen",
+  wajah_hilang: "faceMissing",
+  orang_lain: "otherPerson",
 };
 
 /** Catatan pelanggaran yang sudah tersimpan pada satu attempt. */
@@ -161,6 +167,11 @@ function hitunganInsiden(a: Attempt): HitunganInsiden {
     klik_kanan: a.rightClicks,
     devtools: a.devtoolsOpens,
     layar_kedua: a.secondScreens,
+    kamera_mati: a.cameraOff,
+    kamera_tertutup: a.cameraCovered,
+    kamera_beku: a.cameraFrozen,
+    wajah_hilang: a.faceMissing,
+    orang_lain: a.otherPerson,
   };
 }
 

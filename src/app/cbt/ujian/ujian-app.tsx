@@ -22,6 +22,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { jawabanKosong, uraiJodoh, type JenisSoal, type Media } from "@/lib/cbt";
 import { aturanMode, rapikanMode, type JenisInsiden } from "@/lib/pengawasan";
 import KreditCbt from "../kredit";
+import KameraPengawas from "./kamera";
 import MediaSoal from "./media-soal";
 import { usePenjaga } from "./penjaga";
 import RangkaUjian from "./rangka-ujian";
@@ -210,6 +211,11 @@ export default function UjianApp() {
   }, []);
 
   const penjaga = usePenjaga({ aktif: layar === "kerja", mode, lapor: laporInsiden });
+
+  /** Jalur laporan untuk kamera. Balasannya tidak dipakai di sana. */
+  const laporKamera = useCallback((jenis: JenisInsiden, detail?: string) => {
+    void laporInsiden(jenis, detail);
+  }, [laporInsiden]);
   const { akhiriLayarPenuh } = penjaga;
 
   // Layar penuh dilepas begitu ujiannya berakhir — dikumpulkan sendiri,
@@ -863,6 +869,15 @@ export default function UjianApp() {
           tangkapan layar bukan urutannya, melainkan warnanya. */}
       {aturan.tandaAir && (
         <TandaAir peserta={{ nama, nim, kode: ujian?.kode ?? "" }} />
+      )}
+
+      {/* ---------- KAMERA PENGAWAS ----------
+          Hanya mode Sertifikasi/OSCE. Gambarnya sengaja TERLIHAT peserta
+          sepanjang ujian: pengawasan yang disembunyikan dari orang yang
+          diawasi kehilangan seluruh daya cegahnya, dan yang menghentikan orang
+          bukan kamera yang diam-diam merekam melainkan kamera yang jelas ada. */}
+      {aturan.kamera && (
+        <KameraPengawas aktif={layar === "kerja"} kunciSesi={kunciSesi} lapor={laporKamera} />
       )}
 
       {/* ---------- PITA PERINGATAN ----------
