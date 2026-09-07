@@ -1,9 +1,9 @@
 // ============================================================
 // CBT — UNGGAH MEDIA SOAL (gambar dan video)
 //
-// Dosen boleh menempelkan tautan, boleh juga mengunggah berkasnya. Yang
+// Pengajar boleh menempelkan tautan, boleh juga mengunggah berkasnya. Yang
 // diunggah mendarat di bucket TERSENDIRI yang bersifat publik, dan itu
-// disengaja: yang membuka soalnya adalah mahasiswa tanpa akun, sehingga URL
+// disengaja: yang membuka soalnya adalah peserta tanpa akun, sehingga URL
 // bertanda tangan — yang dipakai berkas layanan lain di portal ini — tidak
 // dapat bekerja di sini. Ia akan kedaluwarsa di tengah ujian.
 //
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     if (!ujian) return Response.json({ success: false, message: "Ujian tidak ditemukan." }, { status: 404 });
     if (!bolehUbah(profile, ujian)) {
       return Response.json(
-        { success: false, message: "Media hanya dapat diunggah oleh dosen pemilik ujiannya." },
+        { success: false, message: "Media hanya dapat diunggah oleh pengajar pemilik ujiannya." },
         { status: 403 },
       );
     }
@@ -155,11 +155,11 @@ export async function POST(request: Request) {
     // getPublicUrl hanya MERANGKAI alamat; ia tidak pernah menghubungi
     // Storage, dan karena itu selalu berhasil — termasuk ketika bucket-nya
     // ternyata tidak publik. Akibatnya kegagalan bergeser ke tempat yang
-    // paling buruk: unggahan tampak berhasil di layar dosen, lalu gambarnya
-    // tidak muncul di layar mahasiswa saat ujian sudah berjalan.
+    // paling buruk: unggahan tampak berhasil di layar pengajar, lalu gambarnya
+    // tidak muncul di layar peserta saat ujian sudah berjalan.
     //
     // Satu permintaan HEAD di sini memindahkan kegagalan itu kembali ke
-    // tempatnya — di depan dosen, sebelum ujian dimulai, dengan keterangan
+    // tempatnya — di depan pengajar, sebelum ujian dimulai, dengan keterangan
     // apa yang harus diperbaiki.
     let terjangkau = false;
     try {
@@ -181,7 +181,7 @@ export async function POST(request: Request) {
           success: false,
           message:
             `Berkasnya terunggah, tetapi bucket "${BUCKET_MEDIA}" TIDAK dapat dibaca umum — ` +
-            "gambarnya akan kosong di layar mahasiswa. Buka Supabase → Storage → " +
+            "gambarnya akan kosong di layar peserta. Buka Supabase → Storage → " +
             `bucket "${BUCKET_MEDIA}" → aktifkan "Public bucket", atau jalankan ` +
             "supabase-update-v26-cbt-lanjutan.sql. Sementara itu, tempelkan tautan gambar " +
             "dari luar sebagai gantinya.",

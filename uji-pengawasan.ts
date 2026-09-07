@@ -43,7 +43,7 @@ const ketat = aturanMode("ketat");
 const sertifikasi = aturanMode("sertifikasi");
 
 // Mode biasa harus benar-benar tidak mengganggu. Kuis harian yang mengunci
-// layar penuh dan mematikan salin-tempel hanya membuat mahasiswa mengira
+// layar penuh dan mematikan salin-tempel hanya membuat peserta mengira
 // aplikasinya rusak.
 sama("biasa: tanpa layar penuh", biasa.layarPenuh, false);
 sama("biasa: salin dibiarkan", biasa.kunciSalin, false);
@@ -177,7 +177,7 @@ const orang = (role: string) => ({ id: "x", role, fullName: "X", lecturerId: nul
 // Menyalakan kamera bukan mengatur ujian, melainkan merekam wajah orang.
 sama("super admin boleh", bolehSaklarKamera(orang("super_admin")), true);
 sama("admin boleh", bolehSaklarKamera(orang("admin")), true);
-sama("dosen TIDAK boleh, walau ujian itu miliknya", bolehSaklarKamera(orang("dosen")), false);
+sama("pengajar TIDAK boleh, walau ujian itu miliknya", bolehSaklarKamera(orang("dosen")), false);
 
 // Admin bagian tidak menyentuh menu CBT sama sekali, apalagi saklar ini.
 for (const bagian of [
@@ -186,7 +186,7 @@ for (const bagian of [
 ]) {
   sama(`${bagian} tidak boleh`, bolehSaklarKamera(orang(bagian)), false);
 }
-sama("mahasiswa tidak boleh", bolehSaklarKamera(orang("mahasiswa")), false);
+sama("peserta tidak boleh", bolehSaklarKamera(orang("peserta")), false);
 sama("tanpa profil tidak boleh", bolehSaklarKamera(null), false);
 // Peran karangan tidak pernah lolos hanya karena namanya mengandung "admin".
 sama("peran karangan tidak boleh", bolehSaklarKamera(orang("admin_super")), false);
@@ -198,7 +198,7 @@ console.log("=== TANDA AIR ===\n");
 const saat = new Date("2026-09-07T09:30:00+07:00");
 const air = tandaAir({ nama: "Rina Halim", nim: "2021001", kode: "SV4LDP" }, saat);
 benar("memuat nama", air.includes("Rina Halim"), air);
-benar("memuat NIM", air.includes("2021001"), air);
+benar("memuat NOMOR PESERTA", air.includes("2021001"), air);
 benar("memuat kode ujian", air.includes("SV4LDP"), air);
 benar("memuat jamnya", air.includes("09") || air.includes("9"), air);
 // Satu potongan kecil tangkapan layar pun harus cukup menunjuk orangnya.

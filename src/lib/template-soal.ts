@@ -1,7 +1,7 @@
 // ============================================================
 // TEMPLATE SOAL YANG DAPAT DIUNDUH — Excel dan Word
 //
-// Dua berkas kosong yang tinggal diisi dosen. Isinya sengaja memuat contoh
+// Dua berkas kosong yang tinggal diisi pengajar. Isinya sengaja memuat contoh
 // yang sudah benar pada baris pertama: template kosong melulu membuat orang
 // menebak-nebak bentuknya, dan tebakannya ditolak saat diunggah.
 //
@@ -28,12 +28,12 @@ export const MIME_DOCX =
  */
 export const CONTOH_EXCEL: Array<Array<string | number>> = [
   //  NO JENIS          PERTANYAAN                     A                  B                 C            D          E    KUNCI                              PASANGAN                                            MEDIA                                BOBOT MATERI               TINGKAT   PEMBAHASAN
-  [1, "PG", "Siapa perumus teori agenda setting?", "McCombs & Shaw", "Lasswell", "Habermas", "Gerbner", "", "A", "", "", 5, "Teori Komunikasi", "sedang", "Dirumuskan McCombs dan Shaw pada 1972."],
-  [2, "PG KOMPLEKS", "Manakah yang termasuk teori komunikasi massa? (jawaban boleh lebih dari satu)", "Agenda setting", "Kultivasi", "Fotosintesis", "Spiral of silence", "", "A,B,D", "", "", 9, "Teori Komunikasi", "sulit", "Dinilai per bagian; yang keliru mengurangi yang tepat."],
-  [3, "PENJODOHAN", "Jodohkan teori berikut dengan perumusnya.", "Lasswell", "", "", "", "", "", "Agenda setting = McCombs & Shaw\nSpiral of silence = Noelle-Neumann\nKultivasi = Gerbner", "", 6, "Teori Komunikasi", "sedang", "Kolom PILIHAN diisi pengecoh yang tidak berpasangan."],
-  [4, "BENAR-SALAH", "Opini publik dapat dibentuk media massa.", "Benar", "Salah", "", "", "", "BENAR", "", "", 5, "Teori Komunikasi", "mudah", ""],
-  [5, "ISIAN", "Sebutkan istilah pengaturan agenda oleh media.", "", "", "", "", "", "agenda setting|penentuan agenda", "", "", 5, "Teori Komunikasi", "sedang", "Beberapa kemungkinan jawaban dipisah tanda |"],
-  [6, "ESSAY", "Jelaskan peran media massa dalam kampanye politik.", "", "", "", "", "", "", "", "https://upload.wikimedia.org/contoh-poster.jpg", 20, "Komunikasi Politik", "sulit", "Kolom MEDIA boleh diisi tautan gambar atau video."],
+  [1, "PG", "Ibu kota Indonesia adalah?", "Jakarta", "Bandung", "Surabaya", "Medan", "", "A", "", "", 5, "Pengetahuan Umum", "mudah", "Contoh soal pilihan ganda berkunci tunggal."],
+  [2, "PG KOMPLEKS", "Manakah yang termasuk bilangan prima? (jawaban boleh lebih dari satu)", "2", "9", "7", "13", "", "A,C,D", "", "", 9, "Pengetahuan Umum", "sedang", "Dinilai per bagian; yang keliru mengurangi yang tepat."],
+  [3, "PENJODOHAN", "Jodohkan negara berikut dengan ibu kotanya.", "Kuala Lumpur", "", "", "", "", "", "Jepang = Tokyo\nMesir = Kairo\nBrasil = Brasilia", "", 6, "Pengetahuan Umum", "sedang", "Kolom PILIHAN diisi pengecoh yang tidak berpasangan."],
+  [4, "BENAR-SALAH", "Air mendidih pada suhu 100 derajat Celsius di permukaan laut.", "Benar", "Salah", "", "", "", "BENAR", "", "", 5, "Pengetahuan Umum", "mudah", ""],
+  [5, "ISIAN", "Planet terdekat dari Matahari adalah?", "", "", "", "", "", "merkurius|mercury", "", "", 5, "Pengetahuan Umum", "sedang", "Beberapa kemungkinan jawaban dipisah tanda |"],
+  [6, "ESSAY", "Jelaskan manfaat energi terbarukan bagi lingkungan.", "", "", "", "", "", "", "", "https://contoh.test/gambar-soal.jpg", 20, "Pengetahuan Umum", "sulit", "Kolom MEDIA boleh diisi tautan gambar atau video."],
 ];
 
 export const PETUNJUK_EXCEL: string[][] = [
@@ -49,15 +49,15 @@ export const PETUNJUK_EXCEL: string[][] = [
   ["   Dinilai per bagian, dan yang keliru MENGURANGI yang tepat, jadi mencentang semua"],
   ["   pilihan tidak menghasilkan nilai penuh. Sisakan minimal satu pengecoh."],
   ["5. PENJODOHAN → kolom PASANGAN diisi satu pasangan per baris, dipisah tanda ="],
-  ["      Agenda setting = McCombs & Shaw"],
-  ["      Kultivasi = Gerbner"],
-  ["   Kolom kanan otomatis menjadi daftar jawaban dan diacak untuk mahasiswa."],
+  ["      Jepang = Tokyo"],
+  ["      Mesir = Kairo"],
+  ["   Kolom kanan otomatis menjadi daftar jawaban dan diacak untuk peserta."],
   ["   Kolom PILIHAN A-E boleh diisi PENGECOH yang tidak berpasangan dengan apa pun."],
   ["   Dinilai per pasangan: satu kekeliruan tidak menghapus jawaban yang sudah benar."],
   ["6. BENAR-SALAH → pilihan boleh dikosongkan, KUNCI ditulis BENAR atau SALAH."],
   ["7. ISIAN → pilihan dikosongkan, KUNCI berisi jawabannya."],
-  ["   Beberapa kemungkinan jawaban dipisah tanda | misalnya: agenda setting|penentuan agenda"],
-  ["8. ESSAY → pilihan dan KUNCI dikosongkan. Dikoreksi dosen setelah ujian selesai."],
+  ["   Beberapa kemungkinan jawaban dipisah tanda | misalnya: merkurius|mercury"],
+  ["8. ESSAY → pilihan dan KUNCI dikosongkan. Dikoreksi pengajar setelah ujian selesai."],
   [""],
   ["MEDIA, BOBOT, DAN LAIN-LAIN"],
   ["9. MEDIA diisi tautan gambar atau video, dan boleh dikosongkan."],
@@ -79,35 +79,35 @@ export const PETUNJUK_EXCEL: string[][] = [
 // ---------- WORD ----------
 
 const NASKAH_WORD = [
-  "TEMPLATE SOAL UJIAN SiPaling FISIP",
+  "TEMPLATE SOAL UJIAN",
   "",
   "Tulis soal langsung di bawah ini. Tiap soal diawali nomor, lalu pilihan berhuruf,",
   "lalu baris KUNCI. Baris BOBOT, MATERI, TINGKAT, dan PEMBAHASAN boleh dikosongkan.",
   "Hapus empat contoh di bawah, lalu tulis soal Anda sendiri.",
   "",
-  "1. Siapa perumus teori agenda setting?",
-  "A. McCombs & Shaw",
-  "B. Lasswell",
-  "C. Habermas",
-  "D. Gerbner",
+  "1. Ibu kota Indonesia adalah?",
+  "A. Jakarta",
+  "B. Bandung",
+  "C. Surabaya",
+  "D. Medan",
   "KUNCI: A",
   "BOBOT: 5",
-  "MATERI: Teori Komunikasi",
-  "TINGKAT: sedang",
-  "PEMBAHASAN: Dirumuskan McCombs dan Shaw pada 1972.",
+  "MATERI: Pengetahuan Umum",
+  "TINGKAT: mudah",
+  "PEMBAHASAN: Contoh soal pilihan ganda berkunci tunggal.",
   "",
-  "2. Opini publik dapat dibentuk media massa.",
+  "2. Air mendidih pada suhu 100 derajat Celsius di permukaan laut.",
   "A. Benar",
   "B. Salah",
   "KUNCI: BENAR",
   "BOBOT: 5",
   "",
-  "3. Sebutkan istilah pengaturan agenda oleh media.",
+  "3. Planet terdekat dari Matahari adalah?",
   "JENIS: ISIAN",
-  "KUNCI: agenda setting|penentuan agenda",
+  "KUNCI: merkurius|mercury",
   "BOBOT: 5",
   "",
-  "4. Jelaskan peran media massa dalam kampanye politik.",
+  "4. Jelaskan manfaat energi terbarukan bagi lingkungan.",
   "JENIS: ESSAY",
   "BOBOT: 20",
   "TINGKAT: sulit",
@@ -164,7 +164,7 @@ export function buatDocxTemplate(baris: string[] = NASKAH_WORD): Blob {
 
   // Jenis isinya HARUS jenis Word, bukan "application/zip". Sebuah .docx
   // memang zip, tetapi zip yang berlabel zip akan tersimpan sebagai arsip di
-  // komputer dosennya — dan itulah sebab template Word sebelumnya turun
+  // komputer pengajarnya — dan itulah sebab template Word sebelumnya turun
   // sebagai .zip.
   return buatZip(
     [
@@ -188,7 +188,7 @@ export function buatDocxTemplate(baris: string[] = NASKAH_WORD): Blob {
  *
  * Contohnya diberi warna berbeda dengan sengaja. Template yang contohnya tidak
  * dapat dibedakan dari isian membuat empat baris contoh ikut terunggah sebagai
- * soal ujian sungguhan — dan itu baru ketahuan ketika mahasiswa membacanya.
+ * soal ujian sungguhan — dan itu baru ketahuan ketika peserta membacanya.
  */
 export function buatXlsxTemplate(): Blob {
   const kolomTerakhir = hurufKolom(KOLOM_EXCEL.length);
@@ -197,7 +197,7 @@ export function buatXlsxTemplate(): Blob {
     {
       tinggi: 30,
       sel: KOLOM_EXCEL.map((_, i) =>
-        i === 0 ? { nilai: "TEMPLATE SOAL UJIAN SiPaling FISIP", gaya: GAYA.judul } : { nilai: "", gaya: GAYA.judul },
+        i === 0 ? { nilai: "TEMPLATE SOAL UJIAN", gaya: GAYA.judul } : { nilai: "", gaya: GAYA.judul },
       ),
     },
     {
@@ -221,7 +221,7 @@ export function buatXlsxTemplate(): Blob {
         gaya: i === 0 || i === 11 ? GAYA.contohTengah : GAYA.contoh,
       })),
     })),
-    // Dua puluh baris kosong yang sudah bergaris, supaya dosen langsung
+    // Dua puluh baris kosong yang sudah bergaris, supaya pengajar langsung
     // mengetik ke dalam tabel dan bukan ke ruang kosong di bawahnya.
     ...Array.from({ length: 20 }, () => ({
       sel: KOLOM_EXCEL.map((_, i) => ({

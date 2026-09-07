@@ -11,7 +11,7 @@
 -- milik dosennya, karena hanya ia yang tahu kelasnya sudah siap. Menyalakan
 -- kamera lain persoalannya: yang dilakukan bukan mengatur ujian melainkan
 -- MEREKAM WAJAH ORANG, dan yang menanggung akibatnya bila keliru adalah
--- fakultas, bukan dosen itu sendiri.
+-- lembaganya, bukan dosen itu sendiri.
 --
 -- Admin bagian — umum, akademik, prodi, PDDIKTI, perpustakaan, laboratorium —
 -- tidak termasuk, sama seperti mereka tidak menyentuh menu CBT sama sekali.

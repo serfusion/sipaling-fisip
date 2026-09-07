@@ -58,7 +58,7 @@ kamera. Wajah pada poster, foto di dinding, dan orang di layar televisi TIDAK
 dihitung.
 
 Isi "catatan" dengan satu kalimat bahasa Indonesia yang menerangkan apa yang
-terlihat, seperti yang akan dibaca dosen penguji.`;
+terlihat, seperti yang akan dibaca pengajar penguji.`;
 
 /** Base64 → bita, dengan batas ukuran. Kiriman dari luar, jadi dijaga ketat. */
 function bacaBase64(masukan: unknown): { data: string; bita: Buffer } | null {

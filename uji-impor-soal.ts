@@ -1,11 +1,11 @@
 // UJI IMPOR SOAL DARI EXCEL DAN WORD
 //
 // Yang dijaga di sini satu hal yang mahal: KUNCI JAWABAN. Kunci yang salah
-// menyalahkan seluruh mahasiswa yang sebenarnya menjawab benar, dan itu baru
+// menyalahkan seluruh peserta yang sebenarnya menjawab benar, dan itu baru
 // ketahuan sesudah nilai keluar.
 //
 // Dan satu hal yang membuat fiturnya dipakai atau ditinggalkan: satu baris
-// rusak tidak boleh menggagalkan seluruh berkas. Dosen memperbaiki tiga baris,
+// rusak tidak boleh menggagalkan seluruh berkas. Pengajar memperbaiki tiga baris,
 // bukan mengunggah ulang empat puluh soal.
 
 import {
@@ -24,9 +24,9 @@ function benar(nama: string, syarat: boolean, info = "") {
 const sama = (nama: string, dapat: unknown, harap: unknown) =>
   benar(nama, dapat === harap, `dapat ${JSON.stringify(dapat)}, harap ${JSON.stringify(harap)}`);
 
-console.log("\n=== MEMBACA TULISAN BEBAS DOSEN ===\n");
+console.log("\n=== MEMBACA TULISAN BEBAS PENGAJAR ===\n");
 
-// Dosen menulis jenisnya dengan cara yang berbeda-beda; semuanya harus sampai.
+// Pengajar menulis jenisnya dengan cara yang berbeda-beda; semuanya harus sampai.
 sama("PG", bacaJenis("PG"), "pg");
 sama("Pilihan Ganda", bacaJenis("Pilihan Ganda"), "pg");
 sama("kosong dianggap PG", bacaJenis(""), "pg");
@@ -56,7 +56,7 @@ sama("huruf A", kunciOk("A"), "0");
 sama("huruf kecil b", kunciOk("b"), "1");
 sama("huruf bertitik C.", kunciOk("C."), "2");
 sama("huruf berkurung D)", kunciOk("D)"), "3");
-// Dosen menyalin teks jawabannya utuh — sering terjadi, dan tidak salah.
+// Pengajar menyalin teks jawabannya utuh — sering terjadi, dan tidak salah.
 sama("teks jawaban disalin utuh", kunciOk("Habermas"), "2");
 sama("teks beda huruf besar-kecil", kunciOk("lasswell"), "1");
 // Yang benar-benar tidak menunjuk ke mana pun WAJIB ditolak.
@@ -118,7 +118,7 @@ sama("ISIAN: tanpa pilihan", hasil.soal[2].pilihan.length, 0);
 sama("ESSAY: tanpa kunci", hasil.soal[3].kunci, "");
 sama("ESSAY: bobot besar dipertahankan", hasil.soal[3].bobot, 20);
 
-// Kolom dicari dari NAMANYA. Dosen menggeser urutan dan menyisipkan kolom
+// Kolom dicari dari NAMANYA. Pengajar menggeser urutan dan menyisipkan kolom
 // catatannya sendiri — berkasnya harus tetap terbaca.
 const acak: Aoa = [
   ["CATATAN", "KUNCI", "PERTANYAAN", "PILIHAN A", "PILIHAN B", "JENIS", "BOBOT"],
@@ -210,7 +210,12 @@ const contoh = (jenis: string) => dariTemplate.soal.find((s) => s.jenis === jeni
 sama("seluruh contoh Excel terbaca", dariTemplate.soal.length, CONTOH_EXCEL.length);
 sama("tanpa satu pun ditolak", dariTemplate.tolak.length, 0);
 sama("contoh PG kuncinya A", contoh("pg")?.kunci, "0");
-sama("contoh PG kompleks kuncinya A,B,D", contoh("pg_kompleks")?.kunci, "0,1,3");
+// Sifatnya yang diperiksa — kuncinya lebih dari satu — bukan nomor pilihan
+// yang kebetulan dipakai contohnya, supaya mengganti contoh soal tidak
+// terbaca sebagai kerusakan.
+benar("contoh PG kompleks kuncinya jamak",
+  (contoh("pg_kompleks")?.kunci ?? "").split(",").filter(Boolean).length >= 2,
+  String(contoh("pg_kompleks")?.kunci));
 sama("contoh penjodohan punya tiga pasangan", contoh("penjodohan")?.pasangan.length, 3);
 sama("contoh penjodohan membawa pengecoh", contoh("penjodohan")?.pilihan.length, 4);
 sama("contoh essay membawa media", contoh("essay")?.media.jenis, "gambar");
@@ -228,9 +233,19 @@ const jadiSoal = (s: (typeof dariTemplate.soal)[number], id: number): Soal => ({
 const pgTemplate = jadiSoal(contoh("pg")!, 1);
 sama("jawaban benar dinilai benar", nilaiJawaban(pgTemplate, "0").benar, true);
 sama("jawaban salah dinilai salah", nilaiJawaban(pgTemplate, "1").benar, false);
+// Yang diuji: kunci isian yang dipisah tanda | menerima SEMUA kemungkinan,
+// dan menerimanya tanpa peduli huruf besar-kecil. Kemungkinannya dibaca dari
+// contohnya sendiri, bukan diketik ulang di sini — mengetiknya ulang berarti
+// uji ini diam-diam berhenti menguji contoh yang sebenarnya dipakai.
 const isianTemplate = jadiSoal(contoh("isian")!, 3);
-sama("isian kunci pertama diterima", nilaiJawaban(isianTemplate, "Agenda Setting").benar, true);
-sama("isian kunci kedua diterima", nilaiJawaban(isianTemplate, "penentuan agenda").benar, true);
+const kemungkinan = (contoh("isian")?.kunci ?? "").split("|").filter(Boolean);
+benar("contoh isian memang menawarkan lebih dari satu kemungkinan",
+  kemungkinan.length >= 2, String(contoh("isian")?.kunci));
+kemungkinan.forEach((jawab, i) => {
+  sama(`isian kemungkinan ke-${i + 1} diterima`, nilaiJawaban(isianTemplate, jawab).benar, true);
+});
+sama("dan huruf besar-kecil tidak menggagalkannya",
+  nilaiJawaban(isianTemplate, (kemungkinan[0] ?? "").toUpperCase()).benar, true);
 
 console.log("\n=== BERKAS .DOCX YANG DIRAKIT SENDIRI ===\n");
 

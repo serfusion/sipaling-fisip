@@ -2,16 +2,22 @@
 // ALAMAT SITUS CBT
 //
 // CBT tidak lagi menumpang di /cbt pada domain portal. Ia pindah ke
-// subdomainnya sendiri — cbt.sipalingfisip.web.id — dan sejak itu ada dua
-// situs di atas SATU penyebaran yang sama:
+// subdomainnya sendiri, dan sejak itu ada dua situs di atas SATU penyebaran
+// yang sama:
 //
-//   portal : www.sipalingfisip.web.id  → layanan akademik, dashboard, login
-//   CBT    : cbt.sipalingfisip.web.id  → pintu masuk ujian dan layar ujian
+//   portal : <domain>      → layanan akademik, dashboard, login
+//   CBT    : cbt.<domain>  → pintu masuk ujian dan layar ujian
+//
+// TIDAK ADA nama domain yang wajib tertanam di sini. Nama yang berlaku
+// diambil dari header Host tiap permintaan; NEXT_PUBLIC_PORTAL_HOST dan
+// NEXT_PUBLIC_CBT_HOST memaksanya bila perlu, dan nama yang tertulis di bawah
+// hanyalah cadangan terakhir untuk penyebaran yang sekarang. Memasang CBT ini
+// di domain lain karena itu tidak menuntut satu baris kode pun diubah.
 //
 // Yang membedakan keduanya hanyalah tuan rumah pada permintaan, jadi
 // pengetahuan tentang "host mana milik siapa" harus tinggal di SATU tempat.
 // Berkas inilah tempatnya: middleware memakainya untuk menuliskan ulang dan
-// mengalihkan, panel dosen memakainya untuk menyusun tautan ujian yang
+// mengalihkan, panel pengajar memakainya untuk menyusun tautan ujian yang
 // dibagikan ke grup kelas, dan halaman CBT memakainya untuk menunjuk balik
 // ke portal.
 //
@@ -22,13 +28,31 @@
 /**
  * Tuan rumah portal, dipakai bila tidak ada petunjuk lain.
  *
+ * Nama di bawah hanyalah CADANGAN TERAKHIR untuk penyebaran yang sekarang.
+ * Nama sesungguhnya diambil dari header Host tiap permintaan, dan bila perlu
+ * dipaksa lewat NEXT_PUBLIC_PORTAL_HOST — jadi memasang CBT ini di domain
+ * mana pun tidak menuntut satu baris kode pun diubah.
+ *
  * Ditulis lengkap dengan "www." karena itulah alamat yang dilayani Vercel;
  * yang tanpa www dialihkan oleh Vercel sendiri.
  */
-export const HOST_PORTAL_BAWAAN = "www.sipalingfisip.web.id";
+const HOST_PORTAL_CADANGAN = "www.sipalingfisip.web.id";
 
-/** Domain yang subdomain CBT-nya sudah hidup. */
-const DOMAIN_PORTAL = "sipalingfisip.web.id";
+/** Tuan rumah portal yang berlaku: yang disetel, atau cadangan di atas. */
+export function hostPortalBawaan(): string {
+  return rapikanHost(process.env.NEXT_PUBLIC_PORTAL_HOST || "") || HOST_PORTAL_CADANGAN;
+}
+
+/**
+ * Domain yang subdomain CBT-nya sudah hidup.
+ *
+ * Diturunkan dari host portal yang berlaku, bukan ditulis kedua kalinya —
+ * dua tempat yang harus diubah bersama-sama adalah satu tempat yang akan
+ * terlupa.
+ */
+function domainPortal(): string {
+  return tanpaWww(hostPortalBawaan());
+}
 
 /** Awalan yang menandai sebuah host sebagai situs CBT. */
 const AWALAN_CBT = "cbt.";
@@ -56,7 +80,7 @@ function tanpaWww(host: string) {
  * Host CBT yang ditetapkan lewat environment; kosong bila tidak diatur.
  *
  * Dua nama dibaca sekaligus dan itu disengaja: NEXT_PUBLIC_CBT_HOST ikut
- * sampai ke peramban sehingga panel dosen dapat menyusun tautan ujian,
+ * sampai ke peramban sehingga panel pengajar dapat menyusun tautan ujian,
  * sedangkan CBT_HOST — nama yang lebih dulu ada — tetap dihormati supaya
  * penyebaran yang sudah memakainya tidak perlu diubah.
  *
@@ -100,10 +124,11 @@ export function hostCbtUntuk(hostMentah: string | null | undefined): string {
   // Hanya domain sungguhan yang punya subdomain CBT. localhost, alamat IP,
   // dan pratayang penyebaran tidak, jadi jangan mengarang alamat untuk
   // mereka: yang lahir dari karangan itu adalah tautan yang mati.
+  const domain = domainPortal();
   const inti = tanpaWww(host);
-  if (inti !== DOMAIN_PORTAL && !inti.endsWith(`.${DOMAIN_PORTAL}`)) return "";
+  if (inti !== domain && !inti.endsWith(`.${domain}`)) return "";
 
-  return `${AWALAN_CBT}${DOMAIN_PORTAL}`;
+  return `${AWALAN_CBT}${domain}`;
 }
 
 /**
@@ -118,8 +143,8 @@ export function hostPortalUntuk(hostMentah: string | null | undefined): string {
 
   const inti = tanpaWww(host);
   const sisa = inti.startsWith(AWALAN_CBT) ? inti.slice(AWALAN_CBT.length) : "";
-  if (!sisa || !sisa.includes(".")) return HOST_PORTAL_BAWAAN;
-  return sisa === DOMAIN_PORTAL ? HOST_PORTAL_BAWAAN : sisa;
+  if (!sisa || !sisa.includes(".")) return hostPortalBawaan();
+  return sisa === domainPortal() ? hostPortalBawaan() : sisa;
 }
 
 /**
@@ -189,7 +214,7 @@ export function asalPortal(hostMentah: string | null | undefined): string {
 // Middleware tinggal menerjemahkan rencana itu menjadi jawaban HTTP.
 //
 // Alasannya satu, dan praktis: rencana yang murni dapat diuji tanpa
-// menyalakan server, sehingga aturan yang menentukan ke mana mahasiswa
+// menyalakan server, sehingga aturan yang menentukan ke mana peserta
 // mendarat di tengah musim ujian tidak perlu dibuktikan lewat percobaan
 // manual di produksi.
 // ============================================================

@@ -1,15 +1,15 @@
 "use client";
 
 // ============================================================
-// PANEL CBT DI DASHBOARD — untuk Dosen, Admin, dan Super Admin
+// PANEL CBT DI DASHBOARD — untuk Pengajar, Admin, dan Super Admin
 //
 // Pembagian wewenangnya kelihatan dari layarnya, bukan hanya dijaga server.
 // Yang menentukan bukan PERAN melainkan KEPEMILIKAN:
 //
-//   Pemilik ujian  — dosen yang membuatnya — menyusun soal, menyetel jadwal,
+//   Pemilik ujian  — pengajar yang membuatnya — menyusun soal, menyetel jadwal,
 //                    mengaktifkan dan menonaktifkan, serta mengoreksi essay.
 //   Admin dan Super Admin memantau seluruh ujian dan boleh menghapusnya, tetapi
-//                    TIDAK memegang tombol aktivasi ujian milik dosen lain.
+//                    TIDAK memegang tombol aktivasi ujian milik pengajar lain.
 //                    Untuk ujian seleksi mereka membuatnya sendiri — dan ujian
 //                    itu milik mereka, jadi tombolnya terbuka di sana.
 //
@@ -61,7 +61,7 @@ type Ujian = {
   bolehSaklarKamera: boolean;
 };
 
-/** Satu jawaban peserta, dibuka dosen untuk dibaca dan dikoreksi. */
+/** Satu jawaban peserta, dibuka pengajar untuk dibaca dan dikoreksi. */
 type Rincian = {
   nomor: number; id: number; jenis: JenisSoal; pertanyaan: string;
   pilihan: string[]; bobot: number; kunci: string; pembahasan: string | null;
@@ -120,7 +120,7 @@ type Statistik = {
  *
  * Bukan dihapus: seluruh jalannya masih utuh, dari pembaca dokumen di peramban
  * sampai /api/cbt/ai-soal, dan menyalakannya kembali cukup dengan menyetel
- * tetapan ini menjadi true. Yang dimatikan hanya pintunya di layar dosen,
+ * tetapan ini menjadi true. Yang dimatikan hanya pintunya di layar pengajar,
  * beserta satu permintaan ke server yang tadinya berjalan pada tiap pemuatan
  * panel hanya untuk menanyakan apakah kuncinya terpasang.
  */
@@ -148,8 +148,8 @@ const SOAL_KOSONG = {
  * Isi awal formulir untuk tiap jenis soal.
  *
  * Berganti jenis berarti berganti bentuk isian. Membiarkan sisa isian jenis
- * sebelumnya membuat dosen menyimpan soal penjodohan yang kuncinya masih
- * menunjuk pilihan ganda — dan itu baru ketahuan saat mahasiswa mengerjakan.
+ * sebelumnya membuat pengajar menyimpan soal penjodohan yang kuncinya masih
+ * menunjuk pilihan ganda — dan itu baru ketahuan saat peserta mengerjakan.
  */
 function bentukJenis(jenis: JenisSoal) {
   if (jenis === "benar_salah") return { pilihan: ["Benar", "Salah"], kunci: "0", pasangan: [] as Pasangan[] };
@@ -175,7 +175,7 @@ function bentukJenis(jenis: JenisSoal) {
  *
  * Tiap baris membawa KETERANGANNYA sendiri. "Satu perangkat hanya untuk satu
  * peserta" terbaca jelas oleh yang membuatnya, tetapi tidak menjelaskan apa
- * yang terjadi pada mahasiswa yang ponselnya sudah dipakai temannya — dan
+ * yang terjadi pada peserta yang ponselnya sudah dipakai temannya — dan
  * itulah yang perlu diketahui pengawas pada menit-menit ujian berjalan.
  *
  * `bentuk` menandai setelan yang MENGUBAH BENTUK ujian. Hanya keempat itu yang
@@ -338,11 +338,11 @@ function GarisWaktu({ jejak, mulai }: { jejak: Jejak[]; mulai: string }) {
 /**
  * Saklar kamera pengawas.
  *
- * Satu-satunya setelan di panel ini yang wewenangnya TIDAK ada pada dosen
+ * Satu-satunya setelan di panel ini yang wewenangnya TIDAK ada pada pengajar
  * pemilik ujiannya, dan karena itu ia berdiri terpisah dari deretan setelan
  * yang lain, bukan menyelinap sebagai satu centang di antaranya.
  *
- * Dosen tetap MELIHAT keadaannya — ia berhak tahu kelasnya direkam atau tidak,
+ * Pengajar tetap MELIHAT keadaannya — ia berhak tahu kelasnya direkam atau tidak,
  * dan menyembunyikan barisnya dari orang yang ujiannya sedang diawasi adalah
  * hal yang justru tidak boleh dilakukan. Yang tidak ada padanya hanya
  * kemampuan menggesernya.
@@ -390,7 +390,7 @@ function SaklarKamera({
       {!boleh && (
         <p className="cbt-kamera-catatan">
           Saklar ini dipegang Admin dan Super Admin. Merekam wajah peserta adalah keputusan
-          fakultas, bukan keputusan satu mata kuliah — hubungi mereka bila ujian Anda perlu
+          lembaga, bukan keputusan satu mata uji — hubungi mereka bila ujian Anda perlu
           disetel berbeda.
         </p>
       )}
@@ -402,14 +402,14 @@ function SaklarKamera({
  * Pemilih mode pengawasan.
  *
  * Satu pilihan, bukan sebelas kotak centang, dan itu keputusan yang disengaja.
- * Dosen tahu ujiannya kuis harian, UAS, atau uji sertifikasi; ia tidak
+ * Pengajar tahu ujiannya kuis harian, UAS, atau uji sertifikasi; ia tidak
  * seharusnya diminta memutuskan sendiri apakah alat pengembang perlu diawasi
  * atau berapa kali pindah tab yang pantas mengakhiri ujian orang. Aturan tiap
  * mode ada di src/lib/pengawasan.ts, satu tempat, dipakai server dan peramban.
  *
  * Yang dijanjikan di keterangannya sengaja tidak dilebihkan. Tangkapan layar
  * TIDAK dapat dilarang peramban mana pun, dan mengatakan sebaliknya di layar
- * ini akan membuat dosen menyetel ujian sertifikasi dengan rasa aman yang
+ * ini akan membuat pengajar menyetel ujian sertifikasi dengan rasa aman yang
  * tidak ada dasarnya.
  */
 function PilihMode({
@@ -440,7 +440,7 @@ function PilihMode({
         Print Screen ditangani sistem operasi, dan tidak ada kode yang menghalangi ponsel kedua
         yang diarahkan ke layar. Yang dikerjakan mode Ketat dan Sertifikasi adalah{" "}
         <b>mematikan salin-tempel</b> (jalan tersering untuk membawa soal ke ChatGPT),{" "}
-        <b>mencatat tiap percobaan</b> beserta jamnya, dan <b>mencetak nama serta NIM peserta</b>{" "}
+        <b>mencatat tiap percobaan</b> beserta jamnya, dan <b>mencetak nama serta nomor peserta</b>{" "}
         samar di seluruh layarnya, sehingga tiap lembar yang bocor menunjuk satu orang.
       </p>
     </div>
@@ -554,7 +554,7 @@ export default function CbtPanel({ role }: { role: string }) {
   // Berita acara: dua keterangan yang hanya diketahui pengawasnya sendiri.
   const [acara, setAcara] = useState({ pengawas: "", ruang: "", catatan: "" });
 
-  // Impor massal: hasil bacaan berkas ditahan dulu untuk dilihat dosen
+  // Impor massal: hasil bacaan berkas ditahan dulu untuk dilihat pengajar
   // sebelum benar-benar masuk. Empat puluh soal yang langsung tersimpan tanpa
   // sempat dilihat berarti empat puluh soal yang harus diperiksa satu per satu
   // sesudahnya.
@@ -591,7 +591,7 @@ export default function CbtPanel({ role }: { role: string }) {
    * Disimpan bersama TAUTANNYA, bukan sebagai ya/tidak belaka: satu tautan
    * yang gagal tidak boleh membuat tautan berikutnya ikut dinyatakan gagal.
    * Kekeliruan itulah yang membuat gambar soal berhenti tampil di layar
-   * mahasiswa, dan ia berulang dengan mudah bila ditulis sebagai boolean.
+   * peserta, dan ia berulang dengan mudah bila ditulis sebagai boolean.
    */
   const [mediaDiperiksa, setMediaDiperiksa] = useState({ url: "", hasil: "" });
   const mediaTermuat = mediaDiperiksa.url === soalBaru.media.url ? mediaDiperiksa.hasil : "";
@@ -697,7 +697,7 @@ export default function CbtPanel({ role }: { role: string }) {
   }, [muatUjian]);
 
   // Ditanyakan sekali di awal: menu AI yang tampil lengkap lalu menjawab
-  // "belum ada kunci" sesudah dosen mengunggah dokumen dan menunggu satu menit
+  // "belum ada kunci" sesudah pengajar mengunggah dokumen dan menunggu satu menit
   // adalah cara paling buruk menyampaikan kabar itu.
   useEffect(() => {
     if (!AI_SOAL_TAMPIL) return;
@@ -715,7 +715,7 @@ export default function CbtPanel({ role }: { role: string }) {
   }, []);
 
   // Monitoring ujian yang sedang berlangsung menyegar sendiri tiap sepuluh
-  // detik: dosen yang harus menekan tombol muat ulang tiap menit tidak sedang
+  // detik: pengajar yang harus menekan tombol muat ulang tiap menit tidak sedang
   // memantau apa pun.
   useEffect(() => {
     if (buka === null || tab !== "pantau") return;
@@ -805,8 +805,8 @@ export default function CbtPanel({ role }: { role: string }) {
 
   async function buatUjian() {
     if (!draf.title.trim() || !draf.courseName.trim()) {
-      setGalat("Nama ujian dan mata kuliah wajib diisi.");
-      kabari("buat", "gagal", "✕ Nama ujian dan mata kuliah wajib diisi", 5000);
+      setGalat("Nama ujian dan mata uji wajib diisi.");
+      kabari("buat", "gagal", "✕ Nama ujian dan mata uji wajib diisi", 5000);
       return;
     }
     const hasil = await kirim("buat", "/api/cbt/ujian", "POST", draf, {
@@ -826,14 +826,14 @@ export default function CbtPanel({ role }: { role: string }) {
    * Inilah yang selama ini tidak ada: setelan hanya dapat ditentukan pada saat
    * ujian dibuat, dan sesudah itu tidak ada satu pun layar yang memanggil
    * PATCH /api/cbt/ujian. Pengawas yang perlu melepas centang "satu perangkat"
-   * di tengah ujian — karena satu mahasiswa terlanjur terblokir oleh ponsel
+   * di tengah ujian — karena satu peserta terlanjur terblokir oleh ponsel
    * temannya — tidak punya jalan sama sekali.
    */
   async function simpanSetelan() {
     if (!terbuka) return;
     if (!setel.title.trim() || !setel.courseName.trim()) {
-      setGalat("Nama ujian dan mata kuliah wajib diisi.");
-      kabari("setel", "gagal", "✕ Nama ujian dan mata kuliah wajib diisi", 5000);
+      setGalat("Nama ujian dan mata uji wajib diisi.");
+      kabari("setel", "gagal", "✕ Nama ujian dan mata uji wajib diisi", 5000);
       return;
     }
     if (setelanBerubah.length === 0) {
@@ -863,7 +863,7 @@ export default function CbtPanel({ role }: { role: string }) {
    * seolah-olah tersimpan.
    *
    * Yang dikembalikan DAFTAR, bukan satu kalimat. Dulu pemeriksaan berhenti
-   * pada keluhan pertama, jadi dosen yang lupa mengisi pilihan sekaligus lupa
+   * pada keluhan pertama, jadi pengajar yang lupa mengisi pilihan sekaligus lupa
    * menandai kuncinya memperbaikinya satu per satu, menekan tombol, dan
    * menemukan keluhan berikutnya. Sekarang semuanya disebut sekali jalan.
    */
@@ -947,7 +947,7 @@ export default function CbtPanel({ role }: { role: string }) {
    * MENAMBAH soal berjalan optimistis: soalnya muncul di daftar seketika,
    * formulirnya langsung kosong, dan pengirimannya berjalan di belakang.
    * Sebelumnya tombol ini menunggu tiga perjalanan ke server berturut-turut —
-   * simpan, muat ulang bank soal, muat ulang daftar ujian — dan dosen yang
+   * simpan, muat ulang bank soal, muat ulang daftar ujian — dan pengajar yang
    * mengetik dua puluh soal menunggu dua puluh kali.
    *
    * Bila kiriman itu ternyata gagal, soalnya ditarik kembali dari daftar DAN
@@ -962,7 +962,7 @@ export default function CbtPanel({ role }: { role: string }) {
     const keluhan = periksaSoal(isi);
     if (keluhan.length > 0) {
       // Menyebut media yang salah sambil membiarkan bagiannya terlipat berarti
-      // menyuruh dosen mencari sendiri isian yang tidak kelihatan.
+      // menyuruh pengajar mencari sendiri isian yang tidak kelihatan.
       if (keluhan.some((k) => k.startsWith("Media"))) setBukaMedia(true);
       setTolakSoal({
         judul: target ? "Perubahan belum dapat disimpan" : "Soal belum dapat ditambahkan",
@@ -1010,7 +1010,7 @@ export default function CbtPanel({ role }: { role: string }) {
       // Gagal sesudah tombolnya sempat berkata berhasil. Tanda hijau itu
       // ditarik kembali, soalnya dikeluarkan lagi dari daftar, isinya
       // dikembalikan ke formulir, dan alasannya dikatakan di jendela yang
-      // harus ditutup: kegagalan yang lewat begitu saja meninggalkan dosen
+      // harus ditutup: kegagalan yang lewat begitu saja meninggalkan pengajar
       // dengan bank soal yang ia kira sudah lengkap.
       kabari("soal", "gagal", "✕ Gagal disimpan", 6000);
       setSoal((kini) => kini.filter((x) => x.id !== idSementara));
@@ -1081,19 +1081,19 @@ export default function CbtPanel({ role }: { role: string }) {
     if (!hasil) return;
 
     // Menyimpan jadwal dapat berarti dua hal yang sangat berbeda bagi
-    // mahasiswa, dan dosennya berhak tahu yang mana. Ujian yang sudah tutup
+    // peserta, dan pengajarnya berhak tahu yang mana. Ujian yang sudah tutup
     // lalu dijadwalkan ulang adalah PELAKSANAAN BARU — jatah percobaan
     // kembali, jadi yang sudah pernah mengerjakan boleh masuk lagi. Menambah
     // waktu di tengah ujian bukan; yang sudah mengumpulkan tetap tidak dapat
-    // mengulang. Tanpa kalimat ini dosennya hanya membaca "Jadwal diperbarui"
+    // mengulang. Tanpa kalimat ini pengajarnya hanya membaca "Jadwal diperbarui"
     // dan menebak sendiri.
     if (perbarui) {
       setPesan(
         hasil.pelaksanaanBaru
           ? "Jadwal diperbarui, dan ini dihitung sebagai pelaksanaan baru: " +
-            "mahasiswa yang sudah pernah mengerjakan boleh masuk lagi."
+            "peserta yang sudah pernah mengerjakan boleh masuk lagi."
           : "Jam ujian diperbarui. Ujian yang sedang berjalan diteruskan — " +
-            "mahasiswa yang sudah mengumpulkan tidak dapat mengerjakan ulang.",
+            "peserta yang sudah mengumpulkan tidak dapat mengerjakan ulang.",
       );
     }
     await muatUjian();
@@ -1140,7 +1140,7 @@ export default function CbtPanel({ role }: { role: string }) {
    *
    * Jalur inilah yang membuat soal essay dapat dinilai sama sekali. Rutenya
    * sudah ada sejak awal, tetapi tidak pernah ada layar yang memanggilnya —
-   * artinya essay yang dikerjakan mahasiswa menggantung sebagai "menunggu
+   * artinya essay yang dikerjakan peserta menggantung sebagai "menunggu
    * koreksi" selamanya, dan nilainya tidak pernah lengkap.
    */
   async function bukaLembar(p: Peserta) {
@@ -1163,7 +1163,7 @@ export default function CbtPanel({ role }: { role: string }) {
       // bersama lembar ini lebih lengkap, jadi ia yang dipakai.
       if (data.peserta) setBukaPeserta({ ...p, ...(data.peserta as Partial<Peserta>) });
       // Kotak nilainya diisi lebih dulu dengan poin yang sudah ada, supaya
-      // dosen yang hanya membetulkan satu angka tidak perlu mengetik ulang
+      // pengajar yang hanya membetulkan satu angka tidak perlu mengetik ulang
       // seluruhnya.
       setDraftKoreksi(
         Object.fromEntries(
@@ -1238,11 +1238,11 @@ export default function CbtPanel({ role }: { role: string }) {
   }
 
   /**
-   * Baca berkas soal yang diunggah dosen.
+   * Baca berkas soal yang diunggah pengajar.
    *
    * Seluruhnya diurai DI PERAMBAN, sama seperti pengimpor transkrip: berkas
    * soal memuat kunci jawaban, dan tidak ada alasan ia singgah di server
-   * sebelum dosennya sendiri melihat hasil bacaannya.
+   * sebelum pengajarnya sendiri melihat hasil bacaannya.
    */
   async function bacaBerkasSoal(berkas: File) {
     setPesan("");
@@ -1281,7 +1281,7 @@ export default function CbtPanel({ role }: { role: string }) {
   // ---------- BUAT SOAL DENGAN AI ----------
 
   /**
-   * Sarikan dokumen yang diunggah dosen — SELURUHNYA di peramban.
+   * Sarikan dokumen yang diunggah pengajar — SELURUHNYA di peramban.
    *
    * Yang berangkat ke server nanti hanya teksnya. Bahan ujian adalah bahan
    * yang belum diujikan; ia tidak perlu singgah di tempat lain hanya untuk
@@ -1345,7 +1345,7 @@ export default function CbtPanel({ role }: { role: string }) {
         throw new Error(data.message || "Soal belum dapat dibuat.");
       }
       // Hasilnya masuk ke pratinjau impor yang sudah ada — bukan langsung ke
-      // bank soal. Dosen yang memutuskan, dan ia melihatnya lebih dulu.
+      // bank soal. Pengajar yang memutuskan, dan ia melihatnya lebih dulu.
       setImporSoal(data.soal || []);
       setImporTolak(data.tolak || []);
       setImporNama(`Dibuat AI dari ${sariNama}`);
@@ -1388,7 +1388,7 @@ export default function CbtPanel({ role }: { role: string }) {
    * Buka satu berkas cetak pada jendelanya sendiri.
    *
    * Cara yang sama dipakai surat tugas dan laporan antrean di portal ini, jadi
-   * dosennya sudah mengenalnya: tekan Cetak, lalu pilih "Simpan sebagai PDF".
+   * pengajarnya sudah mengenalnya: tekan Cetak, lalu pilih "Simpan sebagai PDF".
    */
   function bukaCetak(html: string, kunciTombol: string) {
     const jendela = window.open("", "_blank");
@@ -1428,7 +1428,7 @@ export default function CbtPanel({ role }: { role: string }) {
     if (denganKunci) {
       const setuju = window.confirm(
         "Berkas ini memuat KUNCI JAWABAN dan hanya untuk pengawas.\n\n" +
-          "Jangan sampai tercetak bersama naskah mahasiswa. Lanjutkan?",
+          "Jangan sampai tercetak bersama naskah peserta. Lanjutkan?",
       );
       if (!setuju) return;
     }
@@ -1492,11 +1492,11 @@ export default function CbtPanel({ role }: { role: string }) {
   // ---------- BAGIKAN ----------
 
   /**
-   * Tautan yang dibagikan dosen ke grup kelas.
+   * Tautan yang dibagikan pengajar ke grup kelas.
    *
    * Sejak CBT pindah, tautan ini menunjuk ke SUBDOMAIN CBT, bukan ke domain
    * portal tempat dashboard ini dibuka. Bedanya bukan kosmetik: yang membuka
-   * tautan itu mahasiswa, dan yang mereka lihat pertama kali sebaiknya sudah
+   * tautan itu peserta, dan yang mereka lihat pertama kali sebaiknya sudah
    * situs ujiannya sendiri — tanpa singgah dulu ke pengalihan.
    *
    * Bila subdomainnya tidak dikenali — pengembangan lokal, pratayang
@@ -1523,7 +1523,7 @@ export default function CbtPanel({ role }: { role: string }) {
       ...(u.startAt ? [`Dibuka       : ${jamRapi(u.startAt)}`] : []),
       ...(u.endAt ? [`Ditutup      : ${jamRapi(u.endAt)}`] : []),
       "",
-      "Tidak perlu membuat akun. Buka tautannya, isi nama dan NIM, lalu mulai.",
+      "Tidak perlu membuat akun. Buka tautannya, isi nama dan nomor peserta, lalu mulai.",
       "Lama pengerjaannya tertulis di layar sebelum tombol Mulai Ujian ditekan.",
       "",
       KREDIT_CBT,
@@ -1543,7 +1543,7 @@ export default function CbtPanel({ role }: { role: string }) {
   function unduhNilai() {
     if (!terbuka || peserta.length === 0) return;
     const baris = [
-      ["NIM", "Nama", "Nilai", "Benar", "Status", "Mulai", "Kumpul"].join(","),
+      ["NIM / Nomor Peserta", "Nama", "Nilai", "Benar", "Status", "Mulai", "Kumpul"].join(","),
       ...peserta.map((p) =>
         [
           p.nim,
@@ -1571,7 +1571,7 @@ export default function CbtPanel({ role }: { role: string }) {
   if (buka === null) {
     return (
       <section>
-        <p className="section-eyebrow">{pemantau ? "DOSEN & ADMIN" : "DOSEN"}</p>
+        <p className="section-eyebrow">{pemantau ? "PENGAJAR & ADMIN" : "PENGAJAR"}</p>
         <h2 className="dsh-title">Ujian Online (CBT)</h2>
 
         {pesan && <div className="dsh-ok">{pesan}</div>}
@@ -1579,10 +1579,10 @@ export default function CbtPanel({ role }: { role: string }) {
 
         <div className="panel cbt-kepala">
           <div>
-            <b>Mahasiswa tidak perlu akun</b>
+            <b>Peserta tidak perlu akun</b>
             <span>
-              Cukup kode ujian, nama, dan NIM. Ujian terbuka sendiri pada jam yang disetel
-              dosen pemiliknya.
+              Cukup kode ujian, nama, dan nomor peserta. Ujian terbuka sendiri pada jam yang disetel
+              pengajar pemiliknya.
               {pemantau ? " Anda memantau dan boleh menghapus, tetapi aktivasi ada pada pemiliknya." : ""}
             </span>
           </div>
@@ -1597,15 +1597,15 @@ export default function CbtPanel({ role }: { role: string }) {
               <label><span>Nama ujian *</span>
                 <input value={draf.title} onChange={(e) => setDraf({ ...draf, title: e.target.value })} placeholder="UTS Komunikasi Politik" />
               </label>
-              <label><span>Mata kuliah *</span>
-                <input value={draf.courseName} onChange={(e) => setDraf({ ...draf, courseName: e.target.value })} placeholder="Komunikasi Politik" />
+              <label><span>Mata Kuliah / Materi *</span>
+                <input value={draf.courseName} onChange={(e) => setDraf({ ...draf, courseName: e.target.value })} placeholder="mis. Matematika, K3, Bahasa Inggris" />
               </label>
               <label><span>Kelas</span>
                 <input value={draf.className} onChange={(e) => setDraf({ ...draf, className: e.target.value })} placeholder="A / Reguler" />
               </label>
             </div>
 
-            {/* Dua angka inilah yang ditentukan dosen, dan blueprint-nya
+            {/* Dua angka inilah yang ditentukan pengajar, dan blueprint-nya
                 menyebutnya khusus: berapa soal, dan berapa lama. */}
             <div className="cbt-baris">
               <label><span>Jumlah soal yang dikerjakan</span>
@@ -1622,7 +1622,7 @@ export default function CbtPanel({ role }: { role: string }) {
               </label>
             </div>
 
-            <label className="cbt-lebar"><span>Instruksi untuk mahasiswa</span>
+            <label className="cbt-lebar"><span>Instruksi untuk peserta</span>
               <textarea rows={3} value={draf.instruction} onChange={(e) => setDraf({ ...draf, instruction: e.target.value })} placeholder="Kerjakan sendiri. Tidak boleh membuka catatan." />
             </label>
 
@@ -1698,13 +1698,13 @@ export default function CbtPanel({ role }: { role: string }) {
       {pesan && <div className="dsh-ok">{pesan}</div>}
       {galat && <div className="dsh-error">{galat}</div>}
 
-      {/* ---------- BAGIKAN KE MAHASISWA ---------- */}
+      {/* ---------- BAGIKAN KE PESERTA ---------- */}
       {soal.length > 0 && (
         <div className="panel cbt-bagi">
           <div className="cbt-bagi-kepala">
-            <b>Bagikan ke mahasiswa</b>
+            <b>Bagikan ke peserta</b>
             <span>
-              Tempel salah satu ke grup kelas. Mahasiswa tidak perlu membuat akun.
+              Tempel salah satu ke grup kelas. Peserta tidak perlu membuat akun.
               {!terbuka.activatedAt && " Ujian baru dapat dimasuki setelah diaktifkan dan jam mulainya tiba."}
             </span>
           </div>
@@ -1762,7 +1762,7 @@ export default function CbtPanel({ role }: { role: string }) {
                 Cetak lalu pilih <b>Simpan sebagai PDF</b>.
               </p>
               <div className="cbt-impor-tombol">
-                <Tbl kabar={aksi.naskah} diam="Naskah untuk mahasiswa" onClick={() => cetakNaskah(false)} />
+                <Tbl kabar={aksi.naskah} diam="Naskah untuk peserta" onClick={() => cetakNaskah(false)} />
                 <Tbl
                   kabar={aksi["naskah-kunci"]}
                   dasar="btn btn-light"
@@ -1771,7 +1771,7 @@ export default function CbtPanel({ role }: { role: string }) {
                 />
               </div>
               <p className="cbt-catatan">
-                Naskah mahasiswa tanpa kunci jawaban, sudah termasuk lembar identitas dan ruang
+                Naskah peserta tanpa kunci jawaban, sudah termasuk lembar identitas dan ruang
                 menulis. Soal bermedia ditandai.
               </p>
             </div>
@@ -1789,7 +1789,7 @@ export default function CbtPanel({ role }: { role: string }) {
                 ? `Dibuka sendiri ${jamRapi(terbuka.startAt)} sampai ${jamRapi(terbuka.endAt)}. Diaktifkan oleh ${terbuka.activatedBy ?? "-"}.`
                 : terbuka.bolehUbah
                   ? "Setel jam mulai dan jam selesai, lalu aktifkan. Pada jam mulainya ujian terbuka sendiri, tidak ada tombol yang perlu ditekan lagi."
-                  : `Ujian ini milik ${terbuka.createdBy}. Hanya dosen pemiliknya yang dapat menjadwalkan dan mengaktifkannya.`}
+                  : `Ujian ini milik ${terbuka.createdBy}. Hanya pengajar pemiliknya yang dapat menjadwalkan dan mengaktifkannya.`}
             </span>
           </div>
           <span className={`pill cbt-${terbuka.status}`}>{STATUS_LABEL[terbuka.status]}</span>
@@ -1821,7 +1821,7 @@ export default function CbtPanel({ role }: { role: string }) {
           </div>
         ) : (
           <p className="cbt-catatan">
-            Jadwal dan aktivasi ujian ini dipegang dosen pemiliknya. Anda dapat memantau peserta dan
+            Jadwal dan aktivasi ujian ini dipegang pengajar pemiliknya. Anda dapat memantau peserta dan
             nilainya di tab sebelah{terbuka.bolehHapus ? ", dan menghapus ujian ini bila memang perlu" : ""}.
             Untuk ujian seleksi, buatlah ujian sendiri: ujian yang Anda buat menjadi milik Anda,
             beserta tombol aktivasinya.
@@ -1844,7 +1844,7 @@ export default function CbtPanel({ role }: { role: string }) {
       {/* ---------- PENGATURAN UJIAN ----------
           Dulu setelan hanya dapat ditentukan sekali, pada formulir pembuatan,
           dan sesudah itu tidak ada layar mana pun yang dapat mengubahnya. Yang
-          paling mahal justru terjadi saat ujian berjalan: satu mahasiswa
+          paling mahal justru terjadi saat ujian berjalan: satu peserta
           terblokir karena ponselnya sudah dipakai temannya, dan centang "satu
           perangkat" tidak dapat dilepas sampai ujiannya usai — artinya orang
           itu tidak ikut ujian sama sekali. Sekarang panel ini terbuka
@@ -1880,7 +1880,7 @@ export default function CbtPanel({ role }: { role: string }) {
                 <label><span>Nama ujian *</span>
                   <input value={setel.title} onChange={(e) => setSetel({ ...setel, title: e.target.value })} />
                 </label>
-                <label><span>Mata kuliah *</span>
+                <label><span>Mata Kuliah / Materi *</span>
                   <input value={setel.courseName} onChange={(e) => setSetel({ ...setel, courseName: e.target.value })} />
                 </label>
                 <label><span>Kelas</span>
@@ -1918,7 +1918,7 @@ export default function CbtPanel({ role }: { role: string }) {
                 </label>
               </div>
 
-              <label className="cbt-lebar"><span>Instruksi untuk mahasiswa</span>
+              <label className="cbt-lebar"><span>Instruksi untuk peserta</span>
                 <textarea
                   rows={3} value={setel.instruction}
                   onChange={(e) => setSetel({ ...setel, instruction: e.target.value })}
@@ -1932,8 +1932,8 @@ export default function CbtPanel({ role }: { role: string }) {
                 ubah={(kunci, nyala) => setSetel({ ...setel, [kunci]: nyala })}
               />
               {/* Sengaja TIDAK ikut terkunci saat ujian berlangsung. Yang paling
-                  sering terjadi bukan dosen yang hendak melonggarkan, melainkan
-                  dosen yang baru sadar kelasnya menyontek dan ingin mengetatkan
+                  sering terjadi bukan pengajar yang hendak melonggarkan, melainkan
+                  pengajar yang baru sadar kelasnya menyontek dan ingin mengetatkan
                   di tengah jalan — dan menahannya sampai ujian selesai berarti
                   menahannya sampai tidak ada gunanya lagi. */}
               <PilihMode nilai={setel.proctorMode} ubah={(m) => setSetel({ ...setel, proctorMode: m })} />
@@ -1979,13 +1979,13 @@ export default function CbtPanel({ role }: { role: string }) {
           {sedangBerlangsung && (
             <div className="dsh-error">
               Ujian sedang berlangsung. Soal dikunci sampai selesai, mengubahnya sekarang berarti
-              sebagian mahasiswa mengerjakan ujian yang berbeda dari sebagian yang lain.
+              sebagian peserta mengerjakan ujian yang berbeda dari sebagian yang lain.
             </div>
           )}
           {!terbuka.bolehUbah && !sedangBerlangsung && (
             <div className="dsh-note">
               Bank soal ini milik <b>{terbuka.createdBy}</b> dan hanya dapat dibaca dari sini.
-              Menyunting soal kelas dosen lain bukan wewenang yang ada pada peran Anda.
+              Menyunting soal kelas pengajar lain bukan wewenang yang ada pada peran Anda.
             </div>
           )}
 
@@ -2271,7 +2271,7 @@ export default function CbtPanel({ role }: { role: string }) {
                 />
               )}
               {/* ---------- PRATINJAU ----------
-                  Dosen melihat SEKARANG apa yang akan dilihat mahasiswa. Tanpa
+                  Pengajar melihat SEKARANG apa yang akan dilihat peserta. Tanpa
                   ini, tautan yang salah ketik atau berkas yang tidak dapat
                   dibaca umum baru ketahuan ketika ujian sudah berjalan — dan
                   saat itu tidak ada lagi yang dapat diperbaiki. */}
@@ -2288,7 +2288,7 @@ export default function CbtPanel({ role }: { role: string }) {
                     <p className="cbt-media-gagal-edit">
                       Gambar ini <b>tidak dapat dimuat</b>. Bila berkasnya baru diunggah, bucket
                       Storage-nya kemungkinan belum publik; bila ini tautan dari luar, periksa
-                      penulisannya. Mahasiswa akan melihat kotak kosong.
+                      penulisannya. Peserta akan melihat kotak kosong.
                     </p>
                   )}
                 </div>
@@ -2423,7 +2423,7 @@ export default function CbtPanel({ role }: { role: string }) {
             )}
 
             {soalBaru.jenis === "essay" && (
-              <p className="cbt-catatan">Essay dikoreksi dosen di tab Monitoring &amp; nilai setelah ujian selesai.</p>
+              <p className="cbt-catatan">Essay dikoreksi pengajar di tab Monitoring &amp; nilai setelah ujian selesai.</p>
             )}
 
             <div className="cbt-form-aksi">
@@ -2577,7 +2577,7 @@ export default function CbtPanel({ role }: { role: string }) {
               <div className="qtable-wrap">
                 <table className="qt">
                   <thead>
-                    <tr><th>Mahasiswa</th><th>Status</th><th>Progres</th><th>Sisa waktu</th><th>Nilai</th><th>Integritas</th><th /></tr>
+                    <tr><th>Mahasiswa / Peserta</th><th>Status</th><th>Progres</th><th>Sisa waktu</th><th>Nilai</th><th>Integritas</th><th /></tr>
                   </thead>
                   <tbody>
                     {peserta.map((p) => (
@@ -2606,7 +2606,7 @@ export default function CbtPanel({ role }: { role: string }) {
                         <td>
                           {/* Satu angka, bukan daftar pelanggaran.
                               Papan ini menampilkan ratusan baris sekaligus, dan
-                              dosen yang mengawas sedang berjalan di antara meja
+                              pengajar yang mengawas sedang berjalan di antara meja
                               — yang ia butuhkan adalah "baris mana yang perlu
                               saya lihat", bukan rincian yang hanya terbaca
                               sesudah ujiannya selesai. Rinciannya ada di lembar
@@ -2653,7 +2653,7 @@ export default function CbtPanel({ role }: { role: string }) {
                 </label>
               </div>
               <label className="cbt-lebar"><span>Catatan kejadian selama ujian</span>
-                <textarea rows={2} value={acara.catatan} onChange={(e) => setAcara({ ...acara, catatan: e.target.value })} placeholder="Mis. listrik padam 5 menit pukul 09.20; dua mahasiswa terlambat masuk." />
+                <textarea rows={2} value={acara.catatan} onChange={(e) => setAcara({ ...acara, catatan: e.target.value })} placeholder="Mis. listrik padam 5 menit pukul 09.20; dua peserta terlambat masuk." />
               </label>
               <Tbl kabar={aksi.acara} diam="🖨 Buat berita acara" onClick={() => cetakBeritaAcara()} />
             </div>
@@ -2685,7 +2685,7 @@ export default function CbtPanel({ role }: { role: string }) {
               </div>
 
               {/* ---------- LEMBAR PENGAWASAN ----------
-                  Ditaruh DI ATAS lembar jawaban, bukan di bawahnya. Dosen yang
+                  Ditaruh DI ATAS lembar jawaban, bukan di bawahnya. Pengajar yang
                   membuka lembar seorang peserta untuk mengoreksi essay akan
                   membaca dari atas dan berhenti begitu koreksinya selesai;
                   catatan pengawasan yang tertinggal di kaki halaman tidak
@@ -2728,7 +2728,7 @@ export default function CbtPanel({ role }: { role: string }) {
                         <p className="cbt-soal-tanya">{r.pertanyaan}</p>
 
                         <div className="cbt-lembar-jawab">
-                          <small>Jawaban mahasiswa</small>
+                          <small>Jawaban peserta</small>
                           <p>{r.jawabanTeks || <i>tidak dijawab</i>}</p>
                         </div>
 
@@ -2738,9 +2738,9 @@ export default function CbtPanel({ role }: { role: string }) {
                           </p>
                         )}
 
-                        {/* Kotak nilai hanya untuk essay, dan hanya bagi dosen
+                        {/* Kotak nilai hanya untuk essay, dan hanya bagi pengajar
                             pemiliknya — inilah satu-satunya jalan agar essay
-                            yang dikerjakan mahasiswa berhenti menggantung
+                            yang dikerjakan peserta berhenti menggantung
                             sebagai "menunggu koreksi". */}
                         {r.jenis === "essay" && terbuka.bolehUbah && (
                           <div className="cbt-koreksi">
@@ -2760,7 +2760,7 @@ export default function CbtPanel({ role }: { role: string }) {
                               />
                             </label>
                             <label className="cbt-koreksi-catatan">
-                              <span>Catatan untuk mahasiswa</span>
+                              <span>Catatan untuk peserta</span>
                               <input
                                 value={draftKoreksi[r.id]?.catatan ?? ""}
                                 onChange={(e) =>
@@ -2781,7 +2781,7 @@ export default function CbtPanel({ role }: { role: string }) {
                           </div>
                         )}
 
-                        {r.catatan && <p className="cbt-lembar-catatan">Catatan dosen: {r.catatan}</p>}
+                        {r.catatan && <p className="cbt-lembar-catatan">Catatan pengajar: {r.catatan}</p>}
                       </li>
                     );
                   })}

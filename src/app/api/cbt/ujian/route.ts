@@ -1,5 +1,5 @@
 // ============================================================
-// CBT — UJIAN (sisi dosen dan admin)
+// CBT — UJIAN (sisi pengajar dan admin)
 //
 // GET    daftar ujian yang boleh dilihat pemanggilnya
 // POST   buat ujian baru
@@ -7,7 +7,7 @@
 // DELETE hapus ujian beserta soal dan hasilnya
 //
 // Yang boleh MENGAKTIFKAN ada di /api/cbt/aktivasi, bukan di sini — dan yang
-// boleh melakukannya hanyalah PEMILIK ujiannya. Dosen yang menyusun soalnyalah
+// boleh melakukannya hanyalah PEMILIK ujiannya. Pengajar yang menyusun soalnyalah
 // yang tahu kapan kelasnya siap; admin memantau, menghapus, dan boleh membuat
 // ujian sendiri (mis. seleksi) yang kemudian juga miliknya.
 // ============================================================
@@ -45,7 +45,7 @@ const angka = (nilai: unknown, bawaan: number, min: number, maks: number) => {
  * berlangsung.
  *
  * Dulu seluruh perubahan ditolak begitu ujiannya berjalan. Terdengar aman,
- * tetapi yang terjadi di ruang ujian justru sebaliknya: seorang mahasiswa
+ * tetapi yang terjadi di ruang ujian justru sebaliknya: seorang peserta
  * terblokir karena ponselnya sudah dipakai temannya, dan pengawas tidak dapat
  * melepas centang "satu perangkat" sampai ujiannya usai — artinya orang itu
  * tidak ikut ujian sama sekali. Setelan pengawasan dan keterangan karena itu
@@ -68,11 +68,11 @@ export async function GET() {
       return Response.json({ success: false, message: "Menu CBT tidak tersedia untuk role Anda." }, { status: 403 });
     }
 
-    // Dosen hanya melihat ujiannya sendiri. Admin melihat semuanya, karena
+    // Pengajar hanya melihat ujiannya sendiri. Admin melihat semuanya, karena
     // merekalah yang memantau.
     //
-    // Dua sisi diperiksa, bukan satu. Dosen yang profilnya belum tersambung ke
-    // baris dosen tetap harus menemukan ujian yang ia buat sendiri; sebaliknya
+    // Dua sisi diperiksa, bukan satu. Pengajar yang profilnya belum tersambung ke
+    // baris pengajar tetap harus menemukan ujian yang ia buat sendiri; sebaliknya
     // ujian lama yang hanya membawa lecturerId tetap harus terlihat.
     const saring =
       profile.role === "dosen"
@@ -153,7 +153,7 @@ export async function GET() {
         bolehHapus: bolehHapus(profile, u),
         // Tidak bergantung pada ujiannya sama sekali — hanya pada peran
         // pemanggilnya. Dihitung server dan dikirim per ujian supaya layar
-        // dosen tidak perlu menebak sendiri dari peran, dan supaya aturannya
+        // pengajar tidak perlu menebak sendiri dari peran, dan supaya aturannya
         // hanya tertulis di satu tempat.
         bolehSaklarKamera: bolehSaklarKamera(profile),
       })),
@@ -181,7 +181,7 @@ export async function POST(request: Request) {
     const title = teks(body.title, 160);
     const courseName = teks(body.courseName, 120);
     if (!title || !courseName) {
-      return Response.json({ success: false, message: "Nama ujian dan mata kuliah wajib diisi." }, { status: 400 });
+      return Response.json({ success: false, message: "Nama ujian dan mata uji wajib diisi." }, { status: 400 });
     }
 
     // Kode diulang bila kebetulan tabrakan. Enam huruf dari 32 abjad memberi
@@ -248,7 +248,7 @@ export async function PATCH(request: Request) {
     if (!ujian) return Response.json({ success: false, message: "Ujian tidak ditemukan." }, { status: 404 });
     if (!bolehUbah(profile, ujian)) {
       return Response.json(
-        { success: false, message: "Ujian ini milik dosen lain. Anda hanya dapat memantaunya." },
+        { success: false, message: "Ujian ini milik pengajar lain. Anda hanya dapat memantaunya." },
         { status: 403 },
       );
     }
@@ -272,8 +272,8 @@ export async function PATCH(request: Request) {
     if (body.showScore !== undefined) ubah.showScore = body.showScore !== false;
     if (body.singleDevice !== undefined) ubah.singleDevice = body.singleDevice !== false;
     // Mode pengawasan sengaja BOLEH diubah walau ujiannya sedang berlangsung.
-    // Yang paling sering terjadi bukan dosen yang ingin melonggarkan, melainkan
-    // dosen yang baru sadar kelasnya menyontek dan hendak mengetatkan di
+    // Yang paling sering terjadi bukan pengajar yang ingin melonggarkan, melainkan
+    // pengajar yang baru sadar kelasnya menyontek dan hendak mengetatkan di
     // tengah jalan — dan menahannya sampai ujian selesai berarti menahannya
     // sampai tidak ada gunanya lagi. Yang berubah hanya penjagaan ke depan;
     // jawaban dan catatan yang sudah ada tidak tersentuh.
@@ -282,12 +282,12 @@ export async function PATCH(request: Request) {
 
     // ---------- SAKLAR KAMERA ----------
     // Satu-satunya setelan di sini yang wewenangnya TIDAK ada pada pemilik
-    // ujian. Layar dosen mengirim seluruh formulir sekaligus, jadi kiriman
-    // yang membawa cameraOn dari dosen bukan tanda ada yang menyusup — ia
+    // ujian. Layar pengajar mengirim seluruh formulir sekaligus, jadi kiriman
+    // yang membawa cameraOn dari pengajar bukan tanda ada yang menyusup — ia
     // hanya diabaikan diam-diam bila nilainya memang tidak berubah.
     //
     // Yang benar-benar berbeda ditolak dengan terang-terangan, karena diam
-    // pada perubahan yang ditolak berarti dosennya melihat saklarnya bergerak
+    // pada perubahan yang ditolak berarti pengajarnya melihat saklarnya bergerak
     // di layar lalu menemukannya kembali seperti semula tanpa penjelasan.
     if (body.cameraOn !== undefined) {
       const diminta = body.cameraOn !== false;
@@ -298,7 +298,7 @@ export async function PATCH(request: Request) {
               success: false,
               message:
                 "Kamera pengawas hanya dapat dinyalakan atau dimatikan Admin dan Super Admin. " +
-                "Merekam wajah peserta adalah keputusan fakultas, bukan keputusan satu mata kuliah.",
+                "Merekam wajah peserta adalah keputusan lembaga, bukan keputusan satu mata uji.",
             },
             { status: 403 },
           );
@@ -308,7 +308,7 @@ export async function PATCH(request: Request) {
     }
 
     // Selama ujian berjalan, yang mengubah bentuknya ditolak — tetapi hanya
-    // bila nilainya memang berbeda. Layar dosen mengirim seluruh formulir
+    // bila nilainya memang berbeda. Layar pengajar mengirim seluruh formulir
     // sekaligus, dan menolaknya karena membawa durasi yang sama persis dengan
     // yang tersimpan berarti mengunci setelan yang sebenarnya boleh diubah.
     if (berlangsung) {
@@ -357,7 +357,7 @@ export async function DELETE(request: Request) {
     const ujian = ada[0];
     if (!ujian) return Response.json({ success: true });
     if (!bolehHapus(profile, ujian)) {
-      return Response.json({ success: false, message: "Ujian ini milik dosen lain." }, { status: 403 });
+      return Response.json({ success: false, message: "Ujian ini milik pengajar lain." }, { status: 403 });
     }
 
     // Ujian yang sudah dikerjakan orang hanya boleh dihapus Super Admin.
@@ -370,7 +370,7 @@ export async function DELETE(request: Request) {
       return Response.json(
         {
           success: false,
-          message: "Ujian ini sudah dikerjakan mahasiswa. Penghapusannya hanya oleh Super Admin.",
+          message: "Ujian ini sudah dikerjakan peserta. Penghapusannya hanya oleh Super Admin.",
         },
         { status: 403 },
       );

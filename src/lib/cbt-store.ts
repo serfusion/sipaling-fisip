@@ -28,11 +28,11 @@ export function bacaSoal(row: typeof cbtQuestions.$inferSelect): Soal {
     if (Array.isArray(isi)) pilihan = isi.map((p) => String(p ?? ""));
   } catch {
     // Pilihan yang rusak dibaca sebagai kosong; soalnya tetap tampil supaya
-    // dosen dapat melihat dan memperbaikinya, bukan hilang tanpa jejak.
+    // pengajar dapat melihat dan memperbaikinya, bukan hilang tanpa jejak.
   }
   // Pasangan penjodohan. Baris yang rusak dibuang satu per satu, bukan
   // menggugurkan seluruh soal: soal yang hilang dari bank jauh lebih sulit
-  // ditelusuri dosennya daripada soal yang pasangannya kurang satu.
+  // ditelusuri pengajarnya daripada soal yang pasangannya kurang satu.
   let pasangan: Pasangan[] = [];
   try {
     const isi = JSON.parse(row.pairs || "[]");
@@ -56,7 +56,7 @@ export function bacaSoal(row: typeof cbtQuestions.$inferSelect): Soal {
     pasangan,
     media: {
       // Media tanpa tautan bukan media. Menyimpan jenisnya saja membuat layar
-      // mahasiswa menyediakan kotak gambar yang selamanya kosong.
+      // peserta menyediakan kotak gambar yang selamanya kosong.
       jenis: row.mediaUrl && (jenisMedia === "gambar" || jenisMedia === "video") ? jenisMedia : "",
       url: row.mediaUrl || "",
       keterangan: row.mediaCaption || "",
@@ -87,7 +87,7 @@ export async function jawabanAttempt(attemptId: number) {
   return db.select().from(cbtAnswers).where(eq(cbtAnswers.attemptId, attemptId));
 }
 
-export async function attemptMahasiswa(examId: number, nim: string) {
+export async function attemptPeserta(examId: number, nim: string) {
   return db
     .select()
     .from(cbtAttempts)

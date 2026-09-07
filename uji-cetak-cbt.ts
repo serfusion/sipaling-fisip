@@ -2,11 +2,12 @@
 // UJI: lembar cetak CBT
 //
 // Satu hal di berkas ini lebih penting daripada semua yang lain: NASKAH YANG
-// DIBAGIKAN KE MAHASISWA TIDAK BOLEH MEMUAT KUNCI JAWABAN. Naskah cadangan
+// DIBAGIKAN KE PESERTA TIDAK BOLEH MEMUAT KUNCI JAWABAN. Naskah cadangan
 // yang tercetak beserta kuncinya lalu dibagikan adalah cara tercepat
 // menggagalkan ujian, dan kekeliruannya tidak akan terlihat sampai sudah
 // terlambat.
 // ============================================================
+import { readFileSync } from "node:fs";
 import { MEDIA_KOSONG } from "./src/lib/cbt";
 import {
   beritaAcaraHtml, laporanPesertaHtml, lolos, naskahSoalHtml,
@@ -52,7 +53,7 @@ const soal: SoalCetak[] = [
 ];
 
 // ---------- YANG PALING PENTING ----------
-bagian("Naskah mahasiswa TIDAK boleh membocorkan kunci");
+bagian("Naskah peserta TIDAK boleh membocorkan kunci");
 const naskah = naskahSoalHtml(ujian, soal);
 
 cek("kunci isian tidak tercetak", !naskah.includes("KUNCIRAHASIAISIAN"),
@@ -72,8 +73,9 @@ cek("pilihan penjodohan tetap ditawarkan", naskah.includes("D. Lasswell"));
 cek("PG kompleks diberi keterangan jawaban jamak", naskah.includes("Jawaban boleh lebih dari satu"));
 cek("essay diberi ruang menulis", (naskah.match(/class="garis"/g) || []).length >= 6);
 cek("soal bermedia ditandai tidak tercetak", naskah.includes("tidak tercetak"));
-cek("ada tempat nama dan NIM", naskah.includes("Nama") && naskah.includes("NIM"));
-cek("instruksi dosen ikut", naskah.includes("Tidak boleh membuka catatan"));
+cek("ada tempat nama dan nomor peserta",
+  naskah.includes("Nama") && naskah.includes("Nomor Peserta"));
+cek("instruksi pengajar ikut", naskah.includes("Tidak boleh membuka catatan"));
 cek("total bobot dihitung", naskah.includes("45 poin"), "harusnya 5+9+6+5+20");
 
 bagian("Berkas pengawas memang membawa kunci");
@@ -87,7 +89,7 @@ cek("rambu penilaian essay ikut", naskahKunci.includes("Sebutkan minimal tiga pe
 cek("diberi peringatan jangan dibagikan", naskahKunci.includes("JANGAN DIBAGIKAN"));
 
 // ---------- KESELAMATAN HTML ----------
-bagian("Teks dosen tidak boleh merusak halaman cetak");
+bagian("Teks pengajar tidak boleh merusak halaman cetak");
 cek("tanda & diloloskan", lolos("McCombs & Shaw") === "McCombs &amp; Shaw");
 cek("tanda kurung siku diloloskan", lolos("<script>") === "&lt;script&gt;");
 const jahat = naskahSoalHtml(ujian, [{
@@ -180,13 +182,13 @@ const laporan = laporanPesertaHtml(ujian, {
     benar: null, poin: 0, bobot: 20, catatan: "Perlu contoh kasus." },
 ], 70);
 
-cek("nama dan NIM tercetak", laporan.includes("Dewi Lestari") && laporan.includes("1234567"));
+cek("nama dan NOMOR PESERTA tercetak", laporan.includes("Dewi Lestari") && laporan.includes("1234567"));
 cek("nilai akhir tercetak", laporan.includes("78"));
 cek("status kelulusan dinyatakan", laporan.includes("LULUS"));
 cek("benar sebagian dihitung terpisah", laporan.includes("Benar sebagian"));
 cek("yang benar sebagian tidak dicap salah", laporan.includes("benar sebagian"));
 cek("essay yang belum dikoreksi dinyatakan", laporan.includes("menunggu koreksi"));
-cek("catatan dosen ikut", laporan.includes("Perlu contoh kasus"));
+cek("catatan pengajar ikut", laporan.includes("Perlu contoh kasus"));
 cek("catatan sistem tercetak", laporan.includes("Pindah tab 2×"));
 cek("ampersand jawaban diloloskan", laporan.includes("McCombs &amp; Shaw"));
 
@@ -204,6 +206,76 @@ for (const [nama, html] of [["naskah", naskah], ["berita acara", acara], ["lapor
       html.includes("sembunyi-cetak") && html.includes("window.print()"));
   cek(`${nama}: ukuran kertas A4`, html.includes("size: A4"));
 }
+
+bagian("Tidak terikat satu lembaga");
+
+// CBT ini satu produk yang sama untuk siapa pun yang memasangnya. Nama lembaga
+// mana pun yang tertanam di dalam kodenya akan ikut tercetak pada naskah soal
+// dan berita acara orang lain — dokumen yang ditandatangani, dan yang paling
+// tidak boleh membawa nama yang salah.
+// KELIMA bentuk berkasnya, bukan dua. Naskah peserta dan naskah pengawas
+// berbeda isinya — blok "Nama / NIM / Tanda Tangan" hanya tercetak pada yang
+// TANPA kunci — dan tabel pelanggaran berita acara hanya muncul bila memang
+// ada yang melanggar. Menguji sebagiannya saja membuat penjaga di bawah lulus
+// tanpa pernah melihat baris yang justru paling perlu dijaga.
+const semuaBerkas = [
+  naskahSoalHtml(ujian, soal),
+  naskahSoalHtml(ujian, soal, { denganKunci: true }),
+  beritaAcaraHtml(ujian, {
+    pengawas: "Dr. Ayu", ruang: "Daring", hadir: 1, terdaftar: 1, selesai: 1,
+    berjalan: 0, pelanggaran: 0, catatan: "",
+    peserta: [{ nim: "1", nama: "A", status: "selesai", pindahTab: 0, keluarFullscreen: 0 }],
+  }),
+  beritaAcaraHtml(ujian, {
+    pengawas: "Dr. Ayu", ruang: "Daring", hadir: 1, terdaftar: 1, selesai: 1,
+    berjalan: 0, pelanggaran: 1, catatan: "",
+    peserta: [{ nim: "2", nama: "B", status: "selesai", pindahTab: 4, keluarFullscreen: 1, integritas: 60 }],
+  }),
+  laporanPesertaHtml(ujian, {
+    nim: "3", nama: "C", nilai: 80, benar: 4, salah: 1, kosong: 0, tertunda: 0,
+    mulai: "2026-09-10T02:00:00.000Z", kumpul: "2026-09-10T03:00:00.000Z",
+    pindahTab: 0, keluarFullscreen: 0,
+  }, [], 60),
+].join("\n");
+for (const jenama of ["FISIP", "Fakultas Ilmu Sosial", "ILMU POLITIK", "SiPaling FISIP"]) {
+  cek(`tidak menyebut "${jenama}"`, !semuaBerkas.toUpperCase().includes(jenama.toUpperCase()));
+}
+// Kosakata perguruan tinggi ikut dijaga, tetapi aturannya BUKAN "jangan pernah
+// dipakai" melainkan "jangan dipakai sendirian". Label berpasangan justru yang
+// paling terbaca: yang dari kampus mengenali kata pertama, yang dari sekolah
+// dan lembaga sertifikasi mengenali kata kedua. Yang berbahaya kata kampusnya
+// berdiri sendiri — di situlah pembaca yang bukan dari kampus tertinggal, dan
+// berkas ini dokumen yang ditandatangani orang.
+//
+// Daftar kata di bawah pernah ikut tersapu penggantian kosakata dan berhenti
+// menjaga apa pun tanpa satu uji pun gagal. Karena itu ada pemeriksaan
+// terakhir di bawahnya: kalau bentuk berpasangannya TIDAK ada sama sekali di
+// berkas cetak, penjaganya sendiri yang sedang rusak.
+const PASANGAN: Array<[string, RegExp]> = [
+  ["Mahasiswa", /Mahasiswa\s*\/\s*Peserta/],
+  ["NIM", /NIM\s*\/\s*(Nomor Peserta|No\.)/],
+  ["Dosen", /Dosen\s*\/\s*Pengajar/],
+  ["Mata Kuliah", /Mata Kuliah\s*\/\s*Materi/],
+];
+for (const [kata, pasangan] of PASANGAN) {
+  const munculan = semuaBerkas.split(kata).length - 1;
+  const berpasangan = (semuaBerkas.match(new RegExp(pasangan.source, "g")) || []).length;
+  cek(`"${kata}" tidak pernah berdiri sendiri`, munculan === berpasangan,
+    `${munculan} kali muncul, ${berpasangan} di antaranya berpasangan`);
+}
+cek("penjaganya sendiri masih hidup: label berpasangan memang ada di berkas cetak",
+  /NIM\s*\/\s*(Nomor Peserta|No\.)/.test(semuaBerkas)
+  && /Mata Kuliah\s*\/\s*Materi/.test(semuaBerkas));
+// Yang menggantikannya bukan kekosongan: kop tetap menyebut mata ujinya,
+// sehingga berkasnya tetap dapat dikenali milik ujian yang mana.
+cek("kop menyebut mata ujinya", semuaBerkas.includes("Komunikasi Politik"));
+
+// Dan yang memasangnya untuk ujian sungguhan tetap dapat menaruh namanya
+// sendiri — lewat pengaturan, bukan lewat kode.
+cek("nama penyelenggara dapat diatur dari environment",
+  /NEXT_PUBLIC_CBT_PENYELENGGARA/.test(
+    readFileSync("./src/lib/cetak-cbt.ts", "utf8"),
+  ));
 
 console.log(`\n${lulus} lulus, ${gagal} gagal`);
 if (gagal > 0) process.exit(1);

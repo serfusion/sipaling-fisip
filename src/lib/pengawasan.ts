@@ -16,7 +16,7 @@
 //      ke ChatGPT lalu menempelkan jawabannya kembali.
 //   2. MENCATAT     — setiap percobaan ditulis lengkap dengan jamnya. Yang
 //      lolos pun meninggalkan jejak yang dapat dibaca penguji.
-//   3. MENANDAI     — nama, NIM, dan jam peserta ditumpuk samar di atas
+//   3. MENANDAI     — nama, nomor peserta, dan jamnya ditumpuk samar di atas
 //      layarnya. Tangkapan layar tetap bisa diambil, tetapi setiap lembar yang
 //      bocor menunjuk satu orang, dan orang itu tahu ia tertulis di sana.
 //
@@ -28,7 +28,7 @@
 /**
  * Seberapa ketat ujian ini diawasi.
  *
- * Sengaja hanya tiga, dan dipilih dari satu daftar pilih. Dosen tidak
+ * Sengaja hanya tiga, dan dipilih dari satu daftar pilih. Pengajar tidak
  * seharusnya diminta mencentang sebelas kotak yang tidak ia mengerti akibatnya;
  * yang ia tahu adalah ujiannya kuis harian, UAS, atau uji sertifikasi.
  */
@@ -45,7 +45,7 @@ export const MODE_LABEL: Record<ModePengawasan, string> = {
 export const MODE_KETERANGAN: Record<ModePengawasan, string> = {
   biasa:
     "Kuis dan latihan. Pindah tab tetap dicatat, selebihnya dibiarkan — " +
-    "mahasiswa boleh menyalin soal untuk dibaca ulang.",
+    "peserta boleh menyalin soal untuk dibaca ulang.",
   ketat:
     "UTS dan UAS. Layar penuh diwajibkan, salin-tempel dimatikan, dan " +
     "identitas peserta tercetak samar di seluruh layarnya.",
@@ -69,7 +69,7 @@ export const MODE_KETERANGAN: Record<ModePengawasan, string> = {
  * Saklarnya menyala secara bawaan, jadi ujian sertifikasi tetap terawasi
  * tanpa ada yang perlu menekan apa pun. Ia ada untuk MEMATIKAN — kelas yang
  * separuh pesertanya tidak punya kamera, atau ujian yang memang tidak boleh
- * merekam wajah — dan yang memegangnya bukan dosen pemilik ujiannya melainkan
+ * merekam wajah — dan yang memegangnya bukan pengajar pemilik ujiannya melainkan
  * Admin, karena merekam wajah orang adalah keputusan lembaga.
  */
 export function kameraMenyala(mode: ModePengawasan, saklar: boolean): boolean {
@@ -344,7 +344,7 @@ export type Peserta = { nama: string; nim: string; kode: string };
  * Tulisan yang ditumpuk samar di atas layar ujian.
  *
  * Isinya dipilih supaya satu potongan tangkapan layar pun cukup untuk
- * menunjuk orangnya: nama dan NIM menjawab "siapa", kode ujian menjawab "ujian
+ * menunjuk orangnya: nama dan nomornya menjawab "siapa", kode ujian menjawab "ujian
  * yang mana", dan jamnya menjawab "kapan" — yang membedakan bocoran saat ujian
  * berlangsung dari lembar yang memang dibagikan sesudahnya.
  */

@@ -5,7 +5,7 @@
 //
 // Layar kode, identitas, dan selesai dahulu berupa kotak putih polos di
 // tengah halaman, sementara halaman depannya sudah berlatar biru dua kolom.
-// Dua rancangan pada satu situs membuat mahasiswa ragu apakah ia masih berada
+// Dua rancangan pada satu situs membuat peserta ragu apakah ia masih berada
 // di tempat yang benar — tepat pada saat ia paling tidak ingin ragu.
 //
 // Kelas yang dipakai SAMA PERSIS dengan halaman depan (cbtd-*), bukan salinan
@@ -25,13 +25,13 @@ export type RangkaUjianProps = {
   sub: string;
   /** Butir-butir penenang di kolom kiri. Disembunyikan di ponsel. */
   poin?: string[];
-  /** Lencana kecil di atas judul, mis. nama mata kuliah. */
+  /** Lencana kecil di atas judul, mis. nama mata uji. */
   lencana?: string;
   children: ReactNode;
 };
 
 const POIN_BAWAAN = [
-  "Tidak perlu membuat akun. Cukup kode ujian, nama, dan NIM.",
+  "Tidak perlu membuat akun. Cukup kode ujian, nama, dan nomor peserta.",
   "Jawaban tersimpan otomatis tiap sepuluh detik.",
   "Waktu dihitung di server, jadi aman walau jaringan tersendat.",
   "Nyaman dikerjakan dari ponsel maupun komputer.",

@@ -2,7 +2,7 @@
 // IMPOR SOAL DARI EXCEL DAN WORD
 //
 // Menambah soal satu per satu lewat formulir itu benar, tetapi lambat: empat
-// puluh soal berarti empat puluh kali mengisi, menekan, dan menunggu. Dosen
+// puluh soal berarti empat puluh kali mengisi, menekan, dan menunggu. Pengajar
 // sudah punya soalnya di Word atau Excel; yang dibutuhkan hanya jalan supaya
 // berkas itu masuk apa adanya.
 //
@@ -13,7 +13,7 @@
 //
 // PRINSIPNYA: satu baris rusak TIDAK menggagalkan seluruh berkas. Yang sah
 // tetap masuk, yang bermasalah dikembalikan beserta nomor barisnya, supaya
-// dosen memperbaiki tiga baris — bukan mengunggah ulang empat puluh soal.
+// pengajar memperbaiki tiga baris — bukan mengunggah ulang empat puluh soal.
 // ============================================================
 import { MEDIA_KOSONG, type JenisSoal, type Media, type Pasangan } from "@/lib/cbt";
 
@@ -46,7 +46,7 @@ const HURUF = ["A", "B", "C", "D", "E", "F"];
 
 const teks = (nilai: unknown) => String(nilai ?? "").replace(/\r/g, "").trim();
 
-/** Baca jenis soal dari tulisan bebas dosen. */
+/** Baca jenis soal dari tulisan bebas pengajar. */
 export function bacaJenis(nilai: unknown): JenisSoal {
   const isi = teks(nilai).toLowerCase().replace(/[^a-z]/g, "");
   if (!isi) return "pg";
@@ -68,14 +68,14 @@ export function bacaJenis(nilai: unknown): JenisSoal {
   return "pg";
 }
 
-/** Baca jenis media dari tulisan bebas dosen. */
+/** Baca jenis media dari tulisan bebas pengajar. */
 export function bacaMedia(jenisMentah: unknown, urlMentah: unknown, keterangan: unknown): Media {
   const url = teks(urlMentah);
   if (!url) return { ...MEDIA_KOSONG };
   const isi = teks(jenisMentah).toLowerCase();
 
   // Jenisnya boleh dikosongkan: yang berakhiran .mp4 sudah jelas video, dan
-  // menuntut dosen menuliskannya lagi hanya menambah satu kolom yang sering
+  // menuntut pengajar menuliskannya lagi hanya menambah satu kolom yang sering
   // salah isi.
   const jenis: Media["jenis"] =
     isi.startsWith("video") || isi.startsWith("film")
@@ -91,7 +91,7 @@ export function bacaMedia(jenisMentah: unknown, urlMentah: unknown, keterangan: 
 /**
  * Baca kunci PG kompleks: "A,C" atau "AC" atau "1,3" menjadi "0,2".
  *
- * Ditulis dosen dengan segala bentuk, dan semuanya diterima selama menunjuk
+ * Ditulis pengajar dengan segala bentuk, dan semuanya diterima selama menunjuk
  * pilihan yang benar-benar ada.
  */
 export function bacaKunciJamak(
@@ -115,7 +115,7 @@ export function bacaKunciJamak(
     }
     const angka = Number(potong.replace(/[^0-9]/g, ""));
     if (!Number.isInteger(angka)) return { ok: false, alasan: `kunci "${potong}" tidak terbaca` };
-    // Dosen menomori mulai 1; sistem menyimpan mulai 0.
+    // Pengajar menomori mulai 1; sistem menyimpan mulai 0.
     const n = angka - 1;
     if (n < 0 || n >= pilihan.length) return { ok: false, alasan: `kunci "${potong}" menunjuk pilihan yang tidak ada` };
     nomor.add(n);
@@ -186,11 +186,11 @@ export function bacaBobot(nilai: unknown): number {
 }
 
 /**
- * Ubah kunci yang ditulis dosen menjadi bentuk yang disimpan sistem.
+ * Ubah kunci yang ditulis pengajar menjadi bentuk yang disimpan sistem.
  *
- * Dosen menulis "B", "b", "b." atau bahkan menyalin teks jawabannya utuh.
+ * Pengajar menulis "B", "b", "b." atau bahkan menyalin teks jawabannya utuh.
  * Ketiganya diterima; yang ditolak hanya yang benar-benar tidak menunjuk ke
- * mana pun — karena kunci yang salah menyalahkan seluruh mahasiswa yang
+ * mana pun — karena kunci yang salah menyalahkan seluruh peserta yang
  * sebenarnya menjawab benar, dan itu baru ketahuan sesudah nilai keluar.
  */
 export function bacaKunci(
@@ -226,7 +226,7 @@ export function bacaKunci(
     return { ok: false, alasan: `kunci "${isi}" menunjuk pilihan yang tidak ada` };
   }
 
-  // Dosen menyalin teks jawabannya utuh: dicocokkan dengan daftar pilihannya.
+  // Pengajar menyalin teks jawabannya utuh: dicocokkan dengan daftar pilihannya.
   const cocok = pilihan.findIndex((p) => p.trim().toLowerCase() === isi.toLowerCase());
   if (cocok >= 0) return { ok: true, kunci: String(cocok) };
 
@@ -238,7 +238,7 @@ export function bacaKunci(
  * Rakit satu soal dari bagian-bagiannya, atau tolak dengan alasan.
  *
  * DIEKSPOR, dan itu disengaja: soal yang dibuat AI melewati gerbang yang
- * PERSIS SAMA dengan soal yang diunggah dosen dari Excel atau Word. Membuat
+ * PERSIS SAMA dengan soal yang diunggah pengajar dari Excel atau Word. Membuat
  * jalur pemeriksaan kedua khusus untuk AI berarti dua tempat yang harus sama
  * selamanya — dan yang kedua akan tertinggal pada perubahan berikutnya.
  */
@@ -306,7 +306,7 @@ export type Aoa = Array<Array<string | number | null | undefined>>;
 /**
  * Baca sheet soal.
  *
- * Kolomnya dicari dari NAMANYA, bukan dari urutannya. Dosen menyisipkan kolom
+ * Kolomnya dicari dari NAMANYA, bukan dari urutannya. Pengajar menyisipkan kolom
  * catatan sendiri, menggeser urutan, atau menghapus kolom yang tidak dipakai —
  * dan berkasnya tetap terbaca. Yang bergantung pada urutan kolom akan rusak
  * pada berkas kedua yang diunggah orang.
@@ -389,7 +389,7 @@ const POLA_JODOH = /^(.{2,120}?)\s*(?:=|->|=>)\s*(.{1,160})$/;
  * Apakah kunci ini berupa DAFTAR jawaban, bukan satu jawaban?
  *
  * Syaratnya sengaja ketat: harus ada pemisah, DAN setiap bagiannya harus satu
- * huruf pilihan. Tanpa syarat kedua, "KUNCI: Jakarta, Indonesia" — dosen yang
+ * huruf pilihan. Tanpa syarat kedua, "KUNCI: Jakarta, Indonesia" — pengajar yang
  * menyalin teks jawabannya utuh — ikut terbaca sebagai jawaban jamak lalu
  * ditolak. Tanpa syarat pertama, "KUNCI: BENAR" ikut terbaca begitu, dan
  * seluruh soal Benar/Salah pada template bawaan gugur.
@@ -406,7 +406,7 @@ function kunciBerdaftar(kunci: string): boolean {
 /**
  * Baca naskah soal dari Word.
  *
- * Bentuknya sengaja yang paling sering dipakai dosen sendiri: nomor, lalu
+ * Bentuknya sengaja yang paling sering dipakai pengajar sendiri: nomor, lalu
  * pilihan berhuruf, lalu baris "KUNCI: B". Tidak ada tabel dan tidak ada gaya
  * khusus yang harus dijaga — dan itu penting, karena berkas Word yang
  * bentuknya harus persis akan gagal pada dokumen kedua.
@@ -428,7 +428,7 @@ export function imporDariWord(mentah: string): HasilImpor {
 
   const tutup = () => {
     if (!kini) return;
-    // Jenisnya ditebak dari bentuk soalnya bila dosen tidak menuliskannya.
+    // Jenisnya ditebak dari bentuk soalnya bila pengajar tidak menuliskannya.
     // Adanya baris pasangan sudah cukup menjadi tanda penjodohan; menuntut
     // baris "JENIS: PENJODOHAN" hanya menambah satu hal lagi yang terlupa.
     const tebakan =

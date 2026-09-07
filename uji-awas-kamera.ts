@@ -76,7 +76,7 @@ benar("alasannya menyebut angkanya",
   p1.tindakan === "catat" ? p1.alasan : "");
 
 // Ruangan yang memang gelap TAPI masih bersebaran bukan lensa tertutup.
-// Mahasiswa yang mengerjakan malam hari dengan lampu mati tidak boleh dituduh
+// Peserta yang mengerjakan malam hari dengan lampu mati tidak boleh dituduh
 // menutup kameranya.
 const remang: CiriCuplikan = { terang: 14, ragam: 22, beda: 8 };
 sama("ruangan gelap tapi bersebaran: bukan lensa tertutup",
@@ -137,7 +137,7 @@ benar("tetapi ikut disebut pada insiden yang memang ada",
   (ponsel?.catatan ?? "").includes("perangkat lain"), ponsel?.catatan);
 
 // Catatan dari model adalah teks dari luar. Ia masuk ke basis data dan
-// ditampilkan di layar dosen, jadi panjangnya dibatasi.
+// ditampilkan di layar pengajar, jadi panjangnya dibatasi.
 const panjang = bacaanKeInsiden({
   orang: 2, tertutup: false, perangkatLain: false, catatan: "x".repeat(500),
 });

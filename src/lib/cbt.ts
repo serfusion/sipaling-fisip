@@ -1,19 +1,19 @@
 // ============================================================
 // CBT — ATURAN UJIAN, DI LUAR BASIS DATA
 //
-// Seluruh keputusan yang menentukan nasib nilai mahasiswa tinggal di sini:
+// Seluruh keputusan yang menentukan nasib nilai peserta tinggal di sini:
 // kapan ujian terbuka, soal mana yang keluar, dan berapa nilainya. Dipisahkan
 // dari route dan dari React supaya dapat diuji tanpa satu pun server hidup —
 // karena kesalahan di berkas ini tidak terlihat sampai sudah terlambat, ketika
-// nilai sudah keluar dan mahasiswanya sudah pulang.
+// nilai sudah keluar dan pesertanya sudah pulang.
 //
 // Dua aturan yang tidak boleh dilanggar oleh apa pun yang memanggil berkas ini:
 //
-//   1. WAKTU DIHITUNG DARI SERVER. Jam di peramban mahasiswa dapat diputar
+//   1. WAKTU DIHITUNG DARI SERVER. Jam di peramban peserta dapat diputar
 //      mundur; kalau batas waktunya dihitung di sana, ujian enam puluh menit
 //      dapat dikerjakan semalaman.
 //   2. KUNCI JAWABAN TIDAK PERNAH IKUT KE PERAMBAN sebelum ujiannya selesai.
-//      Yang dikirim ke mahasiswa hanya pertanyaan dan pilihannya.
+//      Yang dikirim ke peserta hanya pertanyaan dan pilihannya.
 // ============================================================
 
 /**
@@ -23,7 +23,7 @@
  * `Number.isInteger(Number(params.get("x")))` LOLOS untuk parameter yang tidak
  * dikirim sama sekali — dan itu pernah membuat daftar peserta monitoring tidak
  * pernah tampil: ketiadaan parameter "attempt" terbaca sebagai attempt nomor
- * nol, cabang rincian satu mahasiswa diambil, dan jawabannya selalu 404.
+ * nol, cabang rincian satu peserta diambil, dan jawabannya selalu 404.
  *
  * Satu fungsi supaya kesalahan yang sama tidak lahir lagi di route berikutnya.
  */
@@ -54,7 +54,7 @@ export const SEMUA_JENIS: JenisSoal[] = [
   "pg", "pg_kompleks", "penjodohan", "benar_salah", "isian", "essay",
 ];
 
-/** Soal yang dapat dinilai mesin. Essay selalu menunggu dosen. */
+/** Soal yang dapat dinilai mesin. Essay selalu menunggu pengajar. */
 export function otomatis(jenis: JenisSoal) {
   return jenis !== "essay";
 }
@@ -68,7 +68,7 @@ export function berpilihan(jenis: JenisSoal) {
  * Satu pasangan pada soal penjodohan.
  *
  * `kanan` adalah INDEKS ke dalam daftar pilihan, bukan teksnya. Menyimpan
- * teksnya akan membuat penilaian pecah begitu dosen membetulkan satu huruf di
+ * teksnya akan membuat penilaian pecah begitu pengajar membetulkan satu huruf di
  * kolom kanan — dan pecahnya diam-diam, sesudah ujian berlangsung.
  */
 export type Pasangan = { kiri: string; kanan: number };
@@ -111,7 +111,7 @@ export type Soal = {
   pembahasan: string;
 };
 
-/** Soal sebagaimana dikirim ke mahasiswa: TANPA kunci dan tanpa pembahasan. */
+/** Soal sebagaimana dikirim ke peserta: TANPA kunci dan tanpa pembahasan. */
 export type SoalTampil = {
   id: number;
   jenis: JenisSoal;
@@ -173,18 +173,18 @@ export function bolehMasuk(u: UjianWaktu, sekarang: Date = new Date()) {
 // atau jadwal yang digeser karena listrik padam. Yang tersimpan di basis data
 // hanyalah SATU baris ujian dengan satu jendela jam, jadi tanpa penanda
 // tambahan seluruh percobaan dari tahun ajaran lalu masih menempel pada ujian
-// yang sama — dan menghabiskan jatah mahasiswa pada pelaksanaan hari ini.
+// yang sama — dan menghabiskan jatah peserta pada pelaksanaan hari ini.
 //
-// Penandanya activatedAt. Ia disetel ulang ketika dosen membuka ujian yang
+// Penandanya activatedAt. Ia disetel ulang ketika pengajar membuka ujian yang
 // SEDANG TIDAK BERLANGSUNG, dan sengaja DIBIARKAN ketika ia hanya memperpanjang
 // jam ujian yang sedang berjalan. Perbedaan itu yang penting:
 //
 //   ujian sudah tutup, dijadwalkan ulang  -> pelaksanaan baru, jatah kembali
 //   ujian sedang berjalan, jamnya digeser -> pelaksanaan yang sama, jatah tetap
 //
-// Kalau yang kedua ikut dianggap baru, tiga puluh mahasiswa yang sudah
+// Kalau yang kedua ikut dianggap baru, tiga puluh peserta yang sudah
 // mengumpulkan pagi itu dapat masuk lagi dan mengerjakan ulang hanya karena
-// dosennya menambah sepuluh menit.
+// pengajarnya menambah sepuluh menit.
 // ============================================================
 
 /** Ujian, dilihat dari sisi "sejak kapan pelaksanaan yang sekarang berlaku". */
@@ -226,13 +226,13 @@ export function attemptPelaksanaanIni<T extends { startedAt: Date }>(
  * waktunya belum lewat.
  *
  * Dicari dari SELURUH riwayat, bukan dari pelaksanaan yang sekarang saja.
- * Mahasiswa yang sedang mengerjakan ketika dosennya menekan "Perbarui jadwal"
+ * Peserta yang sedang mengerjakan ketika pengajarnya menekan "Perbarui jadwal"
  * harus menemukan lembar yang sama beserta sisa waktunya; kalau ia disaring
  * lebih dulu, layarnya berganti menjadi ujian baru yang kosong dan jawaban
  * yang sudah ia ketik seolah hilang.
  *
  * Yang berstatus berjalan tetapi waktunya sudah habis TIDAK dihitung hidup.
- * Baris seperti itu tertinggal dari mahasiswa yang perambannya tertutup sebelum
+ * Baris seperti itu tertinggal dari peserta yang perambannya tertutup sebelum
  * sempat mengumpulkan, dan membukanya kembali berarti memberi tambahan waktu
  * kepada orang yang jam ujiannya sudah lewat.
  */
@@ -248,7 +248,7 @@ export function attemptHidup<T extends { status: string; deadlineAt: Date }>(
 /**
  * Kapan attempt ini harus berakhir.
  *
- * Yang lebih dulu antara "durasi sejak mulai" dan "jam tutup ujian". Mahasiswa
+ * Yang lebih dulu antara "durasi sejak mulai" dan "jam tutup ujian". Peserta
  * yang masuk sepuluh menit sebelum ujian ditutup tidak mendapat satu jam penuh;
  * dan yang masuk di awal tidak dipotong oleh jam tutup yang masih jauh.
  */
@@ -276,7 +276,7 @@ export function ejaWaktu(detik: number) {
 /**
  * Pengacak yang DAPAT DIULANG dari benihnya.
  *
- * Urutan soal harus tetap sama setiap kali halaman dimuat ulang: mahasiswa
+ * Urutan soal harus tetap sama setiap kali halaman dimuat ulang: peserta
  * yang jaringannya putus lalu kembali harus menemukan soal nomor 7 yang sama,
  * bukan soal lain. Karena itu urutannya diturunkan dari benih yang disimpan
  * bersama attempt-nya, bukan diacak ulang tiap permintaan.
@@ -310,7 +310,7 @@ export function benihBaru() {
 export type AturanAcak = { acakSoal: boolean; acakPilihan: boolean; jumlahSoal: number };
 
 /**
- * Susun paket soal untuk satu mahasiswa.
+ * Susun paket soal untuk satu peserta.
  *
  * Bank soal boleh jauh lebih banyak daripada yang dikerjakan; yang diambil
  * sejumlah `jumlahSoal`. Bila banknya lebih sedikit, yang ada dipakai semua —
@@ -333,7 +333,7 @@ export function susunPaket(bank: Soal[], aturan: AturanAcak, benih: number): Soa
       pilihan: petaPilihan.map((i) => soal.pilihan[i]),
       // Kolom kiri penjodohan TIDAK ikut diacak bersama kolom kanan. Yang
       // diacak hanya jawabannya; pertanyaannya tetap berurutan supaya
-      // mahasiswa dapat menyebut "nomor 3" dan pengawas tahu yang mana.
+      // peserta dapat menyebut "nomor 3" dan pengawas tahu yang mana.
       kiri: soal.jenis === "penjodohan" ? soal.pasangan.map((p) => p.kiri) : [],
       media: soal.media,
       bobot: soal.bobot,
@@ -374,7 +374,7 @@ export function uraiKunciJamak(kunci: string): Set<number> {
  * Bentuknya JSON objek "indeks kiri" → "indeks kanan yang dipilih", mis.
  * {"0":2,"1":0}. Jawaban yang rusak diperlakukan sebagai belum dijawab, bukan
  * sebagai galat: yang rusak biasanya jaringan, dan yang menanggungnya jangan
- * sampai mahasiswa.
+ * sampai peserta.
  */
 export function uraiJodoh(jawaban: string): Map<number, number> {
   const hasil = new Map<number, number>();
@@ -415,11 +415,11 @@ export type HasilSatuSoal = { benar: boolean | null; poin: number };
  * Nilai satu jawaban.
  *
  * `benar: null` berarti belum dapat dinilai mesin — essay, yang menunggu
- * dosen. Ia dibedakan dari `false` dengan sengaja: essay yang belum dikoreksi
+ * pengajar. Ia dibedakan dari `false` dengan sengaja: essay yang belum dikoreksi
  * bukan jawaban yang salah, dan menghitungnya sebagai salah membuat nilai
- * sementara mahasiswa terlihat jauh lebih rendah daripada yang sebenarnya.
+ * sementara peserta terlihat jauh lebih rendah daripada yang sebenarnya.
  *
- * `petaPilihan` diperlukan karena pilihan yang dilihat mahasiswa sudah diacak:
+ * `petaPilihan` diperlukan karena pilihan yang dilihat peserta sudah diacak:
  * yang ia pilih nomor 2 pada layarnya bisa jadi pilihan nomor 4 pada banknya.
  */
 export function nilaiJawaban(soal: Soal, jawaban: string, petaPilihan?: number[]): HasilSatuSoal {
@@ -427,7 +427,7 @@ export function nilaiJawaban(soal: Soal, jawaban: string, petaPilihan?: number[]
   if (soal.jenis === "essay") return { benar: null, poin: 0 };
   if (!isi) return { benar: false, poin: 0 };
 
-  // Nomor pilihan yang dilihat mahasiswa dikembalikan ke nomor pada banknya.
+  // Nomor pilihan yang dilihat peserta dikembalikan ke nomor pada banknya.
   const keAsli = (tampil: number) =>
     petaPilihan && petaPilihan.length > tampil && tampil >= 0 ? petaPilihan[tampil] : tampil;
 
@@ -497,12 +497,12 @@ export type RingkasNilai = {
   benar: number;
   salah: number;
   kosong: number;
-  /** Essay yang menunggu dosen. */
+  /** Essay yang menunggu pengajar. */
   tertunda: number;
   /**
    * Dijawab sebagian benar — hanya mungkin pada PG kompleks dan penjodohan.
    *
-   * Dihitung terpisah karena memasukkannya ke "salah" membuat mahasiswa yang
+   * Dihitung terpisah karena memasukkannya ke "salah" membuat peserta yang
    * benar tiga dari empat pasangan terbaca gagal total pada laporan, padahal
    * nilainya sudah menghitungnya dengan benar.
    */
@@ -569,7 +569,7 @@ export function hitungNilai(
   return { nilai, benar, salah, kosong, tertunda, sebagian, poin, poinMaks, lulus: nilai >= passing };
 }
 
-// ---------- IDENTITAS MAHASISWA ----------
+// ---------- IDENTITAS PESERTA ----------
 
 export function rapikanNim(masukan: unknown) {
   return String(masukan ?? "").replace(/\D/g, "").slice(0, 20);
@@ -588,9 +588,9 @@ export function rapikanToken(masukan: unknown) {
  *
  * "Budi  Santoso", "budi santoso", dan "BUDI SANTOSO." adalah satu orang.
  * Gelar dan tanda baca dibuang; yang tersisa hanya huruf dan satu spasi
- * pemisah. Ini BUKAN pengenal yang aman dipakai sendirian — dua mahasiswa
+ * pemisah. Ini BUKAN pengenal yang aman dipakai sendirian — dua peserta
  * boleh saja benar-benar bernama sama — melainkan penanda yang membuat
- * pendaftaran kedua dengan NIM berbeda tertahan untuk diperiksa manusia.
+ * pendaftaran kedua dengan nomor berbeda tertahan untuk diperiksa manusia.
  */
 export function kunciNama(masukan: unknown) {
   return String(masukan ?? "")
@@ -603,7 +603,7 @@ export function kunciNama(masukan: unknown) {
 }
 
 /**
- * Penanda perangkat dari peramban mahasiswa.
+ * Penanda perangkat dari peramban peserta.
  *
  * Dibersihkan keras, karena nilainya datang dari luar dan langsung masuk ke
  * basis data: hanya huruf, angka, dan tanda hubung, paling panjang 64.
@@ -626,12 +626,12 @@ export type HasilGanda = { ok: true } | { ok: false; pesan: string };
 /**
  * Satu orang, satu kali — diperiksa dari tiga sisi.
  *
- * NIM saja tidak cukup. Yang benar-benar terjadi di ruang ujian adalah dua hal
- * lain: satu orang mendaftar ulang dengan NIM yang digeser satu angka, dan satu
+ * Nomor peserta saja tidak cukup. Yang benar-benar terjadi di ruang ujian ada
+ * dua: satu orang mendaftar ulang dengan nomor yang digeser satu angka, dan satu
  * ponsel dipakai bergantian oleh dua orang yang duduk bersebelahan. Karena itu
  * nama dan perangkat ikut diperiksa.
  *
- * Yang TIDAK diperiksa di sini adalah baris milik NIM yang sama — orang yang
+ * Yang TIDAK diperiksa di sini adalah baris milik nomor yang sama — orang yang
  * kembali ke ujiannya sendiri sesudah ponselnya mati bukan peserta kedua, dan
  * jalur itu ditangani pemanggilnya sebelum fungsi ini dipakai.
  *
@@ -652,8 +652,8 @@ export function periksaGanda(
       return {
         ok: false,
         pesan:
-          `Nama ini sudah terdaftar pada ujian tersebut dengan NIM ${kembar.nim}. ` +
-          "Bila NIM Anda salah ketik, hubungi pengawas.",
+          `Nama ini sudah terdaftar pada ujian tersebut dengan nomor ${kembar.nim}. ` +
+          "Bila nomor peserta Anda salah ketik, hubungi pengawas.",
       };
     }
   }
@@ -676,11 +676,11 @@ export function periksaGanda(
 export type HasilMasuk = { ok: true; nim: string; nama: string } | { ok: false; pesan: string };
 
 /**
- * Periksa identitas mahasiswa yang hendak masuk.
+ * Periksa identitas peserta yang hendak masuk.
  *
  * Tanpa akun, inilah satu-satunya gerbang. Ia sengaja longgar pada hal yang
  * tidak penting (huruf besar-kecil, spasi berlebih) dan ketat pada yang
- * penting (NIM harus angka, token harus persis), karena mahasiswa mengetiknya
+ * penting (nomornya harus angka, token harus persis), karena peserta mengetiknya
  * sambil gugup lima menit sebelum ujian dimulai.
  */
 export function periksaMasuk(
@@ -691,9 +691,9 @@ export function periksaMasuk(
   if (nama.length < 3) return { ok: false, pesan: "Nama lengkap belum diisi." };
 
   const nim = rapikanNim(masukan.nim);
-  if (!nim) return { ok: false, pesan: "NIM belum diisi." };
+  if (!nim) return { ok: false, pesan: "Nomor peserta belum diisi." };
   if (nim.length < ujian.nimMin) {
-    return { ok: false, pesan: `NIM sepertinya kurang lengkap, minimal ${ujian.nimMin} angka.` };
+    return { ok: false, pesan: `Nomor peserta sepertinya kurang lengkap, minimal ${ujian.nimMin} angka.` };
   }
 
   if (ujian.token) {
@@ -827,8 +827,8 @@ export type Kepemilikan = {
  * Ujian ini miliknya sendiri?
  *
  * Kepemilikan ditentukan id profil pembuatnya. Semula ia dilihat dari
- * lecturerId saja, dan itu mengunci dosen yang akun profilnya belum
- * tersambung ke baris dosen: ia membuat ujian, lalu tidak pernah dapat
+ * lecturerId saja, dan itu mengunci pengajar yang akun profilnya belum
+ * tersambung ke baris pengajar: ia membuat ujian, lalu tidak pernah dapat
  * membukanya lagi karena lecturerId-nya null di kedua sisi.
  *
  * Nama pembuat dipakai sebagai cadangan HANYA untuk baris lama yang lahir
@@ -838,9 +838,9 @@ export type Kepemilikan = {
 export function pemilik(profile: Pemakai, ujian: Kepemilikan) {
   if (ujian.createdById) return ujian.createdById === profile.id;
 
-  // Mulai di sini semuanya soal baris lama. Baris dosen dipakai HANYA bila
+  // Mulai di sini semuanya soal baris lama. Baris pengajar dipakai HANYA bila
   // kedua sisi memilikinya; ujian lama yang lecturerId-nya kosong — dibuat
-  // ketika akun dosennya belum tersambung — jatuh ke pencocokan nama, supaya
+  // ketika akun pengajarnya belum tersambung — jatuh ke pencocokan nama, supaya
   // penyambungan yang datang belakangan tidak merampas ujiannya sendiri.
   if (profile.role === "dosen" && profile.lecturerId !== null && ujian.lecturerId !== null) {
     return ujian.lecturerId === profile.lecturerId;
@@ -862,9 +862,9 @@ export function bolehPantau(profile: Pemakai, ujian: Kepemilikan) {
  * Boleh MENGUBAH ujian ini — soal, jadwal, aktivasi.
  *
  * Hanya pemiliknya. Permintaan pemilik portal tegas: "admin dan super admin
- * tidak berhak mengaktifkan dan non aktifkan, hanya dosen saja". Admin yang
+ * tidak berhak mengaktifkan dan non aktifkan, hanya pengajar saja". Admin yang
  * ingin mengadakan ujian seleksi membuatnya sendiri — dan ujian itu miliknya,
- * jadi jalur ini tetap terbuka baginya tanpa menyentuh kelas dosen lain.
+ * jadi jalur ini tetap terbuka baginya tanpa menyentuh kelas pengajar lain.
  */
 export function bolehUbah(profile: Pemakai, ujian: Kepemilikan) {
   return pemilik(profile, ujian);
@@ -878,13 +878,13 @@ export function bolehHapus(profile: Pemakai, ujian: Kepemilikan) {
 /**
  * Boleh menyalakan atau mematikan KAMERA PENGAWAS.
  *
- * Admin dan Super Admin saja — TIDAK termasuk dosen pemilik ujiannya, dan
+ * Admin dan Super Admin saja — TIDAK termasuk pengajar pemilik ujiannya, dan
  * itulah satu-satunya wewenang di berkas ini yang justru menjauh dari pemilik.
  *
  * Alasannya berbeda dari wewenang yang lain. Yang lain soal siapa yang tahu
  * kelasnya; yang ini soal merekam wajah orang. Menyalakan kamera pada ujian
- * adalah keputusan lembaga, bukan keputusan satu dosen atas kelasnya sendiri —
- * yang menanggung akibatnya bila keliru adalah fakultas, bukan dosen itu.
+ * adalah keputusan lembaga, bukan keputusan satu pengajar atas kelasnya sendiri —
+ * yang menanggung akibatnya bila keliru adalah lembaganya, bukan pengajar itu.
  * Karena itu ia dipegang pihak yang sama yang memegang kebijakan portal.
  *
  * Admin bagian — umum, akademik, prodi, PDDIKTI, perpustakaan, laboratorium —

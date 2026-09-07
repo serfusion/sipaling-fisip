@@ -2,7 +2,7 @@
 //
 // Yang diuji di sini satu keluhan yang benar-benar datang dari lapangan:
 // ujian sudah pernah dibuka dan ditutup, jam dan tanggalnya diperbarui supaya
-// dapat dibuka lagi, tetapi mahasiswanya tetap tidak bisa masuk.
+// dapat dibuka lagi, tetapi pesertanya tetap tidak bisa masuk.
 //
 // Sebabnya jatah percobaan. "Satu orang satu kali" itu benar untuk satu kali
 // pelaksanaan, dan salah kalau dihitung seumur hidup ujiannya — ujian susulan
@@ -11,8 +11,8 @@
 // Dua sisi yang harus lulus bersama-sama, karena memperbaiki satu sisi saja
 // justru merusak sisi lain:
 //
-//   - dijadwalkan ulang sesudah tutup  -> jatah kembali, mahasiswa dapat masuk
-//   - jam digeser saat sedang berjalan -> jatah TETAP terpakai, dan mahasiswa
+//   - dijadwalkan ulang sesudah tutup  -> jatah kembali, peserta dapat masuk
+//   - jam digeser saat sedang berjalan -> jatah TETAP terpakai, dan peserta
 //     yang sedang mengerjakan tidak kehilangan lembarnya
 
 import {
@@ -55,8 +55,8 @@ sama("sudah diaktifkan memakai jam aktivasinya",
 
 console.log("=== KELUHANNYA: SUDAH DIBUKA, DITUTUP, LALU DIBUKA LAGI ===\n");
 
-// Pelaksanaan pertama. Dosen mengaktifkan pukul 07.30, ujian 09.00-11.00,
-// durasi 60 menit. Satu mahasiswa masuk 09.15 dan mengumpulkan.
+// Pelaksanaan pertama. Pengajar mengaktifkan pukul 07.30, ujian 09.00-11.00,
+// durasi 60 menit. Satu peserta masuk 09.15 dan mengumpulkan.
 const aktivasi1 = h1("07:30");
 const riwayat: Baris[] = [attempt(1, h1("09:15"), 60, "selesai", 1)];
 
@@ -64,7 +64,7 @@ const sesi1 = attemptPelaksanaanIni(riwayat, { activatedAt: aktivasi1 });
 sama("pelaksanaan pertama: percobaannya terhitung", sesi1.length, 1);
 benar("jatah 1 habis pada pelaksanaan pertama", sesi1.length >= 1);
 
-// Sepekan kemudian dosen membuka ujian susulan. Ia menekan "Perbarui jadwal"
+// Sepekan kemudian pengajar membuka ujian susulan. Ia menekan "Perbarui jadwal"
 // pukul 07.30 tanggal 12, dan menyetel jendelanya 08.00-15.00 — SENGAJA
 // dimulai lebih pagi daripada percobaan lama pukul 09.15, karena begitulah
 // cara membuat ujian langsung terbuka hari itu.
@@ -78,10 +78,10 @@ sama("maka ini pelaksanaan baru", pelaksanaanBaru(statusSaatDiperbarui), true);
 const aktivasi2 = h2("07:30");
 const sesi2 = attemptPelaksanaanIni(riwayat, { activatedAt: aktivasi2 });
 sama("percobaan pekan lalu tidak ikut menghabiskan jatah", sesi2.length, 0);
-benar("mahasiswa yang sama boleh masuk lagi", sesi2.length < 1 + 0 + 1);
+benar("peserta yang sama boleh masuk lagi", sesi2.length < 1 + 0 + 1);
 
 // Batas yang lama — jam MULAI ujian — tidak menyelesaikan keluhan ini, karena
-// dosen justru menyetel jam mulai lebih pagi supaya ujiannya langsung terbuka.
+// pengajar justru menyetel jam mulai lebih pagi supaya ujiannya langsung terbuka.
 const batasJamMulai = h2("08:00");
 sama("batas jam mulai masih menahan percobaan lama? tidak, tanggalnya beda",
   riwayat.filter((a) => a.startedAt.getTime() >= batasJamMulai.getTime()).length, 0);
@@ -96,8 +96,8 @@ sama("batas aktivasi: dibuka ulang sore harinya, jatah kembali",
 
 console.log("=== SISI SEBALIKNYA: JAM DIGESER SAAT UJIAN BERJALAN ===\n");
 
-// Pukul 10.00, ujian sedang berlangsung. Dua puluh mahasiswa sudah
-// mengumpulkan, satu masih mengerjakan. Dosen menambah waktu tutup.
+// Pukul 10.00, ujian sedang berlangsung. Dua puluh peserta sudah
+// mengumpulkan, satu masih mengerjakan. Pengajar menambah waktu tutup.
 const sedangJalan: Baris[] = [
   attempt(1, h1("09:05"), 60, "selesai", 1),
   attempt(2, h1("09:07"), 60, "selesai", 1),
@@ -122,7 +122,7 @@ sama("lembar yang sedang dikerjakan tetap ditemukan", hidup?.id, 3);
 
 console.log("=== PERCOBAAN BASI TIDAK IKUT DIHIDUPKAN ===\n");
 
-// Mahasiswa yang perambannya tertutup dan tidak pernah kembali meninggalkan
+// Peserta yang perambannya tertutup dan tidak pernah kembali meninggalkan
 // baris "berjalan" selamanya. Waktunya sudah lewat; membukanya lagi berarti
 // memberi tambahan waktu kepada orang yang jam ujiannya sudah habis.
 const basi: Baris[] = [attempt(9, h1("09:00"), 60, "berjalan", 1)];
@@ -148,7 +148,7 @@ console.log("=== NOMOR PERCOBAAN TIDAK BOLEH DIULANG ===\n");
 
 // Indeks unik (ujian, nim, nomor) menolak nomor yang sudah terpakai. Nomor
 // baru karena itu dihitung dari SELURUH riwayat, bukan dari pelaksanaan ini
-// saja — kalau tidak, mahasiswa yang masuk pada ujian susulan menabrak baris
+// saja — kalau tidak, peserta yang masuk pada ujian susulan menabrak baris
 // pekan lalu tepat ketika ia menekan "Mulai Ujian".
 const nomorBaru = (r: Baris[]) => r.reduce((n, a) => Math.max(n, a.attemptNo), 0) + 1;
 sama("pelaksanaan pertama mulai dari 1", nomorBaru([]), 1);

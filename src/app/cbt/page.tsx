@@ -5,14 +5,14 @@ import MasukCbt from "./masuk-cbt";
 
 export const metadata: Metadata = {
   title: "Masuk · SiPaling CBT",
-  description: "Pilih masuk sebagai mahasiswa dengan kode ujian, atau sebagai dosen dan admin.",
+  description: "Pilih masuk sebagai peserta dengan kode ujian, atau sebagai pengajar dan admin.",
 };
 
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
   // Tautan yang keluar dari situs CBT — ke beranda portal dan ke halaman
-  // masuk dosen — harus membawa tuan rumah portal secara lengkap, sebab di
+  // masuk pengajar — harus membawa tuan rumah portal secara lengkap, sebab di
   // subdomain ini "/" berarti pintu masuk ujian, bukan beranda portal.
   //
   // Tuan rumahnya dibaca DI SERVER dan diturunkan sebagai properti. Kalau
