@@ -6,6 +6,13 @@
 // ujian SMA dan "NIM" pada uji kompetensi profesi adalah kekeliruan yang
 // terlihat semua orang di ruangan, dan yang menemukannya bukan pengembangnya.
 //
+// ATURANNYA BUKAN "JANGAN PERNAH DIPAKAI", melainkan "JANGAN DIPAKAI
+// SENDIRIAN". Label yang berpasangan — "Mahasiswa / Peserta", "NIM / Nomor
+// Peserta" — justru yang paling terbaca: pemakai dari kampus mengenali kata
+// pertama, pemakai dari sekolah dan lembaga sertifikasi mengenali kata kedua,
+// dan tidak seorang pun harus menebak. Yang dilarang kata kampusnya berdiri
+// sendiri, karena di situlah pembaca yang bukan dari kampus tertinggal.
+//
 // Penjaga ini membaca BERKAS SUMBERNYA, bukan keluarannya, dengan sengaja.
 // Yang paling mungkin mengembalikan kata-kata itu bukan seseorang yang
 // mengetiknya lagi dengan sadar, melainkan blok yang disalin dari bagian lain
@@ -60,11 +67,20 @@ const KECUALI = [
   "NOMOR PESERTA",  // hasil penggantian sebelumnya, huruf besar
 ];
 
-const TERLARANG: Array<{ kata: RegExp; sebut: string; kenapa: string }> = [
-  { kata: /\bmahasiswa\b/i, sebut: "mahasiswa", kenapa: "sekolah dan lembaga sertifikasi memakai CBT ini juga" },
-  { kata: /\bdosen\b/i, sebut: "dosen", kenapa: "pengajar tidak selalu dosen" },
-  { kata: /\bNIM\b/, sebut: "NIM", kenapa: "nomor induk mahasiswa hanya ada di perguruan tinggi" },
-  { kata: /\bmata kuliah\b/i, sebut: "mata kuliah", kenapa: "yang diuji tidak selalu mata kuliah" },
+/**
+ * `pasangan` adalah bentuk berlabel ganda yang MEMANG boleh dipakai. Bila
+ * barisnya memuat bentuk itu, kata kampusnya sedang dipasangkan dan tidak
+ * dianggap pelanggaran; tanpa `pasangan`, kata itu terlarang di mana pun.
+ */
+const TERLARANG: Array<{ kata: RegExp; sebut: string; kenapa: string; pasangan?: RegExp }> = [
+  { kata: /\bmahasiswa\b/i, sebut: "mahasiswa", kenapa: "sekolah dan lembaga sertifikasi memakai CBT ini juga",
+    pasangan: /Mahasiswa\s*\/\s*Peserta/i },
+  { kata: /\bdosen\b/i, sebut: "dosen", kenapa: "pengajar tidak selalu dosen",
+    pasangan: /Dosen\s*\/\s*Pengajar/i },
+  { kata: /\bNIM\b/, sebut: "NIM", kenapa: "nomor induk mahasiswa hanya ada di perguruan tinggi",
+    pasangan: /NIM\s*\/\s*(Nomor Peserta|No\.)/i },
+  { kata: /\bmata kuliah\b/i, sebut: "mata kuliah", kenapa: "yang diuji tidak selalu mata kuliah",
+    pasangan: /Mata Kuliah\s*\/\s*Materi/i },
   { kata: /\bsiswa\b/i, sebut: "siswa", kenapa: "menandai jenjang sekolah, sama terikatnya" },
   { kata: /\bguru\b/i, sebut: "guru", kenapa: "sama terikatnya, arah sebaliknya" },
   { kata: /\bFISIP\b/i, sebut: "FISIP", kenapa: "nama satu fakultas" },
@@ -76,7 +92,8 @@ for (const nama of berkas) {
   const baris = readFileSync(nama, "utf8").split("\n");
   baris.forEach((isi, i) => {
     if (KECUALI.some((k) => isi.includes(k))) return;
-    for (const { kata, sebut, kenapa } of TERLARANG) {
+    for (const { kata, sebut, kenapa, pasangan } of TERLARANG) {
+      if (pasangan && pasangan.test(isi)) continue;
       if (kata.test(isi)) {
         temuan += 1;
         gagal.push(`${nama}:${i + 1} memakai "${sebut}" (${kenapa}) — ${isi.trim().slice(0, 90)}`);
@@ -94,6 +111,25 @@ benar("penjaganya menangkap baris yang memang salah",
   TERLARANG.some((t) => t.kata.test(contohBuruk)));
 benar("dan tidak menangkap nama medan `nim`",
   KECUALI.some((k) => "  nim: cbtAttempts.nim,".includes(k)));
+
+// Label berpasangan harus LOLOS. Penjaga yang ikut menolaknya akan memaksa
+// orang membuang justru bentuk yang paling terbaca kedua belah pihak.
+const contohBaik = [
+  '<label htmlFor="uj-nim">NIM / Nomor Peserta</label>',
+  "<span>Mata Kuliah / Materi *</span>",
+  "Mahasiswa / Peserta",
+  "Dosen / Pengajar",
+];
+for (const baris of contohBaik) {
+  const kena = TERLARANG.filter((t) => !(t.pasangan && t.pasangan.test(baris)) && t.kata.test(baris));
+  benar(`label berpasangan lolos: ${baris.slice(0, 40)}`, kena.length === 0,
+    kena.map((k) => k.sebut).join(", "));
+}
+// Tetapi kata kampusnya yang BERDIRI SENDIRI tetap tertangkap.
+for (const baris of ["<label>NIM</label>", "<span>Mata kuliah *</span>", ">Mahasiswa<"]) {
+  const kena = TERLARANG.filter((t) => !(t.pasangan && t.pasangan.test(baris)) && t.kata.test(baris));
+  benar(`yang berdiri sendiri tetap ditolak: ${baris}`, kena.length > 0);
+}
 
 console.log(`\n${lulus} periksa lulus atas ${berkas.length} berkas CBT`);
 if (gagal.length > 0) {

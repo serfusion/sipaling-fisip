@@ -213,23 +213,59 @@ bagian("Tidak terikat satu lembaga");
 // mana pun yang tertanam di dalam kodenya akan ikut tercetak pada naskah soal
 // dan berita acara orang lain — dokumen yang ditandatangani, dan yang paling
 // tidak boleh membawa nama yang salah.
+// KELIMA bentuk berkasnya, bukan dua. Naskah peserta dan naskah pengawas
+// berbeda isinya — blok "Nama / NIM / Tanda Tangan" hanya tercetak pada yang
+// TANPA kunci — dan tabel pelanggaran berita acara hanya muncul bila memang
+// ada yang melanggar. Menguji sebagiannya saja membuat penjaga di bawah lulus
+// tanpa pernah melihat baris yang justru paling perlu dijaga.
 const semuaBerkas = [
+  naskahSoalHtml(ujian, soal),
   naskahSoalHtml(ujian, soal, { denganKunci: true }),
   beritaAcaraHtml(ujian, {
     pengawas: "Dr. Ayu", ruang: "Daring", hadir: 1, terdaftar: 1, selesai: 1,
     berjalan: 0, pelanggaran: 0, catatan: "",
     peserta: [{ nim: "1", nama: "A", status: "selesai", pindahTab: 0, keluarFullscreen: 0 }],
   }),
+  beritaAcaraHtml(ujian, {
+    pengawas: "Dr. Ayu", ruang: "Daring", hadir: 1, terdaftar: 1, selesai: 1,
+    berjalan: 0, pelanggaran: 1, catatan: "",
+    peserta: [{ nim: "2", nama: "B", status: "selesai", pindahTab: 4, keluarFullscreen: 1, integritas: 60 }],
+  }),
+  laporanPesertaHtml(ujian, {
+    nim: "3", nama: "C", nilai: 80, benar: 4, salah: 1, kosong: 0, tertunda: 0,
+    mulai: "2026-09-10T02:00:00.000Z", kumpul: "2026-09-10T03:00:00.000Z",
+    pindahTab: 0, keluarFullscreen: 0,
+  }, [], 60),
 ].join("\n");
 for (const jenama of ["FISIP", "Fakultas Ilmu Sosial", "ILMU POLITIK", "SiPaling FISIP"]) {
   cek(`tidak menyebut "${jenama}"`, !semuaBerkas.toUpperCase().includes(jenama.toUpperCase()));
 }
-// Kosakata perguruan tinggi ikut dijaga. Berkas cetak ini dipakai sekolah dan
-// lembaga sertifikasi juga, dan "Mahasiswa" pada lembar ujian SMA adalah
-// kekeliruan yang terlihat semua orang di ruangan.
-for (const kata of ["Mahasiswa", "NOMOR PESERTA", "Dosen", "Mata uji"]) {
-  cek(`tidak memakai kata "${kata}"`, !semuaBerkas.includes(kata));
+// Kosakata perguruan tinggi ikut dijaga, tetapi aturannya BUKAN "jangan pernah
+// dipakai" melainkan "jangan dipakai sendirian". Label berpasangan justru yang
+// paling terbaca: yang dari kampus mengenali kata pertama, yang dari sekolah
+// dan lembaga sertifikasi mengenali kata kedua. Yang berbahaya kata kampusnya
+// berdiri sendiri — di situlah pembaca yang bukan dari kampus tertinggal, dan
+// berkas ini dokumen yang ditandatangani orang.
+//
+// Daftar kata di bawah pernah ikut tersapu penggantian kosakata dan berhenti
+// menjaga apa pun tanpa satu uji pun gagal. Karena itu ada pemeriksaan
+// terakhir di bawahnya: kalau bentuk berpasangannya TIDAK ada sama sekali di
+// berkas cetak, penjaganya sendiri yang sedang rusak.
+const PASANGAN: Array<[string, RegExp]> = [
+  ["Mahasiswa", /Mahasiswa\s*\/\s*Peserta/],
+  ["NIM", /NIM\s*\/\s*(Nomor Peserta|No\.)/],
+  ["Dosen", /Dosen\s*\/\s*Pengajar/],
+  ["Mata Kuliah", /Mata Kuliah\s*\/\s*Materi/],
+];
+for (const [kata, pasangan] of PASANGAN) {
+  const munculan = semuaBerkas.split(kata).length - 1;
+  const berpasangan = (semuaBerkas.match(new RegExp(pasangan.source, "g")) || []).length;
+  cek(`"${kata}" tidak pernah berdiri sendiri`, munculan === berpasangan,
+    `${munculan} kali muncul, ${berpasangan} di antaranya berpasangan`);
 }
+cek("penjaganya sendiri masih hidup: label berpasangan memang ada di berkas cetak",
+  /NIM\s*\/\s*(Nomor Peserta|No\.)/.test(semuaBerkas)
+  && /Mata Kuliah\s*\/\s*Materi/.test(semuaBerkas));
 // Yang menggantikannya bukan kekosongan: kop tetap menyebut mata ujinya,
 // sehingga berkasnya tetap dapat dikenali milik ujian yang mana.
 cek("kop menyebut mata ujinya", semuaBerkas.includes("Komunikasi Politik"));

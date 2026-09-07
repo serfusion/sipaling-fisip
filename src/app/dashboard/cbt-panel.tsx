@@ -1543,7 +1543,7 @@ export default function CbtPanel({ role }: { role: string }) {
   function unduhNilai() {
     if (!terbuka || peserta.length === 0) return;
     const baris = [
-      ["Nomor Peserta", "Nama", "Nilai", "Benar", "Status", "Mulai", "Kumpul"].join(","),
+      ["NIM / Nomor Peserta", "Nama", "Nilai", "Benar", "Status", "Mulai", "Kumpul"].join(","),
       ...peserta.map((p) =>
         [
           p.nim,
@@ -1597,7 +1597,7 @@ export default function CbtPanel({ role }: { role: string }) {
               <label><span>Nama ujian *</span>
                 <input value={draf.title} onChange={(e) => setDraf({ ...draf, title: e.target.value })} placeholder="UTS Komunikasi Politik" />
               </label>
-              <label><span>Mata uji *</span>
+              <label><span>Mata Kuliah / Materi *</span>
                 <input value={draf.courseName} onChange={(e) => setDraf({ ...draf, courseName: e.target.value })} placeholder="mis. Matematika, K3, Bahasa Inggris" />
               </label>
               <label><span>Kelas</span>
@@ -1880,7 +1880,7 @@ export default function CbtPanel({ role }: { role: string }) {
                 <label><span>Nama ujian *</span>
                   <input value={setel.title} onChange={(e) => setSetel({ ...setel, title: e.target.value })} />
                 </label>
-                <label><span>Mata uji *</span>
+                <label><span>Mata Kuliah / Materi *</span>
                   <input value={setel.courseName} onChange={(e) => setSetel({ ...setel, courseName: e.target.value })} />
                 </label>
                 <label><span>Kelas</span>
@@ -2577,7 +2577,7 @@ export default function CbtPanel({ role }: { role: string }) {
               <div className="qtable-wrap">
                 <table className="qt">
                   <thead>
-                    <tr><th>Peserta</th><th>Status</th><th>Progres</th><th>Sisa waktu</th><th>Nilai</th><th>Integritas</th><th /></tr>
+                    <tr><th>Mahasiswa / Peserta</th><th>Status</th><th>Progres</th><th>Sisa waktu</th><th>Nilai</th><th>Integritas</th><th /></tr>
                   </thead>
                   <tbody>
                     {peserta.map((p) => (

@@ -92,14 +92,14 @@ export default function MasukCbt({ portal = "" }: { portal?: string }) {
               className={pintu === "peserta" ? "on" : ""}
               onClick={() => { setPintu("peserta"); setGalat(""); }}
             >
-              Peserta
+              Mahasiswa / Peserta
             </button>
             <button
               type="button" role="tab" aria-selected={pintu === "pengajar"}
               className={pintu === "pengajar" ? "on" : ""}
               onClick={() => { setPintu("pengajar"); setGalat(""); }}
             >
-              Pengajar / Admin
+              Dosen / Pengajar
             </button>
           </div>
 
@@ -128,7 +128,7 @@ export default function MasukCbt({ portal = "" }: { portal?: string }) {
           ) : (
             <>
               <p className="cbtd-bantu">
-                Pengajar dan admin memakai akun portal yang sama dengan layanan akademik. Menu CBT ada
+                Pengajar dan admin memakai akun portal yang sama. Menu CBT ada
                 di dalam dashboard, pada bagian Ujian Online.
               </p>
               <a href={`${portal}/login`} className="cbtd-btn cbtd-btn-tautan">

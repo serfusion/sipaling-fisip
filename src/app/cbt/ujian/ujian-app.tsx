@@ -744,8 +744,8 @@ export default function UjianApp() {
               <label htmlFor="uj-nama">Nama Lengkap</label>
               <input id="uj-nama" className="uj-input" value={nama} onChange={(e) => setNama(e.target.value)} placeholder="Nama sesuai daftar hadir" autoComplete="name" />
 
-              <label htmlFor="uj-nim">Nomor Peserta</label>
-              <input id="uj-nim" className="uj-input" value={nim} onChange={(e) => setNim(e.target.value.replace(/\D/g, ""))} placeholder="Nomor induk peserta" inputMode="numeric" autoComplete="off" />
+              <label htmlFor="uj-nim">NIM / Nomor Peserta</label>
+              <input id="uj-nim" className="uj-input" value={nim} onChange={(e) => setNim(e.target.value.replace(/\D/g, ""))} placeholder="Nomor induk atau nomor peserta" inputMode="numeric" autoComplete="off" />
 
               {ujian.pakaiToken && (
                 <>

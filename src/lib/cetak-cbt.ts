@@ -228,7 +228,7 @@ export function naskahSoalHtml(
   const isi = `
 ${kop(ujian, denganKunci ? "NASKAH SOAL DAN KUNCI JAWABAN" : "NASKAH SOAL UJIAN")}
 ${barisKeterangan([
-  ["Mata Uji", ujian.mataKuliah],
+  ["Mata Kuliah / Materi", ujian.mataKuliah],
   ["Nama Ujian", ujian.judul],
   ["Kelas", ujian.kelas || "-"],
   ["Waktu", `${ujian.durasi} menit`],
@@ -242,7 +242,7 @@ ${denganKunci ? '<div class="petunjuk"><b>BERKAS PENGAWAS: JANGAN DIBAGIKAN KE P
   Tulis nama dan nomor peserta pada lembar jawaban. Kerjakan dengan pulpen. Naskah ini adalah
   cadangan tercetak; bila ujian daring dapat dilanjutkan, ikuti arahan pengawas.
 </div>
-${!denganKunci ? barisKeterangan([["Nama", "……………………………………………"], ["Nomor Peserta", "……………………………………………"], ["Tanda Tangan", "……………………………………………"]]) : ""}
+${!denganKunci ? barisKeterangan([["Nama", "……………………………………………"], ["NIM / Nomor Peserta", "……………………………………………"], ["Tanda Tangan", "……………………………………………"]]) : ""}
 <ol class="soal">${daftar}</ol>
 <div class="kaki">Kode ujian ${lolos(ujian.kode)} · dicetak ${tanggalPanjang(new Date().toISOString())}</div>`;
 
@@ -297,7 +297,7 @@ export function beritaAcaraHtml(ujian: UjianCetak, acara: BeritaAcara): string {
   const daftarLanggar = urut.length === 0
     ? "<p>Tidak ada pelanggaran yang tercatat sistem selama ujian berlangsung.</p>"
     : `<table class="nilai">
-        <tr><th>No. Peserta</th><th>Nama</th><th>Integritas</th><th>Pindah tab</th><th>Keluar layar penuh</th><th>Keterangan</th></tr>
+        <tr><th>NIM / No.</th><th>Nama</th><th>Integritas</th><th>Pindah tab</th><th>Keluar layar penuh</th><th>Keterangan</th></tr>
         ${urut.map((p) => `<tr><td>${lolos(p.nim)}</td><td>${lolos(p.nama)}</td>
           <td>${typeof p.integritas === "number" ? `${p.integritas}/100` : "—"}</td>
           <td>${p.pindahTab}×</td><td>${p.keluarFullscreen}×</td>
@@ -311,7 +311,7 @@ export function beritaAcaraHtml(ujian: UjianCetak, acara: BeritaAcara): string {
   const isi = `
 ${kop(ujian, "BERITA ACARA PELAKSANAAN UJIAN")}
 ${barisKeterangan([
-  ["Mata Uji", ujian.mataKuliah],
+  ["Mata Kuliah / Materi", ujian.mataKuliah],
   ["Nama Ujian", ujian.judul],
   ["Kelas", ujian.kelas || "-"],
   ["Kode Ujian", ujian.kode],
@@ -400,8 +400,8 @@ export function laporanPesertaHtml(
 ${kop(ujian, "LAPORAN HASIL UJIAN PESERTA")}
 ${barisKeterangan([
   ["Nama", peserta.nama],
-  ["Nomor Peserta", peserta.nim],
-  ["Mata Uji", ujian.mataKuliah],
+  ["NIM / Nomor Peserta", peserta.nim],
+  ["Mata Kuliah / Materi", ujian.mataKuliah],
   ["Nama Ujian", ujian.judul],
   ["Kelas", ujian.kelas || "-"],
   ["Mulai Mengerjakan", tanggalPanjang(peserta.mulai)],
