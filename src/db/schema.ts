@@ -527,6 +527,19 @@ export const cbtExams = pgTable("cbt_exams", {
    * src/lib/pengawasan.ts, tempat ia dapat diubah sekali untuk semua ujian.
    */
   proctorMode: varchar("proctor_mode", { length: 20 }).notNull().default("biasa"),
+  /**
+   * Saklar kamera pengawas. Hanya berpengaruh pada mode Sertifikasi/OSCE.
+   *
+   * Bawaannya MENYALA, supaya ujian sertifikasi tetap terawasi tanpa ada yang
+   * perlu menekan apa pun. Ia ada untuk mematikan — kelas yang separuh
+   * pesertanya tidak punya kamera, atau ujian yang memang tidak boleh merekam
+   * wajah.
+   *
+   * Yang memegangnya Admin dan Super Admin, BUKAN dosen pemilik ujiannya.
+   * Merekam wajah orang adalah keputusan lembaga, dan yang menanggung
+   * akibatnya bila keliru adalah fakultas.
+   */
+  cameraOn: boolean("camera_on").notNull().default(true),
   /** Kode tambahan yang diketik mahasiswa. Kosong berarti tanpa kode. */
   token: varchar("token", { length: 12 }),
 

@@ -36,6 +36,13 @@ type Ujian = {
   status: string; mulai: string | null; selesai: string | null;
   /** Mode pengawasan: "biasa" | "ketat" | "sertifikasi". */
   pengawasan?: string;
+  /**
+   * Kamera pengawas menyala atau tidak.
+   *
+   * Datang dari SERVER, bukan disimpulkan dari modenya, karena saklarnya
+   * dipegang Admin dan dapat dimatikan pada ujian sertifikasi mana pun.
+   */
+  kamera?: boolean;
 };
 
 type Soal = {
@@ -876,7 +883,7 @@ export default function UjianApp() {
           sepanjang ujian: pengawasan yang disembunyikan dari orang yang
           diawasi kehilangan seluruh daya cegahnya, dan yang menghentikan orang
           bukan kamera yang diam-diam merekam melainkan kamera yang jelas ada. */}
-      {aturan.kamera && (
+      {ujian?.kamera && (
         <KameraPengawas aktif={layar === "kerja"} kunciSesi={kunciSesi} lapor={laporKamera} />
       )}
 

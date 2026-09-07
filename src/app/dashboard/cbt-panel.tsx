@@ -32,7 +32,7 @@ import {
 import { buatDocxTemplate, buatXlsxTemplate } from "@/lib/template-soal";
 import { asalCbt } from "@/lib/situs-cbt";
 import {
-  INSIDEN_LABEL, MODE_KETERANGAN, MODE_LABEL, SEMUA_MODE, rapikanMode,
+  INSIDEN_LABEL, MODE_KETERANGAN, MODE_LABEL, SEMUA_MODE, aturanMode, rapikanMode,
   tingkatIntegritas, TINGKAT_LABEL, type JenisInsiden, type ModePengawasan,
 } from "@/lib/pengawasan";
 import { KREDIT_CBT } from "../cbt/kredit";
@@ -47,10 +47,18 @@ type Ujian = {
   singleDevice: boolean;
   /** Mode pengawasan: "biasa" | "ketat" | "sertifikasi". */
   proctorMode: string;
+  /** Saklar kamera pengawas. Hanya berlaku pada mode Sertifikasi/OSCE. */
+  cameraOn: boolean;
   status: StatusUjian; jumlahBank: number;
   peserta: { total: number; berjalan: number; selesai: number };
   /** Izin yang dihitung server untuk pemanggil ini, per ujian. */
   milik: boolean; bolehUbah: boolean; bolehHapus: boolean;
+  /**
+   * Boleh menggeser saklar kamera. Dihitung SERVER dari peran pemanggil, dan
+   * sengaja tidak disimpulkan di sini — aturan siapa boleh apa hanya boleh
+   * tertulis di satu tempat, dan tempat itu bukan peramban.
+   */
+  bolehSaklarKamera: boolean;
 };
 
 /** Satu jawaban peserta, dibuka dosen untuk dibaca dan dikoreksi. */
@@ -328,6 +336,69 @@ function GarisWaktu({ jejak, mulai }: { jejak: Jejak[]; mulai: string }) {
 }
 
 /**
+ * Saklar kamera pengawas.
+ *
+ * Satu-satunya setelan di panel ini yang wewenangnya TIDAK ada pada dosen
+ * pemilik ujiannya, dan karena itu ia berdiri terpisah dari deretan setelan
+ * yang lain, bukan menyelinap sebagai satu centang di antaranya.
+ *
+ * Dosen tetap MELIHAT keadaannya — ia berhak tahu kelasnya direkam atau tidak,
+ * dan menyembunyikan barisnya dari orang yang ujiannya sedang diawasi adalah
+ * hal yang justru tidak boleh dilakukan. Yang tidak ada padanya hanya
+ * kemampuan menggesernya.
+ */
+function SaklarKamera({
+  nyala, mode, boleh, ubah,
+}: {
+  nyala: boolean;
+  mode: ModePengawasan;
+  boleh: boolean;
+  ubah: (nyala: boolean) => void;
+}) {
+  // Pada mode selain Sertifikasi, saklarnya memang tidak berpengaruh apa pun.
+  // Menampilkannya sebagai saklar yang dapat digeser tetapi tidak melakukan
+  // apa-apa adalah kebohongan kecil yang akan memakan waktu seseorang.
+  const berlaku = aturanMode(mode).kamera;
+
+  return (
+    <div className={`cbt-kamera${berlaku && nyala ? " on" : ""}`}>
+      <div className="cbt-kamera-teks">
+        <b>Kamera pengawas</b>
+        <small>
+          {!berlaku
+            ? `Tidak berlaku pada mode ${MODE_LABEL[mode]}. Kamera hanya menyala pada mode ${MODE_LABEL.sertifikasi}.`
+            : nyala
+              ? "Kamera peserta menyala selama ujian. Cuplikan diperiksa lalu dibuang; hanya yang bermasalah yang disimpan sebagai bukti."
+              : "Kamera dimatikan. Penjagaan lain pada mode ini tetap berjalan seperti biasa."}
+        </small>
+      </div>
+      {boleh ? (
+        <label className="cbt-kamera-tbl">
+          <input
+            type="checkbox"
+            checked={berlaku && nyala}
+            disabled={!berlaku}
+            onChange={(e) => ubah(e.target.checked)}
+          />
+          <span>{berlaku && nyala ? "Menyala" : "Mati"}</span>
+        </label>
+      ) : (
+        <span className="cbt-kamera-kunci" title="Wewenang Admin dan Super Admin">
+          {berlaku && nyala ? "Menyala" : "Mati"} · dikunci
+        </span>
+      )}
+      {!boleh && (
+        <p className="cbt-kamera-catatan">
+          Saklar ini dipegang Admin dan Super Admin. Merekam wajah peserta adalah keputusan
+          fakultas, bukan keputusan satu mata kuliah — hubungi mereka bila ujian Anda perlu
+          disetel berbeda.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
  * Pemilih mode pengawasan.
  *
  * Satu pilihan, bukan sebelas kotak centang, dan itu keputusan yang disengaja.
@@ -424,6 +495,7 @@ function setelanUjian(u: Ujian) {
     showScore: u.showScore,
     singleDevice: u.singleDevice,
     proctorMode: rapikanMode(u.proctorMode),
+    cameraOn: u.cameraOn !== false,
   };
 }
 
@@ -500,7 +572,7 @@ export default function CbtPanel({ role }: { role: string }) {
     title: "", courseName: "", className: "", instruction: "", token: "",
     questionCount: 0, durationMinutes: 60, passingGrade: 60, maxAttempts: 1,
     randomQuestions: true, randomOptions: true, allowBack: true, showScore: true,
-    singleDevice: true, proctorMode: "biasa" as ModePengawasan,
+    singleDevice: true, proctorMode: "biasa" as ModePengawasan, cameraOn: true,
   });
   const [bukaSetel, setBukaSetel] = useState(false);
 
@@ -1865,6 +1937,12 @@ export default function CbtPanel({ role }: { role: string }) {
                   di tengah jalan — dan menahannya sampai ujian selesai berarti
                   menahannya sampai tidak ada gunanya lagi. */}
               <PilihMode nilai={setel.proctorMode} ubah={(m) => setSetel({ ...setel, proctorMode: m })} />
+              <SaklarKamera
+                nyala={setel.cameraOn}
+                mode={setel.proctorMode}
+                boleh={terbuka.bolehSaklarKamera}
+                ubah={(nyala) => setSetel({ ...setel, cameraOn: nyala })}
+              />
 
               <div className="cbt-form-aksi">
                 <Tbl

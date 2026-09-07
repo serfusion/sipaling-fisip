@@ -55,6 +55,27 @@ export const MODE_KETERANGAN: Record<ModePengawasan, string> = {
     "pelanggaran berat.",
 };
 
+/**
+ * Apakah kamera pengawas benar-benar menyala untuk satu ujian.
+ *
+ * DUA syarat, dan keduanya harus benar:
+ *
+ *   1. modenya memang memakai kamera — hanya Sertifikasi/OSCE. Kuis harian
+ *      yang menyalakan webcam bukan sesuatu yang diinginkan siapa pun, dan
+ *      membiarkannya mungkin terjadi karena satu saklar tergeser lebih buruk
+ *      daripada keluwesan yang didapat.
+ *   2. saklarnya tidak dimatikan Admin atau Super Admin.
+ *
+ * Saklarnya menyala secara bawaan, jadi ujian sertifikasi tetap terawasi
+ * tanpa ada yang perlu menekan apa pun. Ia ada untuk MEMATIKAN — kelas yang
+ * separuh pesertanya tidak punya kamera, atau ujian yang memang tidak boleh
+ * merekam wajah — dan yang memegangnya bukan dosen pemilik ujiannya melainkan
+ * Admin, karena merekam wajah orang adalah keputusan lembaga.
+ */
+export function kameraMenyala(mode: ModePengawasan, saklar: boolean): boolean {
+  return aturanMode(mode).kamera && saklar !== false;
+}
+
 export function rapikanMode(masukan: unknown): ModePengawasan {
   const teks = String(masukan ?? "").trim().toLowerCase();
   return (SEMUA_MODE as string[]).includes(teks) ? (teks as ModePengawasan) : "biasa";

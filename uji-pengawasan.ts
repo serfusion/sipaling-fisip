@@ -9,9 +9,10 @@
 import {
   BOBOT_INSIDEN, INSIDEN_BERAT, INSIDEN_LABEL, MODE_KETERANGAN, MODE_LABEL,
   SEMUA_INSIDEN, SEMUA_MODE, aturanMode, berat, harusDipaksa, jumlahBerat,
-  pesanPeringatan, rapikanInsiden, rapikanMode, skorIntegritas, tandaAir,
-  tingkatIntegritas, type JenisInsiden,
+  kameraMenyala, pesanPeringatan, rapikanInsiden, rapikanMode, skorIntegritas,
+  tandaAir, tingkatIntegritas, type JenisInsiden,
 } from "./src/lib/pengawasan";
+import { bolehSaklarKamera, PEMANTAU } from "./src/lib/cbt";
 
 let lulus = 0;
 const gagal: string[] = [];
@@ -152,6 +153,45 @@ benar("mode ketat tidak mengancam yang tidak akan terjadi",
 
 const p4 = pesanPeringatan("sertifikasi", "klik_kanan", { klik_kanan: 3 });
 benar("pelanggaran ringan tidak dihitung mundur", !p4.includes("Sisa"), p4);
+
+console.log("=== SAKLAR KAMERA ===\n");
+
+// Dua syarat, dan keduanya harus benar. Kuis harian yang menyalakan webcam
+// karena satu saklar tergeser adalah kesalahan yang tidak boleh mungkin.
+sama("sertifikasi + saklar menyala: kamera hidup", kameraMenyala("sertifikasi", true), true);
+sama("sertifikasi + saklar mati: kamera mati", kameraMenyala("sertifikasi", false), false);
+sama("ketat + saklar menyala: tetap mati", kameraMenyala("ketat", true), false);
+sama("biasa + saklar menyala: tetap mati", kameraMenyala("biasa", true), false);
+
+// Ujian lama, dari sebelum kolom saklarnya ada, tidak boleh mendadak
+// kehilangan kameranya. Bawaan kolomnya TRUE, dan nilai yang hilang pun
+// diperlakukan sebagai menyala.
+sama("saklar tidak diisi diperlakukan menyala",
+  kameraMenyala("sertifikasi", undefined as unknown as boolean), true);
+
+console.log("=== SIAPA YANG BOLEH MENGGESERNYA ===\n");
+
+const orang = (role: string) => ({ id: "x", role, fullName: "X", lecturerId: null });
+
+// Wewenang ini satu-satunya di CBT yang justru MENJAUH dari pemilik ujian.
+// Menyalakan kamera bukan mengatur ujian, melainkan merekam wajah orang.
+sama("super admin boleh", bolehSaklarKamera(orang("super_admin")), true);
+sama("admin boleh", bolehSaklarKamera(orang("admin")), true);
+sama("dosen TIDAK boleh, walau ujian itu miliknya", bolehSaklarKamera(orang("dosen")), false);
+
+// Admin bagian tidak menyentuh menu CBT sama sekali, apalagi saklar ini.
+for (const bagian of [
+  "admin_umum", "admin_akademik", "admin_prodi",
+  "admin_pddikti", "admin_perpustakaan", "admin_laboratorium",
+]) {
+  sama(`${bagian} tidak boleh`, bolehSaklarKamera(orang(bagian)), false);
+}
+sama("mahasiswa tidak boleh", bolehSaklarKamera(orang("mahasiswa")), false);
+sama("tanpa profil tidak boleh", bolehSaklarKamera(null), false);
+// Peran karangan tidak pernah lolos hanya karena namanya mengandung "admin".
+sama("peran karangan tidak boleh", bolehSaklarKamera(orang("admin_super")), false);
+benar("daftarnya persis dua peran", PEMANTAU.length === 2,
+  JSON.stringify(PEMANTAU));
 
 console.log("=== TANDA AIR ===\n");
 

@@ -34,8 +34,8 @@ import {
 } from "@/lib/cbt";
 import { attemptDariKunci, bacaLembar, soalUjian, ujianDariKode, type Attempt, type Ujian } from "@/lib/cbt-store";
 import {
-  harusDipaksa, pesanPeringatan, rapikanInsiden, rapikanMode, skorIntegritas,
-  type HitunganInsiden, type JenisInsiden,
+  harusDipaksa, kameraMenyala, pesanPeringatan, rapikanInsiden, rapikanMode,
+  skorIntegritas, type HitunganInsiden, type JenisInsiden,
 } from "@/lib/pengawasan";
 
 export const runtime = "nodejs";
@@ -71,6 +71,9 @@ function ringkasUjian(u: Ujian, sekarang: Date) {
     // mengubah keketatan satu mode tidak menuntut peramban yang sedang terbuka
     // ikut diperbarui — dan tidak mungkin kedua sisi berbeda pendapat.
     pengawasan: rapikanMode(u.proctorMode),
+    // Kecuali kamera. Ia punya saklarnya sendiri yang dipegang Admin, jadi
+    // modenya saja tidak cukup untuk menjawab "menyala atau tidak".
+    kamera: kameraMenyala(rapikanMode(u.proctorMode), u.cameraOn),
   };
 }
 

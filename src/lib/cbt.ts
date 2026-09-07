@@ -874,3 +874,22 @@ export function bolehUbah(profile: Pemakai, ujian: Kepemilikan) {
 export function bolehHapus(profile: Pemakai, ujian: Kepemilikan) {
   return PEMANTAU.includes(profile.role) || pemilik(profile, ujian);
 }
+
+/**
+ * Boleh menyalakan atau mematikan KAMERA PENGAWAS.
+ *
+ * Admin dan Super Admin saja — TIDAK termasuk dosen pemilik ujiannya, dan
+ * itulah satu-satunya wewenang di berkas ini yang justru menjauh dari pemilik.
+ *
+ * Alasannya berbeda dari wewenang yang lain. Yang lain soal siapa yang tahu
+ * kelasnya; yang ini soal merekam wajah orang. Menyalakan kamera pada ujian
+ * adalah keputusan lembaga, bukan keputusan satu dosen atas kelasnya sendiri —
+ * yang menanggung akibatnya bila keliru adalah fakultas, bukan dosen itu.
+ * Karena itu ia dipegang pihak yang sama yang memegang kebijakan portal.
+ *
+ * Admin bagian — umum, akademik, prodi, PDDIKTI, perpustakaan, laboratorium —
+ * tidak termasuk, sama seperti mereka tidak menyentuh menu CBT sama sekali.
+ */
+export function bolehSaklarKamera(profile: Pemakai | null) {
+  return Boolean(profile && PEMANTAU.includes(profile.role));
+}

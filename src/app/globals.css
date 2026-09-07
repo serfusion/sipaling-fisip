@@ -5673,3 +5673,37 @@ table.qt td small { font-size: 11.5px; }
 }
 .cbt-jejak-bukti span { font-size: 11.5px; font-weight: 700; color: var(--primary); }
 .cbt-jejak-bukti:hover span { text-decoration: underline; }
+
+/* ---------- Saklar kamera pengawas ---------- */
+/* Berdiri terpisah dari deretan setelan yang lain, dan itu disengaja: ia
+   satu-satunya setelan yang wewenangnya bukan pada dosen pemilik ujian.
+   Menyelinapkannya sebagai satu centang di antara yang lain akan membuatnya
+   terlihat seperti setelan biasa yang kebetulan tidak bisa diubah. */
+.cbt-kamera {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 13px 15px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 11px;
+  background: #fff;
+}
+.cbt-kamera.on { border-color: #fca5a5; background: #fef2f2; }
+.cbt-kamera-teks b { display: block; font-size: 14px; color: var(--navy); }
+.cbt-kamera-teks small { display: block; margin-top: 3px; font-size: 12px; line-height: 1.55; color: #475569; }
+.cbt-kamera-tbl { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.cbt-kamera-tbl input { width: 17px; height: 17px; }
+.cbt-kamera-tbl input:disabled { cursor: not-allowed; }
+.cbt-kamera-tbl input:disabled + span { color: #94a3b8; }
+/* Yang tidak berwenang tetap MELIHAT keadaannya. Dosen berhak tahu kelasnya
+   direkam atau tidak; yang tidak ada padanya hanya kemampuan menggesernya. */
+.cbt-kamera-kunci { font-size: 12.5px; font-weight: 700; color: #64748b; white-space: nowrap; }
+.cbt-kamera-catatan {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: #64748b;
+}

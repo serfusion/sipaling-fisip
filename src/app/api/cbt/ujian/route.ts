@@ -18,7 +18,8 @@ import { getCurrentProfile } from "@/lib/supabase-server";
 import { explainServerError } from "@/lib/api-errors";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import {
-  angkaParam, bolehCbt, bolehHapus, bolehUbah, kodeUjianBaru, pemilik, PEMANTAU, statusUjian,
+  angkaParam, bolehCbt, bolehHapus, bolehSaklarKamera, bolehUbah, kodeUjianBaru,
+  pemilik, PEMANTAU, statusUjian,
 } from "@/lib/cbt";
 import { rapikanMode } from "@/lib/pengawasan";
 
@@ -100,6 +101,7 @@ export async function GET() {
         showScore: cbtExams.showScore,
         singleDevice: cbtExams.singleDevice,
         proctorMode: cbtExams.proctorMode,
+        cameraOn: cbtExams.cameraOn,
         token: cbtExams.token,
         startAt: cbtExams.startAt,
         endAt: cbtExams.endAt,
@@ -149,6 +151,11 @@ export async function GET() {
         milik: pemilik(profile, u),
         bolehUbah: bolehUbah(profile, u),
         bolehHapus: bolehHapus(profile, u),
+        // Tidak bergantung pada ujiannya sama sekali — hanya pada peran
+        // pemanggilnya. Dihitung server dan dikirim per ujian supaya layar
+        // dosen tidak perlu menebak sendiri dari peran, dan supaya aturannya
+        // hanya tertulis di satu tempat.
+        bolehSaklarKamera: bolehSaklarKamera(profile),
       })),
     });
   } catch (error: unknown) {
@@ -272,6 +279,33 @@ export async function PATCH(request: Request) {
     // jawaban dan catatan yang sudah ada tidak tersentuh.
     if (body.proctorMode !== undefined) ubah.proctorMode = rapikanMode(body.proctorMode);
     if (body.token !== undefined) ubah.token = teks(body.token, 12).toUpperCase() || null;
+
+    // ---------- SAKLAR KAMERA ----------
+    // Satu-satunya setelan di sini yang wewenangnya TIDAK ada pada pemilik
+    // ujian. Layar dosen mengirim seluruh formulir sekaligus, jadi kiriman
+    // yang membawa cameraOn dari dosen bukan tanda ada yang menyusup — ia
+    // hanya diabaikan diam-diam bila nilainya memang tidak berubah.
+    //
+    // Yang benar-benar berbeda ditolak dengan terang-terangan, karena diam
+    // pada perubahan yang ditolak berarti dosennya melihat saklarnya bergerak
+    // di layar lalu menemukannya kembali seperti semula tanpa penjelasan.
+    if (body.cameraOn !== undefined) {
+      const diminta = body.cameraOn !== false;
+      if (diminta !== ujian.cameraOn) {
+        if (!bolehSaklarKamera(profile)) {
+          return Response.json(
+            {
+              success: false,
+              message:
+                "Kamera pengawas hanya dapat dinyalakan atau dimatikan Admin dan Super Admin. " +
+                "Merekam wajah peserta adalah keputusan fakultas, bukan keputusan satu mata kuliah.",
+            },
+            { status: 403 },
+          );
+        }
+        ubah.cameraOn = diminta;
+      }
+    }
 
     // Selama ujian berjalan, yang mengubah bentuknya ditolak — tetapi hanya
     // bila nilainya memang berbeda. Layar dosen mengirim seluruh formulir

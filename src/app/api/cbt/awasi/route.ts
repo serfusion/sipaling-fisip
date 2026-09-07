@@ -33,7 +33,7 @@ import { attemptDariKunci } from "@/lib/cbt-store";
 import {
   SKEMA_BACAAN, bacaanKeInsiden, type BacaanModel,
 } from "@/lib/awas-kamera";
-import { aturanMode, rapikanMode, skorIntegritas } from "@/lib/pengawasan";
+import { aturanMode, kameraMenyala, rapikanMode, skorIntegritas } from "@/lib/pengawasan";
 import { mintaJson, penyediaTersedia } from "@/lib/ai-penyedia";
 
 export const runtime = "nodejs";
@@ -98,8 +98,13 @@ export async function POST(request: Request) {
     const ujian = baris[0];
     if (!ujian) return Response.json({ success: false, message: "Ujian tidak ditemukan." }, { status: 404 });
 
-    const aturan = aturanMode(rapikanMode(ujian.proctorMode));
-    if (!aturan.kamera) {
+    const mode = rapikanMode(ujian.proctorMode);
+    const aturan = aturanMode(mode);
+    // Saklarnya ikut diperiksa DI SINI, bukan hanya di layar peserta. Peramban
+    // yang sudah membuka kamera sebelum Admin mematikannya akan terus mengirim
+    // cuplikan; menolaknya di server adalah satu-satunya tempat yang benar,
+    // karena di situlah gambarnya berhenti.
+    if (!kameraMenyala(mode, ujian.cameraOn)) {
       return Response.json(
         { success: false, message: "Ujian ini tidak memakai pengawasan kamera." },
         { status: 409 },
