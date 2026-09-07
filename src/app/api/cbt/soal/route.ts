@@ -13,6 +13,8 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { getCurrentProfile } from "@/lib/supabase-server";
 import { explainServerError } from "@/lib/api-errors";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
+import { jalurDariSoal } from "@/lib/media-cbt";
+import { BUCKET_MEDIA, hapusMedia } from "@/lib/media-simpan";
 import {
   angkaParam, bolehCbt, bolehPantau, bolehUbah, statusUjian, uraiKunciJamak,
   SEMUA_JENIS, type JenisMedia, type JenisSoal, type Pasangan,
@@ -332,7 +334,13 @@ export async function PATCH(request: Request) {
     const hasil = rapikanSoal(body);
     if (!hasil.ok) return Response.json({ success: false, message: hasil.pesan }, { status: 400 });
 
+    // Media lama yang TERGANTIKAN dibuang. Tanpa ini, tiap kali pengajar
+    // menukar gambar satu soal, gambar sebelumnya tertinggal di Storage tanpa
+    // ada satu pun jalan untuk menemukannya lagi.
+    const lamaMedia = jalurDariSoal([punya[0]], BUCKET_MEDIA);
     await db.update(cbtQuestions).set(hasil.nilai as never).where(eq(cbtQuestions.id, id));
+    const barunya = new Set(jalurDariSoal([hasil.nilai as { mediaUrl?: unknown }], BUCKET_MEDIA));
+    await hapusMedia(lamaMedia.filter((j) => !barunya.has(j)));
     return Response.json({ success: true });
   } catch (error: unknown) {
     console.error("ubah soal cbt", error);
@@ -362,6 +370,11 @@ export async function DELETE(request: Request) {
     }
 
     await db.delete(cbtQuestions).where(and(eq(cbtQuestions.id, id)));
+    // Berkas medianya ikut dibuang. Barisnya hilang dalam satu perintah;
+    // gambarnya TIDAK, dan di situlah penyimpanan berbayar itu bocor.
+    // Kegagalannya sengaja tidak menggagalkan penghapusan soalnya: yang
+    // tertinggal satu berkas yatim, dan penyapu harian mengambilnya nanti.
+    await hapusMedia(jalurDariSoal([punya[0]], BUCKET_MEDIA));
     return Response.json({ success: true });
   } catch (error: unknown) {
     console.error("hapus soal cbt", error);

@@ -23,6 +23,7 @@ import {
 } from "@/lib/cbt";
 import { rapikanMode } from "@/lib/pengawasan";
 import { rapikanPerangkatKunci } from "@/lib/kunci-layar";
+import { hapusMediaUjian } from "@/lib/media-simpan";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -393,6 +394,11 @@ export async function DELETE(request: Request) {
     }
 
     await db.delete(cbtExams).where(and(eq(cbtExams.id, id)));
+    // Seluruh map ujian-<id>/ dibuang sekaligus. Menghapus berkas milik tiap
+    // soal satu per satu tidak lagi mungkin di sini: soalnya sudah ikut hilang
+    // bersama ujiannya, jadi tidak ada yang dapat ditanya berkas mana saja
+    // yang tadi ditunjuknya.
+    await hapusMediaUjian(id);
     return Response.json({ success: true });
   } catch (error: unknown) {
     console.error("hapus ujian cbt", error);

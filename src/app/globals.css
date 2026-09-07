@@ -5669,7 +5669,7 @@ table.qt td small { font-size: 11.5px; }
   background: #14161f;
   box-shadow: 0 24px 60px rgba(0, 0, 0, .55);
 }
-.uj-tegur-lambang { font-size: 38px; line-height: 1; }
+.uj-tegur-lambang { font-size: 38px; line-height: 1; color: #f87171; }
 .uj-tegur-judul {
   display: block; margin-top: 10px;
   font-size: 21px; font-weight: 800; letter-spacing: .01em; color: #fecaca;

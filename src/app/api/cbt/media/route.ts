@@ -24,11 +24,17 @@ import { getSupabaseSecretKey, getSupabaseUrl } from "@/lib/supabase-config";
 import { explainServerError } from "@/lib/api-errors";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { angkaParam, bolehCbt, bolehUbah } from "@/lib/cbt";
+import { BUCKET_MEDIA } from "@/lib/media-simpan";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export const BUCKET_MEDIA = process.env.SUPABASE_CBT_BUCKET || "cbt-media";
+// Nama bucket-nya berdiri di src/lib/media-simpan.ts, bersama perintah
+// menghapusnya. Dua tempat yang masing-masing membaca environment sendiri
+// akan berbeda diam-diam begitu salah satunya diberi nilai bawaan yang lain,
+// dan yang terjadi kemudian adalah unggahan yang mendarat di satu bucket
+// sementara penyapunya membersihkan bucket yang lain.
+export { BUCKET_MEDIA } from "@/lib/media-simpan";
 const MAKS_GAMBAR = 5 * 1024 * 1024;
 const MAKS_VIDEO = 50 * 1024 * 1024;
 
