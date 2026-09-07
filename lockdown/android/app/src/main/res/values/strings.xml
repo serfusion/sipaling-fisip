@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ujian Terkunci</string>
+    <!--
+      Dikatakan apa adanya, tanpa menakut-nakuti.
+
+      Penyematan layar yang gagal BUKAN kegagalan ujian: penguncian tangkapan
+      layar tetap berjalan, karena ia dipasang lewat FLAG_SECURE yang tidak
+      bergantung pada penyematan sama sekali. Yang berkurang hanya satu lapis,
+      dan pesertanya berhak tahu lapisan mana.
+    -->
+    <string name="sematan_gagal">Penyematan layar tidak dapat dinyalakan di perangkat ini. Penguncian tangkapan layar tetap berjalan. Jangan berpindah aplikasi selama ujian — perpindahannya tercatat pengawas.</string>
+</resources>

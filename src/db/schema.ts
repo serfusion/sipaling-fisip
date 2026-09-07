@@ -540,6 +540,23 @@ export const cbtExams = pgTable("cbt_exams", {
    * akibatnya bila keliru adalah lembaganya.
    */
   cameraOn: boolean("camera_on").notNull().default(true),
+  /**
+   * Ujian ini HANYA boleh dikerjakan lewat Aplikasi Ujian Terkunci.
+   *
+   * Inilah satu-satunya saklar di seluruh sistem yang benar-benar dapat
+   * menolak tangkapan layar, dan ia menolaknya bukan dengan kode melainkan
+   * dengan memindahkan ujiannya ke tempat yang sistem operasinya sendiri
+   * menolak: FLAG_SECURE di Android, WDA_EXCLUDEFROMCAPTURE di Windows.
+   * Peramban tidak akan pernah bisa, dan tidak ada versi berikutnya yang
+   * mengubah itu.
+   *
+   * MATI secara bawaan, dan itu disengaja. Menyalakannya berarti setiap
+   * peserta harus memasang aplikasi lebih dulu; ujian yang menyalakannya tanpa
+   * memberi tahu kelasnya sehari sebelumnya akan menolak seluruh pesertanya
+   * pada pagi hari pelaksanaan — kesalahan yang jauh lebih mahal daripada satu
+   * tangkapan layar yang lolos pada kuis harian.
+   */
+  requireLockdown: boolean("require_lockdown").notNull().default(false),
   /** Kode tambahan yang diketik mahasiswa. Kosong berarti tanpa kode. */
   token: varchar("token", { length: 12 }),
 
@@ -617,6 +634,15 @@ export const cbtAttempts = pgTable("cbt_attempts", {
    * sama.
    */
   deviceId: varchar("device_id", { length: 64 }).notNull().default(""),
+  /**
+   * Perangkat yang dipakai mengerjakan: "peramban" | "android" | "windows".
+   *
+   * Disimpan pada attempt, bukan disimpulkan ulang dari User-Agent saat
+   * laporan dibaca, karena inilah satu-satunya jawaban atas pertanyaan yang
+   * muncul ketika hasil ujian digugat berbulan-bulan kemudian: layar peserta
+   * ini terkunci atau tidak. User-Agent-nya sudah lama hilang; barisnya tidak.
+   */
+  clientType: varchar("client_type", { length: 20 }).notNull().default("peramban"),
   /** Kunci rahasia yang dipegang peramban mahasiswa selama ujian. */
   sessionKey: varchar("session_key", { length: 64 }).notNull().unique(),
   /** Benih pengacak, supaya urutan soalnya sama tiap kali halaman dimuat. */

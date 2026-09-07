@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Tema paling sederhana yang mungkin: tanpa bilah judul, latar gelap.
+
+      Latar gelapnya bukan selera. Ia adalah warna yang terlihat sepersekian
+      detik sebelum halaman ujiannya selesai digambar, dan juga warna yang
+      tertangkap perekam layar bila FLAG_SECURE bekerja sebagaimana mestinya.
+    -->
+    <style name="Theme.SiPalingLockdown" parent="@android:style/Theme.Material.NoActionBar.Fullscreen">
+        <item name="android:windowBackground">#0B1220</item>
+    </style>
+</resources>

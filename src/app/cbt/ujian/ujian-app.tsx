@@ -20,6 +20,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { jawabanKosong, uraiJodoh, type JenisSoal, type Media } from "@/lib/cbt";
+import {
+  ajakanAplikasi, bacaKlien, kunciSistem, pesanKunciLayar,
+  type JembatanKlien,
+} from "@/lib/kunci-layar";
 import { aturanMode, rapikanMode, type JenisInsiden } from "@/lib/pengawasan";
 import KreditCbt from "../kredit";
 import KameraPengawas from "./kamera";
@@ -27,6 +31,7 @@ import MediaSoal from "./media-soal";
 import { usePenjaga } from "./penjaga";
 import RangkaUjian from "./rangka-ujian";
 import TandaAir from "./tanda-air";
+import Tirai from "./tirai";
 
 type Ujian = {
   kode: string; judul: string; mataKuliah: string; kelas: string | null;
@@ -43,6 +48,8 @@ type Ujian = {
    * dipegang Admin dan dapat dimatikan pada ujian sertifikasi mana pun.
    */
   kamera?: boolean;
+  /** Ujian ini hanya boleh dikerjakan lewat Aplikasi Ujian Terkunci. */
+  wajibAplikasi?: boolean;
 };
 
 type Soal = {
@@ -112,6 +119,27 @@ function penandaPerangkat() {
   } catch {
     return "";
   }
+}
+
+/**
+ * Perangkat peserta beserta kunci aplikasinya, untuk disertakan ke server.
+ *
+ * Dibaca dari objek jembatan yang disuntikkan Aplikasi Ujian Terkunci ke
+ * halaman ini, lalu dari User-Agent-nya bila jembatannya tidak ada. Di peramban
+ * biasa keduanya kosong, dan itu jawaban yang benar — bukan kegagalan.
+ *
+ * Dikirim pada dua permintaan saja: masuk dan lanjut. Keduanya adalah pintu
+ * yang dijaga server; menyertakannya pada tiap penyimpanan jawaban hanya
+ * menambah muatan pada permintaan yang paling sering terjadi selama ujian.
+ */
+function bekalKlien() {
+  if (typeof window === "undefined") return { klien: "peramban", kunciAplikasi: "" };
+  const jendela = window as Window & { SipalingLockdown?: JembatanKlien };
+  const jembatan = jendela.SipalingLockdown ?? null;
+  return {
+    klien: bacaKlien({ ua: navigator.userAgent, jembatan }),
+    kunciAplikasi: String(jembatan?.kunci ?? ""),
+  };
 }
 
 /**
@@ -284,7 +312,7 @@ export default function UjianApp() {
     fetch("/api/cbt/ikut", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ aksi: "lanjut", kunciSesi: tersimpan }),
+      body: JSON.stringify({ aksi: "lanjut", kunciSesi: tersimpan, ...bekalKlien() }),
     })
       .then((jawab) => jawab.json())
       .then((isi) => {
@@ -429,6 +457,7 @@ export default function UjianApp() {
         body: JSON.stringify({
           aksi: "masuk", kode: ujian?.kode, nama, nim, token,
           perangkat: penandaPerangkat(),
+          ...bekalKlien(),
         }),
       });
       const data = await jawab.json();
@@ -730,6 +759,54 @@ export default function UjianApp() {
 
           {ujian.instruksi && <div className="uj-instruksi"><b>Instruksi</b><p>{ujian.instruksi}</p></div>}
 
+          {/* ---------- KUNCI TANGKAPAN LAYAR ----------
+              Dikatakan SEBELUM tombol Mulai ditekan, dan kalimatnya berbeda
+              menurut perangkatnya.
+
+              Bedanya bukan basa-basi. "Tangkapan layar diblokir" pada peramban
+              biasa akan diuji peserta pertama dalam lima detik, dan begitu
+              terbukti tidak benar, seluruh peringatan lain di layar ini ikut
+              kehilangan wibawanya — termasuk yang sungguh-sungguh ditegakkan.
+
+              Hanya muncul pada ujian yang memang menjaganya: mode Biasa untuk
+              kuis harian tidak perlu membuka layarnya dengan peringatan. */}
+          {(aturan.jagaTangkapanLayar || ujian.wajibAplikasi) && (
+            <div className={`uj-kunci ${kunciSistem(penjaga.klien) ? "uj-kunci-sistem" : ""}`}>
+              <span className="uj-kunci-ikon" aria-hidden="true">
+                {kunciSistem(penjaga.klien) ? "🔒" : "👁"}
+              </span>
+              <div>
+                <b>
+                  {kunciSistem(penjaga.klien)
+                    ? "Tangkapan layar dikunci sistem"
+                    : "Tangkapan layar diawasi"}
+                </b>
+                <span>{pesanKunciLayar(penjaga.klien)}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Ujian yang MEWAJIBKAN aplikasi, dibuka dari peramban. Dikatakan di
+              sini, bukan sesudah tombol Mulai ditekan: peserta yang baru
+              mengetahuinya sesudah menekan Mulai sudah duduk di ruang ujian
+              dengan waktu berjalan, dan yang tersisa baginya hanya memasang
+              aplikasi di tengah ujian. */}
+          {ujian.wajibAplikasi && !kunciSistem(penjaga.klien) && (
+            <div className="uj-kabar uj-kabar-tutup">
+              <b>Ujian ini harus dikerjakan lewat Aplikasi Ujian Terkunci.</b> Peramban biasa
+              tidak dapat menolak tangkapan layar, jadi ujian ini tidak dapat dimulai dari sini.
+              Unduh aplikasinya dari tautan yang diberikan pengajarmu, buka, lalu masukkan kode
+              ujian yang sama.
+            </div>
+          )}
+
+          {/* Ujian yang belum mewajibkannya cukup diberi tahu, tanpa
+              menghalangi. Ajakannya kosong sendiri bila pesertanya memang sudah
+              memakai aplikasinya. */}
+          {aturan.jagaTangkapanLayar && ajakanAplikasi(penjaga.klien, ujian.wajibAplikasi === true) && (
+            <p className="uj-catatan">{ajakanAplikasi(penjaga.klien, ujian.wajibAplikasi === true)}</p>
+          )}
+
           {belumBuka && (
             <div className="uj-kabar uj-kabar-tunggu">
               Ujian ini dibuka <b>{tanggalRapi(ujian.mulai)}</b> dan dikerjakan selama{" "}
@@ -797,12 +874,20 @@ export default function UjianApp() {
                 <b>{hasil.nilai}</b>
                 <span>{hasil.lulus ? "Lulus" : "Belum mencapai batas"} · batas {hasil.passing}</span>
               </div>
+              {/* Hijau untuk benar, merah untuk salah.
+
+                  Empat kotak yang seragam abu-abu menuntut peserta membaca
+                  labelnya satu per satu untuk tahu mana kabar baiknya; warna
+                  menjawabnya sebelum labelnya terbaca. Kotak "kosong"
+                  dibiarkan netral dengan sengaja — soal yang tidak dijawab
+                  bukan jawaban yang salah, dan mengecatnya merah menghukum dua
+                  kali untuk satu hal yang sama. */}
               <div className="uj-fakta">
-                <div><b>{hasil.benar}</b><span>benar</span></div>
+                <div className="uj-fakta-benar"><b>{hasil.benar}</b><span>benar</span></div>
                 {hasil.sebagian > 0 && (
-                  <div><b>{hasil.sebagian}</b><span>benar sebagian</span></div>
+                  <div className="uj-fakta-sebagian"><b>{hasil.sebagian}</b><span>benar sebagian</span></div>
                 )}
-                <div><b>{hasil.salah}</b><span>salah</span></div>
+                <div className="uj-fakta-salah"><b>{hasil.salah}</b><span>salah</span></div>
                 <div><b>{hasil.kosong}</b><span>kosong</span></div>
               </div>
               {hasil.sebagian > 0 && (
@@ -887,6 +972,19 @@ export default function UjianApp() {
         <KameraPengawas aktif={layar === "kerja"} kunciSesi={kunciSesi} lapor={laporKamera} />
       )}
 
+      {/* ---------- TIRAI ----------
+          Digambar SESUDAH tanda air dan kamera supaya keduanya ikut tertutup,
+          dan dengan z-index tertinggi di seluruh layar ujian. Satu lapisan yang
+          tidak sengaja berada di atasnya sudah cukup membocorkan potongan soal
+          ke dalam gambar — dan yang bocor persis bagian yang dijaga.
+
+          Ia TIDAK menggagalkan tangkapan layar; ia mengosongkan isinya. Yang
+          benar-benar menolak adalah Aplikasi Ujian Terkunci di lockdown/,
+          tempat sistem operasinya sendiri yang menolak. */}
+      {penjaga.tirai && (
+        <Tirai sebab={penjaga.tirai} peserta={{ nama, nim, kode: ujian?.kode ?? "" }} />
+      )}
+
       {/* ---------- PITA PERINGATAN ----------
           Dua keadaan yang berbeda, dan yang kedua menuntut tindakan peserta
           sehingga ia tidak boleh menghilang sendiri seperti yang pertama. */}
@@ -912,6 +1010,15 @@ export default function UjianApp() {
           <span className="ck-bar-nim">{nim}</span>
         </div>
         <div className="ck-bar-tengah">{ujian?.judul}</div>
+        {/* Hanya muncul ketika penguncian sistemnya memang menyala. Lencana
+            "tidak dikunci" di atas layar ujian tidak memberi tahu pesertanya
+            apa pun yang berguna, dan hanya memberitahu tetangganya bahwa layar
+            ini boleh difoto. */}
+        {kunciSistem(penjaga.klien) && (
+          <span className="ck-kunci" title="Tangkapan layar dan perekaman layar ditolak sistem">
+            🔒 Layar terkunci
+          </span>
+        )}
         <span className={`ck-simpan ck-simpan-${simpanan}`}>
           {simpanan === "aman" ? "✓ Tersimpan" : simpanan === "menyimpan" ? "Menyimpan…" : "Menyimpan ulang…"}
         </span>

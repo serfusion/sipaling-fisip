@@ -12,17 +12,29 @@
 // Dan tidak ada satu pun baris kode yang dapat menghalangi ponsel kedua yang
 // diarahkan ke monitor.
 //
-// Karena itu berkas ini TIDAK berpura-pura melarang. Yang dikerjakannya tiga:
+// Karena itu berkas ini TIDAK berpura-pura melarang. Yang dikerjakannya empat:
 //
 //   MENYULITKAN — salin, potong, tempel, klik kanan, seret, dan seleksi teks
 //                 dimatikan. Ini menutup jalan yang paling sering benar-benar
 //                 dipakai: menyalin soal ke ChatGPT lalu menempelkan
 //                 jawabannya kembali. Yang tersisa adalah mengetik ulang soal
 //                 dengan tangan, dan itu memakan waktu ujian yang sama.
+//   MENGOSONGKAN— begitu ada isyarat tangkapan layar, atau halamannya
+//                 ditinggalkan, SOALNYA DITUTUP tirai gelap. Tangkapannya
+//                 tetap terjadi; yang berubah isinya. Ini satu-satunya hal
+//                 yang benar-benar dapat dikerjakan halaman web terhadap
+//                 tangkapan layar, dan batasnya tertulis apa adanya pada
+//                 SebabTirai di src/lib/kunci-layar.ts.
 //   MENCATAT    — tiap percobaan dilaporkan ke server beserta jam servernya.
 //   MENANDAI    — identitas peserta ditumpuk di atas layarnya (lihat
 //                 tanda-air.tsx), sehingga tangkapan layar yang tetap berhasil
 //                 diambil menunjuk satu orang.
+//
+// Yang BENAR-BENAR menolak tangkapan layar ada satu tingkat di bawah ini:
+// aplikasi ujian di lockdown/, tempat sistem operasinya sendiri yang menolak
+// (FLAG_SECURE di Android, WDA_EXCLUDEFROMCAPTURE di Windows). Berkas ini
+// mengenali aplikasi itu dan menyampaikannya ke layar, tetapi tidak pernah
+// mengaku-aku memilikinya.
 //
 // Satu keputusan yang berulang di seluruh berkas ini: DETEKSI YANG RAGU LEBIH
 // BAIK DIAM. Tuduhan palsu pada ujian sertifikasi jauh lebih mahal daripada
@@ -32,6 +44,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { aturanMode, type JenisInsiden, type ModePengawasan } from "@/lib/pengawasan";
+import {
+  bacaKlien, TIRAI_MS, type JembatanKlien, type JenisKlien, type SebabTirai,
+} from "@/lib/kunci-layar";
 
 export type Penjaga = {
   /** Dipanggil dari tombol "Mulai Ujian" — layar penuh menuntut ketukan orang. */
@@ -44,6 +59,12 @@ export type Penjaga = {
   keluarLayarPenuh: boolean;
   /** Minta layar penuh lagi, dari tombol di pita peringatan. */
   ulangiLayarPenuh: () => void;
+  /**
+   * Soal sedang ditutup tirai, dan sebabnya. Null berarti layar terbuka.
+   */
+  tirai: SebabTirai | null;
+  /** Perangkat yang dipakai peserta: peramban biasa, atau aplikasi terkunci. */
+  klien: JenisKlien;
 };
 
 type Opsi = {
@@ -66,6 +87,56 @@ export function usePenjaga({ aktif, mode, lapor }: Opsi): Penjaga {
 
   const [peringatan, setPeringatan] = useState("");
   const [keluarLayarPenuh, setKeluarLayarPenuh] = useState(false);
+  const [tirai, setTirai] = useState<SebabTirai | null>(null);
+
+  /**
+   * Perangkat peserta, dikenali SEKALI pada gambar pertama lalu tidak pernah
+   * dibaca ulang.
+   *
+   * Dibaca lewat penginisialisasi useState, bukan effect, karena nilainya
+   * menentukan kalimat yang tertulis di layar sejak detik pertama: layar yang
+   * mula-mula berkata "tangkapan layar dicatat" lalu berganti sendiri menjadi
+   * "diblokir sistem" satu gambar kemudian terbaca seperti sistem yang tidak
+   * yakin pada penjagaannya sendiri.
+   *
+   * Penjaga `typeof window` ada karena halaman ujian ini digambar server lebih
+   * dulu; di sana tidak ada navigator maupun jembatan aplikasi.
+   */
+  const [klien] = useState<JenisKlien>(() => {
+    if (typeof window === "undefined") return "peramban";
+    const jendela = window as Window & { SipalingLockdown?: JembatanKlien };
+    return bacaKlien({ ua: navigator.userAgent, jembatan: jendela.SipalingLockdown ?? null });
+  });
+
+  // Penghitung waktu tirai disimpan supaya isyarat kedua yang datang beruntun
+  // MEMPERPANJANG tutupnya, bukan membuka layarnya lebih cepat karena
+  // penghitung yang lama terlanjur habis. Menekan Print Screen tiga kali
+  // berturut-turut adalah persis yang dilakukan orang ketika yang pertama
+  // gagal.
+  const jamTiraiRef = useRef<number | null>(null);
+
+  /**
+   * Tutup soal sesaat.
+   *
+   * Ini BUKAN pelarangan. Tangkapan layarnya tetap terjadi; yang berubah
+   * hanyalah apa yang ada di dalamnya — bidang gelap, bukan soal. Batas
+   * keberhasilannya ditulis apa adanya pada SebabTirai di
+   * src/lib/kunci-layar.ts, dan tidak boleh dijanjikan lebih dari itu.
+   */
+  const tutupSesaat = useCallback(() => {
+    setTirai("tangkap");
+    if (jamTiraiRef.current) window.clearTimeout(jamTiraiRef.current);
+    jamTiraiRef.current = window.setTimeout(() => {
+      jamTiraiRef.current = null;
+      setTirai((kini) => (kini === "tangkap" ? null : kini));
+    }, TIRAI_MS);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (jamTiraiRef.current) window.clearTimeout(jamTiraiRef.current);
+    };
+  }, []);
 
   // Pendengar peristiwa dipasang sekali dan hidup sepanjang ujian, sedangkan
   // `lapor` berganti tiap kali komponennya digambar ulang. Tanpa salinan ini
@@ -135,11 +206,28 @@ export function usePenjaga({ aktif, mode, lapor }: Opsi): Penjaga {
   useEffect(() => {
     if (!aktif) return;
     function sembunyi() {
-      if (document.visibilityState === "hidden") kirim("tab");
+      if (document.visibilityState === "hidden") {
+        kirim("tab");
+        // Tirai dipasang PADA SAAT halamannya disembunyikan, bukan sesudah ia
+        // kembali. Inilah yang menutup perekam layar yang dinyalakan dari
+        // aplikasi lain, baris notifikasi yang ditarik untuk menekan tombol
+        // rekam, dan pratinjau aplikasi yang muncul di layar "aplikasi
+        // terakhir" ponsel — ketiganya menangkap halaman ini dalam keadaan
+        // tersembunyi, dan ketiganya nyata.
+        //
+        // Dipasang hanya bila modenya memang menjaga tangkapan layar. Pada
+        // mode Biasa peserta memang boleh berpindah aplikasi.
+        if (aturan.jagaTangkapanLayar) setTirai("pergi");
+        return;
+      }
+      // Kembali ke depan → tirai "pergi" dibuka sendiri. Tirai "tangkap"
+      // dibiarkan, karena ia punya penghitung waktunya sendiri dan menutup
+      // untuk alasan yang belum selesai.
+      setTirai((kini) => (kini === "pergi" ? null : kini));
     }
     document.addEventListener("visibilitychange", sembunyi);
     return () => document.removeEventListener("visibilitychange", sembunyi);
-  }, [aktif, kirim]);
+  }, [aktif, aturan.jagaTangkapanLayar, kirim]);
 
   useEffect(() => {
     if (!aktif || !aturan.jagaLingkungan) return;
@@ -194,6 +282,17 @@ export function usePenjaga({ aktif, mode, lapor }: Opsi): Penjaga {
   useEffect(() => {
     if (!aktif || !aturan.jagaTangkapanLayar) return;
 
+    // Satu penekanan tombol = SATU insiden.
+    //
+    // Pendengarnya terpasang pada keydown DAN keyup, dan itu memang perlu:
+    // PrintScreen di Windows sering hanya sampai pada keyup karena
+    // penekanannya dicegat sistem lebih dulu, sedangkan Win+Shift+S sampai
+    // pada keduanya. Tanpa penjaga ini, satu ketukan Win+Shift+S tercatat dua
+    // kali dan memotong empat puluh angka dari skor integritas peserta untuk
+    // satu perbuatan — pada ujian sertifikasi, dua ketukan seperti itu sudah
+    // cukup mengumpulkan ujiannya secara paksa.
+    let terakhir = 0;
+
     function tekan(e: KeyboardEvent) {
       const kunci = e.key;
       // Windows dan Linux. PrintScreen sering hanya muncul pada keyup, karena
@@ -206,7 +305,26 @@ export function usePenjaga({ aktif, mode, lapor }: Opsi): Penjaga {
       if (!cetak && !potong) return;
 
       e.preventDefault();
+
+      // Setengah detik: cukup lebar untuk menyatukan keydown dan keyup dari
+      // satu ketukan, cukup sempit untuk tetap mencatat orang yang menekan
+      // tombolnya berulang-ulang dengan sengaja.
+      const sekarang = Date.now();
+      if (sekarang - terakhir < 500) return;
+      terakhir = sekarang;
+
       kirim("tangkap", cetak ? "PrintScreen" : `Meta+Shift+${kunci}`);
+
+      // Soalnya ditutup SEKARANG JUGA, sebelum apa pun yang lain.
+      //
+      // Untuk alat potong — Win+Shift+S dan Cmd+Shift+4 — ini hampir selalu
+      // menang: sesudah pintasannya ditekan, orangnya masih harus menyeret
+      // kotak seleksi, dan itu jauh lebih lama daripada satu gambar ulang.
+      // Untuk Print Screen sering TIDAK sempat: sistem sudah menyalin layarnya
+      // pada saat tombolnya turun. Keduanya tetap dijalankan lewat jalan yang
+      // sama, karena yang kalah pun tidak merugikan apa pun — dan yang
+      // menang menyelamatkan satu soal.
+      tutupSesaat();
 
       // Di Windows, PrintScreen menyalin layar ke papan klip. Menimpanya
       // adalah satu-satunya tindakan nyata yang dapat dilakukan halaman ini,
@@ -225,7 +343,7 @@ export function usePenjaga({ aktif, mode, lapor }: Opsi): Penjaga {
       window.removeEventListener("keyup", tekan);
       window.removeEventListener("keydown", tekan);
     };
-  }, [aktif, aturan.jagaTangkapanLayar, kirim]);
+  }, [aktif, aturan.jagaTangkapanLayar, kirim, tutupSesaat]);
 
   // ---------- LINGKUNGAN: LAYAR KEDUA ----------
   //
@@ -282,5 +400,13 @@ export function usePenjaga({ aktif, mode, lapor }: Opsi): Penjaga {
     return () => window.clearTimeout(jam);
   }, [peringatan]);
 
-  return { mulaiLayarPenuh, akhiriLayarPenuh, peringatan, keluarLayarPenuh, ulangiLayarPenuh };
+  return {
+    mulaiLayarPenuh, akhiriLayarPenuh, peringatan,
+    keluarLayarPenuh, ulangiLayarPenuh, klien,
+    // Disaring di sini, bukan dibersihkan lewat effect ketika ujiannya
+    // berakhir. Tirai yang tertinggal menutupi halaman hasil membuat peserta
+    // mengira ujiannya menggantung — dan menutupnya lewat effect berarti ada
+    // satu gambar di antaranya tempat bidang gelap itu masih ada.
+    tirai: aktif ? tirai : null,
+  };
 }

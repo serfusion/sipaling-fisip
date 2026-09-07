@@ -11,7 +11,10 @@
 // dan yang paling perlu diuji di sini adalah bahwa KUNCI JAWABAN tidak ikut
 // tercetak pada naskah yang dibagikan ke peserta.
 // ============================================================
-import { JENIS_LABEL, type JenisSoal, type Media, type Pasangan } from "@/lib/cbt";
+import {
+  JENIS_LABEL, KEADAAN_JAWAB_LABEL, keadaanJawab,
+  type JenisSoal, type Media, type Pasangan,
+} from "@/lib/cbt";
 
 export type SoalCetak = {
   id: number;
@@ -86,6 +89,19 @@ const GAYA = `
   table.nilai { width: 100%; border-collapse: collapse; font-size: 11pt; }
   table.nilai th, table.nilai td { border: 1px solid #555; padding: 5px 7px; text-align: left; }
   table.nilai th { background: #eee; }
+  /* Benar hijau, salah merah — sama seperti di layar pengajar.
+     print-color-adjust WAJIB ada: tanpa itu peramban membuang seluruh warna
+     latar saat mencetak, dan yang tersisa di kertas hanya kata "benar" dan
+     "salah" berlatar putih yang sama — persis kolom yang paling sering dibaca
+     sambil menyusuri halaman dengan jari. */
+  td.n-benar, td.n-salah, td.n-sebagian, td.n-tunggu {
+    font-weight: bold; text-align: center;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  td.n-benar    { background: #bbf7d0; color: #14532d; }
+  td.n-salah    { background: #fecaca; color: #7f1d1d; }
+  td.n-sebagian { background: #fef3c7; color: #92400e; }
+  td.n-tunggu   { background: #e2e8f0; color: #475569; }
   .ttd { margin-top: 34px; width: 100%; }
   .ttd td { width: 50%; vertical-align: top; text-align: center; font-size: 11pt; }
   .ttd .ruang { height: 62px; }
@@ -95,6 +111,34 @@ const GAYA = `
            align-items: center; justify-content: space-between; margin: -18mm -16mm 16px; }
   .bilah button { padding: 7px 15px; border: 0; border-radius: 5px; background: #fff;
                   color: #1e3a5f; font: inherit; font-weight: 700; cursor: pointer; }
+
+  /* ---------- POSTER KODE QR ----------
+     Satu halaman, dibaca dari bangku paling belakang. Ukurannya sengaja jauh
+     lebih besar daripada yang terlihat pantas di layar: yang menentukan bukan
+     tampilannya di monitor pengajar melainkan keterbacaannya dari jarak lima
+     meter, tertempel di dinding atau terproyeksi di papan. */
+  .poster { text-align: center; }
+  .poster h2 { margin: 0 0 2px; font-size: 26pt; line-height: 1.15; }
+  .poster .mapel { margin: 0 0 14px; font-size: 14pt; color: #333; }
+  .poster img { display: block; width: 108mm; height: 108mm; margin: 0 auto;
+                border: 1px solid #999; }
+  .poster .ajak { margin: 12px 0 4px; font-size: 13pt; font-weight: bold; }
+  .poster .kode {
+    margin: 6px auto 4px; padding: 8px 0; max-width: 120mm;
+    border: 3px solid #000; border-radius: 6px;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 40pt; font-weight: bold; letter-spacing: .18em;
+  }
+  .poster .kode small { display: block; font-family: inherit; font-size: 10pt;
+                        font-weight: normal; letter-spacing: .12em; }
+  .poster .alamat { margin: 4px 0 12px; font-size: 12pt; word-break: break-all; }
+  .poster .jadwal { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11.5pt; }
+  .poster .jadwal th, .poster .jadwal td { border: 1px solid #555; padding: 5px 8px; text-align: left; }
+  .poster .jadwal th { width: 38%; background: #eee; }
+  .poster .langkah { margin: 12px 0 0; padding-left: 20px; text-align: left; font-size: 11.5pt; }
+  .poster .langkah li { margin-bottom: 3px; }
+  .poster .tanpa-qr { display: block; width: 108mm; margin: 0 auto; padding: 24mm 4mm;
+                      border: 2px dashed #999; font-size: 12pt; color: #555; }
 `;
 
 function bungkus(judul: string, isi: string) {
@@ -249,6 +293,67 @@ ${!denganKunci ? barisKeterangan([["Nama", "………………………………
   return bungkus(`Naskah Soal: ${ujian.judul}`, isi);
 }
 
+// ---------- 1b. POSTER KODE QR ----------
+
+/**
+ * Poster satu halaman berisi kode QR ujian, untuk ditempel atau diproyeksikan.
+ *
+ * Ini menjawab satu hal yang selalu terjadi dan selalu memakan sepuluh menit
+ * pertama ujian: peserta yang tidak membuka grup kelas, duduk di ruangan,
+ * mengetik ulang kode dari papan tulis — lalu tertukar "0" dengan "O". Yang
+ * dipindai di sini bukan kodenya melainkan TAUTAN LENGKAPNYA, sehingga
+ * halaman ujiannya terbuka dengan kode yang sudah terisi.
+ *
+ * Kodenya TETAP dicetak besar-besar di bawah QR-nya, dan itu bukan hiasan:
+ * ponsel dengan kamera rusak, ponsel yang kameranya tidak diizinkan, dan
+ * peserta yang memakai komputer laboratorium tanpa kamera semuanya nyata.
+ * Poster yang hanya memuat QR meninggalkan mereka tanpa jalan masuk.
+ *
+ * `qr` berupa data URL PNG dan boleh kosong. Poster tanpa QR tetap dicetak
+ * beserta kode dan tautannya — pengajar yang menekan tombol ini tiga menit
+ * sebelum ujian tidak boleh mendapat halaman kosong hanya karena penggambar
+ * QR-nya gagal dimuat.
+ */
+export function posterQrHtml(ujian: UjianCetak, alamat: string, qr: string): string {
+  // Hanya data URL gambar yang diterima. Nilai ini datang dari penggambar QR
+  // di peramban yang sama, tetapi berkas ini merangkai HTML mentah: satu
+  // sumber gambar yang tidak diperiksa adalah satu jalan bagi apa pun yang
+  // suatu saat memanggil fungsi ini dengan tali dari tempat lain.
+  const gambar = /^data:image\/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/=]+$/.test(qr)
+    ? `<img src="${qr}" alt="Kode QR ujian ${lolos(ujian.kode)}">`
+    : '<span class="tanpa-qr">Kode QR tidak dapat digambar. Ketik kode ujian di bawah ini.</span>';
+
+  const isi = `
+<div class="poster">
+  ${kop(ujian, "UJIAN BERBASIS KOMPUTER")}
+  <h2>${lolos(ujian.judul)}</h2>
+  <p class="mapel">${lolos(ujian.mataKuliah)}${ujian.kelas ? ` · Kelas ${lolos(ujian.kelas)}` : ""}</p>
+
+  ${gambar}
+
+  <p class="ajak">Pindai dengan kamera ponsel</p>
+  <div class="kode">${lolos(ujian.kode)}<small>KODE UJIAN</small></div>
+  <p class="alamat">atau buka ${lolos(alamat)}</p>
+
+  <table class="jadwal">
+    <tr><th>Jumlah soal</th><td>${ujian.jumlahSoal} butir</td></tr>
+    <tr><th>Waktu pengerjaan</th><td>${ujian.durasi} menit</td></tr>
+    <tr><th>Dibuka</th><td>${tanggalPanjang(ujian.mulai)}</td></tr>
+    <tr><th>Ditutup</th><td>${tanggalPanjang(ujian.selesai)}</td></tr>
+  </table>
+
+  <ol class="langkah">
+    <li>Pindai kode QR di atas, atau buka alamatnya lalu masukkan kode ujian.</li>
+    <li>Isi nama dan nomor peserta. Tidak perlu membuat akun dan tidak perlu kata sandi.</li>
+    <li>Baca petunjuknya, lalu tekan MULAI UJIAN. Waktu baru berjalan sesudah tombol itu ditekan.</li>
+    <li>Jawaban tersimpan otomatis. Bila jaringan sempat terputus, pekerjaanmu tidak hilang.</li>
+  </ol>
+</div>
+<div class="kaki">Kode ujian ${lolos(ujian.kode)} · dicetak ${tanggalPanjang(new Date().toISOString())}</div>`;
+
+  return bungkus(`Kode QR: ${ujian.judul}`, isi);
+}
+
 // ---------- 2. BERITA ACARA ----------
 
 export type BeritaAcara = {
@@ -384,13 +489,18 @@ export function laporanPesertaHtml(
   const lulus = peserta.nilai !== null && peserta.nilai >= passing;
   const baris = rincian
     .map((r) => {
-      const tanda = r.benar === null ? "menunggu koreksi" : r.benar ? "benar" : r.poin > 0 ? "benar sebagian" : "salah";
+      // Keadaannya disimpulkan oleh fungsi yang sama dengan yang dipakai layar
+      // pengajar. Sebelumnya kertas dan layar masing-masing menyimpulkannya
+      // sendiri, dan dua tempat yang menyimpulkan hal yang sama pada akhirnya
+      // akan menyimpulkannya berbeda — pada berkas yang justru dilampirkan ke
+      // berita acara.
+      const keadaan = keadaanJawab(r);
       return `<tr>
         <td>${r.nomor}</td>
         <td>${lolos(JENIS_LABEL[r.jenis])}</td>
         <td>${lolos(r.pertanyaan.slice(0, 110))}${r.pertanyaan.length > 110 ? "…" : ""}</td>
         <td>${lolos(r.jawabanTeks) || "<i>tidak dijawab</i>"}</td>
-        <td>${tanda}</td>
+        <td class="n-${keadaan}">${lolos(KEADAAN_JAWAB_LABEL[keadaan])}</td>
         <td>${r.poin} / ${r.bobot}</td>
       </tr>${r.catatan ? `<tr><td></td><td colspan="5"><i>Catatan pengajar: ${lolos(r.catatan)}</i></td></tr>` : ""}`;
     })

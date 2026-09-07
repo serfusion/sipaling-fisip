@@ -250,6 +250,11 @@ export async function GET(request: Request) {
           : null,
         keluarFullscreen: p.leftFullscreen,
         pindahTab: p.switchedTab,
+        // Perangkat yang benar-benar dipakai. Pada ujian yang mewajibkan
+        // aplikasi terkunci, kolom ini yang membedakan peserta yang layarnya
+        // ditolak sistem dari peserta yang layarnya hanya dicatat — dan itu
+        // pertanyaan pertama ketika hasil ujian digugat.
+        klien: p.clientType,
         integritas: p.integrityScore,
         dihentikan: p.forcedReason,
         mulai: p.startedAt.toISOString(),

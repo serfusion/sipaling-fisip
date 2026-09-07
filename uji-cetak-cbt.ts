@@ -186,8 +186,20 @@ cek("nama dan NOMOR PESERTA tercetak", laporan.includes("Dewi Lestari") && lapor
 cek("nilai akhir tercetak", laporan.includes("78"));
 cek("status kelulusan dinyatakan", laporan.includes("LULUS"));
 cek("benar sebagian dihitung terpisah", laporan.includes("Benar sebagian"));
-cek("yang benar sebagian tidak dicap salah", laporan.includes("benar sebagian"));
-cek("essay yang belum dikoreksi dinyatakan", laporan.includes("menunggu koreksi"));
+cek("yang benar sebagian tidak dicap salah", laporan.includes('class="n-sebagian">Benar sebagian'));
+cek("essay yang belum dikoreksi dinyatakan", laporan.includes('class="n-tunggu">Menunggu koreksi'));
+// Hijau untuk benar, merah untuk salah — sampai ke kertas. Yang dijaga di sini
+// bukan seleranya melainkan satu kekeliruan yang pernah ada: kolom ini dahulu
+// meminjam warna lencana status, dan lencana "berjalan" berwarna hijau,
+// sehingga jawaban SALAH tercetak hijau pada berkas yang dilampirkan ke berita
+// acara.
+cek("jawaban benar bersel hijau", laporan.includes('class="n-benar">Benar'));
+cek("kelas selnya punya warna di lembar gayanya",
+  laporan.includes("td.n-benar") && laporan.includes("#bbf7d0") &&
+  laporan.includes("td.n-salah") && laporan.includes("#fecaca"));
+// Tanpa baris ini peramban membuang seluruh warna latar saat mencetak, dan
+// yang tersisa di kertas hanya kata benar dan salah berlatar putih yang sama.
+cek("warna latarnya tidak dibuang saat dicetak", laporan.includes("print-color-adjust: exact"));
 cek("catatan pengajar ikut", laporan.includes("Perlu contoh kasus"));
 cek("catatan sistem tercetak", laporan.includes("Pindah tab 2×"));
 cek("ampersand jawaban diloloskan", laporan.includes("McCombs &amp; Shaw"));

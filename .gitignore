@@ -35,6 +35,18 @@ next-env.d.ts.timestamp
 # Seluruhnya berdiri sendiri: tanpa jalur mutlak, tanpa berkas contoh dari
 # luar, tanpa jaringan. Jalankan dengan: npx tsx uji-<nama>.ts
 
+# Hasil build aplikasi ujian terkunci (lockdown/).
+# Sumbernya ikut ter-commit, hasilnya tidak: .apk dan .exe berukuran puluhan
+# megabita dan harus DITANDATANGANI ulang tiap kali dibagikan, jadi berkas yang
+# tersimpan di sini hanya akan menjadi versi lama yang terlanjur dipasang orang.
+/lockdown/android/.gradle/
+/lockdown/android/build/
+/lockdown/android/app/build/
+/lockdown/android/local.properties
+/lockdown/windows/src-tauri/target/
+/lockdown/windows/src-tauri/gen/
+/lockdown/windows/src-tauri/Cargo.lock
+
 # Sistem operasi & editor
 .DS_Store
 Thumbs.db
