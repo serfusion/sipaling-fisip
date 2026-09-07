@@ -2,7 +2,7 @@
 // UJI: lembar cetak CBT
 //
 // Satu hal di berkas ini lebih penting daripada semua yang lain: NASKAH YANG
-// DIBAGIKAN KE MAHASISWA TIDAK BOLEH MEMUAT KUNCI JAWABAN. Naskah cadangan
+// DIBAGIKAN KE PESERTA TIDAK BOLEH MEMUAT KUNCI JAWABAN. Naskah cadangan
 // yang tercetak beserta kuncinya lalu dibagikan adalah cara tercepat
 // menggagalkan ujian, dan kekeliruannya tidak akan terlihat sampai sudah
 // terlambat.
@@ -53,7 +53,7 @@ const soal: SoalCetak[] = [
 ];
 
 // ---------- YANG PALING PENTING ----------
-bagian("Naskah mahasiswa TIDAK boleh membocorkan kunci");
+bagian("Naskah peserta TIDAK boleh membocorkan kunci");
 const naskah = naskahSoalHtml(ujian, soal);
 
 cek("kunci isian tidak tercetak", !naskah.includes("KUNCIRAHASIAISIAN"),
@@ -73,8 +73,9 @@ cek("pilihan penjodohan tetap ditawarkan", naskah.includes("D. Lasswell"));
 cek("PG kompleks diberi keterangan jawaban jamak", naskah.includes("Jawaban boleh lebih dari satu"));
 cek("essay diberi ruang menulis", (naskah.match(/class="garis"/g) || []).length >= 6);
 cek("soal bermedia ditandai tidak tercetak", naskah.includes("tidak tercetak"));
-cek("ada tempat nama dan NIM", naskah.includes("Nama") && naskah.includes("NIM"));
-cek("instruksi dosen ikut", naskah.includes("Tidak boleh membuka catatan"));
+cek("ada tempat nama dan nomor peserta",
+  naskah.includes("Nama") && naskah.includes("Nomor Peserta"));
+cek("instruksi pengajar ikut", naskah.includes("Tidak boleh membuka catatan"));
 cek("total bobot dihitung", naskah.includes("45 poin"), "harusnya 5+9+6+5+20");
 
 bagian("Berkas pengawas memang membawa kunci");
@@ -88,7 +89,7 @@ cek("rambu penilaian essay ikut", naskahKunci.includes("Sebutkan minimal tiga pe
 cek("diberi peringatan jangan dibagikan", naskahKunci.includes("JANGAN DIBAGIKAN"));
 
 // ---------- KESELAMATAN HTML ----------
-bagian("Teks dosen tidak boleh merusak halaman cetak");
+bagian("Teks pengajar tidak boleh merusak halaman cetak");
 cek("tanda & diloloskan", lolos("McCombs & Shaw") === "McCombs &amp; Shaw");
 cek("tanda kurung siku diloloskan", lolos("<script>") === "&lt;script&gt;");
 const jahat = naskahSoalHtml(ujian, [{
@@ -181,13 +182,13 @@ const laporan = laporanPesertaHtml(ujian, {
     benar: null, poin: 0, bobot: 20, catatan: "Perlu contoh kasus." },
 ], 70);
 
-cek("nama dan NIM tercetak", laporan.includes("Dewi Lestari") && laporan.includes("1234567"));
+cek("nama dan NOMOR PESERTA tercetak", laporan.includes("Dewi Lestari") && laporan.includes("1234567"));
 cek("nilai akhir tercetak", laporan.includes("78"));
 cek("status kelulusan dinyatakan", laporan.includes("LULUS"));
 cek("benar sebagian dihitung terpisah", laporan.includes("Benar sebagian"));
 cek("yang benar sebagian tidak dicap salah", laporan.includes("benar sebagian"));
 cek("essay yang belum dikoreksi dinyatakan", laporan.includes("menunggu koreksi"));
-cek("catatan dosen ikut", laporan.includes("Perlu contoh kasus"));
+cek("catatan pengajar ikut", laporan.includes("Perlu contoh kasus"));
 cek("catatan sistem tercetak", laporan.includes("Pindah tab 2×"));
 cek("ampersand jawaban diloloskan", laporan.includes("McCombs &amp; Shaw"));
 
@@ -223,9 +224,15 @@ const semuaBerkas = [
 for (const jenama of ["FISIP", "Fakultas Ilmu Sosial", "ILMU POLITIK", "SiPaling FISIP"]) {
   cek(`tidak menyebut "${jenama}"`, !semuaBerkas.toUpperCase().includes(jenama.toUpperCase()));
 }
-// Yang menggantikannya bukan kekosongan: kop tetap menyebut mata kuliahnya,
+// Kosakata perguruan tinggi ikut dijaga. Berkas cetak ini dipakai sekolah dan
+// lembaga sertifikasi juga, dan "Mahasiswa" pada lembar ujian SMA adalah
+// kekeliruan yang terlihat semua orang di ruangan.
+for (const kata of ["Mahasiswa", "NOMOR PESERTA", "Dosen", "Mata uji"]) {
+  cek(`tidak memakai kata "${kata}"`, !semuaBerkas.includes(kata));
+}
+// Yang menggantikannya bukan kekosongan: kop tetap menyebut mata ujinya,
 // sehingga berkasnya tetap dapat dikenali milik ujian yang mana.
-cek("kop menyebut mata kuliahnya", semuaBerkas.includes("Komunikasi Politik"));
+cek("kop menyebut mata ujinya", semuaBerkas.includes("Komunikasi Politik"));
 
 // Dan yang memasangnya untuk ujian sungguhan tetap dapat menaruh namanya
 // sendiri — lewat pengaturan, bukan lewat kode.

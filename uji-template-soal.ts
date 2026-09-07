@@ -48,8 +48,13 @@ async function jalan() {
   cek("keenam jenis soal ada contohnya",
       new Set(bacaan.soal.map((s) => s.jenis)).size === 6,
       JSON.stringify([...new Set(bacaan.soal.map((s) => s.jenis))]));
-  cek("contoh PG kompleks kuncinya jamak", contoh("pg_kompleks")?.kunci === "0,1,3",
-      JSON.stringify(contoh("pg_kompleks")));
+  // Yang diperiksa SIFATNYA — kuncinya lebih dari satu — bukan nomor pilihan
+  // yang kebetulan dipakai contohnya. Menambatkan uji pada "0,1,3" membuat
+  // pergantian contoh soal terbaca sebagai kerusakan, padahal contoh memang
+  // boleh diganti kapan saja.
+  cek("contoh PG kompleks kuncinya jamak",
+      (contoh("pg_kompleks")?.kunci ?? "").split(",").filter(Boolean).length >= 2,
+      JSON.stringify(contoh("pg_kompleks")?.kunci));
   cek("contoh penjodohan punya pasangan", (contoh("penjodohan")?.pasangan.length ?? 0) === 3,
       JSON.stringify(contoh("penjodohan")));
 

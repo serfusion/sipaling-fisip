@@ -3,11 +3,11 @@
 // ============================================================
 // MEDIA PADA SOAL — gambar dan video
 //
-// Dosen boleh mengunggah berkasnya, boleh juga menempelkan tautan. Keduanya
+// Pengajar boleh mengunggah berkasnya, boleh juga menempelkan tautan. Keduanya
 // berakhir sebagai satu tautan, dan berkas ini yang memutuskan bagaimana
 // tautan itu ditampilkan.
 //
-// TAUTAN YANG DITEMPEL DOSEN ADALAH MASUKAN DARI LUAR, dan diperlakukan
+// TAUTAN YANG DITEMPEL PENGAJAR ADALAH MASUKAN DARI LUAR, dan diperlakukan
 // begitu: hanya http(s) yang dipasang, dan hanya segelintir tuan rumah yang
 // boleh masuk sebagai <iframe>. Sisanya dicoba sebagai <video> biasa —
 // yang gagal memutar hanya menampilkan kotak kosong, sedangkan iframe dari
@@ -30,7 +30,7 @@ function alamatSemat(url: string): string | null {
   const host = alamat.hostname.replace(/^www\./, "").toLowerCase();
 
   // YouTube. Dipakai bentuk -nocookie supaya penonton tidak ikut dilacak;
-  // mahasiswa sedang ujian, bukan sedang menonton.
+  // peserta sedang ujian, bukan sedang menonton.
   if (host === "youtube.com" || host === "m.youtube.com") {
     const id = alamat.searchParams.get("v");
     if (id) return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}`;
@@ -66,8 +66,8 @@ export default function MediaSoal({ media }: { media: Media }) {
    * Dahulu di sini ada boolean, dan itu keliru dengan cara yang tidak terlihat
    * sampai ujian berjalan. Komponen ini menempati kedudukan yang sama di pohon
    * React untuk SELURUH soal, sehingga React memakai ulang satu wadah keadaan
-   * yang sama ketika mahasiswa berpindah nomor. Satu gambar yang gagal — tautan
-   * dosen yang telanjur mati, atau jaringan yang tersendat sedetik — mengunci
+   * yang sama ketika peserta berpindah nomor. Satu gambar yang gagal — tautan
+   * pengajar yang telanjur mati, atau jaringan yang tersendat sedetik — mengunci
    * boolean itu, dan sejak saat itu SETIAP gambar berikutnya ikut dinyatakan
    * tidak dapat dimuat meskipun sebenarnya baik-baik saja.
    *
@@ -88,7 +88,7 @@ export default function MediaSoal({ media }: { media: Media }) {
   ) : null;
 
   // Tautan yang mati TIDAK boleh menyisakan kotak rusak selebar layar.
-  // Mahasiswa yang menatapnya di tengah ujian tidak dapat membedakan "gambar
+  // Peserta yang menatapnya di tengah ujian tidak dapat membedakan "gambar
   // ini memang tidak penting" dari "saya kehilangan bagian soalnya"; satu
   // baris jujur menjawab itu, dan pengawas dapat menindaklanjutinya.
   if (gagal) {
@@ -103,7 +103,7 @@ export default function MediaSoal({ media }: { media: Media }) {
   if (media.jenis === "gambar") {
     return (
       <figure className="ck-media">
-        {/* next/image tidak dipakai: tautannya dari dosen, tuan rumahnya tidak
+        {/* next/image tidak dipakai: tautannya dari pengajar, tuan rumahnya tidak
             dapat didaftarkan lebih dulu, dan pengoptimalnya justru akan
             menolak gambar yang sah. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}

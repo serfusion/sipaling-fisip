@@ -9,7 +9,7 @@
 // PRINSIP YANG PALING PENTING DI SINI:
 // Jawaban model TIDAK PERNAH masuk ke bank soal begitu saja. Ia melewati
 // rakitSoal() — gerbang yang sama persis dengan berkas Excel dan Word yang
-// diunggah dosen. Model dapat keliru menulis kunci "F" pada soal berpilihan
+// diunggah pengajar. Model dapat keliru menulis kunci "F" pada soal berpilihan
 // tiga, dan gerbang itulah yang menolaknya. Membuat jalur pemeriksaan kedua
 // khusus untuk AI berarti dua tempat yang harus sama selamanya, dan yang
 // kedua pasti tertinggal.
@@ -21,13 +21,13 @@ import { JENIS_LABEL, type JenisSoal } from "@/lib/cbt";
 export const JENIS_AI: JenisSoal[] = ["pg", "pg_kompleks", "penjodohan", "benar_salah", "isian", "essay"];
 
 export type PermintaanAi = {
-  /** Naskah yang sudah disarikan dari dokumen dosen, di peramban. */
+  /** Naskah yang sudah disarikan dari dokumen pengajar, di peramban. */
   teks: string;
   jumlah: number;
   jenis: JenisSoal[];
   tingkat: "campuran" | "mudah" | "sedang" | "sulit";
   materi: string;
-  /** Petunjuk tambahan dari dosen, bebas. */
+  /** Petunjuk tambahan dari pengajar, bebas. */
   arahan: string;
 };
 
@@ -58,7 +58,7 @@ export function rapikanPermintaan(mentah: Partial<PermintaanAi>): PermintaanAi {
  * Bentuknya sengaja MENDEKATI kolom template Excel, bukan bentuk basis data:
  * kunci ditulis sebagai huruf ("A", "A,C", "BENAR"), pasangan ditulis sebagai
  * teks. Dengan begitu jawaban model melewati pembaca yang sudah teruji
- * bertahun-tahun menghadapi tulisan dosen — bukan pembaca baru yang belum
+ * bertahun-tahun menghadapi tulisan pengajar — bukan pembaca baru yang belum
  * pernah menghadapi apa pun.
  */
 export const SKEMA_JAWABAN = {
@@ -106,7 +106,7 @@ export const PERAN_SISTEM = [
   "   karangan yang terdengar meyakinkan jauh lebih merusak daripada soal yang",
   "   kurang jumlahnya.",
   "2. Kunci jawaban WAJIB benar menurut naskah itu. Kunci yang salah",
-  "   menyalahkan seluruh mahasiswa yang sebenarnya menjawab benar.",
+  "   menyalahkan seluruh peserta yang sebenarnya menjawab benar.",
   "3. Bahasa Indonesia akademik yang lugas. Hindari pertanyaan menjebak,",
   "   kalimat bermakna ganda, dan pengecoh yang sebenarnya juga benar.",
   "4. Pengecoh harus masuk akal, sama panjang, sekelas, dan sejenis dengan",
@@ -130,7 +130,7 @@ export const PERAN_SISTEM = [
   "                 kolom pembahasan.",
   "",
   "Bobot: pilihan ganda dan benar/salah 5, pg kompleks dan penjodohan 9,",
-  "isian 5, essay 20, kecuali dosen meminta lain.",
+  "isian 5, essay 20, kecuali pengajar meminta lain.",
 ].join("\n");
 
 /** Susun perintah untuk satu permintaan. */
@@ -147,7 +147,7 @@ export function susunPerintah(minta: PermintaanAi): string {
       ? "Tingkat kesulitan dicampur: kira-kira 30% mudah, 50% sedang, 20% sulit."
       : `Seluruh soal pada tingkat ${minta.tingkat}.`,
     minta.materi ? `Tulis "${minta.materi}" pada kolom materi setiap soal.` : "",
-    minta.arahan ? `\nPermintaan tambahan dari dosen:\n${minta.arahan}` : "",
+    minta.arahan ? `\nPermintaan tambahan dari pengajar:\n${minta.arahan}` : "",
     "",
     "=== NASKAH ===",
     minta.teks,
@@ -170,8 +170,8 @@ type SoalMentah = {
  * Periksa jawaban model dan ubah menjadi soal yang siap masuk bank.
  *
  * Tiap soal dilewatkan rakitSoal — gerbang yang sama dengan berkas unggahan
- * dosen. Yang tidak lolos dikembalikan beserta alasannya, TIDAK dibuang
- * diam-diam: dosen berhak tahu bahwa dari dua puluh yang diminta, tiga
+ * pengajar. Yang tidak lolos dikembalikan beserta alasannya, TIDAK dibuang
+ * diam-diam: pengajar berhak tahu bahwa dari dua puluh yang diminta, tiga
  * ditolak karena kuncinya menunjuk pilihan yang tidak ada.
  */
 export function periksaJawabanAi(mentah: unknown, diminta: number): HasilAi {
@@ -193,7 +193,7 @@ export function periksaJawabanAi(mentah: unknown, diminta: number): HasilAi {
     const pertanyaan = String(s.pertanyaan ?? "").trim();
 
     // Pasangan dikirim model sebagai teks; disatukan menjadi bentuk baris
-    // "kiri = kanan" yang sudah dimengerti pembaca berkas dosen.
+    // "kiri = kanan" yang sudah dimengerti pembaca berkas pengajar.
     const pasangan = Array.isArray(s.pasangan)
       ? s.pasangan
           .map((p) => {

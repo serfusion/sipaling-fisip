@@ -1,8 +1,8 @@
 // UJI ATURAN CBT
 //
 // Yang dijaga di sini adalah keputusan-keputusan yang menentukan nasib nilai
-// mahasiswa, dan yang kesalahannya baru terlihat setelah terlambat — ketika
-// nilai sudah keluar dan mahasiswanya sudah pulang.
+// peserta, dan yang kesalahannya baru terlihat setelah terlambat — ketika
+// nilai sudah keluar dan pesertanya sudah pulang.
 
 import {
   statusUjian, bolehMasuk, batasWaktu, sisaDetik, ejaWaktu,
@@ -39,7 +39,7 @@ sama("sesudah jam tutup: selesai", statusUjian(jadwal, jam("12:01")), "selesai")
 // Tanpa aktivasi Super Admin/Admin, jam berapa pun tidak membuka apa-apa.
 sama("belum diaktifkan tetap tertutup",
   statusUjian({ aktif: false, mulai: pukul10, selesai: pukul12 }, pukul11), "menunggu");
-benar("dan mahasiswa tidak boleh masuk",
+benar("dan peserta tidak boleh masuk",
   !bolehMasuk({ aktif: false, mulai: pukul10, selesai: pukul12 }, pukul11));
 sama("tanpa jadwal masih draf", statusUjian({ aktif: true, mulai: null, selesai: null }), "draf");
 
@@ -68,7 +68,7 @@ sama("detik negatif dibaca nol", ejaWaktu(-5), "00:00");
 console.log("\n=== PENGACAKAN YANG DAPAT DIULANG ===\n");
 
 const daftar = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-// Mahasiswa yang jaringannya putus lalu kembali HARUS menemukan soal nomor 7
+// Peserta yang jaringannya putus lalu kembali HARUS menemukan soal nomor 7
 // yang sama. Karena itu urutannya diturunkan dari benih, bukan diacak ulang.
 sama("benih yang sama menghasilkan urutan yang sama",
   JSON.stringify(kocok(daftar, 12345)), JSON.stringify(kocok(daftar, 12345)));
@@ -92,7 +92,7 @@ sama("paket dari benih yang sama identik",
   JSON.stringify(susunPaket(bank, { acakSoal: true, acakPilihan: true, jumlahSoal: 8 }, 777).map((p) => p.id)),
   JSON.stringify(paket.map((p) => p.id)));
 benar("peta pilihan ikut tersimpan", paket.every((p) => p.petaPilihan.length === 4));
-// KUNCI JAWABAN TIDAK BOLEH IKUT ke bentuk yang dikirim ke mahasiswa.
+// KUNCI JAWABAN TIDAK BOLEH IKUT ke bentuk yang dikirim ke peserta.
 benar("paket tidak membawa kunci jawaban",
   !JSON.stringify(paket).includes("kunci") && !JSON.stringify(paket).includes("pembahasan"));
 
@@ -112,7 +112,7 @@ sama("tidak dijawab dianggap salah, poin nol", nilaiJawaban(pg, "").poin, 0);
 
 // Inilah yang paling mudah salah: pilihan sudah diacak, jadi "pilihan ke-0
 // pada layar" belum tentu "pilihan ke-0 pada bank". Salah mengembalikannya
-// berarti menyalahkan mahasiswa yang menjawab benar.
+// berarti menyalahkan peserta yang menjawab benar.
 const peta = [3, 2, 1, 0];
 sama("pilihan teracak dikembalikan dulu", nilaiJawaban(pg, "1", peta).benar, true);
 sama("dan yang bukan kuncinya tetap salah", nilaiJawaban(pg, "0", peta).benar, false);
@@ -127,8 +127,8 @@ sama("penyeragam isian", rapikanIsian("Komunikasi  Massa!!"), "komunikasi massa"
 const essay: Soal = { ...pg, id: 3, jenis: "essay", pilihan: [], kunci: "", bobot: 20 };
 // Essay yang belum dikoreksi BUKAN jawaban salah. Membedakannya penting:
 // menghitungnya salah membuat nilai sementara jauh lebih rendah daripada
-// yang sebenarnya, dan mahasiswanya panik atas sesuatu yang belum terjadi.
-sama("essay menunggu dosen, bukan salah", nilaiJawaban(essay, "jawaban panjang").benar, null);
+// yang sebenarnya, dan pesertanya panik atas sesuatu yang belum terjadi.
+sama("essay menunggu pengajar, bukan salah", nilaiJawaban(essay, "jawaban panjang").benar, null);
 benar("essay tidak dinilai mesin", !otomatis("essay"));
 benar("pilihan ganda dinilai mesin", otomatis("pg"));
 
@@ -167,16 +167,16 @@ benar("tidak lulus", !kosongSemua.lulus);
 
 console.log("\n=== IDENTITAS TANPA LOGIN ===\n");
 
-sama("NIM hanya angka", rapikanNim("19-6520.1058"), "1965201058");
+sama("NOMOR PESERTA hanya angka", rapikanNim("19-6520.1058"), "1965201058");
 sama("nama dirapikan", rapikanNama("  Darojah   Nur  Syarifah "), "Darojah Nur Syarifah");
 sama("token huruf besar tanpa tanda", rapikanToken(" k7m2-qx "), "K7M2QX");
 
 const tanpaToken = { token: null, nimMin: 6 };
-benar("nama dan NIM cukup", periksaMasuk({ nama: "Budi Santoso", nim: "1965201058" }, tanpaToken).ok);
+benar("nama dan NOMOR PESERTA cukup", periksaMasuk({ nama: "Budi Santoso", nim: "1965201058" }, tanpaToken).ok);
 benar("nama kosong ditolak", !periksaMasuk({ nama: "", nim: "1965201058" }, tanpaToken).ok);
 benar("nama satu huruf ditolak", !periksaMasuk({ nama: "B", nim: "1965201058" }, tanpaToken).ok);
-benar("NIM kosong ditolak", !periksaMasuk({ nama: "Budi Santoso", nim: "" }, tanpaToken).ok);
-benar("NIM terlalu pendek ditolak", !periksaMasuk({ nama: "Budi Santoso", nim: "123" }, tanpaToken).ok);
+benar("NOMOR PESERTA kosong ditolak", !periksaMasuk({ nama: "Budi Santoso", nim: "" }, tanpaToken).ok);
+benar("NOMOR PESERTA terlalu pendek ditolak", !periksaMasuk({ nama: "Budi Santoso", nim: "123" }, tanpaToken).ok);
 
 const denganToken = { token: "K7M2QX", nimMin: 6 };
 benar("token benar diterima",

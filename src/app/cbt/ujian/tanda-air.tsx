@@ -8,7 +8,7 @@
 //
 // Tangkapan layar tetap dapat diambil — lewat Print Screen, alat potong, atau
 // ponsel kedua yang diarahkan ke monitor. Yang berubah adalah apa yang
-// tertangkap: nama, NIM, kode ujian, dan jamnya, tercetak di seluruh
+// tertangkap: nama, nomor peserta, kode ujian, dan jamnya, tercetak di seluruh
 // permukaan, sehingga satu potongan kecil pun cukup untuk menunjuk orangnya.
 //
 // Pencegahan yang berhasil bukan yang menutup rapat, melainkan yang membuat

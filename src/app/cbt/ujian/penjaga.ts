@@ -47,7 +47,7 @@ export type Penjaga = {
 };
 
 type Opsi = {
-  /** Hanya menyala saat mahasiswa benar-benar sedang mengerjakan. */
+  /** Hanya menyala saat peserta benar-benar sedang mengerjakan. */
   aktif: boolean;
   mode: ModePengawasan;
   /** Melaporkan satu insiden ke server. Balasannya dipakai sebagai peringatan. */
@@ -166,7 +166,7 @@ export function usePenjaga({ aktif, mode, lapor }: Opsi): Penjaga {
     }
     function tolakSeret(e: Event) { e.preventDefault(); }
     function tolakSeleksi(e: Event) {
-      // Kolom essay dikecualikan. Mahasiswa yang mengetik jawaban panjang
+      // Kolom essay dikecualikan. Peserta yang mengetik jawaban panjang
       // HARUS dapat menyorot kalimatnya sendiri untuk membetulkannya; melarang
       // itu tidak menghalangi kecurangan apa pun dan hanya membuat menulis
       // essay menjadi siksaan.

@@ -2,7 +2,7 @@
 // MENYARIKAN TEKS DARI DOKUMEN — di peramban, bukan di server
 //
 // Sama seperti pengimpor soal dan pengimpor transkrip: berkasnya diurai di
-// komputer dosennya sendiri, dan yang berangkat ke server hanya teksnya.
+// komputer pengajarnya sendiri, dan yang berangkat ke server hanya teksnya.
 // Bahan ujian adalah bahan yang belum diujikan; ia tidak perlu singgah di
 // tempat lain hanya untuk dijadikan soal.
 //

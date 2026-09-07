@@ -1,9 +1,9 @@
 // ============================================================
-// CBT — MONITORING, HASIL, DAN ANALISIS (sisi dosen)
+// CBT — MONITORING, HASIL, DAN ANALISIS (sisi pengajar)
 //
 // GET ?ujian=<id>            monitoring + statistik + analisis soal
-// GET ?ujian=<id>&attempt=<id>  rincian jawaban satu mahasiswa
-// PATCH                      koreksi essay: nilai + catatan dosen
+// GET ?ujian=<id>&attempt=<id>  rincian jawaban satu peserta
+// PATCH                      koreksi essay: nilai + catatan pengajar
 // ============================================================
 import { createClient } from "@supabase/supabase-js";
 import { db } from "@/db";
@@ -26,7 +26,7 @@ export const dynamic = "force-dynamic";
  *
  * MEMANTAU terbuka bagi admin — itu memang tugas mereka, dan membaca nilai
  * tidak mengubah apa pun. MENGOREKSI essay tidak: nilai yang keluar dari
- * koreksi adalah nilai akademik, dan yang memberikannya harus dosen pengampu
+ * koreksi adalah nilai akademik, dan yang memberikannya harus pengajar pengampu
  * ujiannya sendiri.
  */
 async function gerbang(examId: number, izin: "pantau" | "ubah" = "pantau") {
@@ -45,8 +45,8 @@ async function gerbang(examId: number, izin: "pantau" | "ubah" = "pantau") {
           success: false,
           message:
             izin === "ubah"
-              ? "Koreksi essay hanya oleh dosen pemilik ujiannya."
-              : "Ujian ini milik dosen lain.",
+              ? "Koreksi essay hanya oleh pengajar pemilik ujiannya."
+              : "Ujian ini milik pengajar lain.",
         },
         { status: 403 },
       ),
@@ -92,7 +92,7 @@ export async function GET(request: Request) {
     const { ujian } = cek;
     const sekarang = new Date();
 
-    // ---------- RINCIAN SATU MAHASISWA ----------
+    // ---------- RINCIAN SATU PESERTA ----------
     // Parameter yang TIDAK dikirim harus bernilai null, bukan nol — lihat
     // angkaParam. Tanpa itu cabang di bawah selalu diambil dan daftar peserta
     // di bawahnya tidak pernah sempat berjalan.
@@ -161,7 +161,7 @@ export async function GET(request: Request) {
           })),
         ),
         // Kunci jawaban baru ikut keluar DI SINI — sesudah ujiannya dikumpulkan,
-        // dan hanya kepada dosen pemiliknya.
+        // dan hanya kepada pengajar pemiliknya.
         rincian: lembar.map((l, urut) => {
           const soal = bank.find((s) => s.id === l.id);
           if (!soal) return null;
@@ -339,7 +339,7 @@ export async function PATCH(request: Request) {
     const benar = jawaban.filter((j) => j.isCorrect === true).length;
     // PG kompleks dan penjodohan dapat bernilai sebagian: isCorrect false,
     // tetapi poinnya di atas nol. Menghitungnya sebagai salah membuat
-    // laporan menyebut gagal total mahasiswa yang benar tiga dari empat.
+    // laporan menyebut gagal total peserta yang benar tiga dari empat.
     const sebagian = jawaban.filter((j) => j.isCorrect === false && (j.points || 0) > 0).length;
     const salah = jawaban.filter((j) => j.isCorrect === false && (j.points || 0) <= 0).length;
 

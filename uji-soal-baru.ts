@@ -4,7 +4,7 @@
 // Dua jenis soal baru dan satu kolom media. Yang paling mudah salah di sini
 // bukan bentuknya melainkan PENILAIANNYA — dan salahnya diam-diam: nilai
 // keluar, angkanya masuk akal, dan tidak ada yang tahu ia keliru sampai ada
-// mahasiswa yang menghitung ulang sendiri.
+// peserta yang menghitung ulang sendiri.
 // ============================================================
 import {
   hitungNilai, jawabanKosong, nilaiJawaban, susunPaket, uraiJodoh, uraiKunciJamak,
@@ -99,7 +99,7 @@ cek("tidak ada yang dicap salah", ringkas.salah === 0, JSON.stringify(ringkas));
 cek("poinnya 6 dari 15", ringkas.poin === 12, JSON.stringify(ringkas));
 
 // ---------- PAKET UNTUK MAHASISWA ----------
-bagian("Paket ke mahasiswa — kunci tidak boleh ikut keluar");
+bagian("Paket ke peserta — kunci tidak boleh ikut keluar");
 const paket = susunPaket([jodoh], { acakSoal: false, acakPilihan: true, jumlahSoal: 1 }, 12345);
 const dikirim = JSON.stringify(paket[0]);
 cek("kolom kiri ikut terkirim", paket[0].kiri.length === 3, dikirim);
@@ -113,11 +113,11 @@ bagian("Media — jenis ditebak dari tautannya");
 cek("mp4 terbaca video", bacaMedia("", "https://x.test/a.mp4", "").jenis === "video");
 cek("youtube terbaca video", bacaMedia("", "https://youtu.be/abc", "").jenis === "video");
 cek("png terbaca gambar", bacaMedia("", "https://x.test/a.png", "").jenis === "gambar");
-cek("jenis yang ditulis dosen menang", bacaMedia("video", "https://x.test/a.png", "").jenis === "video");
+cek("jenis yang ditulis pengajar menang", bacaMedia("video", "https://x.test/a.png", "").jenis === "video");
 cek("tanpa tautan bukan media", bacaMedia("gambar", "", "").jenis === "");
 
 // ---------- IMPOR ----------
-bagian("Impor — jenis baru terbaca dari berkas dosen");
+bagian("Impor — jenis baru terbaca dari berkas pengajar");
 cek('"PG Kompleks" tidak jatuh menjadi "pg"', bacaJenis("PG Kompleks") === "pg_kompleks", bacaJenis("PG Kompleks"));
 cek('"PGK" terbaca kompleks', bacaJenis("PGK") === "pg_kompleks");
 cek('"Penjodohan" terbaca', bacaJenis("Penjodohan") === "penjodohan");

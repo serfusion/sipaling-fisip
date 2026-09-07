@@ -17,7 +17,7 @@
 // Yang membedakan keduanya hanyalah tuan rumah pada permintaan, jadi
 // pengetahuan tentang "host mana milik siapa" harus tinggal di SATU tempat.
 // Berkas inilah tempatnya: middleware memakainya untuk menuliskan ulang dan
-// mengalihkan, panel dosen memakainya untuk menyusun tautan ujian yang
+// mengalihkan, panel pengajar memakainya untuk menyusun tautan ujian yang
 // dibagikan ke grup kelas, dan halaman CBT memakainya untuk menunjuk balik
 // ke portal.
 //
@@ -80,7 +80,7 @@ function tanpaWww(host: string) {
  * Host CBT yang ditetapkan lewat environment; kosong bila tidak diatur.
  *
  * Dua nama dibaca sekaligus dan itu disengaja: NEXT_PUBLIC_CBT_HOST ikut
- * sampai ke peramban sehingga panel dosen dapat menyusun tautan ujian,
+ * sampai ke peramban sehingga panel pengajar dapat menyusun tautan ujian,
  * sedangkan CBT_HOST — nama yang lebih dulu ada — tetap dihormati supaya
  * penyebaran yang sudah memakainya tidak perlu diubah.
  *
@@ -214,7 +214,7 @@ export function asalPortal(hostMentah: string | null | undefined): string {
 // Middleware tinggal menerjemahkan rencana itu menjadi jawaban HTTP.
 //
 // Alasannya satu, dan praktis: rencana yang murni dapat diuji tanpa
-// menyalakan server, sehingga aturan yang menentukan ke mana mahasiswa
+// menyalakan server, sehingga aturan yang menentukan ke mana peserta
 // mendarat di tengah musim ujian tidak perlu dibuktikan lewat percobaan
 // manual di produksi.
 // ============================================================

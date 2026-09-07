@@ -22,7 +22,7 @@ import type { ReactNode } from "react";
 export const metadata: Metadata = {
   title: "SiPaling CBT: Ujian Berbasis Komputer",
   description:
-    "Sistem ujian berbasis komputer. Peserta masuk dengan kode ujian, nama, dan NIM, tanpa membuat akun.",
+    "Sistem ujian berbasis komputer. Peserta masuk dengan kode ujian, nama, dan nomor peserta, tanpa membuat akun.",
   robots: { index: false, follow: false },
 };
 

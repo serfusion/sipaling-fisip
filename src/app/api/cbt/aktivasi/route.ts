@@ -1,7 +1,7 @@
 // ============================================================
 // CBT — GERBANG AKTIVASI
 //
-// HANYA PEMILIK UJIANNYA. Dosen yang menyusun soalnyalah yang membuka dan
+// HANYA PEMILIK UJIANNYA. Pengajar yang menyusun soalnyalah yang membuka dan
 // menutup ujiannya sendiri, karena hanya ia yang tahu kelasnya sudah siap atau
 // belum. Admin dan Super Admin TIDAK ikut memegang tombol ini — mereka
 // memantau, menghapus, dan boleh mengadakan ujian sendiri (mis. seleksi) yang
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
         {
           success: false,
           message:
-            "Ujian ini hanya dapat diaktifkan dan dijadwalkan oleh dosen pemiliknya.",
+            "Ujian ini hanya dapat diaktifkan dan dijadwalkan oleh pengajar pemiliknya.",
         },
         { status: 403 },
       );
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
         return Response.json(
           {
             success: false,
-            message: "Ujian sedang berlangsung. Membatalkannya sekarang memutus mahasiswa yang sedang mengerjakan.",
+            message: "Ujian sedang berlangsung. Membatalkannya sekarang memutus peserta yang sedang mengerjakan.",
           },
           { status: 409 },
         );
@@ -114,7 +114,7 @@ export async function POST(request: Request) {
     }
 
     // Jendela ujian harus memuat setidaknya satu durasi penuh. Jendela 30
-    // menit untuk ujian 60 menit berarti setiap mahasiswa terpotong, dan itu
+    // menit untuk ujian 60 menit berarti setiap peserta terpotong, dan itu
     // baru ketahuan ketika mereka sudah duduk di depan layar.
     const menitJendela = (selesai.getTime() - mulai.getTime()) / 60_000;
     if (menitJendela < ujian.durationMinutes) {
@@ -123,14 +123,14 @@ export async function POST(request: Request) {
           success: false,
           message:
             `Jendela ujian ${Math.round(menitJendela)} menit, lebih pendek daripada durasinya ` +
-            `${ujian.durationMinutes} menit. Mahasiswa akan terpotong waktunya.`,
+            `${ujian.durationMinutes} menit. Peserta akan terpotong waktunya.`,
         },
         { status: 400 },
       );
     }
 
     // Ujian tanpa soal tidak boleh diaktifkan. Yang terjadi bila lolos:
-    // mahasiswa masuk, layarnya kosong, dan tidak ada yang dapat ia kerjakan.
+    // peserta masuk, layarnya kosong, dan tidak ada yang dapat ia kerjakan.
     const bank = await db
       .select({ n: sql<number>`count(*)::int` })
       .from(cbtQuestions)
@@ -138,7 +138,7 @@ export async function POST(request: Request) {
     const jumlahBank = bank[0]?.n ?? 0;
     if (jumlahBank === 0) {
       return Response.json(
-        { success: false, message: "Bank soalnya masih kosong. Minta dosennya mengisi soal dulu." },
+        { success: false, message: "Bank soalnya masih kosong. Minta pengajarnya mengisi soal dulu." },
         { status: 400 },
       );
     }
@@ -160,14 +160,14 @@ export async function POST(request: Request) {
     // disegarkan. Menyimpan jadwal pada ujian yang SEDANG BERLANGSUNG bukan
     // membuka pelaksanaan baru — itu pembetulan jam di tengah jalan, biasanya
     // menambah waktu karena listriknya sempat padam. Kalau jam aktivasinya
-    // ikut maju, seluruh mahasiswa yang sudah mengumpulkan pagi itu mendadak
+    // ikut maju, seluruh peserta yang sudah mengumpulkan pagi itu mendadak
     // punya jatah percobaan baru dan dapat mengerjakan ulang.
     //
     // Sebaliknya, ujian yang sudah tutup lalu dijadwalkan ulang memang
     // pelaksanaan yang baru — ujian susulan, ujian ulang — dan di situlah jam
-    // aktivasinya harus maju supaya jatah mahasiswanya kembali. Tanpa itu,
+    // aktivasinya harus maju supaya jatah pesertanya kembali. Tanpa itu,
     // memperbarui jadwal tidak menolong siapa pun: ujiannya terbuka, tetapi
-    // setiap mahasiswa yang pernah masuk tetap ditolak.
+    // setiap peserta yang pernah masuk tetap ditolak.
     const statusSebelumnya = statusUjian(
       { aktif: Boolean(ujian.activatedAt), mulai: ujian.startAt, selesai: ujian.endAt },
       sekarang,
@@ -191,7 +191,7 @@ export async function POST(request: Request) {
       mulai: mulai.toISOString(),
       selesai: selesai.toISOString(),
       olehSiapa: babakBaru ? profile.fullName : (ujian.activatedBy ?? profile.fullName),
-      // Dipakai layar dosen untuk memilih kalimatnya: jadwal yang dibetulkan
+      // Dipakai layar pengajar untuk memilih kalimatnya: jadwal yang dibetulkan
       // di tengah ujian tidak boleh dilaporkan sebagai "ujian dibuka kembali".
       pelaksanaanBaru: babakBaru,
     });

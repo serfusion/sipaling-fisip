@@ -6,8 +6,8 @@
 // bergantung pada model mana pun:
 //
 //   1. Jawaban model DIPERIKSA sebelum masuk bank soal — lewat gerbang yang
-//      sama dengan berkas unggahan dosen. Model yang keliru menulis kunci
-//      tidak boleh menghasilkan soal yang menyalahkan mahasiswa.
+//      sama dengan berkas unggahan pengajar. Model yang keliru menulis kunci
+//      tidak boleh menghasilkan soal yang menyalahkan peserta.
 //   2. Pembaca zip untuk .pptx benar-benar membuka arsip terpampat.
 // ============================================================
 import { readFileSync } from "node:fs";
@@ -27,7 +27,7 @@ function bagian(j: string) { console.log(`\n== ${j} ==`); }
 const NASKAH = "kata ".repeat(600);
 
 // ---------- PERMINTAAN ----------
-bagian("Merapikan permintaan dosen");
+bagian("Merapikan permintaan pengajar");
 const m1 = rapikanPermintaan({ jumlah: 999, jenis: ["pg", "sihir" as never], tingkat: "aneh" as never });
 cek("jumlah dipagari batas atas", m1.jumlah === MAKS_SOAL, String(m1.jumlah));
 cek("jenis karangan dibuang", m1.jenis.join(",") === "pg", m1.jenis.join(","));
@@ -46,7 +46,7 @@ const perintah = susunPerintah(rapikanPermintaan({
 cek("menyebut jumlah soal", perintah.includes("Buat 5 soal"));
 cek("menyebut jenis yang diminta", perintah.includes("penjodohan"));
 cek("menyebut tingkat", perintah.includes("tingkat sulit"));
-cek("membawa arahan dosen", perintah.includes("Fokus pada bab 2."));
+cek("membawa arahan pengajar", perintah.includes("Fokus pada bab 2."));
 cek("naskah dibatasi penanda yang jelas",
     perintah.includes("=== NASKAH ===") && perintah.includes("=== AKHIR NASKAH ==="));
 

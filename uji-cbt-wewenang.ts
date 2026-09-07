@@ -7,12 +7,12 @@
 //   1. angkaParam — parameter yang TIDAK dikirim harus null, bukan nol.
 //      Number(null) bernilai 0 dan Number.isInteger(0) bernilai true, jadi
 //      pemeriksaan lama menganggap "attempt" selalu terkirim. Akibatnya
-//      /api/cbt/hasil selalu mengambil cabang "satu mahasiswa", selalu
+//      /api/cbt/hasil selalu mengambil cabang "satu peserta", selalu
 //      menjawab 404, dan daftar peserta tidak pernah sempat dijalankan —
 //      itulah sebab Monitoring tampak kosong padahal ada empat peserta.
-//   2. Kepemilikan — aktivasi hanya di tangan dosen pemilik ujiannya.
+//   2. Kepemilikan — aktivasi hanya di tangan pengajar pemilik ujiannya.
 //   3. periksaGanda — satu orang satu kali, dilihat dari nama dan perangkat,
-//      bukan dari NIM saja.
+//      bukan dari NOMOR PESERTA saja.
 // ============================================================
 import {
   angkaParam, bolehHapus, bolehPantau, bolehUbah, kunciNama, pemilik,
@@ -45,7 +45,7 @@ cek(
 );
 
 // ---------- 2. KEPEMILIKAN ----------
-bagian("Kepemilikan — hanya dosen pemilik yang mengaktifkan");
+bagian("Kepemilikan — hanya pengajar pemilik yang mengaktifkan");
 
 const dosenA: Pemakai = { id: "u-a", fullName: "Dr. Ayu", role: "dosen", lecturerId: 7 };
 const dosenB: Pemakai = { id: "u-b", fullName: "Dr. Budi", role: "dosen", lecturerId: 9 };
@@ -57,48 +57,48 @@ const ujianAyu: Kepemilikan = { lecturerId: 7, createdBy: "Dr. Ayu", createdById
 const ujianSeleksiAdmin: Kepemilikan = { lecturerId: null, createdBy: "Admin Umum", createdById: "u-ad" };
 const ujianCitra: Kepemilikan = { lecturerId: null, createdBy: "Dr. Citra", createdById: "u-c" };
 
-cek("dosen memiliki ujiannya sendiri", pemilik(dosenA, ujianAyu));
-cek("dosen lain bukan pemiliknya", !pemilik(dosenB, ujianAyu));
-cek("admin BUKAN pemilik ujian dosen", !pemilik(admin, ujianAyu));
+cek("pengajar memiliki ujiannya sendiri", pemilik(dosenA, ujianAyu));
+cek("pengajar lain bukan pemiliknya", !pemilik(dosenB, ujianAyu));
+cek("admin BUKAN pemilik ujian pengajar", !pemilik(admin, ujianAyu));
 cek("super admin pun BUKAN pemiliknya", !pemilik(superAdmin, ujianAyu));
 
-// Ini bug yang kedua: dosen yang profilnya belum tersambung ke baris dosen
+// Ini bug yang kedua: pengajar yang profilnya belum tersambung ke baris pengajar
 // dapat membuat ujian, lalu terkunci di luar ujiannya sendiri selamanya.
-cek("dosen tanpa lecturerId tetap memiliki ujian buatannya", pemilik(dosenTanpaBaris, ujianCitra));
+cek("pengajar tanpa lecturerId tetap memiliki ujian buatannya", pemilik(dosenTanpaBaris, ujianCitra));
 
 cek("admin memiliki ujian seleksi buatannya sendiri", pemilik(admin, ujianSeleksiAdmin));
 cek("admin boleh mengaktifkan ujian seleksinya", bolehUbah(admin, ujianSeleksiAdmin));
-cek("admin TIDAK boleh mengaktifkan ujian dosen", !bolehUbah(admin, ujianAyu));
-cek("super admin TIDAK boleh mengaktifkan ujian dosen", !bolehUbah(superAdmin, ujianAyu));
-cek("dosen pemiliknya boleh mengaktifkan", bolehUbah(dosenA, ujianAyu));
-cek("dosen lain tidak boleh mengaktifkan", !bolehUbah(dosenB, ujianAyu));
+cek("admin TIDAK boleh mengaktifkan ujian pengajar", !bolehUbah(admin, ujianAyu));
+cek("super admin TIDAK boleh mengaktifkan ujian pengajar", !bolehUbah(superAdmin, ujianAyu));
+cek("pengajar pemiliknya boleh mengaktifkan", bolehUbah(dosenA, ujianAyu));
+cek("pengajar lain tidak boleh mengaktifkan", !bolehUbah(dosenB, ujianAyu));
 
 cek("admin boleh memantau ujian siapa pun", bolehPantau(admin, ujianAyu));
 cek("super admin boleh memantau", bolehPantau(superAdmin, ujianAyu));
-cek("dosen lain tidak boleh memantau ujian bukan miliknya", !bolehPantau(dosenB, ujianAyu));
-cek("dosen pemiliknya boleh memantau", bolehPantau(dosenA, ujianAyu));
+cek("pengajar lain tidak boleh memantau ujian bukan miliknya", !bolehPantau(dosenB, ujianAyu));
+cek("pengajar pemiliknya boleh memantau", bolehPantau(dosenA, ujianAyu));
 
 cek("admin boleh menghapus ujian", bolehHapus(admin, ujianAyu));
 cek("super admin boleh menghapus ujian", bolehHapus(superAdmin, ujianAyu));
-cek("dosen pemiliknya boleh menghapus", bolehHapus(dosenA, ujianAyu));
-cek("dosen lain tidak boleh menghapus", !bolehHapus(dosenB, ujianAyu));
+cek("pengajar pemiliknya boleh menghapus", bolehHapus(dosenA, ujianAyu));
+cek("pengajar lain tidak boleh menghapus", !bolehHapus(dosenB, ujianAyu));
 
 // Baris lama, dari sebelum kolom created_by_id ada.
 const ujianLamaDosen: Kepemilikan = { lecturerId: 7, createdBy: "Dr. Ayu", createdById: null };
 const ujianLamaAdmin: Kepemilikan = { lecturerId: null, createdBy: "Admin Umum", createdById: null };
 cek("ujian lama tetap dikenali pemiliknya lewat lecturerId", pemilik(dosenA, ujianLamaDosen));
-cek("ujian lama milik dosen lain tetap tertutup", !pemilik(dosenB, ujianLamaDosen));
+cek("ujian lama milik pengajar lain tetap tertutup", !pemilik(dosenB, ujianLamaDosen));
 cek("ujian lama buatan admin dikenali lewat namanya", pemilik(admin, ujianLamaAdmin));
 cek("nama yang berbeda tidak menjadikannya pemilik", !pemilik(superAdmin, ujianLamaAdmin));
 
-// Dosen yang akun profilnya baru DISAMBUNGKAN ke baris dosen sesudah ujiannya
+// Pengajar yang akun profilnya baru DISAMBUNGKAN ke baris pengajar sesudah ujiannya
 // dibuat. Ujiannya lahir tanpa lecturerId; kalau kepemilikan lama hanya dilihat
 // dari kolom itu, penyambungan justru merampas ujiannya sendiri.
 const dosenBaruTersambung: Pemakai = { id: "u-c", fullName: "Dr. Citra", role: "dosen", lecturerId: 12 };
 const ujianCitraLama: Kepemilikan = { lecturerId: null, createdBy: "Dr. Citra", createdById: null };
-cek("penyambungan baris dosen tidak merampas ujian lamanya sendiri",
+cek("penyambungan baris pengajar tidak merampas ujian lamanya sendiri",
     pemilik(dosenBaruTersambung, ujianCitraLama));
-cek("ujian lama tanpa lecturerId tetap tertutup bagi dosen lain",
+cek("ujian lama tanpa lecturerId tetap tertutup bagi pengajar lain",
     !pemilik(dosenB, ujianCitraLama));
 
 // ---------- 3. UJIAN GANDA ----------
@@ -126,8 +126,8 @@ cek("orang baru dengan perangkat baru diterima",
     periksaGanda({ nim: "3333", nameKey: "dedi kurnia", deviceId: "hp-dedi" }, riwayat).ok);
 
 const namaKembar = periksaGanda({ nim: "9999", nameKey: "budi santoso", deviceId: "hp-lain" }, riwayat);
-cek("nama sama dengan NIM berbeda ditolak", !namaKembar.ok);
-cek("penolakannya menyebut NIM yang sudah terdaftar",
+cek("nama sama dengan NOMOR PESERTA berbeda ditolak", !namaKembar.ok);
+cek("penolakannya menyebut NOMOR PESERTA yang sudah terdaftar",
     !namaKembar.ok && namaKembar.pesan.includes("1111"), !namaKembar.ok ? namaKembar.pesan : "");
 
 const perangkatKembar = periksaGanda({ nim: "9999", nameKey: "eka putri", deviceId: "hp-budi" }, riwayat);
@@ -137,9 +137,9 @@ cek("penolakannya menyebut perangkat",
 
 // Yang paling penting: orang yang kembali ke ujiannya SENDIRI tidak boleh
 // tertahan oleh pemeriksaan yang ditujukan kepada orang lain.
-cek("NIM yang sama kembali dengan perangkatnya sendiri tetap lolos",
+cek("NOMOR PESERTA yang sama kembali dengan perangkatnya sendiri tetap lolos",
     periksaGanda({ nim: "1111", nameKey: "budi santoso", deviceId: "hp-budi" }, riwayat).ok);
-cek("NIM yang sama kembali dari perangkat lain tetap lolos",
+cek("NOMOR PESERTA yang sama kembali dari perangkat lain tetap lolos",
     periksaGanda({ nim: "1111", nameKey: "budi santoso", deviceId: "laptop-pinjam" }, riwayat).ok);
 
 // Laboratorium: satu komputer memang dipakai bergantian sepanjang hari.

@@ -1,6 +1,6 @@
 // Uji alamat situs CBT sesudah ia pindah ke subdomainnya sendiri.
 //
-// Yang diuji di sini menentukan ke mana mahasiswa mendarat saat membuka
+// Yang diuji di sini menentukan ke mana peserta mendarat saat membuka
 // tautan ujian dari grup kelas — jadi salahnya tidak terasa sebagai bug
 // kecil, melainkan sebagai satu kelas yang tidak bisa mulai ujian. Semuanya
 // fungsi murni, sehingga dapat dibuktikan di sini tanpa menyalakan server.

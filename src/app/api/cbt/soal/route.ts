@@ -1,8 +1,8 @@
 // ============================================================
 // CBT — BANK SOAL
 //
-// GET    daftar soal satu ujian, LENGKAP dengan kuncinya — hanya untuk dosen
-//        pemiliknya dan admin. Jalur mahasiswa tidak pernah lewat sini.
+// GET    daftar soal satu ujian, LENGKAP dengan kuncinya — hanya untuk pengajar
+//        pemiliknya dan admin. Jalur peserta tidak pernah lewat sini.
 // POST   tambah soal (satu, atau banyak sekaligus dari tempel-tempelan)
 // PATCH  ubah satu soal
 // DELETE hapus satu soal
@@ -30,7 +30,7 @@ const MEDIA: JenisMedia[] = ["", "gambar", "video"];
  *
  * Hanya http(s), dan hanya sampai seribu huruf. Yang ditahan di sini terutama
  * "javascript:" dan "data:" — keduanya berubah menjadi jalan menjalankan kode
- * begitu tautannya dipasang pada halaman yang dibuka mahasiswa.
+ * begitu tautannya dipasang pada halaman yang dibuka peserta.
  */
 function tautanAman(nilai: unknown): string {
   const isi = String(nilai ?? "").trim().slice(0, 1000);
@@ -69,7 +69,7 @@ function rapikanPasangan(mentah: unknown, pilihan: string[]): Pasangan[] {
  * Bersihkan dan periksa satu soal.
  *
  * Soal yang kuncinya tidak sah lebih berbahaya daripada soal yang tidak ada:
- * ia tampak beres di layar dosen, lalu menyalahkan seluruh mahasiswa yang
+ * ia tampak beres di layar pengajar, lalu menyalahkan seluruh peserta yang
  * sebenarnya menjawab benar.
  */
 function rapikanSoal(m: Masukan): { ok: true; nilai: Record<string, unknown> } | { ok: false; pesan: string } {
@@ -88,7 +88,7 @@ function rapikanSoal(m: Masukan): { ok: true; nilai: Record<string, unknown> } |
   const mediaUrl = tautanAman(mediaMentah.url);
   const mediaJenisDiminta = String(mediaMentah.jenis ?? "") as JenisMedia;
   // Media tanpa tautan yang sah bukan media. Menyimpan jenisnya saja
-  // menyediakan kotak gambar yang selamanya kosong di layar mahasiswa.
+  // menyediakan kotak gambar yang selamanya kosong di layar peserta.
   const mediaJenis: JenisMedia = mediaUrl && MEDIA.includes(mediaJenisDiminta) && mediaJenisDiminta !== ""
     ? mediaJenisDiminta
     : mediaUrl ? "gambar" : "";
@@ -121,7 +121,7 @@ function rapikanSoal(m: Masukan): { ok: true; nilai: Record<string, unknown> } |
     pilihan = [];
     if (!kunci) return { ok: false, pesan: "Kunci jawaban isian singkat belum diisi." };
   } else {
-    // Essay tidak punya kunci; ia menunggu dosen.
+    // Essay tidak punya kunci; ia menunggu pengajar.
     pilihan = [];
     kunci = "";
   }
@@ -156,7 +156,7 @@ function rapikanSoal(m: Masukan): { ok: true; nilai: Record<string, unknown> } |
  * Dua tingkat izin, dan perbedaannya penting: MEMBACA bank soal terbuka bagi
  * admin yang memantau, sedangkan MENGUBAHNYA hanya bagi pemilik ujiannya.
  * Sebelumnya keduanya satu pintu, dan itu berarti setiap admin dapat menyunting
- * soal kelas dosen mana pun.
+ * soal kelas pengajar mana pun.
  */
 async function ujianMilikSaya(examId: number, izin: "pantau" | "ubah" = "ubah") {
   const profile = await getCurrentProfile();
@@ -174,8 +174,8 @@ async function ujianMilikSaya(examId: number, izin: "pantau" | "ubah" = "ubah") 
           success: false,
           message:
             izin === "ubah"
-              ? "Soal ujian ini hanya dapat diubah dosen pemiliknya."
-              : "Ujian ini milik dosen lain.",
+              ? "Soal ujian ini hanya dapat diubah pengajar pemiliknya."
+              : "Ujian ini milik pengajar lain.",
         },
         { status: 403 },
       ),
@@ -275,7 +275,7 @@ export async function POST(request: Request) {
       return Response.json({ success: false, message: ditolak[0] || "Soal tidak sah." }, { status: 400 });
     }
 
-    // Barisnya dikembalikan, bukan hanya jumlahnya. Panel dosen memasang soal
+    // Barisnya dikembalikan, bukan hanya jumlahnya. Panel pengajar memasang soal
     // barunya ke layar seketika lalu menukarnya dengan baris asli begitu
     // jawaban ini tiba — tanpa id yang sebenarnya, ia harus memuat ulang
     // seluruh bank soal hanya untuk satu soal yang baru ditambahkan.

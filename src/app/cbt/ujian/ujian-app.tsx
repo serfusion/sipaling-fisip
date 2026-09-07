@@ -1,10 +1,10 @@
 "use client";
 
 // ============================================================
-// HALAMAN UJIAN MAHASISWA — TANPA LOGIN
+// HALAMAN UJIAN PESERTA — TANPA LOGIN
 //
 // Empat layar, dan tidak lebih: kode → identitas → mengerjakan → selesai.
-// Setiap layar tambahan adalah satu tempat lagi bagi mahasiswa untuk tersesat
+// Setiap layar tambahan adalah satu tempat lagi bagi peserta untuk tersesat
 // lima menit sebelum ujian dimulai.
 //
 // Tiga hal yang menentukan rancangannya:
@@ -15,7 +15,7 @@
 //   2. AUTO-SAVE TIDAK BOLEH MENAKUTKAN. Jaringan kampus putus-nyambung.
 //      Kegagalan menyimpan ditandai tenang lalu dicoba lagi, bukan
 //      dilemparkan sebagai galat merah yang membuat orang berhenti mengerjakan.
-//   3. PONSEL DULU. Sebagian besar mahasiswa mengerjakannya dari HP.
+//   3. PONSEL DULU. Sebagian besar peserta mengerjakannya dari HP.
 // ============================================================
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -72,7 +72,7 @@ const JEDA_SIMPAN_MS = 900;
  *
  * Jeda 900 milidetik di atas menyimpan sesudah mengetik BERHENTI SEJENAK, dan
  * itu menutup hampir semua keadaan — kecuali satu yang justru paling mahal:
- * mahasiswa yang mengetik essay tanpa jeda selama sepuluh menit tidak pernah
+ * peserta yang mengetik essay tanpa jeda selama sepuluh menit tidak pernah
  * memicunya sekali pun, karena jedanya disetel ulang pada tiap ketukan. Denyut
  * ini yang menutupnya.
  *
@@ -118,7 +118,7 @@ function penandaPerangkat() {
  * Lamanya ujian, dieja seperti orang mengucapkannya.
  *
  * "90 menit" benar tetapi tidak langsung terbayang; "1 jam 30 menit" langsung
- * terbayang. Mahasiswa yang membuka tautannya perlu tahu ia harus menyediakan
+ * terbayang. Peserta yang membuka tautannya perlu tahu ia harus menyediakan
  * berapa lama SEBELUM menekan Mulai Ujian, bukan sesudah jam mundur berjalan.
  */
 function ejaMenit(menit: number) {
@@ -212,7 +212,7 @@ export default function UjianApp() {
     } catch {
       // Laporan yang gagal terkirim tidak boleh mengganggu ujiannya. Yang
       // hilang hanya satu catatan; yang tidak boleh hilang adalah pekerjaan
-      // mahasiswanya.
+      // pesertanya.
       return "";
     }
   }, []);
@@ -236,7 +236,7 @@ export default function UjianApp() {
 
   // ---------- kode dari alamat: tautan yang dibagikan langsung terbuka ----------
   //
-  // Dosen menempelkan tautannya ke grup kelas; mahasiswa yang menekannya harus
+  // Pengajar menempelkan tautannya ke grup kelas; peserta yang menekannya harus
   // langsung melihat ujiannya, bukan layar kosong dengan kode yang sudah
   // terisi tetapi masih menunggu satu ketukan lagi.
   //
@@ -301,7 +301,7 @@ export default function UjianApp() {
         setLayar("kerja");
       })
       .catch(() => {
-        // Gagal memulihkan bukan alasan menampilkan galat: mahasiswanya
+        // Gagal memulihkan bukan alasan menampilkan galat: pesertanya
         // mungkin memang sedang membuka halaman ini untuk ujian yang lain.
       });
     return () => { hidup = false; };
@@ -344,7 +344,7 @@ export default function UjianApp() {
       }
 
       // Jawaban yang belum sampai ke server TIDAK boleh ikut terkumpul diam-
-      // diam. Mahasiswa yang menekan "Kumpulkan" sambil melihat palet hijau
+      // diam. Peserta yang menekan "Kumpulkan" sambil melihat palet hijau
       // berhak tahu bahwa sebagian jawabannya masih tertahan di perangkatnya.
       if (tertinggal > 0 && !otomatis) {
         setSimpanan("tertunda");
@@ -535,7 +535,7 @@ export default function UjianApp() {
     const denyut = setInterval(() => {
       if (!kunciRef.current) return;
       // Ada yang tertahan di antrean → kirim. Tidak ada → tetap menyapa server
-      // sekali, supaya papan pantau dosen tahu layar ini masih hidup dan sisa
+      // sekali, supaya papan pantau pengajar tahu layar ini masih hidup dan sisa
       // waktunya ikut diluruskan.
       if (antreRef.current.size > 0) {
         void kirimAntrean();
@@ -572,7 +572,7 @@ export default function UjianApp() {
    * Keluar tanpa mengumpulkan.
    *
    * Ujiannya TIDAK ditutup — attempt-nya tetap berjalan di server beserta sisa
-   * waktunya, dan mahasiswa dapat masuk lagi dengan NIM yang sama untuk
+   * waktunya, dan peserta dapat masuk lagi dengan nomor yang sama untuk
    * menemukan lembar yang persis sama. Yang dihapus hanya ingatan peramban ini.
    * Waktunya tetap berjalan, dan itu dikatakan terus terang di kotak
    * konfirmasinya, bukan disembunyikan.
@@ -580,7 +580,7 @@ export default function UjianApp() {
   function keluar() {
     const setuju = window.confirm(
       "Keluar dari halaman ujian?\n\n" +
-        "Jawaban yang sudah tersimpan tidak hilang, dan kamu dapat masuk lagi dengan NIM yang " +
+        "Jawaban yang sudah tersimpan tidak hilang, dan kamu dapat masuk lagi dengan nomor yang " +
         "sama. Tetapi WAKTU UJIAN TERUS BERJALAN selama kamu di luar.",
     );
     if (!setuju) return;
@@ -627,7 +627,7 @@ export default function UjianApp() {
    * Keadaan satu soal pada palet nomor. Tiga warna, persis seperti legendanya.
    *
    * Urutannya menentukan: soal yang sudah dijawab LALU ditandai ragu-ragu tetap
-   * terbaca oranye, karena itulah yang ingin dilihat mahasiswa — daftar soal
+   * terbaca oranye, karena itulah yang ingin dilihat peserta — daftar soal
    * yang sengaja ia sisihkan untuk ditengok lagi sebelum mengumpulkan.
    *
    * Soal yang sedang dibuka tidak mendapat warna keempat; ia diberi bingkai
@@ -667,7 +667,7 @@ export default function UjianApp() {
         <h2>Masuk ke ujianmu</h2>
         <p className="cbtd-lead">
           Tidak perlu membuat akun dan tidak perlu kata sandi. Masukkan kode ujian yang diberikan
-          dosenmu.
+          pengajarmu.
         </p>
         <label htmlFor="uj-kode">Kode Ujian</label>
         <input
@@ -714,7 +714,7 @@ export default function UjianApp() {
 
           {/* ---------- LAMA UJIAN, DIKATAKAN SEKALI LAGI DENGAN JELAS ----------
               Angka pada kotak fakta di atas mudah terlewat: tiga kotak seukuran
-              yang dibaca sekilas. Yang paling ditanyakan mahasiswa saat membuka
+              yang dibaca sekilas. Yang paling ditanyakan peserta saat membuka
               tautannya justru satu hal — ini berapa lama — dan ia perlu tahu
               SEBELUM menekan Mulai Ujian, bukan sesudah jam mundur berjalan. */}
           <div className="uj-waktu">
@@ -744,8 +744,8 @@ export default function UjianApp() {
               <label htmlFor="uj-nama">Nama Lengkap</label>
               <input id="uj-nama" className="uj-input" value={nama} onChange={(e) => setNama(e.target.value)} placeholder="Nama sesuai daftar hadir" autoComplete="name" />
 
-              <label htmlFor="uj-nim">NIM</label>
-              <input id="uj-nim" className="uj-input" value={nim} onChange={(e) => setNim(e.target.value.replace(/\D/g, ""))} placeholder="Nomor induk mahasiswa" inputMode="numeric" autoComplete="off" />
+              <label htmlFor="uj-nim">Nomor Peserta</label>
+              <input id="uj-nim" className="uj-input" value={nim} onChange={(e) => setNim(e.target.value.replace(/\D/g, ""))} placeholder="Nomor induk peserta" inputMode="numeric" autoComplete="off" />
 
               {ujian.pakaiToken && (
                 <>
@@ -783,7 +783,7 @@ export default function UjianApp() {
         poin={[
           "Jawabanmu sudah tersimpan di server.",
           "Halaman ini boleh ditutup.",
-          "Nilai essay menunggu koreksi dosen bila ada.",
+          "Nilai essay menunggu koreksi pengajar bila ada.",
         ]}
       >
         <div className="uj-dalam-rangka uj-kotak-selesai">
@@ -813,13 +813,13 @@ export default function UjianApp() {
               )}
               {hasil.tertunda > 0 && (
                 <p className="uj-catatan">
-                  {hasil.tertunda} soal essay menunggu koreksi dosen, jadi nilai ini masih bisa naik.
+                  {hasil.tertunda} soal essay menunggu koreksi pengajar, jadi nilai ini masih bisa naik.
                 </p>
               )}
             </>
           ) : (
             <p className="uj-catatan">
-              Nilaimu diumumkan dosen setelah seluruh peserta selesai.
+              Nilaimu diumumkan pengajar setelah seluruh peserta selesai.
             </p>
           )}
 

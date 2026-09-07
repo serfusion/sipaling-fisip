@@ -3,13 +3,13 @@
 //
 // Tiga berkas cetak, dan semuanya dirakit sebagai HTML lalu dibuka pada
 // jendela tersendiri untuk dicetak atau disimpan sebagai PDF. Cara ini sudah
-// dipakai portal untuk surat tugas dan laporan antrean, jadi dosennya sudah
+// dipakai portal untuk surat tugas dan laporan antrean, jadi pengajarnya sudah
 // mengenalnya — dan tidak perlu ada satu pun pustaka PDF baru.
 //
 // SELURUHNYA FUNGSI MURNI: masuk data, keluar untai HTML. Tidak menyentuh
 // jendela, dokumen, maupun jaringan, sehingga isinya dapat diuji apa adanya —
 // dan yang paling perlu diuji di sini adalah bahwa KUNCI JAWABAN tidak ikut
-// tercetak pada naskah yang dibagikan ke mahasiswa.
+// tercetak pada naskah yang dibagikan ke peserta.
 // ============================================================
 import { JENIS_LABEL, type JenisSoal, type Media, type Pasangan } from "@/lib/cbt";
 
@@ -44,7 +44,7 @@ const HURUF = "ABCDEFGH";
 /**
  * Lolos-kan teks sebelum masuk HTML.
  *
- * Soal ditulis dosen, dan tanda < > & muncul wajar pada rumus dan nama
+ * Soal ditulis pengajar, dan tanda < > & muncul wajar pada rumus dan nama
  * ("McCombs & Shaw", "x < y"). Tanpa ini, satu tanda kurung siku membuat sisa
  * naskahnya hilang dari halaman cetak — dan hilangnya diam-diam.
  */
@@ -158,7 +158,7 @@ function barisKeterangan(pasangan: Array<[string, string]>) {
  * Naskah soal siap cetak — cadangan ketika listrik padam atau jaringan mati.
  *
  * `denganKunci` menentukan dua berkas yang sama sekali berbeda peruntukannya:
- * yang dibagikan ke mahasiswa, dan yang dipegang pengawas. Kunci jawaban
+ * yang dibagikan ke peserta, dan yang dipegang pengawas. Kunci jawaban
  * TIDAK PERNAH ikut kecuali diminta tegas — naskah cadangan yang tercetak
  * beserta kuncinya lalu dibagikan adalah cara tercepat menggagalkan ujian.
  */
@@ -228,21 +228,21 @@ export function naskahSoalHtml(
   const isi = `
 ${kop(ujian, denganKunci ? "NASKAH SOAL DAN KUNCI JAWABAN" : "NASKAH SOAL UJIAN")}
 ${barisKeterangan([
-  ["Mata Kuliah", ujian.mataKuliah],
+  ["Mata Uji", ujian.mataKuliah],
   ["Nama Ujian", ujian.judul],
   ["Kelas", ujian.kelas || "-"],
   ["Waktu", `${ujian.durasi} menit`],
   ["Jumlah Soal", `${soal.length} butir`],
   ["Total Bobot", `${soal.reduce((n, s) => n + s.bobot, 0)} poin`],
 ])}
-${denganKunci ? '<div class="petunjuk"><b>BERKAS PENGAWAS: JANGAN DIBAGIKAN KE MAHASISWA.</b>Berkas ini memuat kunci jawaban.</div>' : ""}
+${denganKunci ? '<div class="petunjuk"><b>BERKAS PENGAWAS: JANGAN DIBAGIKAN KE PESERTA.</b>Berkas ini memuat kunci jawaban.</div>' : ""}
 <div class="petunjuk">
   <b>PETUNJUK</b>
   ${ujian.instruksi ? `${lolos(ujian.instruksi)}<br>` : ""}
-  Tulis nama dan NIM pada lembar jawaban. Kerjakan dengan pulpen. Naskah ini adalah
+  Tulis nama dan nomor peserta pada lembar jawaban. Kerjakan dengan pulpen. Naskah ini adalah
   cadangan tercetak; bila ujian daring dapat dilanjutkan, ikuti arahan pengawas.
 </div>
-${!denganKunci ? barisKeterangan([["Nama", "……………………………………………"], ["NIM", "……………………………………………"], ["Tanda Tangan", "……………………………………………"]]) : ""}
+${!denganKunci ? barisKeterangan([["Nama", "……………………………………………"], ["Nomor Peserta", "……………………………………………"], ["Tanda Tangan", "……………………………………………"]]) : ""}
 <ol class="soal">${daftar}</ol>
 <div class="kaki">Kode ujian ${lolos(ujian.kode)} · dicetak ${tanggalPanjang(new Date().toISOString())}</div>`;
 
@@ -297,7 +297,7 @@ export function beritaAcaraHtml(ujian: UjianCetak, acara: BeritaAcara): string {
   const daftarLanggar = urut.length === 0
     ? "<p>Tidak ada pelanggaran yang tercatat sistem selama ujian berlangsung.</p>"
     : `<table class="nilai">
-        <tr><th>NIM</th><th>Nama</th><th>Integritas</th><th>Pindah tab</th><th>Keluar layar penuh</th><th>Keterangan</th></tr>
+        <tr><th>No. Peserta</th><th>Nama</th><th>Integritas</th><th>Pindah tab</th><th>Keluar layar penuh</th><th>Keterangan</th></tr>
         ${urut.map((p) => `<tr><td>${lolos(p.nim)}</td><td>${lolos(p.nama)}</td>
           <td>${typeof p.integritas === "number" ? `${p.integritas}/100` : "—"}</td>
           <td>${p.pindahTab}×</td><td>${p.keluarFullscreen}×</td>
@@ -305,13 +305,13 @@ export function beritaAcaraHtml(ujian: UjianCetak, acara: BeritaAcara): string {
       </table>
       <p class="media-catatan">Catatan sistem ini adalah penanda, bukan putusan, dan skor
       integritas BUKAN nilai ujian. Rincian tiap kejadian beserta jamnya ada pada lembar
-      pengawasan masing-masing peserta. Penentuan pelanggaran tetap pada pengawas dan dosen
+      pengawasan masing-masing peserta. Penentuan pelanggaran tetap pada pengawas dan pengajar
       pengampu.</p>`;
 
   const isi = `
 ${kop(ujian, "BERITA ACARA PELAKSANAAN UJIAN")}
 ${barisKeterangan([
-  ["Mata Kuliah", ujian.mataKuliah],
+  ["Mata Uji", ujian.mataKuliah],
   ["Nama Ujian", ujian.judul],
   ["Kelas", ujian.kelas || "-"],
   ["Kode Ujian", ujian.kode],
@@ -338,7 +338,7 @@ ${daftarLanggar}
 <p>Demikian berita acara ini dibuat dengan sebenarnya untuk dipergunakan sebagaimana mestinya.</p>
 
 <table class="ttd">
-  <tr><td>Mengetahui,<br>Dosen Pengampu</td><td>Pengawas Ujian</td></tr>
+  <tr><td>Mengetahui,<br>Pengajar Pengampu</td><td>Pengawas Ujian</td></tr>
   <tr><td class="ruang"></td><td class="ruang"></td></tr>
   <tr><td>(………………………………)</td><td>(${lolos(acara.pengawas || "………………………………")})</td></tr>
 </table>`;
@@ -392,7 +392,7 @@ export function laporanPesertaHtml(
         <td>${lolos(r.jawabanTeks) || "<i>tidak dijawab</i>"}</td>
         <td>${tanda}</td>
         <td>${r.poin} / ${r.bobot}</td>
-      </tr>${r.catatan ? `<tr><td></td><td colspan="5"><i>Catatan dosen: ${lolos(r.catatan)}</i></td></tr>` : ""}`;
+      </tr>${r.catatan ? `<tr><td></td><td colspan="5"><i>Catatan pengajar: ${lolos(r.catatan)}</i></td></tr>` : ""}`;
     })
     .join("");
 
@@ -400,8 +400,8 @@ export function laporanPesertaHtml(
 ${kop(ujian, "LAPORAN HASIL UJIAN PESERTA")}
 ${barisKeterangan([
   ["Nama", peserta.nama],
-  ["NIM", peserta.nim],
-  ["Mata Kuliah", ujian.mataKuliah],
+  ["Nomor Peserta", peserta.nim],
+  ["Mata Uji", ujian.mataKuliah],
   ["Nama Ujian", ujian.judul],
   ["Kelas", ujian.kelas || "-"],
   ["Mulai Mengerjakan", tanggalPanjang(peserta.mulai)],
@@ -416,7 +416,7 @@ ${barisKeterangan([
   ${peserta.sebagian ? `<tr><th>Benar sebagian</th><td>${peserta.sebagian} butir</td></tr>` : ""}
   <tr><th>Salah</th><td>${peserta.salah} butir</td></tr>
   <tr><th>Tidak dijawab</th><td>${peserta.kosong} butir</td></tr>
-  ${peserta.tertunda ? `<tr><th>Menunggu koreksi dosen</th><td>${peserta.tertunda} butir</td></tr>` : ""}
+  ${peserta.tertunda ? `<tr><th>Menunggu koreksi pengajar</th><td>${peserta.tertunda} butir</td></tr>` : ""}
 </table>
 
 <h3>B. Rincian jawaban</h3>
@@ -431,7 +431,7 @@ ${peserta.pindahTab > 0 || peserta.keluarFullscreen > 0 ? `
 Catatan ini penanda, bukan putusan.</p>` : ""}
 
 <table class="ttd">
-  <tr><td>Dosen Pengampu</td><td>Mahasiswa</td></tr>
+  <tr><td>Pengajar Pengampu</td><td>Peserta</td></tr>
   <tr><td class="ruang"></td><td class="ruang"></td></tr>
   <tr><td>(………………………………)</td><td>(${lolos(peserta.nama)})</td></tr>
 </table>`;

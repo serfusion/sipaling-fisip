@@ -1,16 +1,16 @@
 // ============================================================
-// CBT — JALUR MAHASISWA (TANPA LOGIN)
+// CBT — JALUR PESERTA (TANPA LOGIN)
 //
 // Ini satu-satunya jalur yang terbuka untuk umum, dan karena itu ia yang
 // paling ketat aturannya:
 //
 //   1. KUNCI JAWABAN TIDAK PERNAH IKUT KELUAR sebelum ujiannya selesai. Yang
 //      dikirim hanya pertanyaan dan pilihan yang sudah diacak.
-//   2. WAKTU DIHITUNG DI SERVER. Jam di peramban mahasiswa dapat diputar
+//   2. WAKTU DIHITUNG DI SERVER. Jam di peramban peserta dapat diputar
 //      mundur; kalau batasnya dihitung di sana, ujian enam puluh menit dapat
 //      dikerjakan semalaman.
 //   3. IDENTITASNYA MELEKAT PADA ATTEMPT, bukan pada akun. Sesudah masuk,
-//      yang dipegang perambannya adalah kunci sesi acak — bukan NIM, yang
+//      yang dipegang perambannya adalah kunci sesi acak — bukan nomor peserta, yang
 //      dapat ditebak siapa pun yang tahu pola nomor induk kampus.
 //
 // GET  ?kode=XXXX      lihat ujian, sebelum masuk
@@ -41,8 +41,15 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Berapa angka minimal sebuah NIM. Menahan salah ketik, bukan memvalidasi. */
-const NIM_MIN = 6;
+/**
+ * Berapa angka minimal sebuah nomor peserta. Menahan salah ketik, bukan
+ * memvalidasi.
+ *
+ * Medannya tetap bernama `nim` di kabel dan di basis data. Nama itu peninggalan
+ * dan sengaja tidak diganti: mengubahnya adalah migrasi skema beserta perubahan
+ * yang memutus API, tanpa satu pun keuntungan yang terlihat pengguna.
+ */
+const NOMOR_MIN = 6;
 
 function kunciSesiBaru() {
   return randomBytes(24).toString("hex");
@@ -105,7 +112,7 @@ export async function GET(request: Request) {
   }
 }
 
-/** Soal untuk layar mahasiswa: pertanyaan dan pilihan saja. */
+/** Soal untuk layar peserta: pertanyaan dan pilihan saja. */
 function lembarUntukLayar(bank: Soal[], lembar: Array<{ id: number; peta: number[] }>) {
   const peta = new Map(bank.map((s) => [s.id, s]));
   return lembar
@@ -181,7 +188,7 @@ function hitunganInsiden(a: Attempt): HitunganInsiden {
 /**
  * Nilai dan tutup satu attempt.
  *
- * Dipakai dua jalur: mahasiswa yang menekan "kumpulkan", dan pengumpulan
+ * Dipakai dua jalur: peserta yang menekan "kumpulkan", dan pengumpulan
  * PAKSA oleh aturan pengawasan. Keduanya harus melewati jalan yang sama persis
  * — attempt yang ditutup paksa tanpa dinilai akan muncul di rekap dengan nilai
  * nol, dan yang terlihat bukan "dihentikan pengawas" melainkan "menjawab semua
@@ -205,7 +212,7 @@ async function nilaiDanTutup(
 
   const ringkas = hitungNilai(dipakai, jawaban, petaPilihan, ujian.passingGrade);
 
-  // Tiap jawaban ikut dinilai satu per satu, supaya dosen dapat melihat mana
+  // Tiap jawaban ikut dinilai satu per satu, supaya pengajar dapat melihat mana
   // yang benar dan mana yang salah tanpa menghitung ulang.
   for (const soal of dipakai) {
     const isi = String(jawaban[soal.id] ?? "");
@@ -271,10 +278,10 @@ export async function POST(request: Request) {
         return Response.json({ success: false, message: pesan, status }, { status: 409 });
       }
 
-      const identitas = periksaMasuk(body, { token: ujian.token, nimMin: NIM_MIN });
+      const identitas = periksaMasuk(body, { token: ujian.token, nimMin: NOMOR_MIN });
       if (!identitas.ok) return Response.json({ success: false, message: identitas.pesan }, { status: 400 });
 
-      // Attempt yang masih berjalan dikembalikan apa adanya. Mahasiswa yang
+      // Attempt yang masih berjalan dikembalikan apa adanya. Peserta yang
       // ponselnya mati lalu masuk lagi harus menemukan lembar yang SAMA,
       // dengan sisa waktu yang terus berjalan — bukan ujian baru yang kosong.
       const seluruhnya = await db
@@ -284,24 +291,24 @@ export async function POST(request: Request) {
 
       // JATAH PERCOBAAN BERLAKU PER PELAKSANAAN, bukan seumur hidup ujian.
       //
-      // Ketika dosen membuka kembali ujian yang sudah tutup — ujian susulan,
+      // Ketika pengajar membuka kembali ujian yang sudah tutup — ujian susulan,
       // ujian ulang, atau jadwal yang digeser karena listrik padam — yang ia
       // mulai adalah pelaksanaan yang BARU. Percobaan dari pelaksanaan
       // sebelumnya tidak boleh ikut menghabiskan jatahnya; kalau ikut, ujian
-      // yang sudah dijadwalkan ulang tetap menolak seluruh mahasiswa yang
-      // pernah masuk, dan dosen tidak punya jalan lain selain menghapus hasil
+      // yang sudah dijadwalkan ulang tetap menolak seluruh peserta yang
+      // pernah masuk, dan pengajar tidak punya jalan lain selain menghapus hasil
       // lamanya.
       //
       // Batasnya JAM AKTIVASI, bukan jam mulai. Jam mulai tidak cukup: untuk
-      // membuka ujian saat itu juga, dosen justru menyetel jam mulai mundur ke
+      // membuka ujian saat itu juga, pengajar justru menyetel jam mulai mundur ke
       // pagi hari, sehingga percobaan lama hari itu tetap berada di dalam
-      // jendelanya dan mahasiswanya tetap tertolak. Jam aktivasi hanya maju
+      // jendelanya dan pesertanya tetap tertolak. Jam aktivasi hanya maju
       // ketika ujiannya memang dibuka kembali — lihat pelaksanaanBaru di
       // src/app/api/cbt/aktivasi/route.ts.
       const sudah = attemptPelaksanaanIni(seluruhnya, ujian);
 
       // Lembar yang masih hidup dicari dari SELURUH riwayat, bukan dari
-      // saringan di atas. Mahasiswa yang sedang mengerjakan ketika dosennya
+      // saringan di atas. Peserta yang sedang mengerjakan ketika pengajarnya
       // menambah waktu harus menemukan lembarnya kembali beserta sisa
       // waktunya; disaring lebih dulu, ia justru mendapat lembar baru yang
       // kosong dan jawaban yang sudah diketiknya seolah hilang.
@@ -324,7 +331,7 @@ export async function POST(request: Request) {
 
       // ---------- SATU ORANG, SATU KALI ----------
       // Diperiksa SESUDAH jalur "lanjutkan yang masih berjalan" di atas,
-      // supaya mahasiswa yang kembali ke ujiannya sendiri tidak pernah
+      // supaya peserta yang kembali ke ujiannya sendiri tidak pernah
       // tertahan oleh pemeriksaan yang ditujukan kepada orang lain.
       if (sudah.length >= ujian.maxAttempts) {
         return Response.json(
@@ -332,15 +339,15 @@ export async function POST(request: Request) {
             success: false,
             message:
               ujian.maxAttempts === 1
-                ? "NIM ini sudah mengerjakan ujian tersebut. Satu kali percobaan saja."
-                : `NIM ini sudah memakai ${sudah.length} dari ${ujian.maxAttempts} percobaan.`,
+                ? "Nomor peserta ini sudah mengerjakan ujian tersebut. Satu kali percobaan saja."
+                : `Nomor peserta ini sudah memakai ${sudah.length} dari ${ujian.maxAttempts} percobaan.`,
           },
           { status: 409 },
         );
       }
 
       // Nama dan perangkat diperiksa terhadap SELURUH peserta ujian ini, bukan
-      // hanya terhadap NIM yang sama. Kolomnya sengaja sedikit: daftar peserta
+      // hanya terhadap nomor yang sama. Kolomnya sengaja sedikit: daftar peserta
       // dapat berisi ratusan baris, dan lembar soal masing-masing tidak ada
       // gunanya di sini.
       const nameKey = kunciNama(identitas.nama);
@@ -398,7 +405,7 @@ export async function POST(request: Request) {
           // Nomor percobaan dihitung dari SELURUH riwayat, bukan dari jendela
           // ini saja. Indeks unik (ujian, nim, nomor) menolak nomor yang
           // terpakai, dan memulai lagi dari 1 pada pelaksanaan berikutnya akan
-          // menabrak baris lama — persis pada saat mahasiswa menekan Mulai.
+          // menabrak baris lama — persis pada saat peserta menekan Mulai.
           attemptNo: seluruhnya.reduce((n, a) => Math.max(n, a.attemptNo), 0) + 1,
           sessionKey: kunciSesi,
           seed: benih,
@@ -479,8 +486,8 @@ export async function POST(request: Request) {
     }
 
     // ---------- DENYUT ----------
-    // Peramban mahasiswa menyapa tiap sepuluh detik. Dua gunanya, dan
-    // dua-duanya penting: papan pantau dosen dapat membedakan "sedang
+    // Peramban peserta menyapa tiap sepuluh detik. Dua gunanya, dan
+    // dua-duanya penting: papan pantau pengajar dapat membedakan "sedang
     // mengerjakan" dari "layarnya mati sejak sepuluh menit lalu", dan sisa
     // waktu yang berlaku — yang dihitung SERVER — dikembalikan untuk
     // meluruskan jam di perambannya.
@@ -508,7 +515,7 @@ export async function POST(request: Request) {
       const mode = rapikanMode(ujian.proctorMode);
 
       // Keterangan dari peramban dipotong pendek dan dibersihkan. Ia masuk ke
-      // basis data dan dibaca kembali di layar dosen, jadi ia diperlakukan
+      // basis data dan dibaca kembali di layar pengajar, jadi ia diperlakukan
       // sebagai kiriman orang luar — karena memang begitulah asalnya.
       const detail = String(body.detail ?? "")
         .replace(/[\u0000-\u001f\u007f]/g, " ")
@@ -589,7 +596,7 @@ export async function POST(request: Request) {
         .onConflictDoUpdate({
           target: [cbtAnswers.attemptId, cbtAnswers.questionId],
           // HANYA kolom penanda yang disentuh. Menulis ulang answer di sini
-          // akan menghapus jawaban yang sudah diketik mahasiswa hanya karena
+          // akan menghapus jawaban yang sudah diketik peserta hanya karena
           // ia menandai soalnya untuk ditinjau.
           set: { marked: tandai, updatedAt: sekarang },
         });
@@ -599,7 +606,7 @@ export async function POST(request: Request) {
     // ---------- AUTO-SAVE ----------
     if (aksi === "jawab") {
       // Lewat batas waktu, jawaban baru TIDAK diterima lagi — tetapi yang
-      // sudah tersimpan tetap dihitung. Menolak dengan galat membuat mahasiswa
+      // sudah tersimpan tetap dihitung. Menolak dengan galat membuat peserta
       // menyangka seluruh pekerjaannya hilang.
       if (sekarang.getTime() > attempt.deadlineAt.getTime()) {
         return Response.json({ success: false, habis: true, message: "Waktu ujian sudah habis." }, { status: 409 });
@@ -634,14 +641,14 @@ export async function POST(request: Request) {
 
       return Response.json({
         success: true,
-        // Nilai hanya ditampilkan bila dosennya mengizinkan. Sebagian ujian
-        // memang diumumkan belakangan, dan itu keputusan dosennya.
+        // Nilai hanya ditampilkan bila pengajarnya mengizinkan. Sebagian ujian
+        // memang diumumkan belakangan, dan itu keputusan pengajarnya.
         tampilkanNilai: ujian.showScore,
         hasil: ujian.showScore
           ? {
               nilai: ringkas.nilai, benar: ringkas.benar, salah: ringkas.salah,
               // Ikut dikirim sejak ada PG kompleks dan penjodohan. Tanpa
-              // angka ini, mahasiswa yang benar sebagian pada dua soal
+              // angka ini, peserta yang benar sebagian pada dua soal
               // membaca "1 benar, 0 salah" dari empat soal — dan dua soal
               // sisanya seolah lenyap.
               sebagian: ringkas.sebagian,

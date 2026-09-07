@@ -4,12 +4,12 @@
 // GET  keterangan: penyedia mana yang siap dipakai
 // POST naskah → soal
 //
-// YANG DIKIRIM KE SINI ADALAH TEKS, BUKAN BERKAS. Dokumen dosen disarikan di
+// YANG DIKIRIM KE SINI ADALAH TEKS, BUKAN BERKAS. Dokumen pengajar disarikan di
 // perambannya sendiri — sama seperti pengimpor Excel dan Word — sehingga
 // berkas aslinya tidak pernah singgah di server ini.
 //
 // Soal yang dihasilkan TIDAK langsung masuk bank. Ia dikembalikan sebagai
-// pratinjau, dan dosennya yang memutuskan. Dua puluh soal buatan mesin yang
+// pratinjau, dan pengajarnya yang memutuskan. Dua puluh soal buatan mesin yang
 // langsung tersimpan berarti dua puluh soal yang harus diperiksa satu per satu
 // sesudahnya — dan yang paling sering terjadi adalah tidak diperiksa sama
 // sekali.
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
     if (!ujian) return Response.json({ success: false, message: "Ujian tidak ditemukan." }, { status: 404 });
     if (!bolehUbah(profile, ujian)) {
       return Response.json(
-        { success: false, message: "Soal ujian ini hanya dapat disusun dosen pemiliknya." },
+        { success: false, message: "Soal ujian ini hanya dapat disusun pengajar pemiliknya." },
         { status: 403 },
       );
     }

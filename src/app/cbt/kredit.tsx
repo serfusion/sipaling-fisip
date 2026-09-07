@@ -2,7 +2,7 @@
 // KREDIT SITUS CBT
 //
 // Satu kalimat, dan hanya satu tempat yang menyimpannya. Ia muncul di setiap
-// layar yang dibuka mahasiswa — pintu masuk, layar identitas, layar
+// layar yang dibuka peserta — pintu masuk, layar identitas, layar
 // mengerjakan, dan layar selesai — dan karena semuanya memanggil berkas ini,
 // tidak mungkin ada satu layar yang tertinggal membawa tulisan lama.
 // ============================================================
