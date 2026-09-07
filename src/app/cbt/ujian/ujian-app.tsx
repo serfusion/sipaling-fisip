@@ -20,9 +20,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { jawabanKosong, uraiJodoh, type JenisSoal, type Media } from "@/lib/cbt";
+import { aturanMode, rapikanMode, type JenisInsiden } from "@/lib/pengawasan";
 import KreditCbt from "../kredit";
 import MediaSoal from "./media-soal";
+import { usePenjaga } from "./penjaga";
 import RangkaUjian from "./rangka-ujian";
+import TandaAir from "./tanda-air";
 
 type Ujian = {
   kode: string; judul: string; mataKuliah: string; kelas: string | null;
@@ -30,6 +33,8 @@ type Ujian = {
   durasi: number; jumlahSoal: number; pakaiToken: boolean;
   bisaKembali: boolean; tampilkanNilai: boolean;
   status: string; mulai: string | null; selesai: string | null;
+  /** Mode pengawasan: "biasa" | "ketat" | "sertifikasi". */
+  pengawasan?: string;
 };
 
 type Soal = {
@@ -153,6 +158,68 @@ export default function UjianApp() {
   useEffect(() => {
     kunciRef.current = kunciSesi;
   }, [kunciSesi]);
+
+  // ---------- PENGAWASAN ----------
+  //
+  // Modenya datang dari server bersama keterangan ujiannya, dan aturannya
+  // dibaca dari satu berkas yang sama dengan yang dipakai server. Peramban
+  // tidak pernah memutuskan sendiri seberapa ketat ia harus menjaga; kalau ia
+  // boleh, mengubah satu nilai di alat pengembang sudah cukup untuk
+  // melonggarkan seluruh penjagaan.
+  const mode = rapikanMode(ujian?.pengawasan);
+  const aturan = aturanMode(mode);
+
+  /**
+   * Laporkan satu insiden, lalu bacakan balasannya kepada peserta.
+   *
+   * Server yang memutuskan apakah ujiannya berakhir, bukan halaman ini. Kalau
+   * keputusan itu dibuat di peramban, peserta yang mematikan JavaScript-nya
+   * mendapat ujian tanpa pengawasan sama sekali — dan yang tercatat di server
+   * tetap "bersih".
+   */
+  const laporInsiden = useCallback(async (jenis: JenisInsiden, detail?: string) => {
+    const kunci = kunciRef.current;
+    if (!kunci) return "";
+    try {
+      const jawab = await fetch("/api/cbt/ikut", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aksi: "langgar", kunciSesi: kunci, jenis, detail }),
+      });
+      const data = await jawab.json();
+      if (data?.dipaksa) {
+        // Server sudah menilai dan menutup ujiannya. Yang tersisa bagi halaman
+        // ini hanya mengatakannya dengan jujur — bukan mengirim "kumpulkan"
+        // sekali lagi, yang hanya akan ditolak dan membuat layarnya menggantung
+        // pada galat yang tidak berarti apa-apa bagi pesertanya.
+        try { window.localStorage.removeItem(KUNCI_SIMPAN); } catch { /* diabaikan */ }
+        setPesanSelesai(
+          "Ujian dihentikan pengawas karena pelanggaran berulang. " +
+          "Jawaban yang sudah kamu isi tetap tersimpan dan dinilai.",
+        );
+        setHasil(null);
+        setLayar("selesai");
+      }
+      return typeof data?.pesan === "string" ? data.pesan : "";
+    } catch {
+      // Laporan yang gagal terkirim tidak boleh mengganggu ujiannya. Yang
+      // hilang hanya satu catatan; yang tidak boleh hilang adalah pekerjaan
+      // mahasiswanya.
+      return "";
+    }
+  }, []);
+
+  const penjaga = usePenjaga({ aktif: layar === "kerja", mode, lapor: laporInsiden });
+  const { akhiriLayarPenuh } = penjaga;
+
+  // Layar penuh dilepas begitu ujiannya berakhir — dikumpulkan sendiri,
+  // kehabisan waktu, atau dihentikan pengawas. Semuanya bermuara ke layar yang
+  // sama, jadi satu effect di sini menutup ketiganya sekaligus; menaruhnya di
+  // masing-masing jalur berarti satu jalur akan terlupa, dan pesertanya
+  // tertinggal terkunci di layar penuh berisi halaman hasil.
+  useEffect(() => {
+    if (layar === "selesai") akhiriLayarPenuh();
+  }, [layar, akhiriLayarPenuh]);
 
   // ---------- kode dari alamat: tautan yang dibagikan langsung terbuka ----------
   //
@@ -305,21 +372,6 @@ export default function UjianApp() {
     return () => window.clearTimeout(tunda);
   }, [layar, sisa, kumpulkan]);
 
-  // ---------- catat pindah tab ----------
-  useEffect(() => {
-    if (layar !== "kerja") return;
-    function sembunyi() {
-      if (document.visibilityState !== "hidden" || !kunciRef.current) return;
-      fetch("/api/cbt/ikut", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ aksi: "langgar", kunciSesi: kunciRef.current, jenis: "tab" }),
-      }).catch(() => undefined);
-    }
-    document.addEventListener("visibilitychange", sembunyi);
-    return () => document.removeEventListener("visibilitychange", sembunyi);
-  }, [layar]);
-
   // ---------- peringatan sebelum menutup halaman ----------
   useEffect(() => {
     if (layar !== "kerja") return;
@@ -349,6 +401,13 @@ export default function UjianApp() {
   }
 
   async function mulai() {
+    // DIPANGGIL LEBIH DULU, sebelum satu pun await. Peramban hanya mengabulkan
+    // permintaan layar penuh selama "izin ketukan" masih berlaku — beberapa
+    // detik sesudah tombolnya ditekan — dan satu permintaan jaringan yang
+    // lambat sudah cukup menghabiskannya. Meminta sesudah balasan datang akan
+    // gagal DIAM-DIAM: ujiannya berjalan tanpa layar penuh dan tidak ada yang
+    // memberi tahu siapa pun.
+    penjaga.mulaiLayarPenuh();
     setSibuk(true); setGalat("");
     try {
       const jawab = await fetch("/api/cbt/ikut", {
@@ -371,6 +430,10 @@ export default function UjianApp() {
       setNomor(0);
       setLayar("kerja");
     } catch (alasan: unknown) {
+      // Gagal masuk berarti tidak jadi mengerjakan, jadi layar penuhnya
+      // dilepas lagi. Peserta yang terkunci di layar penuh berisi pesan galat
+      // akan mengira perangkatnya yang bermasalah.
+      penjaga.akhiriLayarPenuh();
       setGalat(alasan instanceof Error ? alasan.message : "Ujian belum dapat dimulai.");
     } finally {
       setSibuk(false);
@@ -508,6 +571,7 @@ export default function UjianApp() {
         "sama. Tetapi WAKTU UJIAN TERUS BERJALAN selama kamu di luar.",
     );
     if (!setuju) return;
+    penjaga.akhiriLayarPenuh();
     try { window.localStorage.removeItem(KUNCI_SIMPAN); } catch { /* diabaikan */ }
     setKunciSesi("");
     setSoal([]);
@@ -792,7 +856,33 @@ export default function UjianApp() {
   );
 
   return (
-    <div className="uj uj-kerja">
+    <div className="uj uj-kerja" data-jaga={aturan.kunciSalin ? "1" : undefined}>
+      {/* ---------- TANDA AIR ----------
+          Digambar paling awal supaya ia berada DI BAWAH seluruh isi layar dan
+          tidak pernah menghalangi ketukan. Yang membuatnya tetap terlihat di
+          tangkapan layar bukan urutannya, melainkan warnanya. */}
+      {aturan.tandaAir && (
+        <TandaAir peserta={{ nama, nim, kode: ujian?.kode ?? "" }} />
+      )}
+
+      {/* ---------- PITA PERINGATAN ----------
+          Dua keadaan yang berbeda, dan yang kedua menuntut tindakan peserta
+          sehingga ia tidak boleh menghilang sendiri seperti yang pertama. */}
+      {penjaga.keluarLayarPenuh && (
+        <div className="uj-jaga uj-jaga-tegas" role="alert">
+          <span>
+            Ujian ini harus dikerjakan dalam layar penuh. Kamu sedang di luarnya,
+            dan itu sudah dicatat pengawas.
+          </span>
+          <button type="button" className="btn btn-mini" onClick={penjaga.ulangiLayarPenuh}>
+            Kembali ke layar penuh
+          </button>
+        </div>
+      )}
+      {!penjaga.keluarLayarPenuh && penjaga.peringatan && (
+        <div className="uj-jaga" role="status">{penjaga.peringatan}</div>
+      )}
+
       {/* ---------- BILAH ATAS ---------- */}
       <header className="ck-bar">
         <div>
