@@ -5,9 +5,15 @@ import type { ReactNode } from "react";
 // TATA LETAK SITUS CBT
 //
 // CBT berdiri sebagai situs tersendiri, terpisah dari portal layanan
-// akademik. Bukan sekadar rapi: yang membukanya adalah mahasiswa yang sedang
-// ujian, dan satu-satunya hal yang boleh ada di layarnya adalah ujian itu.
-// Menu layanan surat, Cakrawala, dan Catatan Uang tidak punya urusan di sana.
+// akademik yang menumpanginya. Bukan sekadar rapi: yang membukanya adalah
+// peserta yang sedang ujian, dan satu-satunya hal yang boleh ada di layarnya
+// adalah ujian itu. Menu portal induknya tidak punya urusan di sana.
+//
+// Ia juga berdiri sendiri sebagai PRODUK: tidak ada nama lembaga, fakultas,
+// maupun program studi yang tertanam di dalamnya. Yang membedakan satu
+// pemasangan dari yang lain hanyalah isi ujiannya dan satu pengaturan nama
+// penyelenggara pada kop cetak — selebihnya sama untuk siapa pun yang
+// memakainya.
 //
 // Ia dapat dipasang pada subdomainnya sendiri — atur CBT_HOST, dan middleware
 // mengarahkan seluruh permintaan dari tuan rumah itu ke sini.
@@ -16,7 +22,7 @@ import type { ReactNode } from "react";
 export const metadata: Metadata = {
   title: "SiPaling CBT: Ujian Berbasis Komputer",
   description:
-    "Sistem ujian berbasis komputer FISIP. Mahasiswa masuk dengan kode ujian, nama, dan NIM, tanpa membuat akun.",
+    "Sistem ujian berbasis komputer. Peserta masuk dengan kode ujian, nama, dan NIM, tanpa membuat akun.",
   robots: { index: false, follow: false },
 };
 

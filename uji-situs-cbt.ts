@@ -112,5 +112,31 @@ sama("/cbt tetap dilayani di tempatnya", rencanaRute("localhost:3000", "/cbt"), 
 sama("/ujian tetap dilayani di tempatnya", rencanaRute("localhost:3000", "/ujian"), { tindakan: "lewat" });
 sama("pratayang penyebaran juga", rencanaRute("sipaling-fisip-abc.vercel.app", "/cbt"), { tindakan: "lewat" });
 
+
+// ---------- DOMAIN TIDAK TERTANAM DI KODE ----------
+//
+// CBT ini satu produk yang sama untuk siapa pun yang memasangnya, jadi tidak
+// boleh ada nama domain yang WAJIB ada di dalam kodenya. Yang di bawah
+// membuktikan seluruh perhitungan host ikut berpindah begitu
+// NEXT_PUBLIC_PORTAL_HOST disetel — tanpa satu baris pun diubah.
+{
+  const semula = process.env.NEXT_PUBLIC_PORTAL_HOST;
+  process.env.NEXT_PUBLIC_PORTAL_HOST = "www.ujikompetensi.id";
+
+  sama("subdomain CBT ikut domain yang disetel",
+    hostCbtUntuk("www.ujikompetensi.id"), "cbt.ujikompetensi.id");
+  sama("dari domain telanjang juga",
+    hostCbtUntuk("ujikompetensi.id"), "cbt.ujikompetensi.id");
+  sama("arah baliknya ikut",
+    hostPortalUntuk("cbt.ujikompetensi.id"), "www.ujikompetensi.id");
+  // Dan domain yang lama berhenti dikenali, karena ia memang bukan lagi
+  // milik pemasangan ini.
+  sama("domain lama tidak lagi mengarang subdomain",
+    hostCbtUntuk("www.sipalingfisip.web.id"), "");
+
+  if (semula === undefined) delete process.env.NEXT_PUBLIC_PORTAL_HOST;
+  else process.env.NEXT_PUBLIC_PORTAL_HOST = semula;
+}
+
 console.log(`\n${lulus} lulus, ${gagal} gagal\n`);
 process.exit(gagal === 0 ? 0 : 1);

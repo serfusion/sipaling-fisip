@@ -390,7 +390,7 @@ function SaklarKamera({
       {!boleh && (
         <p className="cbt-kamera-catatan">
           Saklar ini dipegang Admin dan Super Admin. Merekam wajah peserta adalah keputusan
-          fakultas, bukan keputusan satu mata kuliah — hubungi mereka bila ujian Anda perlu
+          lembaga, bukan keputusan satu mata kuliah — hubungi mereka bila ujian Anda perlu
           disetel berbeda.
         </p>
       )}

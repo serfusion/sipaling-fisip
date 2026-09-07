@@ -7,6 +7,7 @@
 // menggagalkan ujian, dan kekeliruannya tidak akan terlihat sampai sudah
 // terlambat.
 // ============================================================
+import { readFileSync } from "node:fs";
 import { MEDIA_KOSONG } from "./src/lib/cbt";
 import {
   beritaAcaraHtml, laporanPesertaHtml, lolos, naskahSoalHtml,
@@ -204,6 +205,34 @@ for (const [nama, html] of [["naskah", naskah], ["berita acara", acara], ["lapor
       html.includes("sembunyi-cetak") && html.includes("window.print()"));
   cek(`${nama}: ukuran kertas A4`, html.includes("size: A4"));
 }
+
+bagian("Tidak terikat satu lembaga");
+
+// CBT ini satu produk yang sama untuk siapa pun yang memasangnya. Nama lembaga
+// mana pun yang tertanam di dalam kodenya akan ikut tercetak pada naskah soal
+// dan berita acara orang lain — dokumen yang ditandatangani, dan yang paling
+// tidak boleh membawa nama yang salah.
+const semuaBerkas = [
+  naskahSoalHtml(ujian, soal, { denganKunci: true }),
+  beritaAcaraHtml(ujian, {
+    pengawas: "Dr. Ayu", ruang: "Daring", hadir: 1, terdaftar: 1, selesai: 1,
+    berjalan: 0, pelanggaran: 0, catatan: "",
+    peserta: [{ nim: "1", nama: "A", status: "selesai", pindahTab: 0, keluarFullscreen: 0 }],
+  }),
+].join("\n");
+for (const jenama of ["FISIP", "Fakultas Ilmu Sosial", "ILMU POLITIK", "SiPaling FISIP"]) {
+  cek(`tidak menyebut "${jenama}"`, !semuaBerkas.toUpperCase().includes(jenama.toUpperCase()));
+}
+// Yang menggantikannya bukan kekosongan: kop tetap menyebut mata kuliahnya,
+// sehingga berkasnya tetap dapat dikenali milik ujian yang mana.
+cek("kop menyebut mata kuliahnya", semuaBerkas.includes("Komunikasi Politik"));
+
+// Dan yang memasangnya untuk ujian sungguhan tetap dapat menaruh namanya
+// sendiri — lewat pengaturan, bukan lewat kode.
+cek("nama penyelenggara dapat diatur dari environment",
+  /NEXT_PUBLIC_CBT_PENYELENGGARA/.test(
+    readFileSync("./src/lib/cetak-cbt.ts", "utf8"),
+  ));
 
 console.log(`\n${lulus} lulus, ${gagal} gagal`);
 if (gagal > 0) process.exit(1);

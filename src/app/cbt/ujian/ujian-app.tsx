@@ -662,7 +662,7 @@ export default function UjianApp() {
     return (
       <RangkaUjian
         judul="SiPaling CBT"
-        sub="Ujian Berbasis Komputer — Fakultas Ilmu Sosial dan Ilmu Politik"
+        sub="Ujian Berbasis Komputer"
       >
         <h2>Masuk ke ujianmu</h2>
         <p className="cbtd-lead">
@@ -697,7 +697,7 @@ export default function UjianApp() {
       <RangkaUjian
         lencana={ujian.mataKuliah}
         judul={ujian.judul}
-        sub={ujian.kelas ? `Kelas ${ujian.kelas}` : "Ujian Berbasis Komputer FISIP"}
+        sub={ujian.kelas ? `Kelas ${ujian.kelas}` : "Ujian Berbasis Komputer"}
         poin={[
           `${ujian.jumlahSoal || "Beberapa"} soal, dikerjakan ${ejaMenit(ujian.durasi)}.`,
           "Waktu baru berjalan setelah tombol Mulai Ujian ditekan.",

@@ -6,6 +6,11 @@
 // Dua pintu, dan pengunjung memilih lebih dulu siapa dirinya — persis seperti
 // rujukan rancangan yang diberikan pemilik portal.
 //
+// Tidak ada nama lembaga di halaman ini, dan itu disengaja: CBT berdiri
+// sebagai produk yang sama untuk siapa pun yang memasangnya. Nama pemakainya
+// muncul dari isi ujiannya sendiri — mata kuliah, kelas, dan kop cetak yang
+// dapat diatur — bukan dari tulisan yang tertanam di dalam kodenya.
+//
 //   Siswa       : cukup kode ujian. Nama dan NIM diisi pada layar berikutnya,
 //                 sesudah ujiannya ketemu — supaya yang salah kode tidak
 //                 terlanjur mengetik identitasnya untuk ujian yang tidak ada.
@@ -22,9 +27,9 @@ import { adalahHostCbt } from "@/lib/situs-cbt";
 import KreditCbt, { KREDIT_CBT } from "./kredit";
 
 /**
- * @param portal Asal portal, mis. "https://www.sipalingfisip.web.id", untuk
- *   tautan yang keluar dari situs CBT. Kosong berarti halaman ini memang
- *   sedang dibuka di portal, dan alamat relatif sudah benar.
+ * @param portal Asal portal induk tempat akun dosen dan admin berada, dipakai
+ *   HANYA untuk tautan masuk mereka. Kosong berarti halaman ini memang sedang
+ *   dibuka di portal itu sendiri, dan alamat relatif sudah benar.
  */
 export default function MasukCbt({ portal = "" }: { portal?: string }) {
   const router = useRouter();
@@ -64,7 +69,7 @@ export default function MasukCbt({ portal = "" }: { portal?: string }) {
         <div className="cbtd-lambang" aria-hidden="true">📝</div>
         <h1>SiPaling CBT</h1>
         <p className="cbtd-sub">
-          Ujian Berbasis Komputer, Fakultas Ilmu Sosial dan Ilmu Politik
+          Ujian Berbasis Komputer — pilihan ganda, penjodohan, isian, dan esai
         </p>
         <ul className="cbtd-nilai">
           <li>Tidak perlu membuat akun. Cukup kode ujian, nama, dan NIM.</li>
@@ -72,9 +77,6 @@ export default function MasukCbt({ portal = "" }: { portal?: string }) {
           <li>Waktu dihitung di server, jadi aman walau jaringan tersendat.</li>
           <li>Nyaman dikerjakan dari ponsel maupun komputer.</li>
         </ul>
-        <p className="cbtd-kaki-kiri">
-          Bagian dari <a href={`${portal}/`}>SiPaling FISIP</a>
-        </p>
         <p className="cbtd-kredit-kiri">{KREDIT_CBT}</p>
       </aside>
 
@@ -133,7 +135,7 @@ export default function MasukCbt({ portal = "" }: { portal?: string }) {
                 Masuk ke dashboard
               </a>
               <p className="cbtd-bantu">
-                Belum punya akun? Hubungi Super Admin fakultas. Menu CBT hanya terbuka untuk dosen,
+                Belum punya akun? Hubungi Super Admin portal. Menu CBT hanya terbuka untuk dosen,
                 Admin, dan Super Admin. Bukan admin bagian.
               </p>
             </>

@@ -884,7 +884,7 @@ export function bolehHapus(profile: Pemakai, ujian: Kepemilikan) {
  * Alasannya berbeda dari wewenang yang lain. Yang lain soal siapa yang tahu
  * kelasnya; yang ini soal merekam wajah orang. Menyalakan kamera pada ujian
  * adalah keputusan lembaga, bukan keputusan satu dosen atas kelasnya sendiri —
- * yang menanggung akibatnya bila keliru adalah fakultas, bukan dosen itu.
+ * yang menanggung akibatnya bila keliru adalah lembaganya, bukan dosen itu.
  * Karena itu ia dipegang pihak yang sama yang memegang kebijakan portal.
  *
  * Admin bagian — umum, akademik, prodi, PDDIKTI, perpustakaan, laboratorium —

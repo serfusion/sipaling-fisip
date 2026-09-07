@@ -298,7 +298,7 @@ export async function PATCH(request: Request) {
               success: false,
               message:
                 "Kamera pengawas hanya dapat dinyalakan atau dimatikan Admin dan Super Admin. " +
-                "Merekam wajah peserta adalah keputusan fakultas, bukan keputusan satu mata kuliah.",
+                "Merekam wajah peserta adalah keputusan lembaga, bukan keputusan satu mata kuliah.",
             },
             { status: 403 },
           );

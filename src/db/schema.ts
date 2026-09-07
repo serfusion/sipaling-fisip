@@ -537,7 +537,7 @@ export const cbtExams = pgTable("cbt_exams", {
    *
    * Yang memegangnya Admin dan Super Admin, BUKAN dosen pemilik ujiannya.
    * Merekam wajah orang adalah keputusan lembaga, dan yang menanggung
-   * akibatnya bila keliru adalah fakultas.
+   * akibatnya bila keliru adalah lembaganya.
    */
   cameraOn: boolean("camera_on").notNull().default(true),
   /** Kode tambahan yang diketik mahasiswa. Kosong berarti tanpa kode. */

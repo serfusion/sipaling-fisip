@@ -118,11 +118,30 @@ function tanggalPanjang(iso?: string | null) {
   });
 }
 
+/**
+ * Nama penyelenggara pada kop berkas cetak.
+ *
+ * Kosong secara bawaan, dan itu disengaja: CBT ini satu produk yang sama untuk
+ * siapa pun yang memasangnya, jadi tidak ada nama lembaga yang tertanam di
+ * dalam kodenya. Yang memakainya untuk ujian sungguhan mengisi
+ * NEXT_PUBLIC_CBT_PENYELENGGARA di environment — mis. nama fakultas, sekolah,
+ * atau lembaga sertifikasinya — dan namanya muncul pada naskah soal, berita
+ * acara, dan laporan peserta sekaligus.
+ *
+ * NEXT_PUBLIC_ karena berkas ini merangkai HTML di peramban, bukan di server.
+ */
+const PENYELENGGARA = (process.env.NEXT_PUBLIC_CBT_PENYELENGGARA || "").trim();
+
 function kop(ujian: UjianCetak, subjudul: string) {
+  // Baris penyelenggara hanya muncul bila memang diisi. Kop yang menyisakan
+  // baris kosong terlihat seperti berkas yang gagal dicetak sebagian, dan
+  // berita acara adalah dokumen yang ditandatangani orang.
+  const penyelenggara = PENYELENGGARA
+    ? `\n  <p>${lolos(PENYELENGGARA.toUpperCase())}</p>`
+    : "";
   return `<div class="kop">
-  <h1>${lolos(subjudul)}</h1>
-  <p>FAKULTAS ILMU SOSIAL DAN ILMU POLITIK</p>
-  <p>SiPaling FISIP: Sistem Ujian Berbasis Komputer</p>
+  <h1>${lolos(subjudul)}</h1>${penyelenggara}
+  <p>${lolos(ujian.mataKuliah)}</p>
 </div>`;
 }
 

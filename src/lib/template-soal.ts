@@ -79,7 +79,7 @@ export const PETUNJUK_EXCEL: string[][] = [
 // ---------- WORD ----------
 
 const NASKAH_WORD = [
-  "TEMPLATE SOAL UJIAN SiPaling FISIP",
+  "TEMPLATE SOAL UJIAN",
   "",
   "Tulis soal langsung di bawah ini. Tiap soal diawali nomor, lalu pilihan berhuruf,",
   "lalu baris KUNCI. Baris BOBOT, MATERI, TINGKAT, dan PEMBAHASAN boleh dikosongkan.",
@@ -197,7 +197,7 @@ export function buatXlsxTemplate(): Blob {
     {
       tinggi: 30,
       sel: KOLOM_EXCEL.map((_, i) =>
-        i === 0 ? { nilai: "TEMPLATE SOAL UJIAN SiPaling FISIP", gaya: GAYA.judul } : { nilai: "", gaya: GAYA.judul },
+        i === 0 ? { nilai: "TEMPLATE SOAL UJIAN", gaya: GAYA.judul } : { nilai: "", gaya: GAYA.judul },
       ),
     },
     {
