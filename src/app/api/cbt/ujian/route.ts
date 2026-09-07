@@ -102,6 +102,7 @@ export async function GET() {
         singleDevice: cbtExams.singleDevice,
         proctorMode: cbtExams.proctorMode,
         cameraOn: cbtExams.cameraOn,
+        requireLockdown: cbtExams.requireLockdown,
         token: cbtExams.token,
         startAt: cbtExams.startAt,
         endAt: cbtExams.endAt,
@@ -212,6 +213,7 @@ export async function POST(request: Request) {
             showScore: body.showScore !== false,
             singleDevice: body.singleDevice !== false,
             proctorMode: rapikanMode(body.proctorMode),
+            requireLockdown: body.requireLockdown === true,
             token: teks(body.token, 12).toUpperCase() || null,
           })
           .returning({ id: cbtExams.id, code: cbtExams.code });
@@ -278,6 +280,16 @@ export async function PATCH(request: Request) {
     // sampai tidak ada gunanya lagi. Yang berubah hanya penjagaan ke depan;
     // jawaban dan catatan yang sudah ada tidak tersentuh.
     if (body.proctorMode !== undefined) ubah.proctorMode = rapikanMode(body.proctorMode);
+    // Kewajiban aplikasi terkunci mengikuti mode pengawasan: boleh diubah walau
+    // ujiannya sedang berlangsung. Yang MENYALAKANNYA di tengah ujian menolak
+    // peserta yang belum masuk, dan itu memang yang dikehendaki pengajar yang
+    // baru menyadari kelasnya menyontek. Yang sudah mengerjakan tidak terputus:
+    // gerbangnya berdiri di pintu masuk, bukan di tengah ruangan.
+    //
+    // `=== true`, bukan `!== false`. Bawaannya MATI, dan setelan yang tidak
+    // disebutkan tidak boleh diam-diam menyalakan kewajiban yang membuat
+    // seluruh kelas harus memasang aplikasi lebih dulu.
+    if (body.requireLockdown !== undefined) ubah.requireLockdown = body.requireLockdown === true;
     if (body.token !== undefined) ubah.token = teks(body.token, 12).toUpperCase() || null;
 
     // ---------- SAKLAR KAMERA ----------

@@ -49,6 +49,8 @@ const POLA = [
   "src/lib/pengawasan.ts",
   "src/lib/awas-kamera.ts",
   "src/lib/situs-cbt.ts",
+  "src/lib/kunci-layar.ts",
+  "src/lib/qr-ujian.ts",
 ];
 
 const berkas = [...new Set(POLA.flatMap((p) => globSync(p)))].sort();

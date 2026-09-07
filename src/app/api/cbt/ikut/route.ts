@@ -37,6 +37,7 @@ import {
   harusDipaksa, kameraMenyala, pesanPeringatan, rapikanInsiden, rapikanMode,
   skorIntegritas, type HitunganInsiden, type JenisInsiden,
 } from "@/lib/pengawasan";
+import { bacaKlien, bolehMasukKlien, periksaKunciKlien, rapikanKlien } from "@/lib/kunci-layar";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -81,7 +82,47 @@ function ringkasUjian(u: Ujian, sekarang: Date) {
     // Kecuali kamera. Ia punya saklarnya sendiri yang dipegang Admin, jadi
     // modenya saja tidak cukup untuk menjawab "menyala atau tidak".
     kamera: kameraMenyala(rapikanMode(u.proctorMode), u.cameraOn),
+    // Ujian ini menuntut Aplikasi Ujian Terkunci.
+    //
+    // Dikirim sejak layar identitas, SEBELUM tombol Mulai ditekan, dan itu
+    // penting: peserta yang baru mengetahuinya sesudah menekan Mulai sudah
+    // duduk di ruang ujian dengan waktu berjalan, dan yang tersisa baginya
+    // hanya memasang aplikasi di tengah ujian. Diberi tahu di layar identitas,
+    // ia masih sempat mengunduhnya.
+    wajibAplikasi: u.requireLockdown === true,
   };
+}
+
+/**
+ * Jenis perangkat yang dipakai peserta, sebagaimana dapat dilihat server.
+ *
+ * User-Agent didahulukan, dan pengakuan halaman hanya dipakai bila di sana
+ * tidak ada penanda apa pun. Urutan itu penting karena aplikasi ujian
+ * menyisipkan penandanya ke User-Agent seluruh permintaan — termasuk yang
+ * dikirim sebelum satu baris JavaScript pun berjalan — sedangkan pengakuan
+ * halaman hanya ada pada permintaan yang membawanya.
+ *
+ * PENGAKUAN INI BUKAN BUKTI, dan tidak pernah diperlakukan sebagai bukti.
+ * Siapa pun dapat mengirim User-Agent apa pun dari alat baris perintah. Yang
+ * menjaga gerbangnya bukan pembacaan ini melainkan kunci bersama yang dibawa
+ * aplikasinya (CBT_KUNCI_APLIKASI), dan batas kekuatannya tertulis apa adanya
+ * pada periksaKunciKlien di src/lib/kunci-layar.ts.
+ */
+function klienPermintaan(request: Request, diakui: unknown) {
+  const dariUa = bacaKlien({ ua: request.headers.get("user-agent") });
+  return dariUa === "peramban" ? rapikanKlien(diakui) : dariUa;
+}
+
+/**
+ * Kunci bersama yang dipegang server, dari environment.
+ *
+ * Kosong berarti belum disetel, dan gerbangnya lalu bersandar pada pengenalan
+ * perangkat saja — lemah, tetapi ada. Kampus yang belum menyiapkan
+ * environment-nya mendapat penjagaan yang tidak sempurna, bukan ujian yang
+ * menolak seluruh pesertanya pada pagi hari pelaksanaan.
+ */
+function kunciAplikasiServer() {
+  return (process.env.CBT_KUNCI_APLIKASI || "").trim();
 }
 
 export async function GET(request: Request) {
@@ -281,6 +322,30 @@ export async function POST(request: Request) {
       const identitas = periksaMasuk(body, { token: ujian.token, nimMin: NOMOR_MIN });
       if (!identitas.ok) return Response.json({ success: false, message: identitas.pesan }, { status: 400 });
 
+      // ---------- GERBANG APLIKASI TERKUNCI ----------
+      //
+      // Diperiksa SEBELUM attempt dibuat dan sebelum satu soal pun disusun.
+      // Peserta yang ditolak di sini tidak boleh meninggalkan baris percobaan
+      // yang menghabiskan jatahnya — ia belum mengerjakan apa pun, dan yang
+      // perlu ia lakukan hanya membuka ujian yang sama dari aplikasinya.
+      //
+      // Ditempatkan sesudah pemeriksaan identitas dengan sengaja: nama yang
+      // salah ketik dan kode pengawas yang keliru jauh lebih sering terjadi,
+      // dan menyebut keduanya lebih dulu menghemat satu perjalanan bolak-balik
+      // bagi peserta yang memang sudah memakai aplikasinya.
+      const klien = klienPermintaan(request, body.klien);
+      const izinKlien = bolehMasukKlien(
+        ujian.requireLockdown === true,
+        klien,
+        periksaKunciKlien(kunciAplikasiServer(), body.kunciAplikasi),
+      );
+      if (!izinKlien.ok) {
+        return Response.json(
+          { success: false, message: izinKlien.pesan, butuhAplikasi: true },
+          { status: 403 },
+        );
+      }
+
       // Attempt yang masih berjalan dikembalikan apa adanya. Peserta yang
       // ponselnya mati lalu masuk lagi harus menemukan lembar yang SAMA,
       // dengan sisa waktu yang terus berjalan — bukan ujian baru yang kosong.
@@ -413,6 +478,7 @@ export async function POST(request: Request) {
           startedAt: sekarang,
           deadlineAt: deadline,
           lastSeenAt: sekarang,
+          clientType: klien,
         });
       } catch {
         // Indeks unik (ujian, nim, percobaan) menolak dua permintaan yang
@@ -463,11 +529,37 @@ export async function POST(request: Request) {
       const ujianRow = await db.select().from(cbtExams).where(eq(cbtExams.id, attempt.examId)).limit(1);
       const ujian = ujianRow[0];
       if (!ujian) return Response.json({ success: false, message: "Ujian tidak ditemukan." }, { status: 404 });
+
+      // Gerbang yang sama seperti pada "masuk", dan ia HARUS ada juga di sini.
+      // Tanpanya, jalan memutarnya terbuka lebar: mulai ujian dari aplikasi
+      // terkunci, salin kunci sesinya, lalu lanjutkan dari peramban biasa yang
+      // tidak menolak tangkapan layar apa pun.
+      const klienLanjut = klienPermintaan(request, body.klien);
+      // Kunci aplikasinya TIDAK diperiksa lagi di sini, dan itu keputusan
+      // sadar. Kunci sampai ke halaman lewat objek yang disuntikkan aplikasi
+      // sesudah dokumennya dimuat, sedangkan pemulihan sesi berjalan pada
+      // gambar pertama — kadang beberapa ratus milidetik lebih dulu. Memeriksa
+      // keduanya di sini berarti sesekali menolak peserta yang memang sedang
+      // memakai aplikasinya, tepat ketika ia baru saja kehilangan halaman
+      // ujiannya. Yang tetap diperiksa adalah perangkatnya, dan itu terbaca
+      // dari User-Agent yang selalu ada sejak permintaan pertama.
+      const izinLanjut = bolehMasukKlien(ujian.requireLockdown === true, klienLanjut, true);
+      if (!izinLanjut.ok) {
+        return Response.json(
+          { success: false, message: izinLanjut.pesan, butuhAplikasi: true },
+          { status: 403 },
+        );
+      }
+
       const bank = await soalUjian(attempt.examId);
       const jawaban = await db.select().from(cbtAnswers).where(eq(cbtAnswers.attemptId, attempt.id));
       void db
         .update(cbtAttempts)
-        .set({ lastSeenAt: sekarang })
+        // Perangkatnya ikut diperbarui, bukan hanya jam sapaannya. Peserta yang
+        // berpindah dari peramban ke aplikasi di tengah ujian — atau
+        // sebaliknya — harus terbaca apa adanya pada lembar pengawasan, karena
+        // itulah yang ditanyakan bila hasilnya digugat.
+        .set({ lastSeenAt: sekarang, clientType: klienLanjut })
         .where(eq(cbtAttempts.id, attempt.id))
         .catch(() => undefined);
       return Response.json({

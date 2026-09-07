@@ -4419,6 +4419,23 @@ a.al-mini:hover { color: var(--al-ink); }
 .uj-fakta-waktu { border-color: #a9c6ea !important; background: #eef4fc !important; }
 .uj-fakta-waktu b { color: #14459a !important; }
 
+/* Kotak BENAR dan SALAH pada layar selesai.
+
+   Empat kotak abu-abu yang seragam menuntut peserta membaca labelnya satu per
+   satu untuk tahu mana yang kabar baik. Hijau dan merah menjawabnya sebelum
+   labelnya terbaca — dan itulah satu-satunya hal yang ingin diketahui orang
+   pada detik pertama layar ini muncul.
+
+   Kotak "kosong" sengaja dibiarkan netral. Soal yang tidak dijawab bukan
+   jawaban yang salah, dan mengecatnya merah menghukum dua kali untuk satu hal
+   yang sama. */
+.uj-fakta-benar { border-color: #86c98c !important; background: #e7f4e8 !important; }
+.uj-fakta-benar b { color: #1d6b32 !important; }
+.uj-fakta-salah { border-color: #edb4b4 !important; background: #fdeeee !important; }
+.uj-fakta-salah b { color: #8f2222 !important; }
+.uj-fakta-sebagian { border-color: #f0c46a !important; background: #fdf6e6 !important; }
+.uj-fakta-sebagian b { color: #8a6212 !important; }
+
 /* ---------- LAYAR MENGERJAKAN ----------
 
    Bentuknya mengikuti rujukan yang diberikan pemilik portal, dan rujukan itu
@@ -4711,6 +4728,22 @@ a.al-mini:hover { color: var(--al-ink); }
 .cbt-p-berjalan    { color: #166534; background: #dcfce7; }
 .cbt-p-selesai     { color: #1e40af; background: #dbeafe; }
 .cbt-p-waktu_habis { color: #92400e; background: #fef3c7; }
+
+/* Benar dan salah pada lembar jawaban.
+
+   Warnanya sengaja BUKAN dipinjam dari lencana status di atas. Dahulu memang
+   dipinjam — "Benar" memakai warna status selesai yang biru, dan "Salah"
+   memakai warna status berjalan yang HIJAU — sehingga jawaban yang salah
+   terbaca hijau dan pengajar yang menggulir cepat membaca lembar itu terbalik.
+   Di sini merah berarti salah dan hijau berarti benar, tanpa perantara.
+
+   Kuning berdiri di antara keduanya untuk jawaban yang benar sebagian: PG
+   kompleks dan penjodohan dinilai per bagian, dan mengecatnya merah pekat
+   menyalahkan peserta yang benar tiga dari empat pasangan. */
+.cbt-nilai-benar    { color: #14532d; background: #bbf7d0; }
+.cbt-nilai-salah    { color: #7f1d1d; background: #fecaca; }
+.cbt-nilai-sebagian { color: #92400e; background: #fef3c7; }
+.cbt-nilai-tunggu   { color: #475569; background: #e2e8f0; }
 .cbt-t-mudah  { color: #166534; background: #dcfce7; }
 .cbt-t-sedang { color: #1e40af; background: #dbeafe; }
 .cbt-t-sulit  { color: #991b1b; background: #fee2e2; }
@@ -4795,6 +4828,35 @@ a.al-mini:hover { color: var(--al-ink); }
 .cbt-bagi-kotak code { display: block; margin-top: 3px; color: var(--navy);
   font-size: 12.5px; word-break: break-all; }
 /* Kode ujian dibacakan di depan kelas dan disalin huruf demi huruf. */
+/* Kotak kode QR.
+
+   Berdiri PALING ATAS di dalam panel bagikan, sebelum tautan dan kodenya.
+   Itu urutan yang benar karena ia yang paling sering dipakai di ruangan:
+   diproyeksikan ke papan, dan seluruh kelas memindainya sekaligus. Tautan dan
+   kode tetap ada di bawahnya untuk peserta yang kameranya tidak bisa dipakai —
+   dan itu selalu ada beberapa orang. */
+.cbt-bagi-qr {
+  display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+  margin-bottom: 12px; padding: 12px; border-radius: 10px;
+  border: 1px solid var(--line, #dfe5ec); background: #fff;
+}
+/* Latar putih dipaksa di belakang gambarnya. Kode QR yang digambar hitam di
+   atas latar transparan menjadi hitam-di-atas-gelap pada mode gelap peramban,
+   dan kode seperti itu tidak terbaca pemindai mana pun. */
+.cbt-bagi-qr img {
+  flex: 0 0 auto; width: 148px; height: 148px; padding: 6px;
+  border-radius: 8px; border: 1px solid var(--line, #dfe5ec); background: #fff;
+}
+.cbt-bagi-qr-teks { flex: 1 1 15rem; min-width: 0; }
+.cbt-bagi-qr-teks b { display: block; color: var(--navy); font-size: 13px; }
+.cbt-bagi-qr-teks span { display: block; margin: 4px 0 10px; max-width: 34rem;
+  color: var(--muted); font-size: 12px; line-height: 1.65; }
+.cbt-bagi-qr-tombol { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Penanda perangkat pada papan pantau. Hanya muncul pada baris yang menyimpang
+   dari yang diharapkan, jadi ia boleh menonjol. */
+.cbt-klien-kunci { display: block; margin-top: 2px; color: #166534; font-size: 10.5px; font-weight: 700; }
+
 .cbt-bagi-kode { flex: 0 1 12rem; }
 .cbt-bagi-kode code { font-size: 19px; font-weight: 800; letter-spacing: .2em; }
 .cbt-bagi-pesan { margin-top: 4px; }
@@ -5535,6 +5597,84 @@ table.qt td small { font-size: 11.5px; }
   border-bottom-color: #fca5a5;
 }
 .uj-jaga .btn-mini { flex: 0 0 auto; }
+
+/* ---------- TIRAI LAYAR ----------
+
+   Bidang pekat yang menutup soal begitu ada isyarat tangkapan layar, atau
+   begitu halaman ujian ditinggalkan. Ia tidak menggagalkan tangkapannya — tidak
+   ada API web yang bisa — melainkan mengosongkan isinya.
+
+   z-index-nya PALING TINGGI di seluruh layar ujian, di atas tanda air (20) dan
+   pita peringatan (21). Satu lapisan yang tidak sengaja berada di atasnya sudah
+   cukup membocorkan potongan soal ke dalam gambar, dan yang bocor persis
+   bagian yang dijaga.
+
+   Warnanya pekat, bukan buram. backdrop-filter menyisakan bentuk paragraf yang
+   masih terbaca pada tangkapan layar beresolusi tinggi, dan sebagian peramban
+   ponsel mengabaikannya sama sekali. */
+.uj-tirai {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #0b1220;
+  /* Kebalikan dari tanda air: tirai HARUS menelan ketukan. Tombol jawaban di
+     baliknya tidak boleh dapat ditekan selama layarnya tertutup — kalau bisa,
+     tirai justru menjadi tempat menjawab soal tanpa terlihat. */
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.uj-tirai-isi { max-width: 27rem; text-align: center; color: #e2e8f0; }
+.uj-tirai-lambang { font-size: 40px; line-height: 1; margin-bottom: 12px; }
+.uj-tirai-isi b { display: block; font-size: 18px; font-weight: 800; letter-spacing: .02em; }
+.uj-tirai-isi p { margin: 8px 0 0; font-size: 13.5px; line-height: 1.7; color: #b6c2d4; }
+/* Identitas peserta, TERANG. Kalau tangkapan layarnya tetap jadi, inilah yang
+   tertangkap — gambar yang isinya hanya nama pengambilnya sendiri. */
+.uj-tirai-tanda {
+  display: inline-block; margin-top: 16px; padding: 7px 13px;
+  border: 1px solid #33415a; border-radius: 8px; background: #111a2b;
+  color: #93a3b8; font-size: 11.5px; font-weight: 700; letter-spacing: .06em;
+}
+
+/* ---------- LENCANA KUNCI LAYAR ----------
+
+   Satu baris di layar identitas dan di bilah atas yang mengatakan sejauh mana
+   tangkapan layar benar-benar dijaga di perangkat INI. Dua rupa, dan bedanya
+   bukan hiasan: yang hijau berarti sistem operasinya sendiri yang menolak,
+   yang abu-abu berarti hanya dicatat. Menyamakan keduanya berarti menuliskan
+   janji yang akan diuji peserta pertama dalam lima detik. */
+/* Warnanya ditulis apa adanya, bukan lewat var(--uj-*).
+
+   Kotak ini berdiri di layar identitas, dan layar itu digambar di dalam rangka
+   halaman depan (.cbtd) — bukan di dalam .uj, satu-satunya tempat variabel
+   --uj-* diberi nilai. Memakai variabel yang tidak ada di sana membuat seluruh
+   deklarasinya batal, dan yang hilang adalah garis tepi kotak peringatan. */
+.uj-kunci {
+  display: flex; gap: 10px; align-items: flex-start; margin: 14px 0;
+  padding: 11px 14px; border-radius: 10px;
+  border: 1px solid #dfe3e8; background: #f6f7f9;
+}
+.uj-kunci-ikon { flex: 0 0 auto; font-size: 17px; line-height: 1.3; }
+.uj-kunci b { display: block; font-size: 13px; color: #333f4d; }
+.uj-kunci span { display: block; margin-top: 3px; color: #6b7684;
+  font-size: 12px; line-height: 1.65; }
+.uj-kunci-sistem { border-color: #a9d5ac; background: #eef7ef; }
+.uj-kunci-sistem b { color: #1d6b32; }
+
+/* Lencana ringkas di bilah atas layar mengerjakan. Hanya muncul ketika
+   penguncian sistemnya memang menyala — lencana "tidak dikunci" di atas layar
+   ujian tidak memberi tahu peserta apa pun yang berguna, dan hanya
+   memberitahu tetangganya bahwa layar ini boleh difoto. */
+.ck-kunci {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 9px; border-radius: 999px;
+  background: rgba(46, 158, 79, .16); color: #7ee2a0;
+  font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  white-space: nowrap;
+}
 
 /* ---------- Pemilih mode pengawasan ---------- */
 .cbt-mode { margin-top: 16px; }

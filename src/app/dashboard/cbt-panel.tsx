@@ -19,18 +19,21 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ejaWaktu, JENIS_LABEL, MEDIA_KOSONG, SEMUA_JENIS, STATUS_LABEL, uraiKunciJamak,
+  ejaWaktu, JENIS_LABEL, KEADAAN_JAWAB_LABEL, keadaanJawab, MEDIA_KOSONG, SEMUA_JENIS,
+  STATUS_LABEL, uraiKunciJamak,
   type JenisSoal, type Media, type Pasangan, type StatusUjian,
 } from "@/lib/cbt";
 import { imporDariExcel, imporDariWord, type SoalImpor, type Aoa } from "@/lib/impor-soal";
 import { sarikanDokumen, type HasilSari } from "@/lib/sari-dokumen";
 import { JENIS_AI, MAKS_SOAL } from "@/lib/ai-soal";
 import {
-  beritaAcaraHtml, laporanPesertaHtml, naskahSoalHtml,
+  beritaAcaraHtml, laporanPesertaHtml, naskahSoalHtml, posterQrHtml,
   type PesertaCetak, type UjianCetak,
 } from "@/lib/cetak-cbt";
+import { gambarQr, namaBerkasQr } from "@/lib/qr-ujian";
 import { buatDocxTemplate, buatXlsxTemplate } from "@/lib/template-soal";
 import { asalCbt } from "@/lib/situs-cbt";
+import { KLIEN_LABEL, kunciSistem, rapikanKlien } from "@/lib/kunci-layar";
 import {
   INSIDEN_LABEL, MODE_KETERANGAN, MODE_LABEL, SEMUA_MODE, aturanMode, rapikanMode,
   tingkatIntegritas, TINGKAT_LABEL, type JenisInsiden, type ModePengawasan,
@@ -45,6 +48,8 @@ type Ujian = {
   activatedAt: string | null; activatedBy: string | null;
   description: string | null; instruction: string | null; createdBy: string;
   singleDevice: boolean;
+  /** Ujian hanya boleh dikerjakan lewat Aplikasi Ujian Terkunci. */
+  requireLockdown: boolean;
   /** Mode pengawasan: "biasa" | "ketat" | "sertifikasi". */
   proctorMode: string;
   /** Saklar kamera pengawas. Hanya berlaku pada mode Sertifikasi/OSCE. */
@@ -87,6 +92,8 @@ type Peserta = {
   dihentikan?: string | null;
   /** Hitungan tiap jenis insiden, hanya pada rincian satu peserta. */
   pengawasan?: Partial<Record<JenisInsiden, number>>;
+  /** Perangkat yang dipakai: "peramban" | "android" | "windows". */
+  klien?: string;
 };
 
 /** Satu baris garis waktu pengawasan. */
@@ -182,7 +189,9 @@ function bentukJenis(jenis: JenisSoal) {
  * terkunci selagi ujian berlangsung; aturan yang sama dijaga server pada
  * /api/cbt/ujian.
  */
-type KunciSetelan = "randomQuestions" | "randomOptions" | "allowBack" | "showScore" | "singleDevice";
+type KunciSetelan =
+  | "randomQuestions" | "randomOptions" | "allowBack" | "showScore"
+  | "singleDevice" | "requireLockdown";
 
 const SETELAN: Array<{ kunci: KunciSetelan; label: string; jelas: string; bentuk: boolean }> = [
   {
@@ -213,6 +222,16 @@ const SETELAN: Array<{ kunci: KunciSetelan; label: string; jelas: string; bentuk
     kunci: "singleDevice",
     label: "Satu perangkat untuk satu peserta",
     jelas: "Mencegah satu ponsel dipakai bergantian. Lepas centangnya bila ada peserta yang terlanjur terblokir.",
+    bentuk: false,
+  },
+  {
+    kunci: "requireLockdown",
+    label: "Wajib lewat Aplikasi Ujian Terkunci",
+    jelas:
+      "Satu-satunya setelan yang benar-benar dapat MENOLAK tangkapan layar — dan ia menolaknya " +
+      "bukan dengan kode, melainkan dengan memindahkan ujian ke aplikasi yang sistem operasinya " +
+      "sendiri menolak. Peserta yang membuka dari peramban ditolak di pintu masuk, jadi beri " +
+      "tahu kelasnya sehari sebelumnya beserta tautan unduhannya.",
     bentuk: false,
   },
 ];
@@ -494,6 +513,7 @@ function setelanUjian(u: Ujian) {
     allowBack: u.allowBack,
     showScore: u.showScore,
     singleDevice: u.singleDevice,
+    requireLockdown: u.requireLockdown === true,
     proctorMode: rapikanMode(u.proctorMode),
     cameraOn: u.cameraOn !== false,
   };
@@ -533,7 +553,7 @@ export default function CbtPanel({ role }: { role: string }) {
     questionCount: 20, durationMinutes: 60, passingGrade: 60, maxAttempts: 1,
     token: "", instruction: "",
     randomQuestions: true, randomOptions: true, allowBack: true, showScore: true,
-    singleDevice: true, proctorMode: "biasa" as ModePengawasan,
+    singleDevice: true, requireLockdown: false, proctorMode: "biasa" as ModePengawasan,
   });
 
   const [soal, setSoal] = useState<Soal[]>([]);
@@ -572,7 +592,8 @@ export default function CbtPanel({ role }: { role: string }) {
     title: "", courseName: "", className: "", instruction: "", token: "",
     questionCount: 0, durationMinutes: 60, passingGrade: 60, maxAttempts: 1,
     randomQuestions: true, randomOptions: true, allowBack: true, showScore: true,
-    singleDevice: true, proctorMode: "biasa" as ModePengawasan, cameraOn: true,
+    singleDevice: true, requireLockdown: false,
+    proctorMode: "biasa" as ModePengawasan, cameraOn: true,
   });
   const [bukaSetel, setBukaSetel] = useState(false);
 
@@ -584,6 +605,23 @@ export default function CbtPanel({ role }: { role: string }) {
    * menjelang ujian, dan sebagian besar soal tidak bergambar sama sekali.
    */
   const [lipatCetak, setLipatCetak] = useState(false);
+
+  /**
+   * Kode QR ujian sebagai PNG data URL, BESERTA kode ujian yang digambarnya.
+   *
+   * Kodenya ikut disimpan, dan itu bukan kelengkapan yang berlebihan: tanpa ia,
+   * kotak QR sempat memperlihatkan kode ujian SEBELUMNYA selama satu perjalanan
+   * penggambaran. Pengajar yang membuka dua ujian beruntun lalu mencetak
+   * posternya akan menempel kode kelas yang salah di dinding — dan tidak ada
+   * yang menyadarinya sampai peserta mulai masuk ke ujian yang keliru.
+   *
+   * Kosong berarti belum digambar ATAU gagal digambar, dan kedua keadaan itu
+   * sengaja tidak dibedakan di layar. Panel bagikan tetap utuh tanpa QR —
+   * tautan dan kodenya ada di sana — jadi menampilkan "gagal memuat penggambar
+   * QR" hanya menakuti pengajar yang membuka panel ini lima menit sebelum
+   * ujian, tentang sesuatu yang tidak menghalanginya sama sekali.
+   */
+  const [qrGambar, setQrGambar] = useState({ kode: "", png: "" });
   const [bukaMedia, setBukaMedia] = useState(false);
   /**
    * Apakah pratinjau medianya berhasil dimuat.
@@ -724,6 +762,27 @@ export default function CbtPanel({ role }: { role: string }) {
   }, [buka, tab]);
 
   const terbuka = ujian.find((u) => u.id === buka) || null;
+
+  // ---------- KODE QR UJIAN ----------
+  //
+  // Digambar sekali tiap kali ujian yang dibuka berganti. `hidup` menutup
+  // perlombaan yang datang dari sifat asinkronnya: ujian yang ditutup sebelum
+  // gambarnya selesai tidak boleh menuliskan hasilnya ke panel yang sudah
+  // pindah ke ujian lain.
+  const kodeTerbuka = terbuka?.code ?? "";
+  useEffect(() => {
+    if (!kodeTerbuka) return;
+    let hidup = true;
+    void gambarQr(alamatUjian(kodeTerbuka)).then((png) => {
+      if (hidup) setQrGambar({ kode: kodeTerbuka, png });
+    });
+    return () => { hidup = false; };
+  }, [kodeTerbuka]);
+
+  // Gambar yang dipakai HANYA bila ia memang gambar ujian yang sedang dibuka.
+  // Penyaringan di sini, bukan pengosongan lewat effect: yang terakhir menyisakan
+  // satu gambar tempat QR ujian sebelumnya masih terpampang.
+  const qrUjian = kodeTerbuka && qrGambar.kode === kodeTerbuka ? qrGambar.png : "";
 
   async function muatSoal(id: number) {
     try {
@@ -1435,6 +1494,39 @@ export default function CbtPanel({ role }: { role: string }) {
     bukaCetak(naskahSoalHtml(info, soal, { denganKunci }), kunciTombol);
   }
 
+  /**
+   * Unduh kode QR sebagai berkas PNG.
+   *
+   * Yang dituju bukan arsip melainkan tempelan: gambar inilah yang dilempar
+   * pengajar ke grup kelas, dimasukkan ke salindia pembuka, dan dikirim ke
+   * pengawas ruangan. Karena itu PNG, bukan SVG — SVG lebih tajam tetapi tidak
+   * dapat ditempel ke percakapan WhatsApp.
+   */
+  function unduhQr() {
+    if (!terbuka || !qrUjian) return;
+    const tautan = document.createElement("a");
+    tautan.href = qrUjian;
+    tautan.download = namaBerkasQr(terbuka.code);
+    document.body.appendChild(tautan);
+    tautan.click();
+    tautan.remove();
+    kabari("qr-unduh", "oke", "✓ QR terunduh", 3000);
+  }
+
+  /**
+   * Poster satu halaman berisi QR, kode, dan jadwalnya — untuk ditempel di
+   * pintu ruang ujian atau diproyeksikan ke papan.
+   *
+   * Tetap dibuka walaupun QR-nya gagal digambar. Pengajar yang menekan ini
+   * tiga menit sebelum ujian membutuhkan kode dan tautannya tercetak besar,
+   * dan itu ada di posternya dengan atau tanpa QR.
+   */
+  function cetakPosterQr() {
+    const info = keteranganUjian();
+    if (!info) return;
+    bukaCetak(posterQrHtml(info, alamatUjian(info.kode), qrUjian), "qr-poster");
+  }
+
   function cetakBeritaAcara(kunciTombol = "acara") {
     const info = keteranganUjian();
     if (!info) return;
@@ -1708,6 +1800,37 @@ export default function CbtPanel({ role }: { role: string }) {
               {!terbuka.activatedAt && " Ujian baru dapat dimasuki setelah diaktifkan dan jam mulainya tiba."}
             </span>
           </div>
+
+          {/* ---------- KODE QR ----------
+              Menjawab satu hal yang selalu memakan sepuluh menit pertama
+              ujian: peserta yang tidak membuka grup kelas, duduk di ruangan,
+              lalu mengetik ulang kode dari papan tulis — dan tertukar "0"
+              dengan "O". Yang dipindai bukan kodenya melainkan tautan
+              lengkapnya, sehingga halaman ujiannya terbuka dengan kode yang
+              sudah terisi.
+
+              Kotaknya hanya muncul bila QR-nya berhasil digambar. Bingkai
+              kosong bertuliskan "memuat…" yang menetap karena penggambarnya
+              gagal jauh lebih mengganggu daripada tidak ada apa-apa —
+              tautan dan kodenya tetap ada persis di sebelahnya. */}
+          {qrUjian && (
+            <div className="cbt-bagi-qr">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={qrUjian} alt={`Kode QR ujian ${terbuka.code}`} width={148} height={148} />
+              <div className="cbt-bagi-qr-teks">
+                <b>Pindai untuk masuk</b>
+                <span>
+                  Tempel di pintu ruang ujian atau tayangkan di papan. Peserta memindainya
+                  dengan kamera ponsel, dan kode ujiannya terisi sendiri — tidak ada lagi
+                  &ldquo;0&rdquo; yang tertukar dengan &ldquo;O&rdquo;.
+                </span>
+                <div className="cbt-bagi-qr-tombol">
+                  <Tbl kabar={aksi["qr-unduh"]} dasar="btn btn-light" diam="⬇ Unduh QR (PNG)" onClick={unduhQr} />
+                  <Tbl kabar={aksi["qr-poster"]} dasar="btn btn-light" diam="🖨 Cetak poster QR" onClick={cetakPosterQr} />
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="cbt-bagi-baris">
             <div className="cbt-bagi-kotak">
@@ -2582,7 +2705,30 @@ export default function CbtPanel({ role }: { role: string }) {
                   <tbody>
                     {peserta.map((p) => (
                       <tr key={p.id} className={bukaPeserta?.id === p.id ? "cbt-baris-buka" : ""}>
-                        <td><b>{p.nama}</b><small className="psn-nama">{p.nim}</small></td>
+                        <td>
+                          <b>{p.nama}</b><small className="psn-nama">{p.nim}</small>
+                          {/* Perangkatnya disebut di bawah nama, bukan sebagai
+                              kolom sendiri. Papan ini sudah tujuh kolom dan
+                              dibaca sambil berjalan di antara meja; yang
+                              dibutuhkan pengawas bukan daftar perangkat semua
+                              orang, melainkan penanda pada baris yang
+                              menyimpang.
+
+                              Karena itu keduanya hanya muncul ketika memang ada
+                              yang perlu dikatakan: gembok bila layarnya
+                              benar-benar terkunci sistem, peringatan bila
+                              ujiannya mewajibkan aplikasi tetapi peserta ini
+                              masuk dari peramban — yang mungkin terjadi pada
+                              peserta yang sudah mulai SEBELUM kewajibannya
+                              dinyalakan. */}
+                          {kunciSistem(rapikanKlien(p.klien)) ? (
+                            <small className="cbt-klien-kunci">
+                              🔒 {KLIEN_LABEL[rapikanKlien(p.klien)]}
+                            </small>
+                          ) : terbuka.requireLockdown ? (
+                            <small className="cbt-putus">⚠ peramban biasa, layarnya tidak terkunci</small>
+                          ) : null}
+                        </td>
                         <td>
                           <span className={`pill cbt-p-${p.status}`}>
                             {p.status === "berjalan" ? "Mengerjakan" : p.status === "waktu_habis" ? "Waktu habis" : "Selesai"}
@@ -2720,8 +2866,8 @@ export default function CbtPanel({ role }: { role: string }) {
                       <li key={r.id} className={belumDikoreksi ? "cbt-perlu-koreksi" : ""}>
                         <div className="cbt-lembar-kepala">
                           <span className="cbt-lembar-nomor">Soal {r.nomor}</span>
-                          <span className={`pill cbt-p-${r.benar === null ? "waktu_habis" : r.benar ? "selesai" : "berjalan"}`}>
-                            {r.benar === null ? "Menunggu koreksi" : r.benar ? "Benar" : "Salah"}
+                          <span className={`pill cbt-nilai-${keadaanJawab(r)}`}>
+                            {KEADAAN_JAWAB_LABEL[keadaanJawab(r)]}
                           </span>
                           <span className="cbt-lembar-poin">{r.poin} / {r.bobot} poin</span>
                         </div>

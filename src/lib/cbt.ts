@@ -412,6 +412,43 @@ export function jawabanKosong(jenis: JenisSoal, jawaban: string): boolean {
 export type HasilSatuSoal = { benar: boolean | null; poin: number };
 
 /**
+ * Empat keadaan yang boleh dipakai satu jawaban, beserta warnanya.
+ *
+ * Ada di sini — bukan di panelnya — karena label dan warna ini muncul di dua
+ * layar yang berbeda dan dibaca orang yang berbeda pula, dan keduanya harus
+ * mengatakan hal yang sama. Sebelumnya panel pengajar menyimpulkannya sendiri
+ * dari `benar` saja, dan kesimpulannya keliru dua kali: jawaban benar sebagian
+ * ikut disebut "Salah", dan warnanya dipinjam dari lencana status sehingga
+ * yang salah justru tercetak HIJAU.
+ *
+ * `sebagian` hanya mungkin pada PG kompleks dan penjodohan, yang dinilai per
+ * bagian. Ia sengaja tidak dilebur ke "salah": peserta yang benar tiga dari
+ * empat pasangan mendapat poin, dan lembar yang mengatakan sebaliknya akan
+ * digugat — dengan alasan yang benar.
+ */
+export type KeadaanJawab = "benar" | "sebagian" | "salah" | "tunggu";
+
+export const KEADAAN_JAWAB_LABEL: Record<KeadaanJawab, string> = {
+  benar: "Benar",
+  sebagian: "Benar sebagian",
+  salah: "Salah",
+  tunggu: "Menunggu koreksi",
+};
+
+/**
+ * Keadaan satu jawaban dari hasil penilaiannya.
+ *
+ * Urutan pemeriksaannya menentukan. `benar === null` diperiksa PALING DULU:
+ * essay yang belum dikoreksi berpoin nol, dan diperiksa sesudah poinnya ia
+ * akan terbaca "Salah" — vonis atas jawaban yang belum dibaca siapa pun.
+ */
+export function keadaanJawab(hasil: HasilSatuSoal): KeadaanJawab {
+  if (hasil.benar === null) return "tunggu";
+  if (hasil.benar) return "benar";
+  return hasil.poin > 0 ? "sebagian" : "salah";
+}
+
+/**
  * Nilai satu jawaban.
  *
  * `benar: null` berarti belum dapat dinilai mesin — essay, yang menunggu

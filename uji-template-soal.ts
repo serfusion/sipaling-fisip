@@ -1,6 +1,8 @@
 // Uji perakit template: berkasnya harus benar-benar terbaca sebagai .xlsx
 // oleh pembaca sungguhan (SheetJS), bukan hanya "berbentuk zip".
 import { writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import * as XLSX from "xlsx";
 
 // Blob ada di Node 18+, tetapi kode sumbernya memakai "@/lib/..." — jalankan
@@ -71,8 +73,16 @@ async function jalan() {
     cek(`memuat ${wajib}`, teks.includes(wajib));
   }
 
-  writeFileSync("/tmp/claude-0/-home-user-sipaling-fisip/43787386-10d9-5ffb-abce-64323d97478e/scratchpad/Template-Soal.xlsx", buf);
-  writeFileSync("/tmp/claude-0/-home-user-sipaling-fisip/43787386-10d9-5ffb-abce-64323d97478e/scratchpad/Template-Soal.docx", dbuf);
+  // Kedua berkas ditulis supaya dapat dibuka sendiri dengan Excel dan Word —
+  // uji yang mengatakan "zip-nya sah" tidak menjawab pertanyaan yang
+  // sebenarnya, yaitu apakah Excel mau membukanya tanpa mengeluh.
+  //
+  // Jalurnya diambil dari direktori sementara sistem, BUKAN dituliskan apa
+  // adanya. Dahulu di sini ada jalur mutlak milik satu komputer, dan berkas uji
+  // ini gagal di setiap komputer lain — termasuk yang menjalankannya untuk
+  // memeriksa perubahan orang lain.
+  writeFileSync(join(tmpdir(), "Template-Soal.xlsx"), buf);
+  writeFileSync(join(tmpdir(), "Template-Soal.docx"), dbuf);
 
   console.log(`\n${lulus} lulus, ${gagal} gagal`);
   if (gagal > 0) process.exit(1);
