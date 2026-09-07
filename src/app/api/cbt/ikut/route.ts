@@ -22,7 +22,7 @@
 // ============================================================
 import { randomBytes } from "node:crypto";
 import { db } from "@/db";
-import { cbtAnswers, cbtAttempts, cbtExams } from "@/db/schema";
+import { cbtAnswers, cbtAttempts, cbtExams, cbtIncidents } from "@/db/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { explainServerError } from "@/lib/api-errors";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
@@ -32,7 +32,11 @@ import {
   kunciNama, nilaiJawaban, periksaGanda, periksaMasuk, rapikanPerangkat, sisaDetik,
   statusUjian, susunPaket, type Soal,
 } from "@/lib/cbt";
-import { attemptDariKunci, bacaLembar, soalUjian, ujianDariKode, type Ujian } from "@/lib/cbt-store";
+import { attemptDariKunci, bacaLembar, soalUjian, ujianDariKode, type Attempt, type Ujian } from "@/lib/cbt-store";
+import {
+  harusDipaksa, pesanPeringatan, rapikanInsiden, rapikanMode, skorIntegritas,
+  type HitunganInsiden, type JenisInsiden,
+} from "@/lib/pengawasan";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -62,6 +66,11 @@ function ringkasUjian(u: Ujian, sekarang: Date) {
     status,
     mulai: u.startAt ? u.startAt.toISOString() : null,
     selesai: u.endAt ? u.endAt.toISOString() : null,
+    // Modenya saja yang dikirim, bukan daftar aturannya. Aturan tiap mode ada
+    // di satu tempat (src/lib/pengawasan.ts) dan dibaca oleh kedua sisi, jadi
+    // mengubah keketatan satu mode tidak menuntut peramban yang sedang terbuka
+    // ikut diperbarui — dan tidak mungkin kedua sisi berbeda pendapat.
+    pengawasan: rapikanMode(u.proctorMode),
   };
 }
 
@@ -115,6 +124,108 @@ function lembarUntukLayar(bank: Soal[], lembar: Array<{ id: number; peta: number
       };
     })
     .filter((s): s is NonNullable<typeof s> => s !== null);
+}
+
+/**
+ * Kolom penghitung untuk tiap jenis insiden.
+ *
+ * Dipisahkan dari mesin aturannya dengan sengaja: src/lib/pengawasan.ts tidak
+ * boleh tahu apa-apa tentang basis data, supaya ia dapat diuji tanpa satu pun
+ * sambungan. Yang ada di sini hanya pemetaan namanya.
+ */
+type KolomHitung =
+  | "switchedTab" | "leftFullscreen" | "blurCount" | "copyAttempts" | "pasteAttempts"
+  | "screenshotAttempts" | "rightClicks" | "devtoolsOpens" | "secondScreens";
+
+const KOLOM_INSIDEN: Record<JenisInsiden, KolomHitung> = {
+  tab: "switchedTab",
+  fullscreen: "leftFullscreen",
+  blur: "blurCount",
+  salin: "copyAttempts",
+  tempel: "pasteAttempts",
+  tangkap: "screenshotAttempts",
+  klik_kanan: "rightClicks",
+  devtools: "devtoolsOpens",
+  layar_kedua: "secondScreens",
+};
+
+/** Catatan pelanggaran yang sudah tersimpan pada satu attempt. */
+function hitunganInsiden(a: Attempt): HitunganInsiden {
+  return {
+    tab: a.switchedTab,
+    fullscreen: a.leftFullscreen,
+    blur: a.blurCount,
+    salin: a.copyAttempts,
+    tempel: a.pasteAttempts,
+    tangkap: a.screenshotAttempts,
+    klik_kanan: a.rightClicks,
+    devtools: a.devtoolsOpens,
+    layar_kedua: a.secondScreens,
+  };
+}
+
+/**
+ * Nilai dan tutup satu attempt.
+ *
+ * Dipakai dua jalur: mahasiswa yang menekan "kumpulkan", dan pengumpulan
+ * PAKSA oleh aturan pengawasan. Keduanya harus melewati jalan yang sama persis
+ * — attempt yang ditutup paksa tanpa dinilai akan muncul di rekap dengan nilai
+ * nol, dan yang terlihat bukan "dihentikan pengawas" melainkan "menjawab semua
+ * soal dengan salah".
+ */
+async function nilaiDanTutup(
+  attempt: Attempt,
+  ujian: Ujian,
+  sekarang: Date,
+  sebabPaksa: string | null,
+) {
+  const bank = await soalUjian(attempt.examId);
+  const lembar = bacaLembar(attempt.paper);
+  const dipakai = lembar
+    .map((l) => bank.find((s) => s.id === l.id))
+    .filter((s): s is Soal => Boolean(s));
+  const petaPilihan = Object.fromEntries(lembar.map((l) => [l.id, l.peta]));
+
+  const tersimpan = await db.select().from(cbtAnswers).where(eq(cbtAnswers.attemptId, attempt.id));
+  const jawaban = Object.fromEntries(tersimpan.map((j) => [j.questionId, j.answer]));
+
+  const ringkas = hitungNilai(dipakai, jawaban, petaPilihan, ujian.passingGrade);
+
+  // Tiap jawaban ikut dinilai satu per satu, supaya dosen dapat melihat mana
+  // yang benar dan mana yang salah tanpa menghitung ulang.
+  for (const soal of dipakai) {
+    const isi = String(jawaban[soal.id] ?? "");
+    const hasil = nilaiJawaban(soal, isi, petaPilihan[soal.id]);
+    await db
+      .insert(cbtAnswers)
+      .values({
+        attemptId: attempt.id, questionId: soal.id, answer: isi,
+        isCorrect: hasil.benar, points: hasil.poin, updatedAt: sekarang,
+      })
+      .onConflictDoUpdate({
+        target: [cbtAnswers.attemptId, cbtAnswers.questionId],
+        set: { isCorrect: hasil.benar, points: hasil.poin, updatedAt: sekarang },
+      });
+  }
+
+  const lewatWaktu = sekarang.getTime() > attempt.deadlineAt.getTime();
+  await db
+    .update(cbtAttempts)
+    .set({
+      status: lewatWaktu ? "waktu_habis" : "selesai",
+      submittedAt: sekarang,
+      score: Math.round(ringkas.nilai),
+      correct: ringkas.benar,
+      wrong: ringkas.salah,
+      partial: ringkas.sebagian,
+      blank: ringkas.kosong,
+      pending: ringkas.tertunda,
+      forcedReason: sebabPaksa,
+      lastSeenAt: sekarang,
+    })
+    .where(eq(cbtAttempts.id, attempt.id));
+
+  return ringkas;
 }
 
 export async function POST(request: Request) {
@@ -365,18 +476,89 @@ export async function POST(request: Request) {
     }
 
     // ---------- CATAT PELANGGARAN ----------
+    //
+    // Yang dikerjakan di sini tiga hal, dan urutannya bukan kebetulan:
+    // BUKTINYA ditulis lebih dulu, baru ringkasannya diperbarui, baru
+    // akibatnya dijalankan. Kalau salah satu langkah berikutnya gagal, yang
+    // tersisa tetap catatan kejadiannya — dan itu bagian yang tidak boleh
+    // hilang.
     if (aksi === "langgar") {
-      const jenis = String(body.jenis || "");
-      const kolom =
-        jenis === "fullscreen"
-          ? { leftFullscreen: sql`${cbtAttempts.leftFullscreen} + 1` }
-          : jenis === "tab"
-            ? { switchedTab: sql`${cbtAttempts.switchedTab} + 1` }
-            : null;
-      if (kolom) {
-        await db.update(cbtAttempts).set({ ...kolom, lastSeenAt: sekarang }).where(eq(cbtAttempts.id, attempt.id));
+      const jenis = rapikanInsiden(body.jenis);
+      if (!jenis) {
+        return Response.json({ success: false, message: "Jenis pelanggaran tidak dikenali." }, { status: 400 });
       }
-      return Response.json({ success: true });
+
+      const ujianRow = await db.select().from(cbtExams).where(eq(cbtExams.id, attempt.examId)).limit(1);
+      const ujian = ujianRow[0];
+      if (!ujian) return Response.json({ success: false, message: "Ujian tidak ditemukan." }, { status: 404 });
+      const mode = rapikanMode(ujian.proctorMode);
+
+      // Keterangan dari peramban dipotong pendek dan dibersihkan. Ia masuk ke
+      // basis data dan dibaca kembali di layar dosen, jadi ia diperlakukan
+      // sebagai kiriman orang luar — karena memang begitulah asalnya.
+      const detail = String(body.detail ?? "")
+        .replace(/[\u0000-\u001f\u007f]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 200) || null;
+
+      await db.insert(cbtIncidents).values({
+        attemptId: attempt.id,
+        kind: jenis,
+        // Jam SERVER. Jam yang dikirim peramban tidak dipercaya di sini
+        // dengan alasan yang sama seperti batas waktu ujian: ia dapat diputar.
+        at: sekarang,
+        detail,
+      });
+
+      // Penghitungnya ditambah oleh BASIS DATA, bukan dihitung di sini lalu
+      // ditulis balik. Dua pelanggaran yang tercatat dalam detik yang sama —
+      // dan itu justru yang terjadi saat peserta panik menekan apa saja — akan
+      // membaca angka lama yang sama pula, lalu yang satu menimpa yang lain.
+      //
+      // Angka yang KEMBALI dari perintah itu yang dipakai menghitung skor,
+      // bukan angka yang terbaca di awal permintaan. Selisihnya kecil dan
+      // jarang, tetapi skor yang dihitung dari angka basi adalah angka yang
+      // salah pada laporan yang justru dibaca ketika hasil ujian digugat.
+      const kolom = KOLOM_INSIDEN[jenis];
+      const sesudah = await db
+        .update(cbtAttempts)
+        .set({
+          [kolom]: sql`${cbtAttempts[kolom]} + 1`,
+          lastSeenAt: sekarang,
+        })
+        .where(eq(cbtAttempts.id, attempt.id))
+        .returning();
+
+      const hitungan = sesudah[0] ? hitunganInsiden(sesudah[0]) : hitunganInsiden(attempt);
+      const skor = skorIntegritas(hitungan);
+      await db
+        .update(cbtAttempts)
+        .set({ integrityScore: skor })
+        .where(eq(cbtAttempts.id, attempt.id));
+
+      // ---------- PENGUMPULAN PAKSA ----------
+      // Hanya mode sertifikasi, dan hanya oleh pelanggaran yang memang
+      // disengaja — blur dan klik kanan tidak pernah ikut menghitung mundur.
+      // Memutus ujian orang tidak dapat dibatalkan, jadi ambangnya dipasang
+      // di tempat yang tidak dapat dicapai tanpa berbuat sesuatu berkali-kali.
+      if (harusDipaksa(mode, hitungan)) {
+        const sebab = `Dihentikan pengawasan: ${jenis} melampaui batas pelanggaran ujian sertifikasi.`;
+        await nilaiDanTutup(attempt, ujian, sekarang, sebab);
+        return Response.json({
+          success: true,
+          skor,
+          dipaksa: true,
+          pesan: pesanPeringatan(mode, jenis, hitungan),
+        });
+      }
+
+      return Response.json({
+        success: true,
+        skor,
+        dipaksa: false,
+        pesan: pesanPeringatan(mode, jenis, hitungan),
+      });
     }
 
     // ---------- TANDAI UNTUK DITINJAU ----------
@@ -434,50 +616,7 @@ export async function POST(request: Request) {
       const ujian = ujianRow[0];
       if (!ujian) return Response.json({ success: false, message: "Ujian tidak ditemukan." }, { status: 404 });
 
-      const bank = await soalUjian(attempt.examId);
-      const lembar = bacaLembar(attempt.paper);
-      const dipakai = lembar
-        .map((l) => bank.find((s) => s.id === l.id))
-        .filter((s): s is Soal => Boolean(s));
-      const petaPilihan = Object.fromEntries(lembar.map((l) => [l.id, l.peta]));
-
-      const tersimpan = await db.select().from(cbtAnswers).where(eq(cbtAnswers.attemptId, attempt.id));
-      const jawaban = Object.fromEntries(tersimpan.map((j) => [j.questionId, j.answer]));
-
-      const ringkas = hitungNilai(dipakai, jawaban, petaPilihan, ujian.passingGrade);
-
-      // Tiap jawaban ikut dinilai satu per satu, supaya dosen dapat melihat
-      // mana yang benar dan mana yang salah tanpa menghitung ulang.
-      for (const soal of dipakai) {
-        const isi = String(jawaban[soal.id] ?? "");
-        const hasil = nilaiJawaban(soal, isi, petaPilihan[soal.id]);
-        await db
-          .insert(cbtAnswers)
-          .values({
-            attemptId: attempt.id, questionId: soal.id, answer: isi,
-            isCorrect: hasil.benar, points: hasil.poin, updatedAt: sekarang,
-          })
-          .onConflictDoUpdate({
-            target: [cbtAnswers.attemptId, cbtAnswers.questionId],
-            set: { isCorrect: hasil.benar, points: hasil.poin, updatedAt: sekarang },
-          });
-      }
-
-      const lewatWaktu = sekarang.getTime() > attempt.deadlineAt.getTime();
-      await db
-        .update(cbtAttempts)
-        .set({
-          status: lewatWaktu ? "waktu_habis" : "selesai",
-          submittedAt: sekarang,
-          score: Math.round(ringkas.nilai),
-          correct: ringkas.benar,
-          wrong: ringkas.salah,
-          partial: ringkas.sebagian,
-          blank: ringkas.kosong,
-          pending: ringkas.tertunda,
-          lastSeenAt: sekarang,
-        })
-        .where(eq(cbtAttempts.id, attempt.id));
+      const ringkas = await nilaiDanTutup(attempt, ujian, sekarang, null);
 
       return Response.json({
         success: true,
