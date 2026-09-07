@@ -50,12 +50,29 @@ const MODEL_GEMINI = process.env.CBT_MODEL_GEMINI || "gemini-2.5-flash";
  * membalas dengan kalimat pembuka, dan yang menanggungnya adalah dosen yang
  * menunggu dua puluh soal lalu menerima galat penguraian.
  */
+/**
+ * Gambar yang ikut dikirim bersama perintah.
+ *
+ * Datanya base64 TANPA awalan "data:", supaya kedua penyedia menerimanya apa
+ * adanya — Claude menuntut base64 murni, dan Gemini juga.
+ */
+export type GambarMasuk = { jenis: string; data: string };
+
 export async function mintaJson(input: {
   sistem: string;
   perintah: string;
   skema: Record<string, unknown>;
   penyedia?: NamaPenyedia;
   maksKeluaran?: number;
+  /** Gambar yang ikut dibaca model. Kosong untuk permintaan teks biasa. */
+  gambar?: GambarMasuk[];
+  /**
+   * Seberapa dalam model diminta berpikir. "low" untuk pekerjaan yang
+   * berulang ribuan kali dan jawabannya pendek — memeriksa satu cuplikan
+   * kamera adalah persis itu, dan "high" di sana hanya menambah biaya tanpa
+   * menambah ketepatan.
+   */
+  usaha?: "low" | "medium" | "high";
 }): Promise<JawabanModel> {
   const tersedia = penyediaTersedia();
   if (tersedia.length === 0) {
@@ -74,6 +91,8 @@ async function lewatClaude(input: {
   perintah: string;
   skema: Record<string, unknown>;
   maksKeluaran?: number;
+  gambar?: GambarMasuk[];
+  usaha?: "low" | "medium" | "high";
 }): Promise<JawabanModel> {
   const client = new Anthropic();
   try {
@@ -86,10 +105,29 @@ async function lewatClaude(input: {
       system: input.sistem,
       thinking: { type: "adaptive" },
       output_config: {
-        effort: "high",
+        effort: input.usaha ?? "high",
         format: { type: "json_schema", schema: input.skema },
       },
-      messages: [{ role: "user", content: input.perintah }],
+      messages: [
+        {
+          role: "user",
+          // Gambar diletakkan SEBELUM teksnya. Perintah yang datang lebih dulu
+          // membuat model menjawab sebelum ia benar-benar melihat gambarnya,
+          // dan pada pemeriksaan kamera itu berarti jawaban yang percaya diri
+          // tentang gambar yang belum dibaca.
+          content: [
+            ...(input.gambar ?? []).map((g) => ({
+              type: "image" as const,
+              source: {
+                type: "base64" as const,
+                media_type: g.jenis as "image/jpeg" | "image/png" | "image/gif" | "image/webp",
+                data: g.data,
+              },
+            })),
+            { type: "text" as const, text: input.perintah },
+          ],
+        },
+      ],
     });
     const pesan = await aliran.finalMessage();
 
@@ -142,6 +180,8 @@ async function lewatGemini(input: {
   perintah: string;
   skema: Record<string, unknown>;
   maksKeluaran?: number;
+  gambar?: GambarMasuk[];
+  usaha?: "low" | "medium" | "high";
 }): Promise<JawabanModel> {
   const kunci = (process.env.GEMINI_API_KEY || "").trim();
   const alamat =
@@ -154,7 +194,17 @@ async function lewatGemini(input: {
       headers: { "Content-Type": "application/json", "x-goog-api-key": kunci },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: input.sistem }] },
-        contents: [{ role: "user", parts: [{ text: input.perintah }] }],
+        contents: [
+          {
+            role: "user",
+            parts: [
+              ...(input.gambar ?? []).map((g) => ({
+                inline_data: { mime_type: g.jenis, data: g.data },
+              })),
+              { text: input.perintah },
+            ],
+          },
+        ],
         generationConfig: {
           responseMimeType: "application/json",
           responseJsonSchema: input.skema,

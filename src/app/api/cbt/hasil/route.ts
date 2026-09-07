@@ -5,10 +5,12 @@
 // GET ?ujian=<id>&attempt=<id>  rincian jawaban satu mahasiswa
 // PATCH                      koreksi essay: nilai + catatan dosen
 // ============================================================
+import { createClient } from "@supabase/supabase-js";
 import { db } from "@/db";
-import { cbtAnswers, cbtAttempts, cbtExams } from "@/db/schema";
+import { cbtAnswers, cbtAttempts, cbtExams, cbtIncidents } from "@/db/schema";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { getCurrentProfile } from "@/lib/supabase-server";
+import { getSupabaseSecretKey, getSupabaseUrl } from "@/lib/supabase-config";
 import { explainServerError } from "@/lib/api-errors";
 import {
   analisisSoal, angkaParam, bolehCbt, bolehPantau, bolehUbah, sisaDetik,
@@ -53,6 +55,31 @@ async function gerbang(examId: number, izin: "pantau" | "ubah" = "pantau") {
   return { profile, ujian };
 }
 
+const BUCKET_BUKTI = "cbt-bukti";
+
+/**
+ * Alamat bertanda tangan untuk satu cuplikan bukti, berumur sepuluh menit.
+ *
+ * Sepuluh menit, bukan sehari. Alamat yang berumur panjang akan tertinggal di
+ * riwayat peramban, di tangkapan layar rapat, dan di tautan yang diteruskan
+ * lewat pesan — dan sejak saat itu ia bukan lagi bukti yang terjaga.
+ */
+async function alamatBukti(jalur: string): Promise<string | null> {
+  const url = getSupabaseUrl();
+  const kunci = getSupabaseSecretKey();
+  if (!url || !kunci) return null;
+  try {
+    const storage = createClient(url, kunci, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data } = await storage.storage.from(BUCKET_BUKTI).createSignedUrl(jalur, 600);
+    return data?.signedUrl ?? null;
+  } catch {
+    // Bukti yang tidak dapat dibuka bukan alasan menahan seluruh laporannya.
+    return null;
+  }
+}
+
 export async function GET(request: Request) {
   try {
     const params = new URL(request.url).searchParams;
@@ -84,6 +111,19 @@ export async function GET(request: Request) {
       const jawaban = await db.select().from(cbtAnswers).where(eq(cbtAnswers.attemptId, attempt.id));
       const petaJawab = new Map(jawaban.map((j) => [j.questionId, j]));
 
+      // GARIS WAKTU PENGAWASAN. Inilah yang sebenarnya dibaca penguji ketika
+      // sebuah hasil digugat, dan angka ringkasannya tidak dapat
+      // menggantikannya: tiga kali pindah tab yang terpencar sepanjang
+      // sembilan puluh menit adalah notifikasi yang muncul sendiri, sedangkan
+      // tiga kali dalam empat puluh detik sesudah soal essay dibuka adalah hal
+      // yang lain sama sekali.
+      const jejak = await db
+        .select()
+        .from(cbtIncidents)
+        .where(eq(cbtIncidents.attemptId, attempt.id))
+        .orderBy(cbtIncidents.at)
+        .limit(500);
+
       return Response.json({
         success: true,
         peserta: {
@@ -93,7 +133,33 @@ export async function GET(request: Request) {
           mulai: attempt.startedAt.toISOString(),
           kumpul: attempt.submittedAt ? attempt.submittedAt.toISOString() : null,
           keluarFullscreen: attempt.leftFullscreen, pindahTab: attempt.switchedTab,
+          integritas: attempt.integrityScore,
+          dihentikan: attempt.forcedReason,
+          pengawasan: {
+            tab: attempt.switchedTab,
+            fullscreen: attempt.leftFullscreen,
+            blur: attempt.blurCount,
+            salin: attempt.copyAttempts,
+            tempel: attempt.pasteAttempts,
+            tangkap: attempt.screenshotAttempts,
+            klik_kanan: attempt.rightClicks,
+            devtools: attempt.devtoolsOpens,
+            layar_kedua: attempt.secondScreens,
+          },
         },
+        jejak: await Promise.all(
+          jejak.map(async (j) => ({
+            jenis: j.kind,
+            jam: j.at.toISOString(),
+            detail: j.detail || "",
+            // Bucket buktinya TERTUTUP, jadi alamatnya dibuatkan di sini,
+            // berumur pendek, dan hanya untuk penguji yang sudah lolos
+            // pemeriksaan izin di atas. Menjadikan bucket-nya publik akan jauh
+            // lebih mudah dan berarti wajah peserta dapat dibuka siapa pun
+            // yang menebak nama berkasnya.
+            bukti: j.evidence ? await alamatBukti(j.evidence) : null,
+          })),
+        ),
         // Kunci jawaban baru ikut keluar DI SINI — sesudah ujiannya dikumpulkan,
         // dan hanya kepada dosen pemiliknya.
         rincian: lembar.map((l, urut) => {
@@ -184,6 +250,8 @@ export async function GET(request: Request) {
           : null,
         keluarFullscreen: p.leftFullscreen,
         pindahTab: p.switchedTab,
+        integritas: p.integrityScore,
+        dihentikan: p.forcedReason,
         mulai: p.startedAt.toISOString(),
         kumpul: p.submittedAt ? p.submittedAt.toISOString() : null,
       })),

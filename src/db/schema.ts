@@ -2,6 +2,7 @@ import {
   bigint,
   boolean,
   customType,
+  index,
   integer,
   numeric,
   pgTable,
@@ -517,6 +518,28 @@ export const cbtExams = pgTable("cbt_exams", {
    * bergantian sepanjang hari.
    */
   singleDevice: boolean("single_device").notNull().default(true),
+  /**
+   * Seberapa ketat ujian ini diawasi: "biasa" | "ketat" | "sertifikasi".
+   *
+   * Satu kolom, bukan sebelas kotak centang. Dosen tahu ujiannya kuis harian,
+   * UAS, atau uji sertifikasi; ia tidak seharusnya diminta memutuskan sendiri
+   * apakah alat pengembang perlu diawasi. Aturan tiap mode ada di
+   * src/lib/pengawasan.ts, tempat ia dapat diubah sekali untuk semua ujian.
+   */
+  proctorMode: varchar("proctor_mode", { length: 20 }).notNull().default("biasa"),
+  /**
+   * Saklar kamera pengawas. Hanya berpengaruh pada mode Sertifikasi/OSCE.
+   *
+   * Bawaannya MENYALA, supaya ujian sertifikasi tetap terawasi tanpa ada yang
+   * perlu menekan apa pun. Ia ada untuk mematikan — kelas yang separuh
+   * pesertanya tidak punya kamera, atau ujian yang memang tidak boleh merekam
+   * wajah.
+   *
+   * Yang memegangnya Admin dan Super Admin, BUKAN dosen pemilik ujiannya.
+   * Merekam wajah orang adalah keputusan lembaga, dan yang menanggung
+   * akibatnya bila keliru adalah fakultas.
+   */
+  cameraOn: boolean("camera_on").notNull().default(true),
   /** Kode tambahan yang diketik mahasiswa. Kosong berarti tanpa kode. */
   token: varchar("token", { length: 12 }),
 
@@ -617,14 +640,93 @@ export const cbtAttempts = pgTable("cbt_attempts", {
   partial: integer("partial").notNull().default(0),
   blank: integer("blank").notNull().default(0),
   pending: integer("pending").notNull().default(0),
-  /** Penghitung pelanggaran: keluar fullscreen, pindah tab. */
+  // ---------- PENGHITUNG PELANGGARAN ----------
+  //
+  // Angkanya diringkas di baris attempt, sementara kejadian satu per satu
+  // tersimpan di cbt_incidents. Keduanya sengaja ada: papan pantau dosen
+  // menampilkan ratusan peserta sekaligus dan tidak boleh menghitung ulang
+  // garis waktu tiap orang, sedangkan sidang yang menggugat hasil ujian
+  // menuntut jam kejadiannya, bukan angka.
   leftFullscreen: integer("left_fullscreen").notNull().default(0),
   switchedTab: integer("switched_tab").notNull().default(0),
+  blurCount: integer("blur_count").notNull().default(0),
+  copyAttempts: integer("copy_attempts").notNull().default(0),
+  pasteAttempts: integer("paste_attempts").notNull().default(0),
+  screenshotAttempts: integer("screenshot_attempts").notNull().default(0),
+  rightClicks: integer("right_clicks").notNull().default(0),
+  devtoolsOpens: integer("devtools_opens").notNull().default(0),
+  secondScreens: integer("second_screens").notNull().default(0),
+  // ---------- DARI KAMERA ----------
+  cameraOff: integer("camera_off").notNull().default(0),
+  cameraCovered: integer("camera_covered").notNull().default(0),
+  cameraFrozen: integer("camera_frozen").notNull().default(0),
+  faceMissing: integer("face_missing").notNull().default(0),
+  otherPerson: integer("other_person").notNull().default(0),
+  /**
+   * Berapa kali attempt ini sudah diperiksa MODEL.
+   *
+   * Batasnya ditegakkan di sini, bukan di peramban, karena batas ini adalah
+   * batas UANG: peramban peserta dapat disuruh mengirim seribu cuplikan, dan
+   * yang membayarnya pemilik portal.
+   */
+  aiChecks: integer("ai_checks").notNull().default(0),
+  /**
+   * Skor integritas 0–100, dihitung ulang tiap kali ada insiden.
+   *
+   * BUKAN nilai, dan tidak pernah mengubah nilai. Ia hanya mengurutkan lembar
+   * pengawasan mana yang perlu dibaca penguji lebih dulu.
+   */
+  integrityScore: integer("integrity_score").notNull().default(100),
+  /** Diisi bila ujiannya dikumpulkan paksa oleh aturan pengawasan. */
+  forcedReason: varchar("forced_reason", { length: 200 }),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
 }, (t) => [
   // Batas percobaan ditegakkan basis data, bukan hanya pemeriksaan di kode:
   // dua permintaan yang datang bersamaan dapat lolos pemeriksaan bersama-sama.
   uniqueIndex("idx_cbt_attempts_sekali").on(t.examId, t.nim, t.attemptNo),
+]);
+
+// ============================================================
+// JEJAK PENGAWASAN
+//
+// Satu baris untuk satu kejadian, dengan jamnya. Penghitung di cbt_attempts
+// menjawab "berapa kali"; tabel ini menjawab "kapan, dan berurutan seperti
+// apa" — dan itulah yang menentukan artinya.
+//
+// Tiga kali pindah tab yang terpencar sepanjang sembilan puluh menit adalah
+// notifikasi yang muncul sendiri. Tiga kali pindah tab dalam empat puluh detik
+// tepat sesudah soal essay dibuka adalah hal yang lain sama sekali. Angka
+// ringkasannya tidak dapat membedakan keduanya; garis waktu bisa.
+//
+// Karena itu pula baris di sini tidak pernah diubah atau dihapus, hanya
+// ditambahkan. Bukti yang dapat disunting bukan bukti.
+// ============================================================
+export const cbtIncidents = pgTable("cbt_incidents", {
+  id: serial("id").primaryKey(),
+  attemptId: integer("attempt_id").notNull().references(() => cbtAttempts.id, { onDelete: "cascade" }),
+  /** Lihat JenisInsiden di src/lib/pengawasan.ts. */
+  kind: varchar("kind", { length: 20 }).notNull(),
+  /**
+   * Jam kejadian menurut SERVER.
+   *
+   * Bukan jam yang dikirim peramban. Peserta yang memutar mundur jam
+   * perangkatnya akan menyusun garis waktu yang rapi dan sepenuhnya palsu,
+   * dan garis waktu itulah satu-satunya hal yang dibaca penguji.
+   */
+  at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  /** Keterangan singkat, mis. nomor soal yang sedang terbuka. */
+  detail: varchar("detail", { length: 200 }),
+  /**
+   * Nama berkas cuplikan kamera di bucket cbt-bukti, bila ada.
+   *
+   * Hanya terisi pada insiden yang MEMANG bermasalah. Cuplikan yang bersih
+   * dibuang begitu selesai diperiksa dan tidak pernah menyentuh penyimpanan —
+   * menyimpan wajah ratusan orang selama berbulan-bulan demi kemungkinan
+   * sengketa yang mungkin tidak pernah datang bukan pilihan yang benar.
+   */
+  evidence: varchar("evidence", { length: 200 }),
+}, (t) => [
+  index("idx_cbt_incidents_attempt").on(t.attemptId, t.at),
 ]);
 
 export const cbtAnswers = pgTable("cbt_answers", {

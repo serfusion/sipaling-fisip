@@ -241,7 +241,14 @@ export type BeritaAcara = {
   berjalan: number;
   pelanggaran: number;
   catatan: string;
-  peserta: Array<{ nim: string; nama: string; status: string; pindahTab: number; keluarFullscreen: number }>;
+  peserta: Array<{
+    nim: string; nama: string; status: string;
+    pindahTab: number; keluarFullscreen: number;
+    /** Skor integritas 0–100. Tidak ada pada ujian dari sebelum pengawasan. */
+    integritas?: number;
+    /** Terisi bila ujiannya dihentikan aturan pengawasan. */
+    dihentikan?: string | null;
+  }>;
 };
 
 /**
@@ -252,16 +259,35 @@ export type BeritaAcara = {
  * ujian bubar, dan itulah yang ditanyakan ketika ada sengketa nilai.
  */
 export function beritaAcaraHtml(ujian: UjianCetak, acara: BeritaAcara): string {
-  const melanggar = acara.peserta.filter((p) => p.pindahTab > 0 || p.keluarFullscreen > 0);
-  const daftarLanggar = melanggar.length === 0
+  // Yang dianggap bercatatan adalah siapa pun yang skor integritasnya belum
+  // seratus — bukan hanya yang pindah tab. Sejak menempel, menyalin, dan
+  // menekan tombol tangkapan layar ikut tercatat, menyaring dengan dua kolom
+  // lama akan menghasilkan berita acara yang menyatakan "tidak ada
+  // pelanggaran" pada ujian yang jawabannya ditempel delapan kali — dan
+  // dokumen itu ditandatangani.
+  const melanggar = acara.peserta.filter(
+    (p) =>
+      p.pindahTab > 0 ||
+      p.keluarFullscreen > 0 ||
+      Boolean(p.dihentikan) ||
+      (typeof p.integritas === "number" && p.integritas < 100),
+  );
+  // Diurutkan dari yang paling perlu dibaca. Berita acara dibaca dari atas,
+  // dan yang di bawah baris kedua puluh jarang sampai terbaca sama sekali.
+  const urut = [...melanggar].sort((a, b) => (a.integritas ?? 100) - (b.integritas ?? 100));
+  const daftarLanggar = urut.length === 0
     ? "<p>Tidak ada pelanggaran yang tercatat sistem selama ujian berlangsung.</p>"
     : `<table class="nilai">
-        <tr><th>NIM</th><th>Nama</th><th>Pindah tab</th><th>Keluar layar penuh</th></tr>
-        ${melanggar.map((p) => `<tr><td>${lolos(p.nim)}</td><td>${lolos(p.nama)}</td>
-          <td>${p.pindahTab}×</td><td>${p.keluarFullscreen}×</td></tr>`).join("")}
+        <tr><th>NIM</th><th>Nama</th><th>Integritas</th><th>Pindah tab</th><th>Keluar layar penuh</th><th>Keterangan</th></tr>
+        ${urut.map((p) => `<tr><td>${lolos(p.nim)}</td><td>${lolos(p.nama)}</td>
+          <td>${typeof p.integritas === "number" ? `${p.integritas}/100` : "—"}</td>
+          <td>${p.pindahTab}×</td><td>${p.keluarFullscreen}×</td>
+          <td>${p.dihentikan ? lolos(p.dihentikan) : "-"}</td></tr>`).join("")}
       </table>
-      <p class="media-catatan">Catatan sistem ini adalah penanda, bukan putusan. Penentuan
-      pelanggaran tetap pada pengawas dan dosen pengampu.</p>`;
+      <p class="media-catatan">Catatan sistem ini adalah penanda, bukan putusan, dan skor
+      integritas BUKAN nilai ujian. Rincian tiap kejadian beserta jamnya ada pada lembar
+      pengawasan masing-masing peserta. Penentuan pelanggaran tetap pada pengawas dan dosen
+      pengampu.</p>`;
 
   const isi = `
 ${kop(ujian, "BERITA ACARA PELAKSANAAN UJIAN")}
