@@ -5847,3 +5847,66 @@ table.qt td small { font-size: 11.5px; }
   line-height: 1.55;
   color: #64748b;
 }
+
+/* ============================================================
+   LAYAR UJIAN TIDAK IKUT TERCETAK
+   ============================================================
+   Dari seluruh jalur tangkapan, cetak-ke-PDF yang paling merugikan sekaligus
+   satu-satunya yang benar-benar dapat DIHENTIKAN — bukan sekadar ditutupi
+   tirai. Ctrl+P menyalin SELURUH naskah, termasuk bagian yang tergulung di
+   luar layar, menjadi satu PDF rapi; tangkapan layar hanya mendapat satu
+   layar.
+
+   Ini lapis kedua. Lapis pertama (Ctrl+P dan beforeprint di penjaga.ts)
+   menutup pintasan dan menu Cetak; aturan di bawah berlaku pada saat
+   perambannya menyusun halaman cetak, sehingga ia tidak dapat dilewati dari
+   mana pun pintunya dibuka.
+
+   CATATAN yang perlu diketahui sebelum mengubah apa pun di sini: layar ujian
+   sebenarnya SUDAH tercetak kosong sejak dulu — tetapi karena kebetulan.
+   Aturan cetak surat portal di bagian atas berkas ini memakai
+   `body * { visibility: hidden }` dan hanya memunculkan kembali .print-area.
+   Begitu aturan surat itu diubah, lubangnya terbuka lagi tanpa ada yang
+   menyadari. Blok ini menjadikannya disengaja. */
+@media print {
+  /* display:none, BUKAN visibility:hidden — yang tersembunyi masih menempati
+     halamannya dan menghasilkan lembar kosong berjumlah persis sebanyak
+     soalnya, yang justru memberi tahu berapa panjang naskahnya. */
+  .uj-kerja > *,
+  .uj-air,
+  .uj-kam {
+    display: none !important;
+  }
+
+  /* Dimunculkan kembali dari `body *` di atas, supaya lembar yang keluar dari
+     pencetak tidak terbaca sebagai pencetak yang rusak. */
+  .uj-kerja {
+    visibility: visible !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    background: none !important;
+  }
+  .uj-kerja::before {
+    content: "Naskah ujian ini tidak dapat dicetak. Percobaan pencetakan dicatat dan dilaporkan ke pengawas.";
+    visibility: visible !important;
+    display: block;
+    padding: 40mm 20mm;
+    font: 700 14pt/1.7 system-ui, sans-serif;
+    text-align: center;
+    color: #000;
+  }
+
+  /* Tirai sengaja DIBIARKAN tercetak bila ia sedang tertutup: yang keluar dari
+     pencetak menjadi lembar berisi peringatannya, lengkap dengan nama dan
+     nomor pesertanya. */
+  .uj-tirai,
+  .uj-tirai * {
+    visibility: visible !important;
+  }
+  .uj-tirai {
+    display: grid !important;
+    position: static !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+}

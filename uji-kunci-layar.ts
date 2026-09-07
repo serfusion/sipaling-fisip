@@ -15,6 +15,7 @@
 // yang meragukan harus selalu jatuh ke "peramban", yang paling longgar dan
 // yang paling sedikit janjinya.
 
+import { readFileSync } from "node:fs";
 import {
   KEMAMPUAN, KLIEN_LABEL, PENANDA_KLIEN, PESAN_TIRAI, SEMUA_KLIEN, TIRAI_MS,
   ajakanAplikasi, bacaKlien, bolehMasukKlien, kunciSistem, periksaKunciKlien,
@@ -236,6 +237,46 @@ const posterJahat = posterQrHtml(ujianContoh, alamat, 'x" onerror="alert(1)');
 benar("sumber gambar yang bukan data URL ditolak", !posterJahat.includes("onerror"));
 const posterLuar = posterQrHtml(ujianContoh, alamat, "https://situs-lain.example/qr.png");
 benar("gambar dari situs luar ditolak", !posterLuar.includes("situs-lain.example"));
+
+console.log("\n=== JALUR CETAK DITUTUP DUA LAPIS ===\n");
+
+// Cetak-ke-PDF adalah jalur tangkapan yang paling merugikan sekaligus
+// SATU-SATUNYA yang benar-benar dapat dihentikan halaman, bukan sekadar
+// ditutupi tirai: pratayang cetak menyalin seluruh naskah termasuk bagian
+// yang tergulung di luar layar, sedangkan tangkapan layar hanya mendapat satu
+// layar. Kedua lapisnya perlu — pendengar tombol menutup Ctrl+P, aturan
+// @media print menutup jalur MENU Cetak yang tidak pernah melewati papan
+// ketik sama sekali.
+const penjagaTs = readFileSync("./src/app/cbt/ujian/penjaga.ts", "utf8");
+benar("lapis 1: Ctrl/Cmd+P dicegat", /ctrlKey \|\| e\.metaKey/.test(penjagaTs));
+benar("lapis 1: peristiwa beforeprint ikut dipasang",
+  penjagaTs.includes('addEventListener("beforeprint"'));
+benar("pendengar tombolnya pada fase tangkap", /capture:\s*true/.test(penjagaTs),
+  "penangan lain yang memanggil stopPropagation lebih dulu akan mendahuluinya");
+
+const gaya = readFileSync("./src/app/globals.css", "utf8");
+const iBlok = gaya.indexOf("LAYAR UJIAN TIDAK IKUT TERCETAK");
+benar("lapis 2: blok aturan cetaknya ada", iBlok > 0);
+const blokCetak = iBlok > 0 ? gaya.slice(iBlok) : "";
+benar("lapis 2: isi layar ujian dibuang dari hasil cetak",
+  /\.uj-kerja > \*,[\s\S]{0,120}display:\s*none/.test(blokCetak));
+benar("lapis 2: tanda air dan kamera ikut dibuang",
+  blokCetak.includes(".uj-air") && blokCetak.includes(".uj-kam"));
+benar("lapis 2: keterangannya tetap tercetak",
+  /\.uj-kerja::before[\s\S]{0,220}tidak dapat dicetak/.test(blokCetak),
+  "lembar kosong tanpa keterangan terbaca sebagai pencetak yang rusak");
+// Aturan cetak surat portal memakai `body * { visibility: hidden }` — tanpa
+// memunculkannya kembali, keterangan di atas ikut tersembunyi.
+benar("lapis 2: keterangannya dimunculkan kembali dari aturan cetak portal",
+  /visibility:\s*visible/.test(blokCetak));
+// display:none, BUKAN visibility:hidden — yang tersembunyi masih menempati
+// halamannya dan menghasilkan lembar kosong sebanyak soalnya.
+benar("isi ujian dibuang, bukan sekadar disembunyikan",
+  !/\.uj-kerja > \*[\s\S]{0,80}visibility:\s*hidden/.test(blokCetak));
+// Aturan cetak surat portal harus TETAP ada: ia yang dipakai mencetak surat
+// tugas dan transkrip, dan blok di atas sengaja tidak menyentuhnya.
+benar("aturan cetak surat portal tidak ikut terganggu",
+  gaya.includes(".print-area, .print-area * { visibility: visible; }"));
 
 console.log(`\n${lulus} periksa lulus`);
 if (gagal.length > 0) {

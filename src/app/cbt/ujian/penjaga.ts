@@ -297,14 +297,26 @@ export function usePenjaga({ aktif, mode, lapor }: Opsi): Penjaga {
       const kunci = e.key;
       // Windows dan Linux. PrintScreen sering hanya muncul pada keyup, karena
       // penekanannya dicegat sistem operasi sebelum keydown sampai ke halaman.
-      const cetak = kunci === "PrintScreen" || kunci === "Print";
+      // `code` ikut diperiksa: papan ketik bertata letak bukan-Latin mengirim
+      // `key` yang berbeda untuk tombol fisik yang sama.
+      const cetak = kunci === "PrintScreen" || kunci === "Print" || e.code === "PrintScreen";
       // Windows: Win+Shift+S membuka alat potong. macOS: Cmd+Shift+3/4/5.
       // Yang macOS sering TIDAK PERNAH sampai ke sini — sistemnya menelan
       // kombinasi itu lebih dulu — dan itu memang batasnya.
-      const potong = e.metaKey && e.shiftKey && ["s", "S", "3", "4", "5"].includes(kunci);
-      if (!cetak && !potong) return;
+      const potong =
+        (e.metaKey && e.shiftKey && ["s", "S", "3", "4", "5"].includes(kunci)) ||
+        (e.metaKey && e.shiftKey && e.code === "KeyS");
+      // Ctrl/Cmd+P — dan inilah satu-satunya di daftar ini yang benar-benar
+      // DAPAT DIHENTIKAN, bukan sekadar ditutupi. Pratayang cetak menyalin
+      // SELURUH naskah, termasuk yang tergulung di luar layar, menjadi satu
+      // PDF rapi; tangkapan layar hanya mendapat satu layar. preventDefault
+      // di sini sungguh membatalkan pratayangnya.
+      const cetakBerkas =
+        (e.ctrlKey || e.metaKey) && (kunci === "p" || kunci === "P" || e.code === "KeyP");
+      if (!cetak && !potong && !cetakBerkas) return;
 
       e.preventDefault();
+      e.stopPropagation();
 
       // Setengah detik: cukup lebar untuk menyatukan keydown dan keyup dari
       // satu ketukan, cukup sempit untuk tetap mencatat orang yang menekan
@@ -313,7 +325,7 @@ export function usePenjaga({ aktif, mode, lapor }: Opsi): Penjaga {
       if (sekarang - terakhir < 500) return;
       terakhir = sekarang;
 
-      kirim("tangkap", cetak ? "PrintScreen" : `Meta+Shift+${kunci}`);
+      kirim("tangkap", cetak ? "PrintScreen" : cetakBerkas ? "Ctrl+P" : `Meta+Shift+${kunci}`);
 
       // Soalnya ditutup SEKARANG JUGA, sebelum apa pun yang lain.
       //
@@ -337,11 +349,38 @@ export function usePenjaga({ aktif, mode, lapor }: Opsi): Penjaga {
       } catch { /* papan klip tidak selalu tersedia; diabaikan */ }
     }
 
-    window.addEventListener("keyup", tekan);
-    window.addEventListener("keydown", tekan);
+    // ---------- MENU CETAK ----------
+    // Ctrl+P dicegat pendengar di atas, tetapi menu Cetak peramban tidak
+    // pernah melewati papan ketik sama sekali — pendengar tombol mana pun
+    // tidak akan tahu. `beforeprint` yang menangkapnya, dan aturan @media
+    // print di globals.css yang benar-benar mengosongkan hasil cetaknya.
+    function sebelumCetak() {
+      kirim("tangkap", "cetak halaman");
+      tutupSesaat();
+    }
+
+    // Kursor meninggalkan halaman ke arah bilah sistem — awal dari hampir
+    // setiap alat potong yang dibuka lewat menu, bukan lewat pintasan. Murah,
+    // dan menutup jeda sebelum fokus benar-benar berpindah.
+    function keluarHalaman(e: MouseEvent) {
+      if (e.relatedTarget === null) tutupSesaat();
+    }
+
+    // Fase TANGKAP, dan pada window sekaligus dokumen: satu penangan lain yang
+    // memanggil stopPropagation lebih dulu akan membuat pendengar biasa tidak
+    // pernah terpanggil sama sekali.
+    const pilihan = { capture: true } as const;
+    window.addEventListener("keyup", tekan, pilihan);
+    window.addEventListener("keydown", tekan, pilihan);
+    document.addEventListener("keydown", tekan, pilihan);
+    window.addEventListener("beforeprint", sebelumCetak);
+    document.addEventListener("mouseout", keluarHalaman);
     return () => {
-      window.removeEventListener("keyup", tekan);
-      window.removeEventListener("keydown", tekan);
+      window.removeEventListener("keyup", tekan, pilihan);
+      window.removeEventListener("keydown", tekan, pilihan);
+      document.removeEventListener("keydown", tekan, pilihan);
+      window.removeEventListener("beforeprint", sebelumCetak);
+      document.removeEventListener("mouseout", keluarHalaman);
     };
   }, [aktif, aturan.jagaTangkapanLayar, kirim, tutupSesaat]);
 
