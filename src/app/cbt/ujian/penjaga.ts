@@ -12,15 +12,21 @@
 // Dan tidak ada satu pun baris kode yang dapat menghalangi ponsel kedua yang
 // diarahkan ke monitor.
 //
-// Karena itu berkas ini TIDAK berpura-pura melarang. Yang dikerjakannya empat:
+// Karena itu berkas ini TIDAK berpura-pura melarang. Yang dikerjakannya lima:
 //
 //   MENYULITKAN — salin, potong, tempel, klik kanan, seret, dan seleksi teks
 //                 dimatikan. Ini menutup jalan yang paling sering benar-benar
 //                 dipakai: menyalin soal ke ChatGPT lalu menempelkan
 //                 jawabannya kembali. Yang tersisa adalah mengetik ulang soal
 //                 dengan tangan, dan itu memakan waktu ujian yang sama.
-//   MENGOSONGKAN— begitu ada isyarat tangkapan layar, atau halamannya
-//                 ditinggalkan, SOALNYA DITUTUP tirai gelap. Tangkapannya
+//   MENCEGAH    — dan sebagian benar-benar tercegah, bukan sekadar dicatat:
+//                 Ctrl+P, Ctrl+S, Ctrl+U, Ctrl+R, dan Ctrl+A dibatalkan
+//                 sungguhan. Yang tidak — PrintScreen, alat potong, F12 —
+//                 ditandai apa adanya pada `benarTercegah` di
+//                 src/lib/tombol-terlarang.ts, supaya kalimat yang sampai ke
+//                 peserta tidak pernah menjanjikan lebih dari yang ada.
+//   MENGOSONGKAN— begitu ada isyarat tangkapan layar, halamannya ditinggalkan,
+//                 atau layar penuhnya dilepas, SOALNYA DITUTUP tirai gelap. Tangkapannya
 //                 tetap terjadi; yang berubah isinya. Ini satu-satunya hal
 //                 yang benar-benar dapat dikerjakan halaman web terhadap
 //                 tangkapan layar, dan batasnya tertulis apa adanya pada
@@ -29,6 +35,13 @@
 //   MENANDAI    — identitas peserta ditumpuk di atas layarnya (lihat
 //                 tanda-air.tsx), sehingga tangkapan layar yang tetap berhasil
 //                 diambil menunjuk satu orang.
+//   MENGAKHIRI  — dan inilah yang bergigi. Halaman tidak dapat menahan tangan
+//                 peserta, tetapi ujiannya ada di sini, dan yang ada di sini
+//                 dapat ditutup. Tiga perbuatan berat pada ujian sertifikasi
+//                 dan ujiannya dikumpulkan paksa — oleh SERVER, sesudah
+//                 laporan yang dikirim dari sini sampai. Keputusannya sengaja
+//                 tidak pernah dibuat di halaman ini: peserta yang mematikan
+//                 JavaScript-nya akan selalu memutuskan bahwa ia bersih.
 //
 // Yang BENAR-BENAR menolak tangkapan layar ada satu tingkat di bawah ini:
 // aplikasi ujian di lockdown/, tempat sistem operasinya sendiri yang menolak
@@ -44,6 +57,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { aturanMode, type JenisInsiden, type ModePengawasan } from "@/lib/pengawasan";
+import { PESAN_TOMBOL, periksaTombol } from "@/lib/tombol-terlarang";
 import {
   bacaKlien, TIRAI_MS, type JembatanKlien, type JenisKlien, type SebabTirai,
 } from "@/lib/kunci-layar";
@@ -278,7 +292,11 @@ export function usePenjaga({ aktif, mode, lapor }: Opsi): Penjaga {
     };
   }, [aktif, aturan.kunciSalin, kirim]);
 
-  // ---------- TOMBOL TANGKAPAN LAYAR ----------
+  // ---------- TOMBOL YANG DICEGAT ----------
+  //
+  // Daftar lengkapnya beserta batas kejujurannya ada di
+  // src/lib/tombol-terlarang.ts. Yang dikerjakan di sini hanya empat: mencegah,
+  // menutup soal, mencatat, dan memberi tahu.
   useEffect(() => {
     if (!aktif || !aturan.jagaTangkapanLayar) return;
 
@@ -291,29 +309,37 @@ export function usePenjaga({ aktif, mode, lapor }: Opsi): Penjaga {
     // kali dan memotong empat puluh angka dari skor integritas peserta untuk
     // satu perbuatan — pada ujian sertifikasi, dua ketukan seperti itu sudah
     // cukup mengumpulkan ujiannya secara paksa.
-    let terakhir = 0;
+    //
+    // Jamnya disimpan PER NAMA KETUKAN, bukan satu untuk semuanya. Satu
+    // penghitung bersama membuat F12 yang ditekan setengah detik sesudah
+    // PrintScreen hilang tanpa jejak — dua perbuatan berbeda yang tercatat
+    // satu.
+    const terakhir = new Map<string, number>();
 
     function tekan(e: KeyboardEvent) {
-      const kunci = e.key;
-      // Windows dan Linux. PrintScreen sering hanya muncul pada keyup, karena
-      // penekanannya dicegat sistem operasi sebelum keydown sampai ke halaman.
-      const cetak = kunci === "PrintScreen" || kunci === "Print";
-      // Windows: Win+Shift+S membuka alat potong. macOS: Cmd+Shift+3/4/5.
-      // Yang macOS sering TIDAK PERNAH sampai ke sini — sistemnya menelan
-      // kombinasi itu lebih dulu — dan itu memang batasnya.
-      const potong = e.metaKey && e.shiftKey && ["s", "S", "3", "4", "5"].includes(kunci);
-      if (!cetak && !potong) return;
+      const putusan = periksaTombol(e, bolehMengetik(e.target));
+      if (!putusan) return;
 
+      // preventDefault dipanggil untuk SEMUANYA, termasuk yang sudah diketahui
+      // tidak akan dihormati peramban. Ia tidak merugikan apa pun, dan sebagian
+      // peramban lama maupun aplikasi ujian terkunci di lockdown/ memang
+      // menghormatinya. Yang tidak boleh adalah MENGAKU tercegah — itu
+      // diurus benarTercegah, bukan baris ini.
       e.preventDefault();
+      e.stopPropagation();
+
+      // Tombol yang ditahan sehingga berulang sendiri bukan tiga perbuatan.
+      // Tanpa baris ini, menahan F12 satu setengah detik sudah cukup
+      // mengumpulkan paksa ujian sertifikasi seseorang.
+      if (e.repeat) return;
 
       // Setengah detik: cukup lebar untuk menyatukan keydown dan keyup dari
       // satu ketukan, cukup sempit untuk tetap mencatat orang yang menekan
-      // tombolnya berulang-ulang dengan sengaja.
+      // tombolnya berulang-ulang dengan sengaja — dan menekannya tiga kali
+      // dengan sengaja memang mengakhiri ujian sertifikasi.
       const sekarang = Date.now();
-      if (sekarang - terakhir < 500) return;
-      terakhir = sekarang;
-
-      kirim("tangkap", cetak ? "PrintScreen" : `Meta+Shift+${kunci}`);
+      if (sekarang - (terakhir.get(putusan.nama) ?? 0) < 500) return;
+      terakhir.set(putusan.nama, sekarang);
 
       // Soalnya ditutup SEKARANG JUGA, sebelum apa pun yang lain.
       //
@@ -324,24 +350,62 @@ export function usePenjaga({ aktif, mode, lapor }: Opsi): Penjaga {
       // pada saat tombolnya turun. Keduanya tetap dijalankan lewat jalan yang
       // sama, karena yang kalah pun tidak merugikan apa pun — dan yang
       // menang menyelamatkan satu soal.
-      tutupSesaat();
+      if (putusan.tirai) tutupSesaat();
+
+      if (putusan.insiden) {
+        kirim(putusan.insiden, putusan.nama);
+      } else {
+        // Tidak dilaporkan, jadi tidak ada balasan server yang dapat
+        // dibacakan. Kalimatnya ditulis di sini supaya peserta yang menekan F5
+        // tidak mengira halamannya rusak lalu menekannya sepuluh kali lagi.
+        setPeringatan(PESAN_TOMBOL[putusan.golongan]);
+      }
 
       // Di Windows, PrintScreen menyalin layar ke papan klip. Menimpanya
       // adalah satu-satunya tindakan nyata yang dapat dilakukan halaman ini,
       // dan ia hanya berhasil bila halamannya sedang fokus dan perambannya
       // mengizinkan. Gagal pun tidak apa-apa: laporannya sudah terkirim.
-      try {
-        void navigator.clipboard?.writeText(
-          "Tangkapan layar selama ujian dilarang dan sudah dicatat pengawas.",
-        ).catch(() => undefined);
-      } catch { /* papan klip tidak selalu tersedia; diabaikan */ }
+      if (putusan.golongan === "tangkap" && !putusan.benarTercegah) {
+        try {
+          void navigator.clipboard?.writeText(
+            "Tangkapan layar selama ujian dilarang dan sudah dicatat pengawas.",
+          ).catch(() => undefined);
+        } catch { /* papan klip tidak selalu tersedia; diabaikan */ }
+      }
     }
 
-    window.addEventListener("keyup", tekan);
-    window.addEventListener("keydown", tekan);
+    // ---------- MENU CETAK ----------
+    // Ctrl+P dicegat pendengar di atas, tetapi menu Cetak peramban tidak
+    // pernah melewati papan ketik sama sekali — pendengar tombol mana pun
+    // tidak akan tahu. `beforeprint` yang menangkapnya, dan aturan @media
+    // print di globals.css yang benar-benar mengosongkan hasil cetaknya.
+    function sebelumCetak() {
+      kirim("tangkap", "cetak halaman");
+      tutupSesaat();
+    }
+
+    // Kursor meninggalkan halaman ke arah bilah sistem — awal dari hampir
+    // setiap alat potong yang dibuka lewat menu, bukan lewat pintasan. Murah,
+    // dan menutup jeda sebelum fokus benar-benar berpindah.
+    function keluarHalaman(e: MouseEvent) {
+      if (e.relatedTarget === null) tutupSesaat();
+    }
+
+    // Fase TANGKAP, dan pada window sekaligus dokumen: satu penangan lain yang
+    // memanggil stopPropagation lebih dulu akan membuat pendengar biasa tidak
+    // pernah terpanggil sama sekali.
+    const pilihan = { capture: true } as const;
+    window.addEventListener("keyup", tekan, pilihan);
+    window.addEventListener("keydown", tekan, pilihan);
+    document.addEventListener("keydown", tekan, pilihan);
+    window.addEventListener("beforeprint", sebelumCetak);
+    document.addEventListener("mouseout", keluarHalaman);
     return () => {
-      window.removeEventListener("keyup", tekan);
-      window.removeEventListener("keydown", tekan);
+      window.removeEventListener("keyup", tekan, pilihan);
+      window.removeEventListener("keydown", tekan, pilihan);
+      document.removeEventListener("keydown", tekan, pilihan);
+      window.removeEventListener("beforeprint", sebelumCetak);
+      document.removeEventListener("mouseout", keluarHalaman);
     };
   }, [aktif, aturan.jagaTangkapanLayar, kirim, tutupSesaat]);
 
@@ -400,13 +464,29 @@ export function usePenjaga({ aktif, mode, lapor }: Opsi): Penjaga {
     return () => window.clearTimeout(jam);
   }, [peringatan]);
 
+  // Keluar dari layar penuh MENUTUP SOALNYA dan menahannya tertutup — bukan
+  // sekadar memasang pita peringatan yang dapat dibiarkan sambil terus membaca
+  // soal di jendela biasa lengkap dengan bilah alamat yang siap ditangkap.
+  //
+  // Tirai ini menang atas tirai lain karena ia satu-satunya yang tidak membuka
+  // dirinya sendiri: yang lain berakhir sesudah dua detik, dan berakhirnya di
+  // sini berarti soal terbuka lagi pada layar yang masih di luar layar penuh.
+  //
+  // Ia hanya mungkin muncul SESUDAH satu peristiwa fullscreenchange menyatakan
+  // layar penuhnya keluar — artinya layar penuh pernah berhasil di perangkat
+  // itu, jadi menyalakannya kembali pun akan berhasil. Peramban yang memang
+  // tidak punya layar penuh (Safari di iPhone) tidak pernah mengirim
+  // peristiwa itu, dan pesertanya tidak pernah terkurung di balik tirai yang
+  // tidak dapat dibukanya.
+  const diLuarLayarPenuh = aktif && aturan.layarPenuh && keluarLayarPenuh;
+
   return {
     mulaiLayarPenuh, akhiriLayarPenuh, peringatan,
-    keluarLayarPenuh, ulangiLayarPenuh, klien,
+    keluarLayarPenuh: diLuarLayarPenuh, ulangiLayarPenuh, klien,
     // Disaring di sini, bukan dibersihkan lewat effect ketika ujiannya
     // berakhir. Tirai yang tertinggal menutupi halaman hasil membuat peserta
     // mengira ujiannya menggantung — dan menutupnya lewat effect berarti ada
     // satu gambar di antaranya tempat bidang gelap itu masih ada.
-    tirai: aktif ? tirai : null,
+    tirai: diLuarLayarPenuh ? "layar" : aktif ? tirai : null,
   };
 }

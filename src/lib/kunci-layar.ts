@@ -238,7 +238,7 @@ export function bolehMasukKlien(
  *     peristiwa web untuk itu. Inilah yang menuntut aplikasi Android, dan
  *     inilah alasan lockdown/android/ ada.
  */
-export type SebabTirai = "tangkap" | "pergi";
+export type SebabTirai = "tangkap" | "pergi" | "layar";
 
 export const PESAN_TIRAI: Record<SebabTirai, { judul: string; isi: string }> = {
   tangkap: {
@@ -253,6 +253,18 @@ export const PESAN_TIRAI: Record<SebabTirai, { judul: string; isi: string }> = {
       "Layar ujian ditinggalkan. Soal ditutup selama halaman ini tidak di depan, dan " +
       "kepergiannya sudah dicatat pengawas. Soal muncul kembali sendiri begitu layar ini " +
       "kembali ke depan.",
+  },
+  // Satu-satunya tirai yang TIDAK membuka dirinya sendiri sesudah beberapa
+  // detik, dan itu yang membuatnya menjadi penegakan dan bukan sekadar
+  // peringatan: selama peserta di luar layar penuh, soalnya memang tidak ada
+  // untuk dibaca. Karena ia menetap, ia WAJIB membawa jalan keluarnya sendiri
+  // — tombol kembali ke layar penuh di dalam tiraïnya — sebab tirai menelan
+  // ketukan, dan tombol apa pun di baliknya tidak dapat ditekan lagi.
+  layar: {
+    judul: "Ujian ini dikerjakan dalam layar penuh",
+    isi:
+      "Kamu sedang di luar layar penuh, dan itu sudah dicatat pengawas. Soal ditutup " +
+      "sampai layar penuh dinyalakan kembali.",
   },
 };
 

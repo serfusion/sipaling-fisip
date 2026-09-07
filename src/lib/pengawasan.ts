@@ -19,10 +19,15 @@
 //   3. MENANDAI     — nama, nomor peserta, dan jamnya ditumpuk samar di atas
 //      layarnya. Tangkapan layar tetap bisa diambil, tetapi setiap lembar yang
 //      bocor menunjuk satu orang, dan orang itu tahu ia tertulis di sana.
+//   4. MENGAKHIRI   — dan inilah yang sebenarnya bergigi. Halaman tidak dapat
+//      menahan tangan peserta, tetapi ujiannya ADA DI SINI, dan yang ada di
+//      sini dapat ditutup. Beberapa kali perbuatan yang menuntut tangan —
+//      tiga pada ujian sertifikasi — dan ujiannya dikumpulkan paksa oleh
+//      server, bukan oleh halaman yang dapat dimatikan peserta.
 //
-// Nomor tiga itu yang sebenarnya bekerja pada ujian sertifikasi. Pencegahan
-// yang berhasil bukan yang menutup rapat, melainkan yang membuat perbuatannya
-// tidak sepadan dengan risikonya.
+// Nomor tiga dan empat yang sebenarnya bekerja pada ujian sertifikasi.
+// Pencegahan yang berhasil bukan yang menutup rapat, melainkan yang membuat
+// perbuatannya tidak sepadan dengan risikonya.
 // ============================================================
 
 /**
@@ -47,12 +52,14 @@ export const MODE_KETERANGAN: Record<ModePengawasan, string> = {
     "Kuis dan latihan. Pindah tab tetap dicatat, selebihnya dibiarkan — " +
     "peserta boleh menyalin soal untuk dibaca ulang.",
   ketat:
-    "UTS dan UAS. Layar penuh diwajibkan, salin-tempel dimatikan, dan " +
-    "identitas peserta tercetak samar di seluruh layarnya.",
+    "UTS dan UAS. Layar penuh diwajibkan dan soal ditutup selama peserta di " +
+    "luarnya, salin-tempel dan tombol alat pengembang dimatikan, identitas " +
+    "peserta tercetak samar di seluruh layarnya, dan ujian dikumpulkan paksa " +
+    "sesudah lima pelanggaran berat.",
   sertifikasi:
     "Uji sertifikasi profesi dan OSCE. Seluruh penjagaan mode Ketat, ditambah " +
-    "pengawasan lingkungan, dan ujian dikumpulkan paksa sesudah beberapa kali " +
-    "pelanggaran berat.",
+    "kamera pengawas serta pemeriksaan layar kedua dan alat pengembang, dan " +
+    "ujian dikumpulkan paksa sesudah TIGA pelanggaran berat.",
 };
 
 /**
@@ -120,10 +127,18 @@ export function aturanMode(mode: ModePengawasan): AturanPengawasan {
     return {
       layarPenuh: true, kunciSalin: true, tandaAir: true,
       jagaTangkapanLayar: true, jagaLingkungan: true,
-      // Lima, bukan tiga. Satu notifikasi sistem yang muncul sendiri sudah
-      // merebut fokus, dan mengumpulkan paksa ujian sertifikasi orang karena
-      // hal itu jauh lebih merugikan daripada satu peserta curang yang lolos.
-      batasPaksa: 5,
+      // TIGA. Angkanya diminta pemilik sistem ini apa adanya: menekan tombol
+      // terlarang tiga kali mengakhiri ujiannya.
+      //
+      // Yang membuat angka sekecil itu aman bukan angkanya melainkan daftar
+      // INSIDEN_BERAT di bawah: blur, klik kanan, wajah hilang, dan orang lain
+      // TIDAK ikut menghitung. Yang tiga kali itu semuanya perbuatan yang
+      // menuntut tangan — menekan PrintScreen, menekan F12, berpindah tab,
+      // menempel ke kolom jawaban, menutup lensa kamera. Notifikasi sistem
+      // yang muncul sendiri merebut fokus dan hanya menghasilkan `blur`, dan
+      // blur tidak pernah membawa siapa pun satu langkah pun lebih dekat ke
+      // sini.
+      batasPaksa: 3,
       peringatanLayar: true,
       kamera: true,
       jatahAi: 12,
@@ -133,7 +148,13 @@ export function aturanMode(mode: ModePengawasan): AturanPengawasan {
     return {
       layarPenuh: true, kunciSalin: true, tandaAir: true,
       jagaTangkapanLayar: true, jagaLingkungan: false,
-      batasPaksa: 0, peringatanLayar: true,
+      // Lima, bukan tiga seperti Sertifikasi. UTS dan UAS dikerjakan ratusan
+      // peserta sekaligus di jaringan kampus yang tidak selalu baik, dan
+      // ambang yang sama galaknya dengan ujian sertifikasi akan memutus ujian
+      // orang yang halamannya tersembunyi sendiri karena hal-hal di luar
+      // kuasanya. Yang menuntut ambang paling ketat adalah ujian yang
+      // sertifikatnya berlaku di luar kampus — dan itu mode di atas.
+      batasPaksa: 5, peringatanLayar: true,
       kamera: false, jatahAi: 0,
     };
   }
@@ -304,9 +325,14 @@ export function jumlahBerat(hitungan: HitunganInsiden): number {
 /**
  * Apakah ujiannya harus dikumpulkan paksa sekarang.
  *
- * Hanya bila modenya memang memintanya. Mode biasa dan ketat mencatat tanpa
- * pernah memutus: memutus ujian orang adalah tindakan yang tidak dapat
- * dibatalkan, dan hanya ujian sertifikasi yang aturannya memang begitu.
+ * Hanya bila modenya memang memintanya, dan ambangnya berbeda menurut
+ * taruhannya: TIGA pada Sertifikasi/OSCE, lima pada Ketat, dan TIDAK PERNAH
+ * pada Biasa — kuis harian tidak boleh berakhir sendiri karena pesertanya
+ * berpindah tab tiga kali.
+ *
+ * Memutus ujian orang adalah tindakan yang tidak dapat dibatalkan, dan yang
+ * menjaganya tetap adil bukan ambangnya melainkan INSIDEN_BERAT: yang
+ * menghitung mundur hanya perbuatan yang menuntut tangan.
  */
 export function harusDipaksa(mode: ModePengawasan, hitungan: HitunganInsiden): boolean {
   const batas = aturanMode(mode).batasPaksa;
