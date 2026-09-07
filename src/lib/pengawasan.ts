@@ -389,17 +389,20 @@ export function pesanPeringatan(
  * ketukan tidak dapat diabaikan. Ia juga menutup soalnya selama terbuka —
  * pada percobaan tangkapan layar, itu bukan efek samping.
  *
- * TIGA hal yang ada di dalamnya, dan satu yang sengaja tidak:
+ * DUA hal saja yang ada di dalamnya, dan dua yang sengaja tidak:
  *
- *   ADA    — perbuatannya, disebut apa adanya.
- *   ADA    — pelanggaran ke berapa. Angka yang naik terus, tanpa ujung yang
+ *   ADA    - perbuatannya, disebut apa adanya.
+ *   ADA    - pelanggaran ke berapa. Angka yang naik terus, tanpa ujung yang
  *            terlihat, adalah yang membuat orang berhenti.
- *   ADA    — bahwa ujiannya dapat berakhir tanpa peringatan lagi.
- *   TIDAK  — berapa batasnya. Peserta yang tahu batasnya membelanjakan
+ *   TIDAK  - berapa batasnya. Peserta yang tahu batasnya membelanjakan
  *            jatahnya sampai satu ketukan sebelum habis; yang tidak tahu
  *            tidak punya jatah untuk dibelanjakan.
+ *   TIDAK  - kalimat penjelas apa pun. Kotak ini muncul di tengah ujian pada
+ *            orang yang sedang panik, dan dua baris yang harus dibaca lebih
+ *            dulu justru membuat angkanya terlewat. Yang menghentikan tangan
+ *            orang adalah nomor yang naik, bukan paragraf di bawahnya.
  */
-export type Teguran = { judul: string; sebab: string; ancaman: string };
+export type Teguran = { judul: string; sebab: string };
 
 /**
  * Kalimat "Terdeteksi ..." di kepala kotak teguran.
@@ -430,9 +433,6 @@ export function pesanTeguran(jenis: JenisInsiden, nomor: number): Teguran {
   return {
     judul: nomor > 0 ? `Pelanggaran ke-${nomor}` : "Pelanggaran tercatat",
     sebab: INSIDEN_TEGUR[jenis],
-    ancaman:
-      "Sudah dilaporkan ke pengawas beserta jam dan identitasmu. " +
-      "Ujian dapat berhenti dan dikumpulkan otomatis tanpa peringatan lagi.",
   };
 }
 

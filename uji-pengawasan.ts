@@ -239,7 +239,7 @@ for (let n = 1; n <= 8; n += 1) {
   const t = pesanTeguran("tangkap", n);
   benar(`teguran ke-${n} menyebut nomornya`, t.judul === `Pelanggaran ke-${n}`, t.judul);
   benar(`teguran ke-${n} tidak membocorkan batas`,
-    !KATA_BOCOR.test(`${t.judul} ${t.sebab} ${t.ancaman}`), JSON.stringify(t));
+    !KATA_BOCOR.test(`${t.judul} ${t.sebab}`), JSON.stringify(t));
 }
 const tg = pesanTeguran("tangkap", 2);
 benar("teguran menyebut perbuatannya", tg.sebab === INSIDEN_TEGUR.tangkap, tg.sebab);
@@ -249,12 +249,14 @@ for (const j of ["tangkap", "tab", "klik_kanan", "salin"] as const) {
   benar(`teguran ${j} berbunyi "Terdeteksi ..."`,
     INSIDEN_TEGUR[j].startsWith("Terdeteksi "), INSIDEN_TEGUR[j]);
 }
-benar("teguran mengatakan laporannya sudah terkirim",
-  /dilaporkan ke pengawas/i.test(tg.ancaman), tg.ancaman);
-benar("teguran mengancam pengumpulan otomatis",
-  /dikumpulkan otomatis/i.test(tg.ancaman), tg.ancaman);
-benar("teguran mengatakan ancamannya dapat datang tanpa aba-aba",
-  /tanpa peringatan lagi/i.test(tg.ancaman), tg.ancaman);
+// Isinya HANYA dua: nomornya dan perbuatannya. Kotak ini muncul di tengah
+// ujian pada orang yang sedang panik, dan dua baris penjelas yang harus
+// dibaca lebih dulu justru membuat angkanya terlewat. Kalau suatu hari ada
+// yang menambahkan paragraf lagi ke sini, uji ini yang menahannya.
+benar("teguran hanya membawa nomor dan perbuatannya",
+  Object.keys(tg).sort().join(",") === "judul,sebab", JSON.stringify(tg));
+benar("teguran tetap singkat", `${tg.judul} ${tg.sebab}`.length <= 70,
+  `${tg.judul} ${tg.sebab}`);
 // Nomor nol tidak boleh menghasilkan "Pelanggaran ke-0".
 benar("nomor yang hilang tidak menjadi ke-0",
   !pesanTeguran("tangkap", 0).judul.includes("ke-0"), pesanTeguran("tangkap", 0).judul);

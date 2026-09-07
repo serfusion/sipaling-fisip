@@ -290,7 +290,7 @@ for (const t of rentetan) {
   benar(`teguran ketukan ke-${sudah} menyebut nomornya`,
     kata.judul.includes(`ke-${sudah}`), kata.judul);
   benar(`teguran ketukan ke-${sudah} tidak menyebut batasnya`,
-    !/\b5\b|lima|sisa|tinggal/i.test(`${kata.judul} ${kata.sebab} ${kata.ancaman}`),
+    !/\b5\b|lima|sisa|tinggal/i.test(`${kata.judul} ${kata.sebab}`),
     JSON.stringify(kata));
 }
 // Yang tidak dicatat tidak pernah mengakhiri ujian siapa pun, berapa pun

@@ -47,7 +47,6 @@ export default function Teguran(
         <div className="uj-tegur-lambang" aria-hidden="true">⚠</div>
         <b className="uj-tegur-judul">{pesan.judul}</b>
         <div className="uj-tegur-sebab">{pesan.sebab}</div>
-        <p className="uj-tegur-ancaman">{pesan.ancaman}</p>
         {/* Tombolnya HARUS di dalam kotak: kotak ini menelan ketukan, dan
             tombol apa pun di baliknya tidak dapat ditekan lagi. */}
         <button type="button" className="btn btn-primary uj-tegur-aku" onClick={tutup}>
