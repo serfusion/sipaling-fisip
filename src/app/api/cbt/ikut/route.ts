@@ -651,12 +651,16 @@ export async function POST(request: Request) {
         .where(eq(cbtAttempts.id, attempt.id));
 
       // ---------- PENGUMPULAN PAKSA ----------
-      // Hanya mode sertifikasi, dan hanya oleh pelanggaran yang memang
-      // disengaja — blur dan klik kanan tidak pernah ikut menghitung mundur.
-      // Memutus ujian orang tidak dapat dibatalkan, jadi ambangnya dipasang
-      // di tempat yang tidak dapat dicapai tanpa berbuat sesuatu berkali-kali.
+      // Ambangnya milik modenya — tiga pada Sertifikasi, lima pada Ketat,
+      // tidak pernah pada Biasa — dan yang menghitung mundur hanya pelanggaran
+      // yang memang disengaja; blur dan klik kanan tidak pernah ikut.
+      //
+      // Keputusannya dibuat DI SINI, di server, dan itu bukan kebetulan. Kalau
+      // halaman yang memutuskannya, peserta yang mematikan JavaScript-nya
+      // mendapat ujian yang tidak pernah berakhir sendiri — dan yang tercatat
+      // di server tetap "bersih".
       if (harusDipaksa(mode, hitungan)) {
-        const sebab = `Dihentikan pengawasan: ${jenis} melampaui batas pelanggaran ujian sertifikasi.`;
+        const sebab = `Dihentikan pengawasan: ${jenis} melampaui batas pelanggaran mode ${mode}.`;
         await nilaiDanTutup(attempt, ujian, sekarang, sebab);
         return Response.json({
           success: true,

@@ -40,7 +40,21 @@
 import { PESAN_TIRAI, type SebabTirai } from "@/lib/kunci-layar";
 import { tandaAir, type Peserta } from "@/lib/pengawasan";
 
-export default function Tirai({ sebab, peserta }: { sebab: SebabTirai; peserta: Peserta }) {
+/**
+ * Jalan keluar yang dibawa tiraïnya sendiri.
+ *
+ * Tirai menelan ketukan — itu memang gunanya — sehingga tombol apa pun di
+ * BALIKNYA tidak dapat ditekan lagi. Tirai yang menetap karena satu keadaan
+ * yang hanya peserta sendiri dapat memperbaikinya (keluar dari layar penuh)
+ * karena itu HARUS membawa tombolnya ke dalam, kalau tidak pesertanya
+ * terkurung di layar gelap yang menyuruhnya melakukan sesuatu yang tidak dapat
+ * ia lakukan.
+ */
+export type AksiTirai = { label: string; saat: () => void };
+
+export default function Tirai(
+  { sebab, peserta, aksi }: { sebab: SebabTirai; peserta: Peserta; aksi?: AksiTirai },
+) {
   const pesan = PESAN_TIRAI[sebab];
   const tanda = tandaAir(peserta);
 
@@ -50,6 +64,11 @@ export default function Tirai({ sebab, peserta }: { sebab: SebabTirai; peserta: 
         <div className="uj-tirai-lambang" aria-hidden="true">🔒</div>
         <b>{pesan.judul}</b>
         <p>{pesan.isi}</p>
+        {aksi && (
+          <button type="button" className="btn btn-primary uj-tirai-aksi" onClick={aksi.saat}>
+            {aksi.label}
+          </button>
+        )}
         {/* Identitas peserta dicetak TERANG di sini, bukan samar seperti pada
             tanda air biasa. Kalau tangkapan layarnya tetap jadi, inilah yang
             tertangkap — dan gambar yang isinya hanya nama pengambilnya sendiri

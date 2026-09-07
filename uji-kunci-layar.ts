@@ -19,11 +19,12 @@ import { readFileSync } from "node:fs";
 import {
   KEMAMPUAN, KLIEN_LABEL, PENANDA_KLIEN, PESAN_TIRAI, SEMUA_KLIEN, TIRAI_MS,
   ajakanAplikasi, bacaKlien, bolehMasukKlien, kunciSistem, periksaKunciKlien,
-  pesanKunciLayar, rapikanKlien, type JenisKlien,
+  pesanKunciLayar, rapikanKlien, type JenisKlien, type SebabTirai,
 } from "./src/lib/kunci-layar";
 import { KEADAAN_JAWAB_LABEL, keadaanJawab } from "./src/lib/cbt";
 import { namaBerkasQr } from "./src/lib/qr-ujian";
 import { posterQrHtml } from "./src/lib/cetak-cbt";
+import { periksaTombol } from "./src/lib/tombol-terlarang";
 
 let lulus = 0;
 const gagal: string[] = [];
@@ -160,13 +161,16 @@ benar("beda huruf besar-kecil ditolak", !periksaKunciKlien("Rahasia", "rahasia")
 
 console.log("\n=== TIRAI ===\n");
 
+const penjagaLayar = readFileSync("./src/app/cbt/ujian/penjaga.ts", "utf8");
+
 benar("tirai cukup lama untuk melewati gerakan memotong layar", TIRAI_MS >= 1500);
 // Dan cukup pendek untuk tidak terasa sebagai ujian yang macet. Peserta yang
 // papan ketiknya menekan Print Screen tanpa sengaja harus kembali membaca
 // soalnya sebelum sempat panik.
 benar("tirai tidak menutup terlalu lama", TIRAI_MS <= 4000, `${TIRAI_MS} ms`);
 
-for (const sebab of ["tangkap", "pergi"] as const) {
+const SEBAB_TIRAI: SebabTirai[] = ["tangkap", "pergi", "layar"];
+for (const sebab of SEBAB_TIRAI) {
   const p = PESAN_TIRAI[sebab];
   benar(`tirai ${sebab} punya judul`, p.judul.length > 3);
   benar(`tirai ${sebab} menjelaskan sebabnya`, p.isi.length > 40);
@@ -177,6 +181,32 @@ for (const sebab of ["tangkap", "pergi"] as const) {
 }
 benar("tirai tangkapan layar menyebut pencatatannya",
   PESAN_TIRAI.tangkap.isi.toLowerCase().includes("dicatat"));
+
+// ---------- TIRAI LAYAR PENUH ----------
+//
+// Satu-satunya tirai yang TIDAK membuka dirinya sendiri sesudah beberapa
+// detik: selama peserta di luar layar penuh, soalnya memang tidak ada untuk
+// dibaca. Karena ia menetap, ia wajib membawa jalan keluarnya sendiri — tirai
+// menelan ketukan, jadi tombol apa pun di BALIKNYA tidak dapat ditekan lagi,
+// dan peserta yang terkurung di layar gelap tanpa tombol kehilangan ujiannya
+// karena penjagaan, bukan karena kecurangan.
+const ujianApp = readFileSync("./src/app/cbt/ujian/ujian-app.tsx", "utf8");
+const tiraiTsx = readFileSync("./src/app/cbt/ujian/tirai.tsx", "utf8");
+benar("tirai layar penuh menyuruh menyalakannya kembali",
+  PESAN_TIRAI.layar.isi.toLowerCase().includes("layar penuh"), PESAN_TIRAI.layar.isi);
+benar("tirai dapat membawa tombolnya sendiri", tiraiTsx.includes("aksi"));
+benar("tombolnya dipasang justru pada tirai layar penuh",
+  /tirai === "layar"/.test(ujianApp),
+  "tanpa itu peserta terkurung di balik tirai yang menyuruhnya menekan tombol yang tidak ada");
+benar("dan tombol itu menyalakan layar penuhnya kembali",
+  /ulangiLayarPenuh/.test(ujianApp));
+// Penjaga layarnya yang memutuskan kapan tirai ini muncul, dan hanya pada mode
+// yang memang menuntut layar penuh.
+benar("penjaga memasang tirai layar penuh sendiri",
+  /tirai:[\s\S]{0,60}"layar"/.test(penjagaLayar),
+  "kalau halaman yang memutuskannya, mode Biasa ikut tertutup tirai");
+benar("hanya pada mode yang menuntut layar penuh",
+  /aturan\.layarPenuh && keluarLayarPenuh/.test(penjagaLayar));
 
 console.log("\n=== BENAR HIJAU, SALAH MERAH ===\n");
 
@@ -248,7 +278,22 @@ console.log("\n=== JALUR CETAK DITUTUP DUA LAPIS ===\n");
 // @media print menutup jalur MENU Cetak yang tidak pernah melewati papan
 // ketik sama sekali.
 const penjagaTs = readFileSync("./src/app/cbt/ujian/penjaga.ts", "utf8");
-benar("lapis 1: Ctrl/Cmd+P dicegat", /ctrlKey \|\| e\.metaKey/.test(penjagaTs));
+// Diperiksa dari perbuatannya, bukan dari bunyi kodenya: putusan tombolnya
+// sendiri yang ditanya. Uji yang hanya mencari potongan teks di dalam penjaga
+// tetap hijau ketika logikanya pindah berkas dan berhenti bekerja.
+const pCtrl = periksaTombol({ key: "p", code: "KeyP", ctrlKey: true });
+const pCmd = periksaTombol({ key: "p", code: "KeyP", metaKey: true });
+benar("lapis 1: Ctrl+P dicegat", pCtrl?.golongan === "tangkap", JSON.stringify(pCtrl));
+benar("lapis 1: Cmd+P dicegat", pCmd?.golongan === "tangkap", JSON.stringify(pCmd));
+// Satu-satunya jalur tangkapan yang benar-benar DAPAT dibatalkan halaman.
+// Kalau ini pernah ditandai tidak tercegah, layar peserta berhenti mengatakan
+// bahwa cetak memang gagal — padahal ia sungguh gagal.
+benar("lapis 1: cetak memang benar-benar tercegah", pCtrl?.benarTercegah === true);
+// Dan penjaganya memang memanggil pemeriksa itu. Tanpa baris ini, seluruh
+// daftar tombol dapat menjadi pustaka yang benar tetapi tidak dipakai
+// siapa pun, dan uji di atas tetap hijau.
+benar("lapis 1: penjaga layar memakai daftar tombolnya",
+  penjagaTs.includes("periksaTombol("));
 benar("lapis 1: peristiwa beforeprint ikut dipasang",
   penjagaTs.includes('addEventListener("beforeprint"'));
 benar("pendengar tombolnya pada fase tangkap", /capture:\s*true/.test(penjagaTs),

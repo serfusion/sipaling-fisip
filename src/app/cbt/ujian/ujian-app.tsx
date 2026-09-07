@@ -982,24 +982,25 @@ export default function UjianApp() {
           benar-benar menolak adalah Aplikasi Ujian Terkunci di lockdown/,
           tempat sistem operasinya sendiri yang menolak. */}
       {penjaga.tirai && (
-        <Tirai sebab={penjaga.tirai} peserta={{ nama, nim, kode: ujian?.kode ?? "" }} />
+        <Tirai
+          sebab={penjaga.tirai}
+          peserta={{ nama, nim, kode: ujian?.kode ?? "" }}
+          /* Keluar dari layar penuh menutup soal dan MENAHANNYA tertutup —
+             tiraï ini tidak membuka dirinya sendiri seperti dua yang lain.
+             Karena itu ia harus membawa jalan keluarnya ke dalam: tirai
+             menelan ketukan, jadi pita peringatan berikut tombolnya yang dulu
+             ada di sini tidak akan pernah dapat ditekan lagi dari baliknya.
+             Dan permintaan layar penuh memang menuntut ketukan orang —
+             menekan tombol ini adalah ketukan itu. */
+          aksi={penjaga.tirai === "layar" ? {
+            label: "Kembali ke layar penuh",
+            saat: penjaga.ulangiLayarPenuh,
+          } : undefined}
+        />
       )}
 
-      {/* ---------- PITA PERINGATAN ----------
-          Dua keadaan yang berbeda, dan yang kedua menuntut tindakan peserta
-          sehingga ia tidak boleh menghilang sendiri seperti yang pertama. */}
-      {penjaga.keluarLayarPenuh && (
-        <div className="uj-jaga uj-jaga-tegas" role="alert">
-          <span>
-            Ujian ini harus dikerjakan dalam layar penuh. Kamu sedang di luarnya,
-            dan itu sudah dicatat pengawas.
-          </span>
-          <button type="button" className="btn btn-mini" onClick={penjaga.ulangiLayarPenuh}>
-            Kembali ke layar penuh
-          </button>
-        </div>
-      )}
-      {!penjaga.keluarLayarPenuh && penjaga.peringatan && (
+      {/* ---------- PITA PERINGATAN ---------- */}
+      {penjaga.peringatan && (
         <div className="uj-jaga" role="status">{penjaga.peringatan}</div>
       )}
 

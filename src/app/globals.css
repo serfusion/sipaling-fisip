@@ -5589,14 +5589,11 @@ table.qt td small { font-size: 11.5px; }
   background: #fef3c7;
   border-bottom: 1px solid #fcd34d;
 }
-/* Yang menuntut tindakan peserta dibedakan warnanya, karena ia TIDAK
-   menghilang sendiri sementara yang kuning menghilang sesudah enam detik. */
-.uj-jaga-tegas {
-  color: #7f1d1d;
-  background: #fee2e2;
-  border-bottom-color: #fca5a5;
-}
-.uj-jaga .btn-mini { flex: 0 0 auto; }
+/* Pita ini kini SELALU menghilang sendiri sesudah enam detik, karena satu
+   keadaan yang dulu ditulisnya — di luar layar penuh — tidak lagi berupa pita
+   melainkan tirai yang menutup soalnya sekalian. Pita yang dibiarkan menetap
+   berhenti dibaca pada menit kedua dan yang tertinggal hanya satu hal yang
+   menutupi soal. */
 
 /* ---------- TIRAI LAYAR ----------
 
@@ -5631,6 +5628,12 @@ table.qt td small { font-size: 11.5px; }
 .uj-tirai-lambang { font-size: 40px; line-height: 1; margin-bottom: 12px; }
 .uj-tirai-isi b { display: block; font-size: 18px; font-weight: 800; letter-spacing: .02em; }
 .uj-tirai-isi p { margin: 8px 0 0; font-size: 13.5px; line-height: 1.7; color: #b6c2d4; }
+/* Jalan keluar dari tirai yang MENETAP — hanya yang keluar dari layar penuh.
+   Ia berada di DALAM tirai dan bukan di baliknya, karena tirai menelan ketukan:
+   tombol di baliknya tidak akan pernah dapat ditekan, dan pesertanya terkurung
+   di layar gelap yang menyuruhnya melakukan sesuatu yang tidak dapat ia
+   lakukan. */
+.uj-tirai-aksi { margin-top: 18px; }
 /* Identitas peserta, TERANG. Kalau tangkapan layarnya tetap jadi, inilah yang
    tertangkap — gambar yang isinya hanya nama pengambilnya sendiri. */
 .uj-tirai-tanda {
