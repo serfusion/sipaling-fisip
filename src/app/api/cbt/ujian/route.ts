@@ -20,6 +20,7 @@ import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import {
   angkaParam, bolehCbt, bolehHapus, bolehUbah, kodeUjianBaru, pemilik, PEMANTAU, statusUjian,
 } from "@/lib/cbt";
+import { rapikanMode } from "@/lib/pengawasan";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -98,6 +99,7 @@ export async function GET() {
         allowBack: cbtExams.allowBack,
         showScore: cbtExams.showScore,
         singleDevice: cbtExams.singleDevice,
+        proctorMode: cbtExams.proctorMode,
         token: cbtExams.token,
         startAt: cbtExams.startAt,
         endAt: cbtExams.endAt,
@@ -202,6 +204,7 @@ export async function POST(request: Request) {
             allowBack: body.allowBack !== false,
             showScore: body.showScore !== false,
             singleDevice: body.singleDevice !== false,
+            proctorMode: rapikanMode(body.proctorMode),
             token: teks(body.token, 12).toUpperCase() || null,
           })
           .returning({ id: cbtExams.id, code: cbtExams.code });
@@ -261,6 +264,13 @@ export async function PATCH(request: Request) {
     if (body.allowBack !== undefined) ubah.allowBack = body.allowBack !== false;
     if (body.showScore !== undefined) ubah.showScore = body.showScore !== false;
     if (body.singleDevice !== undefined) ubah.singleDevice = body.singleDevice !== false;
+    // Mode pengawasan sengaja BOLEH diubah walau ujiannya sedang berlangsung.
+    // Yang paling sering terjadi bukan dosen yang ingin melonggarkan, melainkan
+    // dosen yang baru sadar kelasnya menyontek dan hendak mengetatkan di
+    // tengah jalan — dan menahannya sampai ujian selesai berarti menahannya
+    // sampai tidak ada gunanya lagi. Yang berubah hanya penjagaan ke depan;
+    // jawaban dan catatan yang sudah ada tidak tersentuh.
+    if (body.proctorMode !== undefined) ubah.proctorMode = rapikanMode(body.proctorMode);
     if (body.token !== undefined) ubah.token = teks(body.token, 12).toUpperCase() || null;
 
     // Selama ujian berjalan, yang mengubah bentuknya ditolak — tetapi hanya

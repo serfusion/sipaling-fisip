@@ -31,6 +31,10 @@ import {
 } from "@/lib/cetak-cbt";
 import { buatDocxTemplate, buatXlsxTemplate } from "@/lib/template-soal";
 import { asalCbt } from "@/lib/situs-cbt";
+import {
+  INSIDEN_LABEL, MODE_KETERANGAN, MODE_LABEL, SEMUA_MODE, rapikanMode,
+  tingkatIntegritas, TINGKAT_LABEL, type JenisInsiden, type ModePengawasan,
+} from "@/lib/pengawasan";
 import { KREDIT_CBT } from "../cbt/kredit";
 
 type Ujian = {
@@ -41,6 +45,8 @@ type Ujian = {
   activatedAt: string | null; activatedBy: string | null;
   description: string | null; instruction: string | null; createdBy: string;
   singleDevice: boolean;
+  /** Mode pengawasan: "biasa" | "ketat" | "sertifikasi". */
+  proctorMode: string;
   status: StatusUjian; jumlahBank: number;
   peserta: { total: number; berjalan: number; selesai: number };
   /** Izin yang dihitung server untuk pemanggil ini, per ujian. */
@@ -67,7 +73,16 @@ type Peserta = {
   /** Detik sejak peramban peserta terakhir menyapa. null = belum pernah. */
   diamDetik: number | null;
   keluarFullscreen: number; pindahTab: number; mulai: string; kumpul: string | null;
+  /** Skor integritas 0–100. Bukan nilai ujian, dan tidak pernah mengubahnya. */
+  integritas?: number;
+  /** Terisi bila ujiannya dihentikan aturan pengawasan. */
+  dihentikan?: string | null;
+  /** Hitungan tiap jenis insiden, hanya pada rincian satu peserta. */
+  pengawasan?: Partial<Record<JenisInsiden, number>>;
 };
+
+/** Satu baris garis waktu pengawasan. */
+type Jejak = { jenis: string; jam: string; detail: string };
 
 /**
  * Sesudah berapa lama diam seorang peserta dianggap TERPUTUS.
@@ -227,6 +242,124 @@ function Tbl({
   );
 }
 
+/**
+ * Skor integritas satu peserta, dalam satu lencana.
+ *
+ * Angkanya BUKAN nilai ujian dan tidak pernah mengubahnya. Ia hanya
+ * mengurutkan: lembar pengawasan siapa yang perlu dibaca penguji lebih dulu.
+ * Karena itu warnanya berhenti di "perlu ditinjau" dan tidak pernah berkata
+ * "curang" — yang memutuskan tetap manusia, dengan garis waktu insidennya di
+ * depan mata.
+ */
+function SkorIntegritas({
+  skor, dihentikan,
+}: {
+  skor?: number;
+  dihentikan?: string | null;
+}) {
+  // Ujian lama, dari sebelum pengawasan ada, tidak punya angka ini. Menampilkan
+  // "100" untuk mereka adalah kebohongan kecil yang justru berbahaya: ia
+  // menyatakan sudah diperiksa dan bersih, padahal tidak pernah diperiksa.
+  if (typeof skor !== "number") return <small className="psn-nama">—</small>;
+  const tingkat = tingkatIntegritas(skor);
+  return (
+    <span className="cbt-integritas">
+      <b className={`cbt-int-${tingkat}`}>{skor}</b>
+      <small>{TINGKAT_LABEL[tingkat]}</small>
+      {dihentikan && <small className="cbt-int-putus">dihentikan pengawas</small>}
+    </span>
+  );
+}
+
+/**
+ * Garis waktu pengawasan satu peserta.
+ *
+ * Inilah yang sebenarnya dibaca ketika sebuah hasil digugat, dan angka
+ * ringkasan tidak dapat menggantikannya. Tiga kali pindah tab yang terpencar
+ * sepanjang sembilan puluh menit adalah notifikasi yang muncul sendiri; tiga
+ * kali dalam empat puluh detik tepat sesudah soal essay dibuka adalah hal yang
+ * lain sama sekali. Karena itu yang ditampilkan jam persisnya beserta jarak
+ * dari kejadian sebelumnya, bukan sekadar daftar.
+ */
+function GarisWaktu({ jejak, mulai }: { jejak: Jejak[]; mulai: string }) {
+  if (jejak.length === 0) {
+    return <p className="cbt-catatan">Tidak ada satu pun catatan pengawasan pada peserta ini.</p>;
+  }
+  const awal = new Date(mulai).getTime();
+  return (
+    <ol className="cbt-jejak">
+      {jejak.map((j, i) => {
+        const saat = new Date(j.jam).getTime();
+        const menit = Math.max(0, Math.round((saat - awal) / 60_000));
+        const sebelumnya = i > 0 ? new Date(jejak[i - 1].jam).getTime() : null;
+        // Kejadian yang menyusul kurang dari sepuluh detik sesudah yang
+        // sebelumnya ditandai. Berkerumun seperti itu jarang berarti
+        // kebetulan, dan itulah pola yang dicari mata penguji.
+        const rapat = sebelumnya !== null && saat - sebelumnya < 10_000;
+        return (
+          <li key={i} className={rapat ? "rapat" : undefined}>
+            <span className="cbt-jejak-jam">menit ke-{menit}</span>
+            <span className="cbt-jejak-apa">
+              {INSIDEN_LABEL[j.jenis as JenisInsiden] ?? j.jenis}
+              {j.detail && <i> — {j.detail}</i>}
+            </span>
+            {rapat && <span className="cbt-jejak-rapat">beruntun</span>}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/**
+ * Pemilih mode pengawasan.
+ *
+ * Satu pilihan, bukan sebelas kotak centang, dan itu keputusan yang disengaja.
+ * Dosen tahu ujiannya kuis harian, UAS, atau uji sertifikasi; ia tidak
+ * seharusnya diminta memutuskan sendiri apakah alat pengembang perlu diawasi
+ * atau berapa kali pindah tab yang pantas mengakhiri ujian orang. Aturan tiap
+ * mode ada di src/lib/pengawasan.ts, satu tempat, dipakai server dan peramban.
+ *
+ * Yang dijanjikan di keterangannya sengaja tidak dilebihkan. Tangkapan layar
+ * TIDAK dapat dilarang peramban mana pun, dan mengatakan sebaliknya di layar
+ * ini akan membuat dosen menyetel ujian sertifikasi dengan rasa aman yang
+ * tidak ada dasarnya.
+ */
+function PilihMode({
+  nilai, ubah,
+}: {
+  nilai: ModePengawasan;
+  ubah: (mode: ModePengawasan) => void;
+}) {
+  return (
+    <div className="cbt-mode">
+      <div className="cbt-mode-kepala">Pengawasan ujian</div>
+      <div className="cbt-mode-pilih">
+        {SEMUA_MODE.map((m) => (
+          <label key={m} className={`cbt-mode-kartu${nilai === m ? " on" : ""}`}>
+            <input
+              type="radio"
+              name="cbt-proctor-mode"
+              checked={nilai === m}
+              onChange={() => ubah(m)}
+            />
+            <b>{MODE_LABEL[m]}</b>
+            <small>{MODE_KETERANGAN[m]}</small>
+          </label>
+        ))}
+      </div>
+      <p className="cbt-mode-jujur">
+        <b>Yang perlu diketahui:</b> tidak ada peramban yang dapat melarang tangkapan layar —
+        Print Screen ditangani sistem operasi, dan tidak ada kode yang menghalangi ponsel kedua
+        yang diarahkan ke layar. Yang dikerjakan mode Ketat dan Sertifikasi adalah{" "}
+        <b>mematikan salin-tempel</b> (jalan tersering untuk membawa soal ke ChatGPT),{" "}
+        <b>mencatat tiap percobaan</b> beserta jamnya, dan <b>mencetak nama serta NIM peserta</b>{" "}
+        samar di seluruh layarnya, sehingga tiap lembar yang bocor menunjuk satu orang.
+      </p>
+    </div>
+  );
+}
+
 /** Deretan centang setelan, sejajar dan masing-masing membawa keterangannya. */
 function DaftarSetelan({
   nilai, kunciBentuk = false, ubah,
@@ -274,6 +407,7 @@ function setelanUjian(u: Ujian) {
     allowBack: u.allowBack,
     showScore: u.showScore,
     singleDevice: u.singleDevice,
+    proctorMode: rapikanMode(u.proctorMode),
   };
 }
 
@@ -311,7 +445,7 @@ export default function CbtPanel({ role }: { role: string }) {
     questionCount: 20, durationMinutes: 60, passingGrade: 60, maxAttempts: 1,
     token: "", instruction: "",
     randomQuestions: true, randomOptions: true, allowBack: true, showScore: true,
-    singleDevice: true,
+    singleDevice: true, proctorMode: "biasa" as ModePengawasan,
   });
 
   const [soal, setSoal] = useState<Soal[]>([]);
@@ -325,6 +459,7 @@ export default function CbtPanel({ role }: { role: string }) {
   // Koreksi essay: satu peserta yang sedang dibuka, beserta rincian jawabannya.
   const [bukaPeserta, setBukaPeserta] = useState<Peserta | null>(null);
   const [rincian, setRincian] = useState<Rincian[]>([]);
+  const [jejak, setJejak] = useState<Jejak[]>([]);
   const [draftKoreksi, setDraftKoreksi] = useState<Record<number, { poin: string; catatan: string }>>({});
   const [muatRincian, setMuatRincian] = useState(false);
 
@@ -349,7 +484,7 @@ export default function CbtPanel({ role }: { role: string }) {
     title: "", courseName: "", className: "", instruction: "", token: "",
     questionCount: 0, durationMinutes: 60, passingGrade: 60, maxAttempts: 1,
     randomQuestions: true, randomOptions: true, allowBack: true, showScore: true,
-    singleDevice: true,
+    singleDevice: true, proctorMode: "biasa" as ModePengawasan,
   });
   const [bukaSetel, setBukaSetel] = useState(false);
 
@@ -925,6 +1060,7 @@ export default function CbtPanel({ role }: { role: string }) {
     kabari(`lembar-${p.id}`, "jalan", "Membuka…");
     setBukaPeserta(p);
     setRincian([]);
+    setJejak([]);
     setDraftKoreksi({});
     setMuatRincian(true);
     try {
@@ -933,6 +1069,11 @@ export default function CbtPanel({ role }: { role: string }) {
       if (!jawab.ok || !data.success) throw new Error(data.message || "Lembar jawaban tidak terbaca.");
       const isi = (data.rincian || []) as Rincian[];
       setRincian(isi);
+      setJejak((data.jejak || []) as Jejak[]);
+      // Baris peserta di papan pantau tidak membawa skor integritas maupun
+      // rincian insidennya — di sana yang diambil hanya ringkasan. Yang datang
+      // bersama lembar ini lebih lengkap, jadi ia yang dipakai.
+      if (data.peserta) setBukaPeserta({ ...p, ...(data.peserta as Partial<Peserta>) });
       // Kotak nilainya diisi lebih dulu dengan poin yang sudah ada, supaya
       // dosen yang hanya membetulkan satu angka tidak perlu mengetik ulang
       // seluruhnya.
@@ -1218,10 +1359,15 @@ export default function CbtPanel({ role }: { role: string }) {
         terdaftar: peserta.length,
         selesai: peserta.filter((p) => p.status !== "berjalan").length,
         berjalan: peserta.filter((p) => p.status === "berjalan").length,
-        pelanggaran: peserta.reduce((n, p) => n + p.pindahTab + p.keluarFullscreen, 0),
+        // Seluruh peserta yang skor integritasnya di bawah seratus, bukan
+        // hanya yang pindah tab. Berita acara yang menyebut "nol pelanggaran"
+        // sementara ada peserta yang menempel jawaban delapan kali adalah
+        // dokumen yang menyesatkan, dan ia ditandatangani.
+        pelanggaran: peserta.filter((p) => typeof p.integritas === "number" && p.integritas < 100).length,
         peserta: peserta.map((p) => ({
           nim: p.nim, nama: p.nama, status: p.status,
           pindahTab: p.pindahTab, keluarFullscreen: p.keluarFullscreen,
+          integritas: p.integritas, dihentikan: p.dihentikan,
         })),
       }),
       kunciTombol,
@@ -1393,6 +1539,7 @@ export default function CbtPanel({ role }: { role: string }) {
             </label>
 
             <DaftarSetelan nilai={draf} ubah={(kunci, nyala) => setDraf({ ...draf, [kunci]: nyala })} />
+            <PilihMode nilai={draf.proctorMode} ubah={(m) => setDraf({ ...draf, proctorMode: m })} />
             <p className="cbt-catatan">
               Seluruh setelan ini masih dapat diubah sesudah ujiannya jadi, lewat
               <b> ⚙ Pengaturan ujian</b> di dalam ujiannya.
@@ -1696,6 +1843,12 @@ export default function CbtPanel({ role }: { role: string }) {
                 kunciBentuk={sedangBerlangsung}
                 ubah={(kunci, nyala) => setSetel({ ...setel, [kunci]: nyala })}
               />
+              {/* Sengaja TIDAK ikut terkunci saat ujian berlangsung. Yang paling
+                  sering terjadi bukan dosen yang hendak melonggarkan, melainkan
+                  dosen yang baru sadar kelasnya menyontek dan ingin mengetatkan
+                  di tengah jalan — dan menahannya sampai ujian selesai berarti
+                  menahannya sampai tidak ada gunanya lagi. */}
+              <PilihMode nilai={setel.proctorMode} ubah={(m) => setSetel({ ...setel, proctorMode: m })} />
 
               <div className="cbt-form-aksi">
                 <Tbl
@@ -2330,7 +2483,7 @@ export default function CbtPanel({ role }: { role: string }) {
               <div className="qtable-wrap">
                 <table className="qt">
                   <thead>
-                    <tr><th>Mahasiswa</th><th>Status</th><th>Progres</th><th>Sisa waktu</th><th>Nilai</th><th>Catatan</th><th /></tr>
+                    <tr><th>Mahasiswa</th><th>Status</th><th>Progres</th><th>Sisa waktu</th><th>Nilai</th><th>Integritas</th><th /></tr>
                   </thead>
                   <tbody>
                     {peserta.map((p) => (
@@ -2357,15 +2510,17 @@ export default function CbtPanel({ role }: { role: string }) {
                           {p.tertunda > 0 && <small className="psn-nama">{p.tertunda} essay menunggu</small>}
                         </td>
                         <td>
-                          {p.pindahTab > 0 || p.keluarFullscreen > 0 ? (
-                            <small className="cbt-langgar">
-                              {p.pindahTab > 0 && `pindah tab ${p.pindahTab}×`}
-                              {p.pindahTab > 0 && p.keluarFullscreen > 0 && " · "}
-                              {p.keluarFullscreen > 0 && `keluar layar penuh ${p.keluarFullscreen}×`}
-                            </small>
-                          ) : (
-                            <small className="psn-nama">-</small>
-                          )}
+                          {/* Satu angka, bukan daftar pelanggaran.
+                              Papan ini menampilkan ratusan baris sekaligus, dan
+                              dosen yang mengawas sedang berjalan di antara meja
+                              — yang ia butuhkan adalah "baris mana yang perlu
+                              saya lihat", bukan rincian yang hanya terbaca
+                              sesudah ujiannya selesai. Rinciannya ada di lembar
+                              jawaban peserta itu. */}
+                          <SkorIntegritas
+                            skor={p.integritas}
+                            dihentikan={p.dihentikan}
+                          />
                         </td>
                         <td>
                           <button
@@ -2429,11 +2584,35 @@ export default function CbtPanel({ role }: { role: string }) {
                     mati={rincian.length === 0}
                     onClick={() => cetakLaporanPeserta()}
                   />
-                  <button type="button" className="btn btn-light btn-mini" onClick={() => { setBukaPeserta(null); setRincian([]); }}>
+                  <button type="button" className="btn btn-light btn-mini" onClick={() => { setBukaPeserta(null); setRincian([]); setJejak([]); }}>
                     Tutup
                   </button>
                 </span>
               </div>
+
+              {/* ---------- LEMBAR PENGAWASAN ----------
+                  Ditaruh DI ATAS lembar jawaban, bukan di bawahnya. Dosen yang
+                  membuka lembar seorang peserta untuk mengoreksi essay akan
+                  membaca dari atas dan berhenti begitu koreksinya selesai;
+                  catatan pengawasan yang tertinggal di kaki halaman tidak
+                  pernah terbaca oleh orang yang paling perlu membacanya. */}
+              {!muatRincian && (
+                <section className="cbt-jaga-lembar">
+                  <div className="cbt-jaga-kepala">
+                    <b>Lembar pengawasan</b>
+                    <SkorIntegritas skor={bukaPeserta.integritas} dihentikan={bukaPeserta.dihentikan} />
+                  </div>
+                  {bukaPeserta.dihentikan && (
+                    <p className="cbt-jaga-putus">{bukaPeserta.dihentikan}</p>
+                  )}
+                  <p className="cbt-catatan">
+                    Skor ini <b>bukan nilai</b> dan tidak pernah mengubah nilai ujian. Ia hanya
+                    menandai lembar mana yang perlu dibaca lebih dulu — yang memutuskan tetap Anda,
+                    dengan garis waktu di bawah ini.
+                  </p>
+                  <GarisWaktu jejak={jejak} mulai={bukaPeserta.mulai} />
+                </section>
+              )}
 
               {muatRincian ? (
                 <div className="dempty">Memuat lembar jawaban…</div>

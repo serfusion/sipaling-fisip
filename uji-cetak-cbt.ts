@@ -118,6 +118,46 @@ cek("catatan pengawas ikut", acara.includes("Listrik sempat padam"));
 cek("ada blok tanda tangan", acara.includes("Pengawas Ujian"));
 cek("menegaskan catatan sistem bukan putusan", acara.includes("bukan putusan"));
 
+// Sejak menempel, menyalin, dan menekan tombol tangkapan layar ikut tercatat,
+// menyaring hanya dengan dua kolom lama akan menghasilkan berita acara yang
+// menyatakan "tidak ada pelanggaran" pada ujian yang jawabannya ditempel
+// delapan kali — dan dokumen itu ditandatangani pengawas.
+const acara2 = beritaAcaraHtml(ujian, {
+  pengawas: "Dr. Ayu", ruang: "Daring",
+  hadir: 3, terdaftar: 3, selesai: 3, berjalan: 0, pelanggaran: 2,
+  catatan: "",
+  peserta: [
+    // Tidak pernah pindah tab, tetapi menempel jawaban berkali-kali.
+    { nim: "333", nama: "Dewi", status: "selesai", pindahTab: 0, keluarFullscreen: 0, integritas: 50 },
+    // Bersih betul.
+    { nim: "444", nama: "Eka", status: "selesai", pindahTab: 0, keluarFullscreen: 0, integritas: 100 },
+    // Dihentikan pengawasan.
+    {
+      nim: "555", nama: "Fajar", status: "waktu_habis", pindahTab: 5, keluarFullscreen: 0,
+      integritas: 20, dihentikan: "Dihentikan pengawasan: tab melampaui batas.",
+    },
+  ],
+});
+cek("yang menempel tanpa pindah tab tetap terdaftar", acara2.includes("Dewi"));
+cek("yang bersih tetap tidak terdaftar", !acara2.includes(">Eka<"));
+cek("skor integritas tercetak", acara2.includes("50/100"));
+cek("sebab pemutusan ikut tercetak", acara2.includes("melampaui batas"));
+// Yang paling perlu dibaca harus berada di baris pertama: berita acara dibaca
+// dari atas, dan baris kedua puluh jarang sampai terbaca.
+cek("diurutkan dari yang paling rendah skornya",
+  acara2.indexOf("Fajar") < acara2.indexOf("Dewi"));
+cek("menegaskan skor bukan nilai ujian", acara2.includes("BUKAN nilai ujian"));
+
+// Ujian lama, dari sebelum pengawasan ada, tidak punya skor sama sekali.
+// Ia tidak boleh dianggap bersih maupun dianggap melanggar.
+const acara3 = beritaAcaraHtml(ujian, {
+  pengawas: "", ruang: "", hadir: 1, terdaftar: 1, selesai: 1, berjalan: 0,
+  pelanggaran: 0, catatan: "",
+  peserta: [{ nim: "666", nama: "Gita", status: "selesai", pindahTab: 0, keluarFullscreen: 0 }],
+});
+cek("peserta lama tanpa skor tidak didaftar sebagai pelanggar",
+  acara3.includes("Tidak ada pelanggaran"));
+
 const acaraBersih = beritaAcaraHtml(ujian, {
   pengawas: "", ruang: "", hadir: 5, terdaftar: 5, selesai: 5, berjalan: 0, pelanggaran: 0,
   catatan: "", peserta: [{ nim: "1", nama: "A", status: "selesai", pindahTab: 0, keluarFullscreen: 0 }],

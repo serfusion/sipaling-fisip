@@ -6,7 +6,7 @@
 // PATCH                      koreksi essay: nilai + catatan dosen
 // ============================================================
 import { db } from "@/db";
-import { cbtAnswers, cbtAttempts, cbtExams } from "@/db/schema";
+import { cbtAnswers, cbtAttempts, cbtExams, cbtIncidents } from "@/db/schema";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { getCurrentProfile } from "@/lib/supabase-server";
 import { explainServerError } from "@/lib/api-errors";
@@ -84,6 +84,19 @@ export async function GET(request: Request) {
       const jawaban = await db.select().from(cbtAnswers).where(eq(cbtAnswers.attemptId, attempt.id));
       const petaJawab = new Map(jawaban.map((j) => [j.questionId, j]));
 
+      // GARIS WAKTU PENGAWASAN. Inilah yang sebenarnya dibaca penguji ketika
+      // sebuah hasil digugat, dan angka ringkasannya tidak dapat
+      // menggantikannya: tiga kali pindah tab yang terpencar sepanjang
+      // sembilan puluh menit adalah notifikasi yang muncul sendiri, sedangkan
+      // tiga kali dalam empat puluh detik sesudah soal essay dibuka adalah hal
+      // yang lain sama sekali.
+      const jejak = await db
+        .select()
+        .from(cbtIncidents)
+        .where(eq(cbtIncidents.attemptId, attempt.id))
+        .orderBy(cbtIncidents.at)
+        .limit(500);
+
       return Response.json({
         success: true,
         peserta: {
@@ -93,7 +106,25 @@ export async function GET(request: Request) {
           mulai: attempt.startedAt.toISOString(),
           kumpul: attempt.submittedAt ? attempt.submittedAt.toISOString() : null,
           keluarFullscreen: attempt.leftFullscreen, pindahTab: attempt.switchedTab,
+          integritas: attempt.integrityScore,
+          dihentikan: attempt.forcedReason,
+          pengawasan: {
+            tab: attempt.switchedTab,
+            fullscreen: attempt.leftFullscreen,
+            blur: attempt.blurCount,
+            salin: attempt.copyAttempts,
+            tempel: attempt.pasteAttempts,
+            tangkap: attempt.screenshotAttempts,
+            klik_kanan: attempt.rightClicks,
+            devtools: attempt.devtoolsOpens,
+            layar_kedua: attempt.secondScreens,
+          },
         },
+        jejak: jejak.map((j) => ({
+          jenis: j.kind,
+          jam: j.at.toISOString(),
+          detail: j.detail || "",
+        })),
         // Kunci jawaban baru ikut keluar DI SINI — sesudah ujiannya dikumpulkan,
         // dan hanya kepada dosen pemiliknya.
         rincian: lembar.map((l, urut) => {
@@ -184,6 +215,8 @@ export async function GET(request: Request) {
           : null,
         keluarFullscreen: p.leftFullscreen,
         pindahTab: p.switchedTab,
+        integritas: p.integrityScore,
+        dihentikan: p.forcedReason,
         mulai: p.startedAt.toISOString(),
         kumpul: p.submittedAt ? p.submittedAt.toISOString() : null,
       })),
