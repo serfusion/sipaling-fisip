@@ -22,6 +22,7 @@ import {
   pemilik, PEMANTAU, statusUjian,
 } from "@/lib/cbt";
 import { rapikanMode } from "@/lib/pengawasan";
+import { rapikanPerangkatKunci } from "@/lib/kunci-layar";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -103,6 +104,7 @@ export async function GET() {
         proctorMode: cbtExams.proctorMode,
         cameraOn: cbtExams.cameraOn,
         requireLockdown: cbtExams.requireLockdown,
+        lockdownDevice: cbtExams.lockdownDevice,
         token: cbtExams.token,
         startAt: cbtExams.startAt,
         endAt: cbtExams.endAt,
@@ -214,6 +216,7 @@ export async function POST(request: Request) {
             singleDevice: body.singleDevice !== false,
             proctorMode: rapikanMode(body.proctorMode),
             requireLockdown: body.requireLockdown === true,
+            lockdownDevice: rapikanPerangkatKunci(body.lockdownDevice),
             token: teks(body.token, 12).toUpperCase() || null,
           })
           .returning({ id: cbtExams.id, code: cbtExams.code });
@@ -290,6 +293,7 @@ export async function PATCH(request: Request) {
     // disebutkan tidak boleh diam-diam menyalakan kewajiban yang membuat
     // seluruh kelas harus memasang aplikasi lebih dulu.
     if (body.requireLockdown !== undefined) ubah.requireLockdown = body.requireLockdown === true;
+    if (body.lockdownDevice !== undefined) ubah.lockdownDevice = rapikanPerangkatKunci(body.lockdownDevice);
     if (body.token !== undefined) ubah.token = teks(body.token, 12).toUpperCase() || null;
 
     // ---------- SAKLAR KAMERA ----------
@@ -333,7 +337,7 @@ export async function PATCH(request: Request) {
             success: false,
             message:
               `Ujian sedang berlangsung, jadi ${tersendat.map((k) => NAMA_BENTUK[k]).join(", ")} ` +
-              "belum dapat diubah — sebagian peserta akan mengerjakan ujian yang berbeda dari " +
+              "belum dapat diubah. Sebagian peserta akan mengerjakan ujian yang berbeda dari " +
               "sebagian yang lain. Setelan pengawasan seperti “satu perangkat”, kode " +
               "pengawas, dan instruksi tetap dapat diubah sekarang.",
           },

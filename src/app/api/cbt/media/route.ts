@@ -180,7 +180,7 @@ export async function POST(request: Request) {
         {
           success: false,
           message:
-            `Berkasnya terunggah, tetapi bucket "${BUCKET_MEDIA}" TIDAK dapat dibaca umum — ` +
+            `Berkasnya terunggah, tetapi bucket "${BUCKET_MEDIA}" TIDAK dapat dibaca umum. ` +
             "gambarnya akan kosong di layar peserta. Buka Supabase → Storage → " +
             `bucket "${BUCKET_MEDIA}" → aktifkan "Public bucket", atau jalankan ` +
             "supabase-update-v26-cbt-lanjutan.sql. Sementara itu, tempelkan tautan gambar " +

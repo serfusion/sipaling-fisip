@@ -404,7 +404,7 @@ export function beritaAcaraHtml(ujian: UjianCetak, acara: BeritaAcara): string {
     : `<table class="nilai">
         <tr><th>NIM / No.</th><th>Nama</th><th>Integritas</th><th>Pindah tab</th><th>Keluar layar penuh</th><th>Keterangan</th></tr>
         ${urut.map((p) => `<tr><td>${lolos(p.nim)}</td><td>${lolos(p.nama)}</td>
-          <td>${typeof p.integritas === "number" ? `${p.integritas}/100` : "—"}</td>
+          <td>${typeof p.integritas === "number" ? `${p.integritas}/100` : "-"}</td>
           <td>${p.pindahTab}×</td><td>${p.keluarFullscreen}×</td>
           <td>${p.dihentikan ? lolos(p.dihentikan) : "-"}</td></tr>`).join("")}
       </table>

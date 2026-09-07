@@ -241,7 +241,7 @@ export async function POST(request: Request) {
       pesan:
         putusan.jenis === "orang_lain"
           ? "Terdeteksi orang lain di depan kamera. Kejadian ini dicatat dan dilaporkan ke pengawas."
-          : "Wajahmu tidak terlihat kamera. Duduklah menghadap layar — kejadian ini dicatat.",
+          : "Wajahmu tidak terlihat kamera. Duduklah menghadap layar. Kejadian ini dicatat.",
     });
   } catch (error: unknown) {
     console.error("awasi kamera cbt", error);

@@ -8,7 +8,7 @@
 // ============================================================
 
 /** Baris kredit yang dicantumkan pada tiap layar CBT. */
-export const KREDIT_CBT = "Computer Based Test (CBT) — SiPaling CBT — Concept Superfal Dev";
+export const KREDIT_CBT = "Computer Based Test (CBT) · SiPaling CBT · Concept Superfal Dev";
 
 export default function KreditCbt({ rapat = false }: { rapat?: boolean }) {
   return <p className={`cbt-kredit${rapat ? " cbt-kredit-rapat" : ""}`}>{KREDIT_CBT}</p>;

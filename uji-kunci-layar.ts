@@ -18,8 +18,9 @@
 import { readFileSync } from "node:fs";
 import {
   KEMAMPUAN, KLIEN_LABEL, PENANDA_KLIEN, PESAN_TIRAI, SEMUA_KLIEN, TIRAI_MS,
-  ajakanAplikasi, bacaKlien, bolehMasukKlien, kunciSistem, periksaKunciKlien,
-  pesanKunciLayar, rapikanKlien, type JenisKlien, type SebabTirai,
+  PERANGKAT_LABEL, SEMUA_PERANGKAT, bacaKlien, bolehMasukKlien, kunciSistem,
+  periksaKunciKlien, rapikanKlien, rapikanPerangkatKunci,
+  type JenisKlien, type SebabTirai,
 } from "./src/lib/kunci-layar";
 import { KEADAAN_JAWAB_LABEL, keadaanJawab } from "./src/lib/cbt";
 import { namaBerkasQr } from "./src/lib/qr-ujian";
@@ -34,6 +35,16 @@ function benar(nama: string, syarat: boolean, info = "") {
 }
 const sama = (nama: string, dapat: unknown, harap: unknown) =>
   benar(nama, dapat === harap, `dapat ${JSON.stringify(dapat)}, harap ${JSON.stringify(harap)}`);
+
+// Berkas sumber dibaca SEKALI di sini, bukan di tempat masing-masing
+// pemeriksaan. Yang dibaca di tengah berkas hanya terlihat oleh baris di
+// bawahnya, dan menambah satu pemeriksaan di atasnya menghasilkan galat
+// "used before declaration" yang tidak ada hubungannya dengan apa pun yang
+// sedang diuji.
+const penjagaLayar = readFileSync("./src/app/cbt/ujian/penjaga.ts", "utf8");
+const gaya = readFileSync("./src/app/globals.css", "utf8");
+const ujianApp = readFileSync("./src/app/cbt/ujian/ujian-app.tsx", "utf8");
+const tiraiTsx = readFileSync("./src/app/cbt/ujian/tirai.tsx", "utf8");
 
 const UA_ANDROID =
   "Mozilla/5.0 (Linux; Android 14; SM-A546E) AppleWebKit/537.36 (KHTML, like Gecko) " +
@@ -98,24 +109,82 @@ benar("peramban tidak mengunci apa pun", !kunciSistem("peramban"));
 benar("Android mengunci", kunciSistem("android"));
 benar("Windows mengunci", kunciSistem("windows"));
 
-const pesanPeramban = pesanKunciLayar("peramban");
-benar("kalimat untuk peramban tidak menjanjikan pemblokiran",
-  !pesanPeramban.toLowerCase().includes("diblokir"), pesanPeramban);
-benar("kalimat untuk peramban menyebut pencatatan",
-  pesanPeramban.toLowerCase().includes("dicatat"), pesanPeramban);
-for (const k of ["android", "windows"] as JenisKlien[]) {
-  benar(`kalimat untuk ${k} menyebut pemblokiran sistem`,
-    pesanKunciLayar(k).toLowerCase().includes("diblokir sistem"), pesanKunciLayar(k));
+// ---------- LAYAR PESERTA TIDAK MENGUMUMKAN PENGAWASAN ----------
+//
+// `pesanKunciLayar` dan `ajakanAplikasi` sudah dibuang, dan tidak boleh
+// kembali. Layar yang mengumumkan apa saja yang diawasi juga mengumumkan apa
+// saja yang TIDAK diawasi, dan itu peta bagi orang yang mencari celahnya.
+const libKunci = readFileSync("./src/lib/kunci-layar.ts", "utf8");
+benar("kalimat pengumuman pengawasan sudah tidak ada",
+  !/export function (pesanKunciLayar|ajakanAplikasi)/.test(libKunci));
+// Komentar dibuang lebih dulu: yang dijaga adalah apa yang TERBACA peserta,
+// dan komentar yang menerangkan mengapa satu kalimat dibuang justru harus
+// boleh menyebut kalimat itu.
+const ujianTampil = ujianApp
+  .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/^\s*\/\/.*$/gm, "");
+for (const kata of ["Tangkapan layar diawasi", "peramban biasa", "tercetak samar"]) {
+  benar(`layar peserta tidak menyebut "${kata}"`, !ujianTampil.includes(kata));
 }
-benar("kalimat kedua perangkat terkunci sama persis",
-  pesanKunciLayar("android") === pesanKunciLayar("windows"));
+// Yang tetap boleh dikatakan: syarat masuknya. Peserta yang ujiannya
+// mewajibkan Exam Browser harus tahu SEBELUM menekan Mulai, kalau tidak ia
+// duduk di ruang ujian dengan waktu berjalan dan ujian yang tidak dapat
+// dibuka.
+benar("syarat Exam Browser tetap dikatakan sebelum mulai",
+  /Exam Browser/.test(ujianTampil));
 
-// Ajakan memasang aplikasi hanya untuk yang belum memakainya, dan hanya pada
-// ujian yang belum mewajibkannya — layar beberapa detik sebelum ujian dimulai
-// sudah cukup penuh peringatan.
-benar("peramban diajak memasang aplikasi", ajakanAplikasi("peramban", false).length > 20);
-sama("yang sudah memakai aplikasi tidak diajak", ajakanAplikasi("android", false), "");
-sama("ujian yang mewajibkan tidak mengajak, ia menolak", ajakanAplikasi("peramban", true), "");
+console.log("\n=== EXAM BROWSER: PERANGKAT MANA ===\n");
+
+// Masukan sembarang harus jatuh ke "semua", yang paling LONGGAR. Arah jatuhnya
+// penting: yang tertolak oleh pilihan yang salah adalah peserta yang datang
+// dengan aplikasi yang benar.
+sama("kosong jatuh ke semua", rapikanPerangkatKunci(""), "semua");
+sama("tidak dikenal jatuh ke semua", rapikanPerangkatKunci("iphone"), "semua");
+sama("null jatuh ke semua", rapikanPerangkatKunci(null), "semua");
+sama("angka jatuh ke semua", rapikanPerangkatKunci(7), "semua");
+sama("huruf besar tetap terbaca", rapikanPerangkatKunci("ANDROID"), "android");
+sama("spasi di tepi dibuang", rapikanPerangkatKunci("  windows "), "windows");
+for (const p of SEMUA_PERANGKAT) {
+  benar(`perangkat ${p} punya label`, (PERANGKAT_LABEL[p] ?? "").length > 3);
+}
+
+// Ujian yang mewajibkan HP: aplikasi Windows pun ditolak, dan kalimatnya
+// menyebut yang HARUS dipakai, bukan yang salah. Peserta yang membaca
+// "aplikasi Windows ditolak" masih belum tahu ia harus mengambil ponselnya.
+const hanyaHp = bolehMasukKlien(true, "windows", true, "android");
+benar("wajib HP menolak aplikasi Windows", !hanyaHp.ok);
+if (!hanyaHp.ok) {
+  benar("dan menyebut yang harus dipakai", /HP Android/i.test(hanyaHp.pesan), hanyaHp.pesan);
+}
+benar("wajib HP menerima aplikasi Android", bolehMasukKlien(true, "android", true, "android").ok);
+const hanyaPc = bolehMasukKlien(true, "android", true, "windows");
+benar("wajib PC menolak aplikasi Android", !hanyaPc.ok);
+if (!hanyaPc.ok) {
+  benar("dan menyebut PC Windows", /PC Windows/i.test(hanyaPc.pesan), hanyaPc.pesan);
+}
+benar("wajib PC menerima aplikasi Windows", bolehMasukKlien(true, "windows", true, "windows").ok);
+// "semua" menerima keduanya, dan itu yang berlaku bagi ujian lama yang
+// menyalakan saklarnya sebelum kolom perangkat ada.
+for (const k of ["android", "windows"] as JenisKlien[]) {
+  benar(`perangkat semua menerima ${k}`, bolehMasukKlien(true, k, true, "semua").ok);
+}
+// Peramban ditolak apa pun perangkat yang diminta, dan kalimatnya selalu
+// menyebut namanya sekarang: Exam Browser.
+for (const p of SEMUA_PERANGKAT) {
+  const tolak = bolehMasukKlien(true, "peramban", true, p);
+  benar(`peramban ditolak pada perangkat ${p}`, !tolak.ok);
+  if (!tolak.ok) {
+    benar(`penolakan ${p} menyebut Exam Browser`, /Exam Browser/.test(tolak.pesan), tolak.pesan);
+    benar(`penolakan ${p} tidak memakai tanda pisah panjang`, !tolak.pesan.includes("\u2014"),
+      tolak.pesan);
+  }
+}
+// Perangkat tidak pernah berlaku pada ujian yang TIDAK mewajibkan apa pun.
+for (const p of SEMUA_PERANGKAT) {
+  benar(`tanpa kewajiban, perangkat ${p} tidak menghalangi`,
+    bolehMasukKlien(false, "peramban", false, p).ok);
+}
 
 console.log("\n=== GERBANG UJIAN YANG MEWAJIBKAN APLIKASI ===\n");
 
@@ -131,7 +200,7 @@ benar("penolakannya menyebut apa yang harus diunduh",
   !tolakPeramban.ok && tolakPeramban.pesan.toLowerCase().includes("unduh"),
   !tolakPeramban.ok ? tolakPeramban.pesan : "");
 benar("penolakannya menyebut aplikasinya",
-  !tolakPeramban.ok && tolakPeramban.pesan.includes("Aplikasi Ujian Terkunci"));
+  !tolakPeramban.ok && tolakPeramban.pesan.includes("Exam Browser"));
 
 benar("aplikasi berkunci benar boleh masuk", bolehMasukKlien(true, "android", true).ok);
 const tolakKunci = bolehMasukKlien(true, "windows", false);
@@ -161,7 +230,6 @@ benar("beda huruf besar-kecil ditolak", !periksaKunciKlien("Rahasia", "rahasia")
 
 console.log("\n=== TIRAI ===\n");
 
-const penjagaLayar = readFileSync("./src/app/cbt/ujian/penjaga.ts", "utf8");
 
 benar("tirai cukup lama untuk melewati gerakan memotong layar", TIRAI_MS >= 1500);
 // Dan cukup pendek untuk tidak terasa sebagai ujian yang macet. Peserta yang
@@ -190,8 +258,6 @@ benar("tirai tangkapan layar menyebut pencatatannya",
 // menelan ketukan, jadi tombol apa pun di BALIKNYA tidak dapat ditekan lagi,
 // dan peserta yang terkurung di layar gelap tanpa tombol kehilangan ujiannya
 // karena penjagaan, bukan karena kecurangan.
-const ujianApp = readFileSync("./src/app/cbt/ujian/ujian-app.tsx", "utf8");
-const tiraiTsx = readFileSync("./src/app/cbt/ujian/tirai.tsx", "utf8");
 benar("tirai layar penuh menyuruh menyalakannya kembali",
   PESAN_TIRAI.layar.isi.toLowerCase().includes("layar penuh"), PESAN_TIRAI.layar.isi);
 benar("tirai dapat membawa tombolnya sendiri", tiraiTsx.includes("aksi"));
@@ -207,6 +273,45 @@ benar("penjaga memasang tirai layar penuh sendiri",
   "kalau halaman yang memutuskannya, mode Biasa ikut tertutup tirai");
 benar("hanya pada mode yang menuntut layar penuh",
   /aturan\.layarPenuh && keluarLayarPenuh/.test(penjagaLayar));
+
+console.log("\n=== KOTAK TEGURAN ===\n");
+
+// Kotak yang menutup soal dan harus diakui peserta. Yang dijaga di sini bukan
+// rupanya melainkan tiga hal yang membuatnya bekerja.
+const tegurTsx = readFileSync("./src/app/cbt/ujian/teguran.tsx", "utf8");
+const gayaTegur = gaya.slice(gaya.indexOf(".uj-tegur {"));
+// 1. Menelan ketukan. Kotak yang tidak menutupi tombol jawaban di baliknya
+//    justru menjadi tempat menjawab soal tanpa terlihat.
+benar("teguran menelan ketukan", /pointer-events:\s*auto/.test(gayaTegur.slice(0, 700)));
+// 2. Di ATAS tirai. Keduanya muncul bersamaan pada percobaan tangkapan layar,
+//    dan yang harus terbaca lebih dulu adalah tegurannya.
+const zTirai = Number(/\.uj-tirai \{[\s\S]{0,200}?z-index:\s*(\d+)/.exec(gaya)?.[1] ?? 0);
+const zTegur = Number(/\.uj-tegur \{[\s\S]{0,200}?z-index:\s*(\d+)/.exec(gaya)?.[1] ?? 0);
+benar("teguran di atas tirai", zTegur > zTirai && zTirai > 0, `tirai ${zTirai}, teguran ${zTegur}`);
+// 3. Membawa tombolnya sendiri, karena tombol di baliknya tidak dapat ditekan.
+benar("teguran membawa tombol pengakuannya", /<button/.test(tegurTsx));
+benar("teguran menandai pesertanya", tegurTsx.includes("tandaAir"));
+
+// Dan hanya muncul selama peserta benar-benar mengerjakan: teguran yang
+// tertinggal di atas halaman hasil membuat peserta mengira ujiannya belum
+// berakhir.
+benar("teguran hanya selama mengerjakan", /layar === "kerja" && teguran/.test(ujianApp));
+benar("teguran dipasang dari balasan server", /data\?\.keras/.test(ujianApp),
+  "kalau halaman yang memutuskan berat-ringannya, mematikan JavaScript sudah cukup mematikannya");
+
+// ---------- BATASNYA TIDAK IKUT DIKIRIM ----------
+//
+// Apa pun yang sampai ke peramban dapat dibaca peserta di panel jaringan alat
+// pengembang. Balasan yang membawa batasnya membocorkannya di sana, walau
+// tidak satu pun kalimat di layar menyebutkannya.
+const rute = readFileSync("./src/app/api/cbt/ikut/route.ts", "utf8");
+const iLanggar = rute.indexOf("PENGUMPULAN PAKSA");
+const balasan = iLanggar > 0 ? rute.slice(iLanggar, iLanggar + 1800) : "";
+benar("balasan pelanggaran ada", balasan.length > 100);
+benar("balasan membawa nomor pelanggarannya", /nomor:/.test(balasan), balasan.slice(0, 200));
+benar("balasan TIDAK membawa batasnya",
+  !/batas:|batasPaksa:\s*aturanMode|sisa:/.test(balasan),
+  "batas yang terkirim terbaca peserta di panel jaringan");
 
 console.log("\n=== BENAR HIJAU, SALAH MERAH ===\n");
 
@@ -277,7 +382,6 @@ console.log("\n=== JALUR CETAK DITUTUP DUA LAPIS ===\n");
 // layar. Kedua lapisnya perlu — pendengar tombol menutup Ctrl+P, aturan
 // @media print menutup jalur MENU Cetak yang tidak pernah melewati papan
 // ketik sama sekali.
-const penjagaTs = readFileSync("./src/app/cbt/ujian/penjaga.ts", "utf8");
 // Diperiksa dari perbuatannya, bukan dari bunyi kodenya: putusan tombolnya
 // sendiri yang ditanya. Uji yang hanya mencari potongan teks di dalam penjaga
 // tetap hijau ketika logikanya pindah berkas dan berhenti bekerja.
@@ -293,13 +397,12 @@ benar("lapis 1: cetak memang benar-benar tercegah", pCtrl?.benarTercegah === tru
 // daftar tombol dapat menjadi pustaka yang benar tetapi tidak dipakai
 // siapa pun, dan uji di atas tetap hijau.
 benar("lapis 1: penjaga layar memakai daftar tombolnya",
-  penjagaTs.includes("periksaTombol("));
+  penjagaLayar.includes("periksaTombol("));
 benar("lapis 1: peristiwa beforeprint ikut dipasang",
-  penjagaTs.includes('addEventListener("beforeprint"'));
-benar("pendengar tombolnya pada fase tangkap", /capture:\s*true/.test(penjagaTs),
+  penjagaLayar.includes('addEventListener("beforeprint"'));
+benar("pendengar tombolnya pada fase tangkap", /capture:\s*true/.test(penjagaLayar),
   "penangan lain yang memanggil stopPropagation lebih dulu akan mendahuluinya");
 
-const gaya = readFileSync("./src/app/globals.css", "utf8");
 const iBlok = gaya.indexOf("LAYAR UJIAN TIDAK IKUT TERCETAK");
 benar("lapis 2: blok aturan cetaknya ada", iBlok > 0);
 const blokCetak = iBlok > 0 ? gaya.slice(iBlok) : "";

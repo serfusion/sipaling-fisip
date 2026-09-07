@@ -69,7 +69,7 @@ export default function MasukCbt({ portal = "" }: { portal?: string }) {
         <div className="cbtd-lambang" aria-hidden="true">📝</div>
         <h1>SiPaling CBT</h1>
         <p className="cbtd-sub">
-          Ujian Berbasis Komputer — pilihan ganda, penjodohan, isian, dan esai
+          Ujian Berbasis Komputer. Pilihan ganda, penjodohan, isian, dan esai
         </p>
         <ul className="cbtd-nilai">
           <li>Tidak perlu membuat akun. Cukup kode ujian, nama, dan nomor peserta.</li>
@@ -135,8 +135,7 @@ export default function MasukCbt({ portal = "" }: { portal?: string }) {
                 Masuk ke dashboard
               </a>
               <p className="cbtd-bantu">
-                Belum punya akun? Hubungi Super Admin portal. Menu CBT hanya terbuka untuk pengajar,
-                Admin, dan Super Admin. Bukan admin bagian.
+                Belum punya akun? Hubungi Super Admin portal.
               </p>
             </>
           )}

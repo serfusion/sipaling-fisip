@@ -184,7 +184,7 @@ export default function ArsipTranskrip({ bolehHapus }: { bolehHapus: boolean }) 
                   </td>
                   <td>
                     <b>IPK {baris.ipk}</b>
-                    <small>{baris.courseCount} MK · {baris.totalSks} SKS · {baris.predikat || "—"}</small>
+                    <small>{baris.courseCount} MK · {baris.totalSks} SKS · {baris.predikat || "-"}</small>
                   </td>
                   <td>
                     {tanggal(baris.updatedAt)}

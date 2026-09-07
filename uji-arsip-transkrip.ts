@@ -100,7 +100,10 @@ sama("IPK 3,50 -> Sangat Memuaskan", predikatKelulusan(3.5, "J"), "Sangat Memuas
 sama("IPK 3,01 -> Sangat Memuaskan", predikatKelulusan(3.01, "J"), "Sangat Memuaskan");
 sama("IPK 2,76 -> Memuaskan", predikatKelulusan(2.76, "J"), "Memuaskan");
 sama("IPK rendah tapi berjudul -> Lulus", predikatKelulusan(2.5, "J"), "Lulus");
-sama("IPK rendah tanpa judul -> belum lulus", predikatKelulusan(2.5, ""), "—");
+// Tanda hubung biasa, BUKAN tanda pisah panjang. Seluruh teks yang tampil di
+// web sudah dibersihkan dari "—" atas permintaan pemilik sistem, dan
+// penampung kosong seperti ini ikut di dalamnya.
+sama("IPK rendah tanpa judul -> belum lulus", predikatKelulusan(2.5, ""), "-");
 
 console.log("\n=== KIRIMAN PERAMBAN DIBERSIHKAN ===\n");
 

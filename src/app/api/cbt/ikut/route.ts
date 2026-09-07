@@ -34,10 +34,13 @@ import {
 } from "@/lib/cbt";
 import { attemptDariKunci, bacaLembar, soalUjian, ujianDariKode, type Attempt, type Ujian } from "@/lib/cbt-store";
 import {
-  harusDipaksa, kameraMenyala, pesanPeringatan, rapikanInsiden, rapikanMode,
+  aturanMode, berat, harusDipaksa, jumlahBerat, kameraMenyala, pesanPeringatan,
+  rapikanInsiden, rapikanMode,
   skorIntegritas, type HitunganInsiden, type JenisInsiden,
 } from "@/lib/pengawasan";
-import { bacaKlien, bolehMasukKlien, periksaKunciKlien, rapikanKlien } from "@/lib/kunci-layar";
+import {
+  bacaKlien, bolehMasukKlien, periksaKunciKlien, rapikanKlien, rapikanPerangkatKunci,
+} from "@/lib/kunci-layar";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -82,7 +85,7 @@ function ringkasUjian(u: Ujian, sekarang: Date) {
     // Kecuali kamera. Ia punya saklarnya sendiri yang dipegang Admin, jadi
     // modenya saja tidak cukup untuk menjawab "menyala atau tidak".
     kamera: kameraMenyala(rapikanMode(u.proctorMode), u.cameraOn),
-    // Ujian ini menuntut Aplikasi Ujian Terkunci.
+    // Ujian ini menuntut aplikasi Exam Browser.
     //
     // Dikirim sejak layar identitas, SEBELUM tombol Mulai ditekan, dan itu
     // penting: peserta yang baru mengetahuinya sesudah menekan Mulai sudah
@@ -90,6 +93,7 @@ function ringkasUjian(u: Ujian, sekarang: Date) {
     // hanya memasang aplikasi di tengah ujian. Diberi tahu di layar identitas,
     // ia masih sempat mengunduhnya.
     wajibAplikasi: u.requireLockdown === true,
+    perangkatAplikasi: rapikanPerangkatKunci(u.lockdownDevice),
   };
 }
 
@@ -338,6 +342,7 @@ export async function POST(request: Request) {
         ujian.requireLockdown === true,
         klien,
         periksaKunciKlien(kunciAplikasiServer(), body.kunciAplikasi),
+        rapikanPerangkatKunci(ujian.lockdownDevice),
       );
       if (!izinKlien.ok) {
         return Response.json(
@@ -416,7 +421,7 @@ export async function POST(request: Request) {
       // dapat berisi ratusan baris, dan lembar soal masing-masing tidak ada
       // gunanya di sini.
       const nameKey = kunciNama(identitas.nama);
-      const deviceId = rapikanPerangkat(body.perangkat);
+      const deviceId = rapikanPerangkatKunci(body.perangkat);
       const semua = await db
         .select({
           nim: cbtAttempts.nim,
@@ -543,7 +548,10 @@ export async function POST(request: Request) {
       // memakai aplikasinya, tepat ketika ia baru saja kehilangan halaman
       // ujiannya. Yang tetap diperiksa adalah perangkatnya, dan itu terbaca
       // dari User-Agent yang selalu ada sejak permintaan pertama.
-      const izinLanjut = bolehMasukKlien(ujian.requireLockdown === true, klienLanjut, true);
+      const izinLanjut = bolehMasukKlien(
+        ujian.requireLockdown === true, klienLanjut, true,
+        rapikanPerangkatKunci(ujian.lockdownDevice),
+      );
       if (!izinLanjut.ok) {
         return Response.json(
           { success: false, message: izinLanjut.pesan, butuhAplikasi: true },
@@ -670,10 +678,22 @@ export async function POST(request: Request) {
         });
       }
 
+      // `keras` menentukan bentuk teguran di layar: pelanggaran yang ikut
+      // menghitung mundur mendapat kotak yang menutup soal dan harus diakui
+      // pesertanya, yang ringan cukup pita yang menghilang sendiri.
+      //
+      // `nomor` adalah pelanggaran berat KE BERAPA, bukan sisa jatahnya.
+      // Batas pengumpulan paksa sengaja tidak pernah ikut dikirim: apa pun
+      // yang sampai ke peramban dapat dibaca peserta di alat pengembang, dan
+      // peserta yang tahu batasnya akan membelanjakannya sampai satu ketukan
+      // sebelum habis.
+      const keras = berat(jenis) && aturanMode(mode).batasPaksa > 0;
       return Response.json({
         success: true,
         skor,
         dipaksa: false,
+        keras,
+        nomor: keras ? jumlahBerat(hitungan) : 0,
         pesan: pesanPeringatan(mode, jenis, hitungan),
       });
     }

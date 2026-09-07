@@ -33,7 +33,10 @@ import {
 import { gambarQr, namaBerkasQr } from "@/lib/qr-ujian";
 import { buatDocxTemplate, buatXlsxTemplate } from "@/lib/template-soal";
 import { asalCbt } from "@/lib/situs-cbt";
-import { KLIEN_LABEL, kunciSistem, rapikanKlien } from "@/lib/kunci-layar";
+import {
+  KLIEN_LABEL, PERANGKAT_LABEL, SEMUA_PERANGKAT, kunciSistem, rapikanKlien,
+  rapikanPerangkatKunci, type PerangkatKunci,
+} from "@/lib/kunci-layar";
 import {
   INSIDEN_LABEL, MODE_KETERANGAN, MODE_LABEL, SEMUA_MODE, aturanMode, rapikanMode,
   tingkatIntegritas, TINGKAT_LABEL, type JenisInsiden, type ModePengawasan,
@@ -48,8 +51,9 @@ type Ujian = {
   activatedAt: string | null; activatedBy: string | null;
   description: string | null; instruction: string | null; createdBy: string;
   singleDevice: boolean;
-  /** Ujian hanya boleh dikerjakan lewat Aplikasi Ujian Terkunci. */
+  /** Ujian hanya boleh dikerjakan lewat aplikasi Exam Browser. */
   requireLockdown: boolean;
+  lockdownDevice?: string;
   /** Mode pengawasan: "biasa" | "ketat" | "sertifikasi". */
   proctorMode: string;
   /** Saklar kamera pengawas. Hanya berlaku pada mode Sertifikasi/OSCE. */
@@ -226,12 +230,8 @@ const SETELAN: Array<{ kunci: KunciSetelan; label: string; jelas: string; bentuk
   },
   {
     kunci: "requireLockdown",
-    label: "Wajib lewat Aplikasi Ujian Terkunci",
-    jelas:
-      "Satu-satunya setelan yang benar-benar dapat MENOLAK tangkapan layar — dan ia menolaknya " +
-      "bukan dengan kode, melainkan dengan memindahkan ujian ke aplikasi yang sistem operasinya " +
-      "sendiri menolak. Peserta yang membuka dari peramban ditolak di pintu masuk, jadi beri " +
-      "tahu kelasnya sehari sebelumnya beserta tautan unduhannya.",
+    label: "Wajib lewat aplikasi Exam Browser",
+    jelas: "Satu-satunya cara benar-benar menolak tangkapan layar. Beri tahu kelas sehari sebelumnya.",
     bentuk: false,
   },
 ];
@@ -291,7 +291,7 @@ function SkorIntegritas({
   // Ujian lama, dari sebelum pengawasan ada, tidak punya angka ini. Menampilkan
   // "100" untuk mereka adalah kebohongan kecil yang justru berbahaya: ia
   // menyatakan sudah diperiksa dan bersih, padahal tidak pernah diperiksa.
-  if (typeof skor !== "number") return <small className="psn-nama">—</small>;
+  if (typeof skor !== "number") return <small className="psn-nama">-</small>;
   const tingkat = tingkatIntegritas(skor);
   return (
     <span className="cbt-integritas">
@@ -332,7 +332,7 @@ function GarisWaktu({ jejak, mulai }: { jejak: Jejak[]; mulai: string }) {
             <span className="cbt-jejak-jam">menit ke-{menit}</span>
             <span className="cbt-jejak-apa">
               {INSIDEN_LABEL[j.jenis as JenisInsiden] ?? j.jenis}
-              {j.detail && <i> — {j.detail}</i>}
+              {j.detail && <i> · {j.detail}</i>}
             </span>
             {rapat && <span className="cbt-jejak-rapat">beruntun</span>}
             {j.bukti && (
@@ -387,7 +387,7 @@ function SaklarKamera({
           {!berlaku
             ? `Tidak berlaku pada mode ${MODE_LABEL[mode]}. Kamera hanya menyala pada mode ${MODE_LABEL.sertifikasi}.`
             : nyala
-              ? "Kamera peserta menyala selama ujian. Cuplikan diperiksa lalu dibuang; hanya yang bermasalah yang disimpan sebagai bukti."
+              ? "Kamera peserta menyala selama ujian. Hanya cuplikan bermasalah yang disimpan."
               : "Kamera dimatikan. Penjagaan lain pada mode ini tetap berjalan seperti biasa."}
         </small>
       </div>
@@ -408,9 +408,7 @@ function SaklarKamera({
       )}
       {!boleh && (
         <p className="cbt-kamera-catatan">
-          Saklar ini dipegang Admin dan Super Admin. Merekam wajah peserta adalah keputusan
-          lembaga, bukan keputusan satu mata uji — hubungi mereka bila ujian Anda perlu
-          disetel berbeda.
+          Saklar ini dipegang Admin dan Super Admin.
         </p>
       )}
     </div>
@@ -454,14 +452,6 @@ function PilihMode({
           </label>
         ))}
       </div>
-      <p className="cbt-mode-jujur">
-        <b>Yang perlu diketahui:</b> tidak ada peramban yang dapat melarang tangkapan layar —
-        Print Screen ditangani sistem operasi, dan tidak ada kode yang menghalangi ponsel kedua
-        yang diarahkan ke layar. Yang dikerjakan mode Ketat dan Sertifikasi adalah{" "}
-        <b>mematikan salin-tempel</b> (jalan tersering untuk membawa soal ke ChatGPT),{" "}
-        <b>mencatat tiap percobaan</b> beserta jamnya, dan <b>mencetak nama serta nomor peserta</b>{" "}
-        samar di seluruh layarnya, sehingga tiap lembar yang bocor menunjuk satu orang.
-      </p>
     </div>
   );
 }
@@ -496,6 +486,37 @@ function DaftarSetelan({
   );
 }
 
+/**
+ * Perangkat mana yang wajib memakai Exam Browser.
+ *
+ * Muncul HANYA ketika saklarnya menyala. Pilihan yang tampil tetapi tidak
+ * berarti apa-apa adalah pilihan yang membuat pengajar mengira ujiannya
+ * terkunci padahal tidak.
+ */
+function PilihPerangkat({
+  nilai, nyala, ubah,
+}: { nilai: PerangkatKunci; nyala: boolean; ubah: (p: PerangkatKunci) => void }) {
+  if (!nyala) return null;
+  return (
+    <div className="cbt-perangkat">
+      <span className="cbt-perangkat-kepala">Exam Browser untuk</span>
+      <div className="cbt-perangkat-pilih">
+        {SEMUA_PERANGKAT.map((p) => (
+          <label key={p} className={`cbt-perangkat-kartu${nilai === p ? " on" : ""}`}>
+            <input
+              type="radio"
+              name={`cbt-lockdown-device-${nyala}`}
+              checked={nilai === p}
+              onChange={() => ubah(p)}
+            />
+            {PERANGKAT_LABEL[p]}
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Salin setelan satu ujian ke bentuk yang dipakai formulir pengaturan. */
 function setelanUjian(u: Ujian) {
   return {
@@ -514,6 +535,7 @@ function setelanUjian(u: Ujian) {
     showScore: u.showScore,
     singleDevice: u.singleDevice,
     requireLockdown: u.requireLockdown === true,
+    lockdownDevice: rapikanPerangkatKunci(u.lockdownDevice),
     proctorMode: rapikanMode(u.proctorMode),
     cameraOn: u.cameraOn !== false,
   };
@@ -553,7 +575,9 @@ export default function CbtPanel({ role }: { role: string }) {
     questionCount: 20, durationMinutes: 60, passingGrade: 60, maxAttempts: 1,
     token: "", instruction: "",
     randomQuestions: true, randomOptions: true, allowBack: true, showScore: true,
-    singleDevice: true, requireLockdown: false, proctorMode: "biasa" as ModePengawasan,
+    singleDevice: true, requireLockdown: false,
+    lockdownDevice: "semua" as PerangkatKunci,
+    proctorMode: "biasa" as ModePengawasan,
   });
 
   const [soal, setSoal] = useState<Soal[]>([]);
@@ -593,6 +617,7 @@ export default function CbtPanel({ role }: { role: string }) {
     questionCount: 0, durationMinutes: 60, passingGrade: 60, maxAttempts: 1,
     randomQuestions: true, randomOptions: true, allowBack: true, showScore: true,
     singleDevice: true, requireLockdown: false,
+    lockdownDevice: "semua" as PerangkatKunci,
     proctorMode: "biasa" as ModePengawasan, cameraOn: true,
   });
   const [bukaSetel, setBukaSetel] = useState(false);
@@ -1151,7 +1176,7 @@ export default function CbtPanel({ role }: { role: string }) {
         hasil.pelaksanaanBaru
           ? "Jadwal diperbarui, dan ini dihitung sebagai pelaksanaan baru: " +
             "peserta yang sudah pernah mengerjakan boleh masuk lagi."
-          : "Jam ujian diperbarui. Ujian yang sedang berjalan diteruskan — " +
+          : "Jam ujian diperbarui. Ujian yang sedang berjalan diteruskan. " +
             "peserta yang sudah mengumpulkan tidak dapat mengerjakan ulang.",
       );
     }
@@ -1673,8 +1698,7 @@ export default function CbtPanel({ role }: { role: string }) {
           <div>
             <b>Peserta tidak perlu akun</b>
             <span>
-              Cukup kode ujian, nama, dan nomor peserta. Ujian terbuka sendiri pada jam yang disetel
-              pengajar pemiliknya.
+              Cukup kode ujian, nama, dan nomor peserta.
               {pemantau ? " Anda memantau dan boleh menghapus, tetapi aktivasi ada pada pemiliknya." : ""}
             </span>
           </div>
@@ -1719,6 +1743,11 @@ export default function CbtPanel({ role }: { role: string }) {
             </label>
 
             <DaftarSetelan nilai={draf} ubah={(kunci, nyala) => setDraf({ ...draf, [kunci]: nyala })} />
+            <PilihPerangkat
+              nilai={draf.lockdownDevice}
+              nyala={draf.requireLockdown}
+              ubah={(p) => setDraf({ ...draf, lockdownDevice: p })}
+            />
             <PilihMode nilai={draf.proctorMode} ubah={(m) => setDraf({ ...draf, proctorMode: m })} />
             <p className="cbt-catatan">
               Seluruh setelan ini masih dapat diubah sesudah ujiannya jadi, lewat
@@ -1796,8 +1825,8 @@ export default function CbtPanel({ role }: { role: string }) {
           <div className="cbt-bagi-kepala">
             <b>Bagikan ke peserta</b>
             <span>
-              Tempel salah satu ke grup kelas. Peserta tidak perlu membuat akun.
-              {!terbuka.activatedAt && " Ujian baru dapat dimasuki setelah diaktifkan dan jam mulainya tiba."}
+              Tempel ke grup kelas.
+              {!terbuka.activatedAt && " Aktifkan dulu sebelum peserta dapat masuk."}
             </span>
           </div>
 
@@ -1819,11 +1848,7 @@ export default function CbtPanel({ role }: { role: string }) {
               <img src={qrUjian} alt={`Kode QR ujian ${terbuka.code}`} width={148} height={148} />
               <div className="cbt-bagi-qr-teks">
                 <b>Pindai untuk masuk</b>
-                <span>
-                  Tempel di pintu ruang ujian atau tayangkan di papan. Peserta memindainya
-                  dengan kamera ponsel, dan kode ujiannya terisi sendiri — tidak ada lagi
-                  &ldquo;0&rdquo; yang tertukar dengan &ldquo;O&rdquo;.
-                </span>
+                <span>Tayangkan di papan. Kode ujiannya terisi sendiri.</span>
                 <div className="cbt-bagi-qr-tombol">
                   <Tbl kabar={aksi["qr-unduh"]} dasar="btn btn-light" diam="⬇ Unduh QR (PNG)" onClick={unduhQr} />
                   <Tbl kabar={aksi["qr-poster"]} dasar="btn btn-light" diam="🖨 Cetak poster QR" onClick={cetakPosterQr} />
@@ -1944,8 +1969,7 @@ export default function CbtPanel({ role }: { role: string }) {
           </div>
         ) : (
           <p className="cbt-catatan">
-            Jadwal dan aktivasi ujian ini dipegang pengajar pemiliknya. Anda dapat memantau peserta dan
-            nilainya di tab sebelah{terbuka.bolehHapus ? ", dan menghapus ujian ini bila memang perlu" : ""}.
+            Jadwal dan aktivasi dipegang pengajar pemiliknya. Anda memantau peserta dan nilainya di tab sebelah{terbuka.bolehHapus ? ", dan menghapus ujian ini bila memang perlu" : ""}.
             Untuk ujian seleksi, buatlah ujian sendiri: ujian yang Anda buat menjadi milik Anda,
             beserta tombol aktivasinya.
           </p>
@@ -1993,9 +2017,9 @@ export default function CbtPanel({ role }: { role: string }) {
           {bukaSetel && (
             <div className="cbt-lipat-isi">
               <p className="cbt-catatan">
-                Boleh diubah sewaktu-waktu, termasuk saat keadaan mendesak.
+                Boleh diubah sewaktu-waktu.
                 {sedangBerlangsung
-                  ? " Ujian ini SEDANG BERLANGSUNG, jadi jumlah soal, durasi, dan dua pengacakan dikunci dulu — mengubahnya di tengah jalan membuat sebagian peserta mengerjakan ujian yang berbeda dari sebagian yang lain. Selebihnya, termasuk “satu perangkat”, tetap dapat diubah sekarang juga."
+                  ? " Sedang berlangsung: jumlah soal, durasi, dan pengacakan dikunci. Sisanya tetap bisa diubah."
                   : " Perubahan berlaku untuk peserta yang masuk sesudah disimpan."}
               </p>
 
@@ -2054,6 +2078,11 @@ export default function CbtPanel({ role }: { role: string }) {
                 kunciBentuk={sedangBerlangsung}
                 ubah={(kunci, nyala) => setSetel({ ...setel, [kunci]: nyala })}
               />
+              <PilihPerangkat
+                nilai={setel.lockdownDevice}
+                nyala={setel.requireLockdown}
+                ubah={(p) => setSetel({ ...setel, lockdownDevice: p })}
+              />
               {/* Sengaja TIDAK ikut terkunci saat ujian berlangsung. Yang paling
                   sering terjadi bukan pengajar yang hendak melonggarkan, melainkan
                   pengajar yang baru sadar kelasnya menyontek dan ingin mengetatkan
@@ -2101,8 +2130,7 @@ export default function CbtPanel({ role }: { role: string }) {
         <>
           {sedangBerlangsung && (
             <div className="dsh-error">
-              Ujian sedang berlangsung. Soal dikunci sampai selesai, mengubahnya sekarang berarti
-              sebagian peserta mengerjakan ujian yang berbeda dari sebagian yang lain.
+              Ujian sedang berlangsung. Soal dikunci sampai selesai.
             </div>
           )}
           {!terbuka.bolehUbah && !sedangBerlangsung && (
@@ -2118,9 +2146,8 @@ export default function CbtPanel({ role }: { role: string }) {
             <div className="cbt-impor-kepala">
               <b>✨ Buat soal dengan AI</b>
               <span>
-                Unggah bahan ajar (Word, PowerPoint, atau PDF) lalu biarkan soalnya disusun dari
-                isi dokumen itu. Dokumennya dibaca di komputer Anda sendiri; yang dikirim ke server
-                hanya teksnya. Soal yang keluar TIDAK langsung masuk bank: Anda memeriksanya dulu.
+                Unggah bahan ajar (Word, PowerPoint, atau PDF). Soal yang keluar diperiksa dulu
+                sebelum masuk bank.
               </span>
             </div>
 
@@ -2228,7 +2255,7 @@ export default function CbtPanel({ role }: { role: string }) {
                       </button>
                     </div>
                     <p className="cbt-catatan">
-                      Periksa kunci jawabannya — itu yang paling sering keliru pada soal buatan mesin.
+                      Periksa kunci jawabannya. Itu yang paling sering keliru pada soal buatan mesin.
                     </p>
                   </>
                 )}
@@ -2847,7 +2874,7 @@ export default function CbtPanel({ role }: { role: string }) {
                   )}
                   <p className="cbt-catatan">
                     Skor ini <b>bukan nilai</b> dan tidak pernah mengubah nilai ujian. Ia hanya
-                    menandai lembar mana yang perlu dibaca lebih dulu — yang memutuskan tetap Anda,
+                    menandai lembar mana yang perlu dibaca lebih dulu. Yang memutuskan tetap Anda,
                     dengan garis waktu di bawah ini.
                   </p>
                   <GarisWaktu jejak={jejak} mulai={bukaPeserta.mulai} />
@@ -2942,8 +2969,7 @@ export default function CbtPanel({ role }: { role: string }) {
                 <div>
                   <b>Analisis soal</b>
                   <span>
-                    Soal yang dijawab benar di bawah 30% ditandai perlu ditinjau, bisa jadi memang
-                    sulit, bisa jadi kuncinya yang salah.
+                    Benar di bawah 30% ditandai perlu ditinjau.
                   </span>
                 </div>
               </div>

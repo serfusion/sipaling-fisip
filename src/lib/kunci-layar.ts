@@ -50,8 +50,8 @@ export const SEMUA_KLIEN: JenisKlien[] = ["peramban", "android", "windows"];
 
 export const KLIEN_LABEL: Record<JenisKlien, string> = {
   peramban: "Peramban biasa",
-  android: "Aplikasi Ujian Android",
-  windows: "Aplikasi Ujian Windows",
+  android: "Exam Browser Android",
+  windows: "Exam Browser Windows",
 };
 
 /**
@@ -184,26 +184,71 @@ export function periksaKunciKlien(kunciServer: string | undefined | null, kunciK
  */
 export type PutusanKlien = { ok: true } | { ok: false; pesan: string };
 
+/**
+ * Perangkat mana yang wajib memakai Exam Browser.
+ *
+ * Ada karena ruang ujian tidak seragam. Kelas yang seluruhnya memakai ponsel
+ * tidak perlu menerima aplikasi Windows, dan laboratorium komputer tidak perlu
+ * menyuruh pesertanya memasang aplikasi Android.
+ */
+export type PerangkatKunci = "semua" | "android" | "windows";
+
+export const SEMUA_PERANGKAT: PerangkatKunci[] = ["semua", "android", "windows"];
+
+export const PERANGKAT_LABEL: Record<PerangkatKunci, string> = {
+  semua: "HP dan PC",
+  android: "HP Android saja",
+  windows: "PC Windows saja",
+};
+
+/**
+ * Selalu jatuh ke "semua", yang paling longgar.
+ *
+ * Arah jatuhnya penting: masukan sembarang tidak boleh MEMPERSEMPIT perangkat
+ * yang diterima, karena yang tertolak di sana adalah peserta yang datang
+ * dengan aplikasi yang benar.
+ */
+export function rapikanPerangkatKunci(masukan: unknown): PerangkatKunci {
+  const teks = String(masukan ?? "").trim().toLowerCase();
+  return (SEMUA_PERANGKAT as string[]).includes(teks) ? (teks as PerangkatKunci) : "semua";
+}
+
 export function bolehMasukKlien(
   wajibAplikasi: boolean,
   klien: JenisKlien,
   kunciCocok: boolean,
+  perangkat: PerangkatKunci = "semua",
 ): PutusanKlien {
   if (!wajibAplikasi) return { ok: true };
+
+  const namaApl =
+    perangkat === "android" ? "Exam Browser untuk HP Android"
+      : perangkat === "windows" ? "Exam Browser untuk PC Windows"
+        : "aplikasi Exam Browser";
+
   if (klien === "peramban") {
     return {
       ok: false,
       pesan:
-        "Ujian ini harus dikerjakan lewat Aplikasi Ujian Terkunci, bukan peramban biasa. " +
-        "Unduh aplikasinya dari tautan yang diberikan pengajarmu, buka, lalu masukkan kode " +
-        "ujian yang sama.",
+        `Ujian ini hanya dapat dibuka lewat ${namaApl}. Unduh dari tautan yang diberikan ` +
+        "pengajarmu, lalu masukkan kode ujian yang sama.",
+    };
+  }
+  // Perangkat yang benar aplikasinya, tetapi bukan perangkat yang diminta.
+  // Kalimatnya menyebut yang harus dipakai, bukan yang salah: peserta yang
+  // membaca "aplikasi Windows ditolak" masih belum tahu ia harus mengambil
+  // ponselnya.
+  if (perangkat !== "semua" && klien !== perangkat) {
+    return {
+      ok: false,
+      pesan: `Ujian ini hanya dapat dikerjakan lewat ${namaApl}.`,
     };
   }
   if (!kunciCocok) {
     return {
       ok: false,
       pesan:
-        "Aplikasi Ujian yang kamu pakai tidak dikenali server. Pastikan aplikasinya diunduh " +
+        "Exam Browser yang kamu pakai tidak dikenali server. Pastikan aplikasinya diunduh " +
         "dari tautan resmi pengajarmu dan versinya yang terbaru.",
     };
   }
@@ -279,40 +324,16 @@ export const PESAN_TIRAI: Record<SebabTirai, { judul: string; isi: string }> = {
  */
 export const TIRAI_MS = 2200;
 
-/**
- * Kalimat yang ditulis di layar peserta tentang tangkapan layar.
- *
- * Berbeda menurut perangkatnya, dan itu bukan basa-basi. "Tangkapan layar
- * diblokir" pada peramban biasa akan diuji peserta pertama dalam lima detik,
- * dan begitu terbukti tidak benar, seluruh peringatan lain di layar itu ikut
- * kehilangan wibawanya — termasuk yang sungguh-sungguh ditegakkan.
- */
-export function pesanKunciLayar(klien: JenisKlien): string {
-  if (kunciSistem(klien)) {
-    return (
-      "Tangkapan layar dan perekaman layar diblokir sistem selama ujian berlangsung. " +
-      "Percobaannya ditolak perangkat ini sendiri."
-    );
-  }
-  return (
-    "Percobaan tangkapan layar dicatat pengawas beserta jamnya, dan soal ditutup sesaat " +
-    "setiap kali terdeteksi. Identitasmu tercetak samar di seluruh layar."
-  );
-}
-
-/**
- * Ajakan memakai aplikasi terkunci, untuk ujian yang belum mewajibkannya.
- *
- * Kosong bila peserta memang sudah memakainya — memuji orang karena melakukan
- * hal yang benar boleh, tetapi tidak di layar yang sudah penuh peringatan
- * beberapa detik sebelum ujian dimulai.
- */
-export function ajakanAplikasi(klien: JenisKlien, wajib: boolean): string {
-  if (kunciSistem(klien)) return "";
-  if (wajib) return "";
-  return (
-    "Kamu mengerjakan lewat peramban biasa. Peramban tidak dapat menolak tangkapan layar; " +
-    "yang dapat dilakukannya hanya mencatat. Untuk ujian yang menuntut penjagaan penuh, " +
-    "pengajarmu dapat mewajibkan Aplikasi Ujian Terkunci."
-  );
-}
+// ------------------------------------------------------------
+// APA YANG TIDAK LAGI ADA DI SINI
+//
+// `pesanKunciLayar` dan `ajakanAplikasi` dibuang. Keduanya menuliskan di layar
+// peserta apa saja yang sedang dijaga: "tangkapan layar diawasi", "peramban
+// tidak dapat menolak tangkapan layar", "identitasmu tercetak samar".
+//
+// Layar yang mengumumkan apa saja yang diawasi juga mengumumkan apa saja yang
+// TIDAK diawasi, dan itu peta bagi orang yang mencari celahnya. Yang
+// menggantikannya adalah kotak teguran yang baru muncul SESUDAH peserta
+// berbuat sesuatu (lihat pesanTeguran di src/lib/pengawasan.ts): pada saat itu
+// ia sudah tertangkap, jadi tidak ada lagi yang bocor dengan mengatakannya.
+// ------------------------------------------------------------
