@@ -97,7 +97,7 @@ harus sama dengan yang dikeluarkan KUI untuk konsentrasi itu — termasuk bunyi
 yang tampak janggal seperti `Sociology and System Social Indonesia`. Selisih
 antar konsentrasi adalah keputusan KUI, bukan galat yang perlu diperbaiki di
 sini. Kalau KUI kelak merapikannya, barisnya dibetulkan di layar lalu disimpan
-(lihat nomor 6).
+(lihat nomor 7).
 
 ### 4. Header dan footer dibetulkan mengikuti transkrip KUI
 
@@ -143,12 +143,61 @@ labelnya diseragamkan huruf besar.
 Akreditasi bawaan mengikuti yang sekarang berlaku: `UNGGUL LAMSPAK Nomor
 156/AK.03.05/2026`.
 
+**Setiap garis miring diapit spasi:** `NAMA MAHASISWA / STUDENT NAME`, bukan
+`NAMA MAHASISWA/STUDENT NAME`. Termasuk yang jatuh di ujung baris karena
+bagian Inggrisnya turun ke bawah — yang tercetak berbunyi `NAMA MAHASISWA /`.
+Aturannya dikunci uji, bukan kesepakatan lisan. Nomor SK **tidak** ikut
+dirapikan: `156/AK.03.05/2026` adalah nomor, bukan pasangan dwibahasa.
+
+**Akreditasi dicetak bertingkat**, seperti transkrip KUI:
+
+```
+TERAKREDITASI / ACCREDITATION  :  UNGGUL
+                                  LAMSPAK Nomor 156/AK.03.05/2026
+```
+
+Tetap **satu isian**, bukan dua kolom: berkas dari SIMAK maupun dari KUI
+menuliskan keduanya pada satu sel, dan memecahnya jadi dua kolom akan membuat
+impor Excel kehilangan salah satunya. Pemenggalannya jatuh sebelum kata yang
+memulai rujukan SK — `LAMSPAK`, `BAN-PT`, `Nomor`, `No.`, `SK` — dan admin
+dapat memaksanya dengan menulis `|`. Isian yang **hanya** memuat nomor SK
+tetap satu baris, supaya tidak tercetak dengan baris atas yang kosong.
+
+Nilai **Jenjang** dicetak satu baris (`SARJANA / BACHELOR DEGREE (S-1)`),
+sedangkan Fakultas dan Program Studi tetap bertingkat — mengikuti transkrip
+KUI.
+
 **Satu lembar untuk kedua prodi.** Ilmu Pemerintahan memakai label yang sama
 persis — perbaikan di atas berlaku untuk transkrip Ilmu Pemerintahan juga,
 bukan hanya Ilmu Komunikasi. Labelnya dipisah ke
 `src/app/dashboard/template/transkrip-label.ts` supaya dapat diuji sendirian.
 
-### 5. Tombol "Isi ulang kolom Inggris"
+### 5. Saklar "Dekan & Rektor" / "Tanpa rektor"
+
+Di Biodata, sebelah kolom Dekan:
+
+> **Tanda tangan:** `Dekan & Rektor` · `Tanpa rektor (Dekan di kanan)`
+
+| Pilihan | Yang tercetak |
+| --- | --- |
+| Dekan & Rektor | Dekan di kiri, Rektor di kanan bersama tanggalnya — seperti sedia kala |
+| Tanpa rektor | **Dekan pindah ke kanan** bersama tanggalnya; kolom kiri hilang |
+
+Kolom kiri tidak disisakan kosong. Kotak kosong di transkrip resmi terbaca
+sebagai tanda tangan yang **belum dibubuhkan**, bukan sebagai tanda tangan
+yang memang tidak diperlukan. Kolom Rektor dan NBM Rektor ikut disembunyikan
+selama saklarnya "tanpa rektor", supaya tidak ada isian yang diisi sia-sia.
+
+Tanggal **selalu** di kolom paling kanan, di atas nama yang menandatangani
+di situ.
+
+Saklarnya disimpan sebagai teks (`ttd`), bukan boolean: penyaring meta di
+server hanya meloloskan nilai teks, dan boolean akan hilang diam-diam saat
+transkripnya diarsipkan. Draf dan arsip yang dibuat **sebelum** saklarnya ada
+tidak menyebut `ttd` sama sekali — yang seperti itu tetap tercetak dengan dua
+tanda tangan, tidak tiba-tiba kehilangan Rektor.
+
+### 6. Tombol "Isi ulang kolom Inggris"
 
 Di bawah tabel nilai, di samping "+ Tambah baris":
 
@@ -163,10 +212,14 @@ koreksi tangan yang baru saja diketik admin, dan terjemahan resmi KUI yang
 ikut terbaca dari berkas dwibahasa. Tombolnya menimpa **seluruh** kolom
 Inggris, dan keterangannya mengatakan begitu sebelum ditekan.
 
-Kolom Konsentrasi sekarang menawarkan ketiga ejaan resmi lewat daftar pilihan,
-tetapi tetap bebas diketik.
+Kolom Konsentrasi menawarkan ketiga ejaan resmi lewat daftar pilihan, tetapi
+daftarnya **baru muncul sesudah admin mengetik sendiri** — dan hanya untuk
+prodi yang memang berkonsentrasi. Daftar yang menyembul begitu kolomnya
+disentuh memancing salah klik, dan konsentrasi yang salah mengganti **seluruh**
+kolom Inggris, bukan hanya satu baris biodata. Yang sudah diketik lengkap dan
+benar tidak diusulkan lagi.
 
-### 6. Koreksi admin ikut berlingkup
+### 7. Koreksi admin ikut berlingkup
 
 Kamus yang tumbuh dari koreksi admin (`app_settings['kamus_matkul']`) dulu
 juga datar. Artinya koreksi yang benar untuk Ilmu Komunikasi akan **mengubah
@@ -186,7 +239,7 @@ sekali: laci "entah prodi mana" persis melahirkan kembali kamus datar ini.
 
 ## Yang diperiksa
 
-`npx tsx uji-transkrip.ts` — **148 pemeriksaan** (sebelumnya 52).
+`npx tsx uji-transkrip.ts` — **167 pemeriksaan** (sebelumnya 52).
 
 Yang baru, dan yang paling menentukan: ketiga transkrip dwibahasa resmi
 fakultas dipakai sebagai bahan uji, tanpa nama dan NIM mahasiswanya
@@ -210,7 +263,12 @@ Selain itu:
 - label `KONSETRASI` yang salah ketik pada berkas fakultas tetap terbaca;
 - seluruh label header & footer dikunci bunyinya, dan sepuluh bunyi lama yang
   terbukti keliru diperiksa **tidak boleh kembali**;
-- singkatan kolom lurus dengan arti kolomnya, dan `WM` tidak dipakai lagi.
+- singkatan kolom lurus dengan arti kolomnya, dan `WM` tidak dipakai lagi;
+- setiap garis miring pada label diapit spasi — diperiksa karakter demi
+  karakter, bukan dengan daftar contoh;
+- pemenggalan akreditasi: bentuk LAMSPAK, bentuk BAN-PT dari base SIMAK,
+  penggalan paksa dengan `|`, dan isian yang hanya memuat nomor SK;
+- saklar rektor, termasuk isian lama yang belum menyebutnya.
 
 `npx tsx uji-arsip-transkrip.ts` — 61 pemeriksaan, tetap lulus.
 `npm run lint`, `npm run typecheck`, `npx next build` — bersih.
@@ -224,6 +282,7 @@ Selain itu:
 | `src/lib/kamus-matkul.ts` | kamus dipecah per lingkup; `terjemahkanMatkul`/`isiInggris`/`panenKamus` menerima lingkup; tambahan `isiUlangInggris`, `rantaiLingkup`, `lingkupUtama`, `kunciKamus`, `kodeBentrok` |
 | `src/app/api/kamus-matkul/route.ts` | kunci koreksi admin berlingkup; lingkup tak dikenal ditolak |
 | `src/app/dashboard/template/template-app.tsx` | lingkup diambil dari biodata berkas; tombol isi ulang; daftar pilihan konsentrasi; singkatan kolom dibetulkan; predikat satu istilah |
-| `src/app/dashboard/template/transkrip-label.ts` | **baru** — label header & footer, dipisah agar dapat diuji |
-| `uji-transkrip.ts` | 52 → 148 pemeriksaan |
+| `src/app/dashboard/template/transkrip-label.ts` | **baru** — label header & footer, pemecah akreditasi, saklar rektor |
+| `src/app/globals.css` | baris nomor SK akreditasi; tanda tangan satu kolom |
+| `uji-transkrip.ts` | 52 → 167 pemeriksaan |
 | `uji-berkas-contoh/transkrip-ilkom-*.json` | tiga bahan uji baru dari transkrip resmi fakultas |

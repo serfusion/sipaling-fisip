@@ -9,7 +9,7 @@ import { AM, HMS, computeTotals, extractBio, parseSheetRows, type Aoa, type Cour
 import { isiInggris, isiUlangInggris, kunciKamus, panenKamus, type Lingkup } from "@/lib/kamus-matkul";
 import { periksaSiapArsip, predikatKelulusan, sidikTranskrip } from "@/lib/arsip-transkrip";
 import { concentrationsFor } from "@/lib/academic";
-import { labelTranskrip } from "./transkrip-label";
+import { labelTranskrip, pakaiRektorDari, pecahAkreditasi } from "./transkrip-label";
 import {
   TEMPLATE_BIO_ROWS, TEMPLATE_NILAI_CONTOH, TEMPLATE_NILAI_HEADER,
   TEMPLATE_SHEET_BIO, TEMPLATE_SHEET_NILAI,
@@ -200,6 +200,15 @@ function BiIn({ text }: { text: string }) {
   return en ? <>{id} <i>{en}</i></> : <>{id}</>;
 }
 
+/**
+ * Nilai akreditasi: peringkat di baris atas, nomor SK di baris bawah —
+ * sejajar kiri dengannya, seperti pada transkrip KUI.
+ */
+function AkredVal({ text }: { text: string }) {
+  const [peringkat, sk] = pecahAkreditasi(text);
+  return sk ? <>{peringkat}<span className="dt-akred-sk">{sk}</span></> : <>{peringkat}</>;
+}
+
 function BiVal({ text }: { text: string }) {
   const [id, en] = splitBi(text);
   return en ? <>{id}<i className="bi-en">{en}</i></> : <>{id}</>;
@@ -246,6 +255,11 @@ function metaAwal() {
     nbmdekan: "739.574",
     rektor: "Dr. H. Desri Arwen, M.Pd.",
     nbmrektor: "837.138",
+    // "dekan-rektor" = dua tanda tangan seperti transkrip lama;
+    // "dekan" = Dekan sendirian DI KANAN, kolom kiri tidak disisakan kosong.
+    // Disimpan sebagai teks, bukan boolean: `bersihkanMeta` di server hanya
+    // meloloskan nilai teks, dan boolean akan hilang diam-diam saat diarsip.
+    ttd: "dekan-rektor",
   };
 }
 
@@ -388,6 +402,21 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
       konsentrasi: bio.konsentrasi?.trim() || meta.konsentrasi,
     };
   }
+
+  // Bawaan transkrip lama adalah dua tanda tangan, jadi isian yang belum
+  // pernah menyebut saklarnya (draf & arsip sebelum v32) tetap tercetak
+  // seperti sedia kala.
+  const pakaiRektor = pakaiRektorDari(meta.ttd);
+
+  // Usul ejaan konsentrasi. Kosong selama kolomnya belum diketik, supaya
+  // daftarnya tidak menyembul sendiri begitu kolomnya disentuh.
+  const usulKonsentrasi = (() => {
+    const diketik = meta.konsentrasi.trim().toLowerCase();
+    if (!diketik || !concentrationsFor(meta.prodi).length) return [];
+    const cocok = KONSENTRASI_ILKOM.filter((nama) => nama.toLowerCase().includes(diketik));
+    // Yang sudah diketik lengkap dan benar tidak perlu diusulkan lagi.
+    return cocok.length === 1 && cocok[0].toLowerCase() === diketik ? [] : cocok;
+  })();
 
   /** Lingkup yang sedang tampil di layar — dipakai tombol & penyimpan kamus. */
   const lingkupLayar: Lingkup = { prodi: meta.prodi, konsentrasi: meta.konsentrasi };
@@ -932,8 +961,13 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
               placeholder="mis. Broadcasting"
               title="Menentukan kamus nama Inggris yang dipakai. Ubah lalu tekan “Isi ulang kolom Inggris”."
             />
+            {/* Daftar pilihannya BARU muncul sesudah admin mengetik sendiri,
+                dan hanya untuk prodi yang memang berkonsentrasi. Daftar yang
+                menyembul begitu kolomnya disentuh memancing salah klik —
+                dan konsentrasi yang salah mengganti seluruh kolom Inggris,
+                bukan hanya satu baris biodata. */}
             <datalist id="tk-konsentrasi">
-              {KONSENTRASI_ILKOM.map((nama) => <option key={nama} value={nama} />)}
+              {usulKonsentrasi.map((nama) => <option key={nama} value={nama} />)}
             </datalist>
           </label>
           <label>Nomor Ijazah Nasional<input value={meta.noijazah} onChange={(e) => setMeta({ ...meta, noijazah: e.target.value })} /></label>
@@ -943,8 +977,18 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
           <label>Tanggal cetak<input value={meta.tanggal} onChange={(e) => setMeta({ ...meta, tanggal: e.target.value })} /></label>
           <label>Dekan<input value={meta.dekan} onChange={(e) => setMeta({ ...meta, dekan: e.target.value })} /></label>
           <label>NBM Dekan<input value={meta.nbmdekan} onChange={(e) => setMeta({ ...meta, nbmdekan: e.target.value })} /></label>
-          <label>Rektor<input value={meta.rektor} onChange={(e) => setMeta({ ...meta, rektor: e.target.value })} /></label>
-          <label>NBM Rektor<input value={meta.nbmrektor} onChange={(e) => setMeta({ ...meta, nbmrektor: e.target.value })} /></label>
+          <label>Tanda tangan
+            <select
+              value={pakaiRektor ? "dekan-rektor" : "dekan"}
+              onChange={(e) => setMeta({ ...meta, ttd: e.target.value })}
+              title="Tanpa rektor: Dekan pindah ke kolom kanan bersama tanggalnya, kolom kiri tidak disisakan kosong."
+            >
+              <option value="dekan-rektor">Dekan &amp; Rektor</option>
+              <option value="dekan">Tanpa rektor (Dekan di kanan)</option>
+            </select>
+          </label>
+          <label hidden={!pakaiRektor}>Rektor<input value={meta.rektor} onChange={(e) => setMeta({ ...meta, rektor: e.target.value })} /></label>
+          <label hidden={!pakaiRektor}>NBM Rektor<input value={meta.nbmrektor} onChange={(e) => setMeta({ ...meta, nbmrektor: e.target.value })} /></label>
         </div>
 
         <h3 className="tpl-h3">
@@ -1190,7 +1234,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
               <div className="dt-cell"><span className="dt-lbl"><Lbl text={L.noij} /></span><span className="dt-sep">:</span><span className="dt-val">{meta.noijazah || "................................"}</span></div>
               <div className="dt-cell"><span className="dt-lbl"><Lbl text={L.nppt} /></span><span className="dt-sep">:</span><span className="dt-val">{meta.nppt}</span></div>
               <div className="dt-cell"><span className="dt-lbl"><Lbl text={L.yud} /></span><span className="dt-sep">:</span><span className="dt-val">{meta.yudisium || "-"}</span></div>
-              <div className="dt-cell"><span className="dt-lbl"><Lbl text={L.akred} /></span><span className="dt-sep">:</span><span className="dt-val">{meta.akred}</span></div>
+              <div className="dt-cell"><span className="dt-lbl"><Lbl text={L.akred} /></span><span className="dt-sep">:</span><span className="dt-val"><AkredVal text={meta.akred} /></span></div>
             </div>
 
             {/* --- judul --- */}
@@ -1204,7 +1248,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
               <div className="bio-cell"><span className="bio-lbl"><Lbl text={L.nama} /></span><span className="bio-sep">:</span><span className="bio-val">{meta.nama || ""}</span></div>
               <div className="bio-cell"><span className="bio-lbl"><BiIn text={L.fak} /></span><span className="bio-sep">:</span><span className="bio-val"><Lbl text={L.fakval} /></span></div>
               <div className="bio-cell"><span className="bio-lbl"><Lbl text={L.nim} /></span><span className="bio-sep">:</span><span className="bio-val">{meta.nim || ""}</span></div>
-              <div className="bio-cell"><span className="bio-lbl"><BiIn text={L.jenjangLbl} /></span><span className="bio-sep">:</span><span className="bio-val"><BiVal text={meta.jenjang} /></span></div>
+              <div className="bio-cell"><span className="bio-lbl"><BiIn text={L.jenjangLbl} /></span><span className="bio-sep">:</span><span className="bio-val"><BiIn text={meta.jenjang} /></span></div>
               <div className="bio-cell"><span className="bio-lbl"><Lbl text={L.ttl} /></span><span className="bio-sep">:</span><span className="bio-val">{meta.ttl || ""}</span></div>
               <div className="bio-cell"><span className="bio-lbl"><BiIn text={L.kons} /></span><span className="bio-sep">:</span><span className="bio-val"><BiVal text={konsentrasiText} /></span></div>
               <div className="bio-cell"><span className="bio-lbl"><Lbl text={L.prodi} /></span><span className="bio-sep">:</span><span className="bio-val"><BiVal text={showProdi(meta.prodi)} /></span></div>
@@ -1269,21 +1313,28 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
             </div>
 
             {/* --- tanda tangan dua kolom (acuan gambar) --- */}
-            <div className="doc-sign2">
-              <div className="ds-col">
-                <p className="ds-date">&nbsp;</p>
-                <p><BiIn text={L.dekan} /></p>
-                <div className="doc-sign-space" />
-                <b className="doc-sign-name">{meta.dekan}</b>
-                <p>NBM : {meta.nbmdekan}</p>
-              </div>
-              <div className="ds-photo no-print" aria-hidden="true">3x4</div>
+            {/* Tanggal SELALU di kolom paling kanan, di atas nama yang
+                menandatangani di situ. Tanpa rektor, Dekan yang pindah ke
+                kanan — kolom kiri tidak ditinggalkan kosong, karena kotak
+                kosong di transkrip resmi terbaca sebagai tanda tangan yang
+                belum dibubuhkan. */}
+            <div className={"doc-sign2" + (pakaiRektor ? "" : " doc-sign1")}>
+              {pakaiRektor && (
+                <div className="ds-col">
+                  <p className="ds-date">&nbsp;</p>
+                  <p><BiIn text={L.dekan} /></p>
+                  <div className="doc-sign-space" />
+                  <b className="doc-sign-name">{meta.dekan}</b>
+                  <p>NBM : {meta.nbmdekan}</p>
+                </div>
+              )}
+              {pakaiRektor && <div className="ds-photo no-print" aria-hidden="true">3x4</div>}
               <div className="ds-col ds-right">
                 <p className="ds-date">Tangerang, {meta.tanggal}</p>
-                <p><BiIn text={L.rektor} /></p>
+                <p><BiIn text={pakaiRektor ? L.rektor : L.dekan} /></p>
                 <div className="doc-sign-space" />
-                <b className="doc-sign-name">{meta.rektor}</b>
-                <p>NBM : {meta.nbmrektor}</p>
+                <b className="doc-sign-name">{pakaiRektor ? meta.rektor : meta.dekan}</b>
+                <p>NBM : {pakaiRektor ? meta.nbmrektor : meta.nbmdekan}</p>
               </div>
             </div>
           </div>

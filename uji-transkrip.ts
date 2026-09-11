@@ -11,7 +11,7 @@
 
 import { readFileSync } from "node:fs";
 import { extractBio, parseSheetRows, computeTotals, type Aoa } from "./src/app/dashboard/template/transkrip-parse";
-import { labelTranskrip } from "./src/app/dashboard/template/transkrip-label";
+import { labelTranskrip, pakaiRektorDari, pecahAkreditasi } from "./src/app/dashboard/template/transkrip-label";
 import {
   isiInggris, isiUlangInggris, terjemahkanMatkul, rapikanNama, rapikanKode, panenKamus,
   rantaiLingkup, lingkupUtama, kunciKamus, kodeBentrok, KAMUS_KODE,
@@ -382,6 +382,72 @@ benar("lembar Indonesia memakai label yang seragam huruf besar",
 sama("ejaan Ijazah, bukan Ijasah", ID_LBL.noij, "NOMOR IJAZAH NASIONAL");
 benar("tidak ada lagi ejaan 'Ijasah' di label mana pun",
   !`${semuaLabel} ${Object.values(ID_LBL).flat().join(" ")}`.toLowerCase().includes("ijasah"));
+
+console.log("\n=== SETIAP GARIS MIRING DIAPIT SPASI ===\n");
+
+// "NAMA MAHASISWA / STUDENT NAME", bukan "NAMA MAHASISWA/STUDENT NAME".
+// Berlaku juga untuk garis miring yang jatuh di ujung baris karena bagian
+// Inggrisnya turun ke bawah — yang tercetak berbunyi "NAMA MAHASISWA /".
+function miringRapat(teks: string): string[] {
+  const salah: string[] = [];
+  for (let i = 0; i < teks.length; i++) {
+    if (teks[i] !== "/") continue;
+    const sebelum = teks[i - 1];
+    const sesudah = teks[i + 1];
+    if (sebelum !== " ") salah.push(`"${teks}" (tidak ada spasi sebelum /)`);
+    else if (sesudah !== undefined && sesudah !== " " && sesudah !== "|") {
+      salah.push(`"${teks}" (tidak ada spasi sesudah /)`);
+    }
+  }
+  return salah;
+}
+
+for (const [nama, kamus] of [["Inggris", EN_LBL], ["Indonesia", ID_LBL]] as const) {
+  const rapat = Object.values(kamus).flat().flatMap((teks) => miringRapat(String(teks)));
+  benar(`label ${nama}: setiap garis miring diapit spasi`, rapat.length === 0, rapat.join(" | "));
+}
+sama("contoh yang diminta", sisiEn(EN_LBL.nama), "STUDENT NAME");
+sama("dan sisi Indonesianya berakhir dengan spasi-garis miring",
+  EN_LBL.nama.split("|")[0], "NAMA MAHASISWA /");
+// Nilai yang ikut tercetak, bukan label, harus ikut aturan yang sama.
+benar("jenjang bawaan diapit spasi", miringRapat("SARJANA / BACHELOR DEGREE (S-1)").length === 0);
+
+console.log("\n=== AKREDITASI: PERINGKAT DI BARIS ATAS ===\n");
+
+// Transkrip KUI mencetak peringkatnya sendirian, nomor SK-nya di bawah.
+sama("UNGGUL dipenggal dari nomor SK",
+  pecahAkreditasi("UNGGUL LAMSPAK Nomor 156/AK.03.05/2026").join(" ¶ "),
+  "UNGGUL ¶ LAMSPAK Nomor 156/AK.03.05/2026");
+sama("tanda kutip dari berkas KUI ikut dibuang",
+  pecahAkreditasi('"UNGGUL" LAMSPAK Nomor 156/AK.03.05/2026')[0], "UNGGUL");
+sama("nomor SK tidak ikut dirapikan spasinya",
+  pecahAkreditasi("UNGGUL LAMSPAK Nomor 156/AK.03.05/2026")[1],
+  "LAMSPAK Nomor 156/AK.03.05/2026");
+sama("bentuk BAN-PT dari base SIMAK",
+  pecahAkreditasi("TERAKREDITASI SK BAN-PT Nomor : 5435/SK/BAN-PT/Ak.KP/S/VIII/2024").join(" ¶ "),
+  "TERAKREDITASI ¶ SK BAN-PT Nomor : 5435/SK/BAN-PT/Ak.KP/S/VIII/2024");
+sama("admin dapat memaksa penggalannya dengan |",
+  pecahAkreditasi("BAIK SEKALI|Nomor 123/ABC").join(" ¶ "), "BAIK SEKALI ¶ Nomor 123/ABC");
+// Isian lama yang HANYA memuat nomor SK tetap satu baris: baris atas yang
+// kosong akan tercetak sebagai celah di transkrip resmi.
+sama("tanpa peringkat tetap satu baris",
+  pecahAkreditasi("LAMSPAK Nomor 099/AK.03.05/2026").join(" ¶ "),
+  "LAMSPAK Nomor 099/AK.03.05/2026 ¶ ");
+sama("isian kosong tidak menghasilkan apa-apa", pecahAkreditasi("").join(" ¶ "), " ¶ ");
+sama("spasi berlebih dirapikan", pecahAkreditasi("  UNGGUL   LAMSPAK  Nomor 1 ").join(" ¶ "),
+  "UNGGUL ¶ LAMSPAK Nomor 1");
+
+console.log("\n=== SAKLAR REKTOR ===\n");
+
+benar("bawaan: dua tanda tangan", pakaiRektorDari("dekan-rektor"));
+benar("\"dekan\" mematikan kolom rektor", !pakaiRektorDari("dekan"));
+benar("huruf besar tetap dikenali", !pakaiRektorDari("DEKAN"));
+benar("spasi berlebih tetap dikenali", !pakaiRektorDari("  dekan  "));
+// Draf dan arsip yang dibuat sebelum saklarnya ada tidak menyebut `ttd`
+// sama sekali. Yang seperti itu harus tetap tercetak seperti sedia kala,
+// bukan tiba-tiba kehilangan tanda tangan Rektor.
+benar("isian lama tanpa saklar tetap dua tanda tangan", pakaiRektorDari(undefined));
+benar("isian kosong pun tetap dua tanda tangan", pakaiRektorDari(""));
 
 console.log(`\n${lulus} periksa lulus`);
 if (gagal.length > 0) {

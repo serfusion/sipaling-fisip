@@ -1051,6 +1051,15 @@ table.tk-table th .tk-lbl-en { font-style: italic; font-weight: 400; font-size: 
 .tk-doc i, .tk-doc .tk-lbl-en, .tk-doc .bi-en { font-style: italic !important; }
 .tk-doc .bio-val i, .tk-doc .dt-val i { text-transform: uppercase; }
 
+/* Nomor SK akreditasi turun ke baris bawah, sejajar kiri dengan peringkatnya
+   ("UNGGUL" di atas, "LAMSPAK Nomor ..." tepat di bawahnya). */
+.tk-doc .dt-akred-sk { display: block; }
+
+/* Tanpa rektor: satu kolom tanda tangan, didorong ke kanan. Kolom kiri tidak
+   disisakan kosong — kotak kosong di transkrip resmi terbaca sebagai tanda
+   tangan yang belum dibubuhkan. */
+.tk-doc .doc-sign2.doc-sign1 { justify-content: flex-end; }
+
 .tk-doc .doc-sign2 .ds-col { width: 6.6cm; }
 .tk-doc .doc-sign2 .ds-right { width: auto; min-width: 5.4cm; }
 .tk-doc .doc-sign2 .ds-right { text-align: left; width: auto; }
