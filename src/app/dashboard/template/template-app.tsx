@@ -6,8 +6,10 @@ import { useAutoLogout } from "@/lib/use-auto-logout";
 import { sanitizeLetterHtml } from "@/lib/sanitize-html";
 import { DEFAULT_LETTER_HTML, LETTER_TITLES, type LetterSlug } from "./letter-defaults";
 import { AM, HMS, computeTotals, extractBio, parseSheetRows, type Aoa, type CourseRow } from "./transkrip-parse";
-import { isiInggris, panenKamus } from "@/lib/kamus-matkul";
+import { isiInggris, isiUlangInggris, kunciKamus, panenKamus, type Lingkup } from "@/lib/kamus-matkul";
 import { periksaSiapArsip, predikatKelulusan, sidikTranskrip } from "@/lib/arsip-transkrip";
+import { concentrationsFor } from "@/lib/academic";
+import { labelTranskrip } from "./transkrip-label";
 import {
   TEMPLATE_BIO_ROWS, TEMPLATE_NILAI_CONTOH, TEMPLATE_NILAI_HEADER,
   TEMPLATE_SHEET_BIO, TEMPLATE_SHEET_NILAI,
@@ -44,6 +46,13 @@ const PRODI = [
   { nama: "Ilmu Pemerintahan", kode: "65201" },
   { nama: "Ilmu Komunikasi", kode: "70201" },
 ];
+
+// Konsentrasi Ilmu Komunikasi. Bukan sekadar isian biodata: konsentrasi
+// menentukan kamus mana yang dipakai untuk mengisi kolom Inggris, karena
+// MKPB-051 berarti "Produksi Feature TV" di Broadcasting dan "PKL" di Ilmu
+// Pemerintahan. Isiannya tetap bebas diketik — daftar ini hanya
+// menawarkan ejaan yang sudah dikenali kamus.
+const KONSENTRASI_ILKOM = concentrationsFor("Ilmu Komunikasi");
 
 function todayID() {
   return new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
@@ -143,8 +152,17 @@ export default function TemplateApp({ profile, initialJenis, initialArsip }: { p
  * ikut dilegalisir; admin harus tahu baris mana yang perlu ia lihat sendiri
  * sebelum mencetaknya.
  */
-function ringkasBahasa(hasil: { dariKamus: number; dariKasar: number; sudahAda: number; perluDicek: string[] }) {
+function ringkasBahasa(
+  hasil: { dariKamus: number; dariKasar: number; sudahAda: number; perluDicek: string[] },
+  lingkup?: Lingkup,
+) {
   const bagian: string[] = [];
+  // Kamus MANA yang dipakai ikut disebut. Kode mata kuliah tidak unik antar
+  // prodi, jadi kalau prodi atau konsentrasinya salah terbaca, seluruh kolom
+  // Inggris ikut salah — dan satu-satunya cara admin menangkapnya sebelum
+  // mencetak adalah melihat kamus mana yang dipilih.
+  const kamus = [lingkup?.prodi, lingkup?.konsentrasi].filter(Boolean).join(" — ");
+  if (kamus) bagian.push(`kamus ${kamus}`);
   if (hasil.dariKamus > 0) bagian.push(`${hasil.dariKamus} nama Inggris terisi dari kamus`);
   if (hasil.sudahAda > 0) bagian.push(`${hasil.sudahAda} sudah berbahasa Inggris di filenya`);
   if (hasil.dariKasar > 0) {
@@ -192,8 +210,11 @@ const PRODI_EN: Record<string, string> = {
   "Ilmu Pemerintahan": "GOVERNMENT SCIENCE",
 };
 
+// Predikat pada transkrip KUI dicetak SATU istilah, bukan pasangan
+// "Indonesia / Inggris" seperti jenjang dan prodi: transkrip contoh dari KUI
+// berbunyi "Cum Laude" saja, bukan "Dengan Pujian / Cum Laude (With Honors)".
 const PREDIKAT_EN: Record<string, string> = {
-  "Dengan Pujian": "Cum Laude (With Honors)",
+  "Dengan Pujian": "Cum Laude",
   "Sangat Memuaskan": "Very Satisfactory",
   "Memuaskan": "Satisfactory",
   "Lulus": "Pass",
@@ -212,7 +233,7 @@ function metaAwal() {
     noijazah: "",
     nppt: "041051",
     yudisium: "",
-    akred: "LAMSPAK Nomor 099/AK.03.05/2026",
+    akred: "UNGGUL LAMSPAK Nomor 156/AK.03.05/2026",
     nama: "",
     nim: "",
     prodi: PRODI[0].nama,
@@ -259,38 +280,9 @@ function tanggalSingkat(waktu: string | null) {
 function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: string }) {
   const EN = lang === "en";
   const customSlug: LetterSlug = EN ? "transkrip-en" : "transkrip-custom";
-  const L = EN
-    ? {
-        title: "TRANSKRIP NILAI", subtitle: "OFFICIAL ACADEMIC TRANSCRIPT",
-        noij: "NOMOR IJAZAH NASIONAL/|DEGREE CERTIFICATE NUMBER", nppt: "NOMOR POKOK PERGURUAN TINGGI/|INSTITUTIONAL REGISTRATION NUMBER",
-        yud: "TANGGAL YUDISIUM/|DEGREE CONFERRAL DATE", akred: "TERAKREDITASI/|ACCREDITED",
-        nama: "NAMA MAHASISWA/|COMPLETE NAME", fak: "FAKULTAS/FACULTY",
-        fakval: "ILMU SOSIAL DAN ILMU POLITIK/|SOCIAL AND POLITICAL SCIENCES",
-        nim: "NOMOR INDUK MAHASISWA/|STUDENT REGISTRATION NUMBER", npps: "NOMOR POKOK PROGRAM STUDI/|STUDY PROGRAM IDENTIFICATION NUMBER",
-        prodi: "PROGRAM STUDI/|STUDY PROGRAM",
-        ttl: "TEMPAT, TGL LAHIR|PLACE AND DATE OF BIRTH", jenjangLbl: "JENJANG/COURSE", kons: "KONSENTRASI/CONCENTRATION",
-        th: ["NO", "KODE MK|Course", "NAMA MATA KULIAH|Descriptions", "K|CR", "HM|LG", "AM|GP", "MK|WM"],
-        totKredit: "Total Kredit / Total Credits Accomplished", totNilai: "Total Nilai / Total Grade Points", ipkLbl: "Indeks Prestasi Kumulatif / Grade Point Average (GPA)", predLbl: "Predikat Kelulusan / Graduation Honors",
-        judul: "JUDUL SKRIPSI/ THESIS TITLE:", ket: "",
-        ketval: "K = Kredit/Credits · HM = Huruf Mutu/Grade · AM = Angka Mutu/Grade Point · MK = Mutu Kredit/Quality Points (K × AM)",
-        meng: "Mengetahui / Acknowledged by,", rektor: "Rektor / Rector,", dekan: "Dekan / Dean,",
-      }
-    : {
-        title: "TRANSKRIP NILAI", subtitle: "",
-        noij: "Nomor Ijasah Nasional", nppt: "Nomor Pokok Perguruan Tinggi",
-        yud: "Tanggal Yudisium", akred: "Terakreditasi",
-        nama: "NAMA MAHASISWA",
-        jenjangLbl: "JENJANG", fak: "Fakultas", fakval: "Ilmu Sosial Dan Ilmu Politik",
-        nim: "NOMOR INDUK MAHASISWA", npps: "Nomor Pokok Program Studi", prodi: "PROGRAM STUDI",
-        ttl: "TEMPAT, TGL LAHIR", kons: "KONSENTRASI",
-        th: ["NO", "KODE MK", "NAMA MATA KULIAH", "K", "HM", "AM", "MK"],
-        totKredit: "Total Kredit", totNilai: "Total Nilai", ipkLbl: "Indeks Prestasi Kumulatif", predLbl: "Predikat Kelulusan",
-        judul: "JUDUL SKRIPSI/ THESIS TITLE:", ket: "",
-        ketval: "K = Kredit/SKS · HM = Huruf Mutu (A,B,C,D) · AM = Angka Mutu (1,2,3,4) · MK = Mutu Kredit (K × AM)",
-        meng: "Mengetahui,", rektor: "Rektor,", dekan: "Dekan,",
-      };
+  const L = labelTranskrip(EN);
   const showIpk = (value: number) => (EN ? value.toFixed(2) : fmtIPK(value));
-  const showPredikat = (value: string) => (EN && PREDIKAT_EN[value] ? `${value} / ${PREDIKAT_EN[value]}` : value);
+  const showPredikat = (value: string) => (EN && PREDIKAT_EN[value] ? PREDIKAT_EN[value] : value);
   const showProdi = (value: string) => (PRODI_EN[value] ? `${value.toUpperCase()} / ${PRODI_EN[value]}` : value.toUpperCase());
 
   const [customMode, setCustomMode] = useState(false);
@@ -381,6 +373,43 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
   const half = Math.ceil(rows.length / 2);
   const columns = [rows.slice(0, half), rows.slice(half)];
 
+  /**
+   * Lingkup kurikulum untuk satu berkas: prodi + konsentrasi.
+   *
+   * Yang tertulis DI BERKASNYA selalu menang. Isian layar hanya dipakai
+   * untuk yang tidak disebut berkasnya sama sekali — base SIMAK mentah
+   * memuat "PROGRAM STUDI" tetapi tidak selalu memuat "KONSENTRASI".
+   * Kalau ternyata keliru, admin membetulkan biodatanya lalu menekan
+   * "Isi ulang kolom Inggris"; tidak ada yang terkunci.
+   */
+  function lingkupDari(bio: Record<string, string> = {}): Lingkup {
+    return {
+      prodi: bio.prodi?.trim() || meta.prodi,
+      konsentrasi: bio.konsentrasi?.trim() || meta.konsentrasi,
+    };
+  }
+
+  /** Lingkup yang sedang tampil di layar — dipakai tombol & penyimpan kamus. */
+  const lingkupLayar: Lingkup = { prodi: meta.prodi, konsentrasi: meta.konsentrasi };
+
+  /**
+   * Terjemahkan ulang SELURUH kolom Inggris memakai prodi & konsentrasi yang
+   * sekarang tertulis di biodata.
+   *
+   * Ditekan sendiri oleh admin, tidak berjalan otomatis: menimpa kolom
+   * Inggris tanpa diminta akan menghapus koreksi tangan yang baru saja ia
+   * ketik, dan terjemahan resmi KUI yang ikut terbaca dari berkas dwibahasa.
+   */
+  function terjemahUlang() {
+    if (rows.length === 0) return;
+    const hasil = isiUlangInggris(rows, kamusTambahan, lingkupLayar);
+    setRows(hasil.rows);
+    setImportMsg({
+      kind: "ok",
+      text: `Kolom Inggris diisi ulang: ${rows.length} baris` + ringkasBahasa(hasil, lingkupLayar) + ".",
+    });
+  }
+
   function applyBio(bio: Record<string, string>) {
     setMeta((current) => {
       const next = { ...current };
@@ -417,7 +446,12 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
     // Berkas mentah dari SIMAK hanya berbahasa Indonesia. Kolom Inggrisnya
     // diisi dari kamus supaya transkrip English tidak perlu menunggu kiriman
     // KUI; yang sudah berisi — berkas dwibahasa — tidak pernah ditimpa.
-    const bahasa = isiInggris(parsed, kamusTambahan);
+    //
+    // Lingkupnya diambil dari BIODATA BERKAS INI, bukan dari yang sedang
+    // tampil di layar: kalau tidak, mahasiswa Ilmu Komunikasi yang diimpor
+    // sesudah mahasiswa Ilmu Pemerintahan akan diterjemahkan memakai kamus
+    // prodi sebelumnya, dan MKK-012 tercetak "Introduction to Sociology".
+    const bahasa = isiInggris(parsed, kamusTambahan, lingkupDari(bio));
     setRows(bahasa.rows);
     applyBio(bio);
     const dilepas = lepasTataLetak();
@@ -425,7 +459,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
       kind: "ok",
       text: `Sheet "${name}": ${parsed.length} mata kuliah terbaca (dua blok kolom digabung)` +
         (bio.nama ? `; biodata ${bio.nama} ikut terisi` : "") +
-        ringkasBahasa(bahasa) +
+        ringkasBahasa(bahasa, lingkupDari(bio)) +
         ". Semua diproses di browser Anda, file tidak diunggah ke mana pun." +
         (dilepas ? " Tata letak kembali ke bentuk bawaan karena isinya diganti." : ""),
     });
@@ -452,7 +486,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
         };
         const parsed = parseTemplateNilai(toAoa(TEMPLATE_SHEET_NILAI));
         const bio = parseTemplateBio(toAoa(TEMPLATE_SHEET_BIO));
-        const bahasa = isiInggris(parsed, kamusTambahan);
+        const bahasa = isiInggris(parsed, kamusTambahan, lingkupDari(bio));
         setRows(bahasa.rows);
         applyBio(bio);
         const dilepas = lepasTataLetak();
@@ -460,7 +494,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
           kind: "ok",
           text: `Template SiPaling terbaca: ${parsed.length} mata kuliah` +
             (bio.nama ? `, biodata ${bio.nama} ikut terisi` : "") +
-            ringkasBahasa(bahasa) +
+            ringkasBahasa(bahasa, lingkupDari(bio)) +
             ". Semua diproses di browser Anda." +
             (dilepas ? " Tata letak kembali ke bentuk bawaan karena isinya diganti." : ""),
         });
@@ -519,7 +553,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
    */
   async function ingatKamus() {
     try {
-      const pasangan = panenKamus(rows);
+      const pasangan = panenKamus(rows, lingkupLayar);
       if (pasangan.length === 0) return 0;
       const balas = await fetch("/api/kamus-matkul", {
         method: "PUT",
@@ -530,7 +564,10 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
       if (!isi.success) return 0;
       setKamusTambahan((kini) => {
         const berikut = { ...kini };
-        for (const p of pasangan) berikut[p.kode] = p.en;
+        // Kuncinya berlingkup, sama persis dengan yang disimpan server —
+        // kalau tidak, koreksi Ilmu Komunikasi ikut mengubah transkrip Ilmu
+        // Pemerintahan sampai halaman ini dimuat ulang.
+        for (const p of pasangan) berikut[kunciKamus(p.lingkup, p.kode)] = p.en;
         return berikut;
       });
       return isi.baru ?? 0;
@@ -887,7 +924,18 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
               {PRODI.map((item) => <option key={item.kode}>{item.nama}</option>)}
             </select>
           </label>
-          <label>Konsentrasi<input value={meta.konsentrasi} onChange={(e) => setMeta({ ...meta, konsentrasi: e.target.value })} placeholder="mis. Broadcasting" /></label>
+          <label>Konsentrasi
+            <input
+              list="tk-konsentrasi"
+              value={meta.konsentrasi}
+              onChange={(e) => setMeta({ ...meta, konsentrasi: e.target.value })}
+              placeholder="mis. Broadcasting"
+              title="Menentukan kamus nama Inggris yang dipakai. Ubah lalu tekan “Isi ulang kolom Inggris”."
+            />
+            <datalist id="tk-konsentrasi">
+              {KONSENTRASI_ILKOM.map((nama) => <option key={nama} value={nama} />)}
+            </datalist>
+          </label>
           <label>Nomor Ijazah Nasional<input value={meta.noijazah} onChange={(e) => setMeta({ ...meta, noijazah: e.target.value })} /></label>
           <label>Tanggal yudisium<input value={meta.yudisium} onChange={(e) => setMeta({ ...meta, yudisium: e.target.value })} /></label>
           <label className="wide">Akreditasi<input value={meta.akred} onChange={(e) => setMeta({ ...meta, akred: e.target.value })} /></label>
@@ -934,6 +982,15 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
           ))}
         </div>
         <button type="button" className="btn btn-light" onClick={() => setRows((current) => [...current, { kode: "", nama: "", en: "", hm: "", k: 3 }])}>+ Tambah baris (mengisi atas → bawah)</button>
+        <button
+          type="button"
+          className="btn btn-light"
+          onClick={terjemahUlang}
+          disabled={rows.length === 0}
+          title="Menimpa SELURUH kolom Inggris memakai kamus prodi & konsentrasi yang tertulis pada Biodata. Koreksi tangan yang belum disimpan ikut tertimpa."
+        >
+          🔤 Isi ulang kolom Inggris (ikut prodi &amp; konsentrasi)
+        </button>
 
         <div className="tpl-actions">
           <button type="button" className="btn btn-primary" onClick={() => window.print()}>🖨 Cetak tanpa kop (Legal 21,59×35,56 cm)</button>
@@ -1145,11 +1202,11 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
             {/* --- biodata DUA kolom, label bertingkat (acuan gambar) --- */}
             <div className="doc-bio2">
               <div className="bio-cell"><span className="bio-lbl"><Lbl text={L.nama} /></span><span className="bio-sep">:</span><span className="bio-val">{meta.nama || ""}</span></div>
-              <div className="bio-cell"><span className="bio-lbl"><Lbl text={L.fak} /></span><span className="bio-sep">:</span><span className="bio-val"><Lbl text={L.fakval} /></span></div>
+              <div className="bio-cell"><span className="bio-lbl"><BiIn text={L.fak} /></span><span className="bio-sep">:</span><span className="bio-val"><Lbl text={L.fakval} /></span></div>
               <div className="bio-cell"><span className="bio-lbl"><Lbl text={L.nim} /></span><span className="bio-sep">:</span><span className="bio-val">{meta.nim || ""}</span></div>
-              <div className="bio-cell"><span className="bio-lbl"><Lbl text={L.jenjangLbl} /></span><span className="bio-sep">:</span><span className="bio-val"><BiVal text={meta.jenjang} /></span></div>
+              <div className="bio-cell"><span className="bio-lbl"><BiIn text={L.jenjangLbl} /></span><span className="bio-sep">:</span><span className="bio-val"><BiVal text={meta.jenjang} /></span></div>
               <div className="bio-cell"><span className="bio-lbl"><Lbl text={L.ttl} /></span><span className="bio-sep">:</span><span className="bio-val">{meta.ttl || ""}</span></div>
-              <div className="bio-cell"><span className="bio-lbl"><Lbl text={L.kons} /></span><span className="bio-sep">:</span><span className="bio-val"><BiVal text={konsentrasiText} /></span></div>
+              <div className="bio-cell"><span className="bio-lbl"><BiIn text={L.kons} /></span><span className="bio-sep">:</span><span className="bio-val"><BiVal text={konsentrasiText} /></span></div>
               <div className="bio-cell"><span className="bio-lbl"><Lbl text={L.prodi} /></span><span className="bio-sep">:</span><span className="bio-val"><BiVal text={showProdi(meta.prodi)} /></span></div>
               <div className="bio-cell"><span className="bio-lbl"><Lbl text={L.npps} /></span><span className="bio-sep">:</span><span className="bio-val">{prodiKode}</span></div>
             </div>
@@ -1162,13 +1219,18 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
                   <table className="doc-table" key={columnIndex}>
                     <thead>
                       <tr>
+                        {/* Singkatan Inggrisnya pernah tergeser satu kolom:
+                            AM (Angka Mutu) berlabel CR, K (Kredit) berlabel
+                            WM, M (Mutu) berlabel GP. CR dan QP mengikuti
+                            bunyi yang dipakai KUI sendiri pada baris total —
+                            "Total Credits" dan "Total Quality Points". */}
                         <th className="c-no">No</th>
                         <th className="c-kode">Kode MK<i>Course</i></th>
                         <th className="c-nama">Nama Mata Kuliah<i>Descriptions</i></th>
                         <th className="c-n">HM<i className="pl">LG</i></th>
-                        <th className="c-n">AM<i className="pl">CR</i></th>
-                        <th className="c-n">K<i className="pl">WM</i></th>
-                        <th className="c-n">M<i className="pl">GP</i></th>
+                        <th className="c-n">AM<i className="pl">GP</i></th>
+                        <th className="c-n">K<i className="pl">CR</i></th>
+                        <th className="c-n">M<i className="pl">QP</i></th>
                       </tr>
                     </thead>
                     <tbody>
