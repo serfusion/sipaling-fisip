@@ -794,3 +794,184 @@ export function isiUlangInggris<T extends BarisMatkul>(
     lingkup,
   );
 }
+
+// ============================================================
+// MENEBAK KONSENTRASI DARI DAFTAR MATA KULIAHNYA
+//
+// Berkas mentah dari SIMAK memuat PROGRAM STUDI tetapi sering TIDAK memuat
+// KONSENTRASI — dan konsentrasi itulah yang memilih kamus. Selama ia kosong,
+// admin harus mengingat sendiri konsentrasi tiap mahasiswa, lalu mengetiknya
+// sebelum mencetak. Yang lupa diketik tercetak memakai kamus inti saja.
+//
+// Padahal daftar mata kuliahnya sudah mengatakannya. Mahasiswa Advertising
+// mengambil "Riset Iklan" dan "Managemen Periklanan"; Broadcasting mengambil
+// "Produksi Siaran Radio" dan "Teknik Kamera"; Public Relations mengambil
+// "Cyber Public Relations" dan "Strategi Kampanye Public Relations". Tidak
+// ada mahasiswa yang mengambil ketiganya.
+//
+// ---------- YANG DIPAKAI SEBAGAI TANDA ----------
+//
+// Tandanya DITURUNKAN dari kamus yang sudah ada, bukan didaftar ulang:
+//
+//   1. KODE yang hanya ada di satu kamus konsentrasi — MKSA-*, MKSB-*,
+//      MKSP-*, MKPA-*, MKPB-*, MKPP-*. Paling kuat (3 angka).
+//   2. NAMA mata kuliah — Indonesia maupun Inggrisnya — yang hanya ada di
+//      satu kamus konsentrasi. Untuk berkas yang kodenya berganti (2 angka).
+//   3. KATA KUNCI pada nama mata kuliah yang tidak dikenal kamus mana pun
+//      ("Iklan", "Siaran", "Public Relations"). Jaring untuk kurikulum baru
+//      (1 angka).
+//
+// Mata kuliah INTI sengaja tidak pernah menjadi tanda. "Dasar Dasar
+// Periklanan" dan "Dasar Dasar Public Relations" diambil KETIGA konsentrasi;
+// memakainya sebagai tanda berarti setiap mahasiswa terbaca Advertising
+// sekaligus Public Relations.
+//
+// ---------- TEBAKAN YANG RAGU TIDAK DIPAKAI ----------
+//
+// Yang menang harus mengumpulkan minimal 2 angka DAN lebih tinggi daripada
+// runner-up-nya. Kalau tidak, hasilnya kosong dan kolom konsentrasi dibiarkan
+// untuk diisi admin. Konsentrasi yang salah mengganti SELURUH kolom Inggris
+// pada dokumen yang ikut dilegalisir — di situ "tidak tahu" jauh lebih murah
+// daripada "kira-kira".
+// ============================================================
+
+/**
+ * Nama konsentrasi sebagaimana ditulis pada biodata transkrip.
+ *
+ * Ejaannya harus sama persis dengan `CONCENTRATIONS["Ilmu Komunikasi"]` pada
+ * `src/lib/academic.ts` — daftar yang sama yang ditawarkan formulir pengajuan
+ * judul. Disalin, bukan diimpor, supaya kamus ini tetap bebas dari modul
+ * lain; kesamaannya dikunci uji.
+ */
+export const NAMA_KONSENTRASI: Record<string, string> = {
+  [LINGKUP_ILKOM_PR]: "Public Relations",
+  [LINGKUP_ILKOM_BC]: "Broadcasting",
+  [LINGKUP_ILKOM_ADV]: "Advertising",
+};
+
+const LINGKUP_KONSENTRASI = [LINGKUP_ILKOM_PR, LINGKUP_ILKOM_BC, LINGKUP_ILKOM_ADV];
+
+/** Kode/nama yang HANYA ada di satu kamus konsentrasi dan bukan mata kuliah inti. */
+function rakitKhas(ambil: (k: KamusLingkup) => Record<string, string>): Record<string, string> {
+  const inti = new Set(Object.keys(ambil(KAMUS[LINGKUP_ILKOM])));
+  const pemilik: Record<string, Set<string>> = {};
+  for (const lingkup of LINGKUP_KONSENTRASI) {
+    for (const kunci of Object.keys(ambil(KAMUS[lingkup]))) {
+      (pemilik[kunci] ||= new Set()).add(lingkup);
+    }
+  }
+  const hasil: Record<string, string> = {};
+  for (const [kunci, punya] of Object.entries(pemilik)) {
+    if (punya.size === 1 && !inti.has(kunci)) hasil[kunci] = [...punya][0];
+  }
+  return hasil;
+}
+
+const KODE_KHAS = rakitKhas((k) => k.kode);
+
+// Nama dicocokkan dua arah: berkas SIMAK menulis nama Indonesianya, berkas
+// dwibahasa KUI menulis keduanya. "Camera Techniques" harus sama kuatnya
+// dengan "Teknik Kamera" sebagai tanda Broadcasting.
+const NAMA_KHAS = (() => {
+  const intiNama = new Set([
+    ...Object.keys(KAMUS[LINGKUP_ILKOM].nama),
+    ...Object.values(KAMUS[LINGKUP_ILKOM].nama).map(rapikanNama),
+  ]);
+  const pemilik: Record<string, Set<string>> = {};
+  for (const lingkup of LINGKUP_KONSENTRASI) {
+    for (const [id, en] of Object.entries(KAMUS[lingkup].nama)) {
+      (pemilik[id] ||= new Set()).add(lingkup);
+      (pemilik[rapikanNama(en)] ||= new Set()).add(lingkup);
+    }
+  }
+  const hasil: Record<string, string> = {};
+  for (const [nama, punya] of Object.entries(pemilik)) {
+    if (punya.size === 1 && !intiNama.has(nama)) hasil[nama] = [...punya][0];
+  }
+  return hasil;
+})();
+
+// Jaring terakhir, untuk mata kuliah yang belum ada di kamus mana pun.
+// Sengaja sempit: hanya kata yang tidak mungkin muncul di konsentrasi lain.
+const KATA_KONSENTRASI: Array<[RegExp, string]> = [
+  [/public\s+relations|kehumasan|\bhumas\b|protokoler/i, LINGKUP_ILKOM_PR],
+  [/broadcast|penyiaran|\bsiaran\b|kamera|camera|sinematograf|cinematograph|televisi|\btv\b/i, LINGKUP_ILKOM_BC],
+  [/advertis|periklanan|\biklan\b/i, LINGKUP_ILKOM_ADV],
+];
+
+export type TebakanKonsentrasi = {
+  /** Kunci lingkup kamusnya, atau "" kalau tidak cukup tanda. */
+  lingkup: string;
+  /** Nama yang siap ditulis ke biodata, atau "". */
+  konsentrasi: string;
+  skor: number;
+  /** Mata kuliah yang menjadi dasar tebakan — untuk diperlihatkan ke admin. */
+  bukti: string[];
+};
+
+const TIDAK_TAHU: TebakanKonsentrasi = { lingkup: "", konsentrasi: "", skor: 0, bukti: [] };
+
+/**
+ * Tebak konsentrasi Ilmu Komunikasi dari daftar mata kuliahnya.
+ *
+ * Hanya untuk Ilmu Komunikasi. Ilmu Pemerintahan tidak berkonsentrasi, dan
+ * kode seperti MKPB-051 yang di Broadcasting berarti "Produksi Feature TV"
+ * di sana berarti "PKL" — menebaknya lintas prodi persis melahirkan kembali
+ * kekeliruan yang memaksa kamus ini dipecah.
+ */
+export function tebakKonsentrasi(rows: BarisMatkul[], prodi?: string): TebakanKonsentrasi {
+  if (!/komunikasi/i.test(String(prodi || ""))) return TIDAK_TAHU;
+
+  const skor: Record<string, number> = {};
+  const bukti: Record<string, string[]> = {};
+  const intiKode = KAMUS[LINGKUP_ILKOM].kode;
+
+  for (const row of rows || []) {
+    const kode = rapikanKode(row?.kode || "");
+    const nama = String(row?.nama || "").trim();
+    const en = String(row?.en || "").trim();
+
+    // Satu baris memberi SATU tanda, yang terkuat saja. Kalau tidak, mata
+    // kuliah yang kode dan namanya sama-sama khas terhitung dua kali dan
+    // satu baris dapat mengalahkan dua baris lain.
+    let pilih = "";
+    let nilai = 0;
+
+    if (kode && KODE_KHAS[kode]) {
+      pilih = KODE_KHAS[kode];
+      nilai = 3;
+    } else if (!kode || !(kode in intiKode)) {
+      const khasNama = NAMA_KHAS[rapikanNama(nama)] || NAMA_KHAS[rapikanNama(en)];
+      if (khasNama) {
+        pilih = khasNama;
+        nilai = 2;
+      } else {
+        const teks = `${nama} ${en}`;
+        const cocok = KATA_KONSENTRASI.find(([re]) => re.test(teks));
+        if (cocok) {
+          pilih = cocok[1];
+          nilai = 1;
+        }
+      }
+    }
+
+    if (!pilih) continue;
+    skor[pilih] = (skor[pilih] || 0) + nilai;
+    (bukti[pilih] ||= []).push(nama || en);
+  }
+
+  const urut = LINGKUP_KONSENTRASI
+    .map((lingkup) => ({ lingkup, nilai: skor[lingkup] || 0 }))
+    .sort((a, b) => b.nilai - a.nilai);
+
+  const juara = urut[0];
+  const kedua = urut[1];
+  if (!juara || juara.nilai < 2 || juara.nilai <= kedua.nilai) return TIDAK_TAHU;
+
+  return {
+    lingkup: juara.lingkup,
+    konsentrasi: NAMA_KONSENTRASI[juara.lingkup],
+    skor: juara.nilai,
+    bukti: (bukti[juara.lingkup] || []).slice(0, 3),
+  };
+}

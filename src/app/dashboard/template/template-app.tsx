@@ -6,10 +6,11 @@ import { useAutoLogout } from "@/lib/use-auto-logout";
 import { sanitizeLetterHtml } from "@/lib/sanitize-html";
 import { DEFAULT_LETTER_HTML, LETTER_TITLES, type LetterSlug } from "./letter-defaults";
 import { AM, HMS, computeTotals, extractBio, parseSheetRows, type Aoa, type CourseRow } from "./transkrip-parse";
-import { isiInggris, isiUlangInggris, kunciKamus, panenKamus, type Lingkup } from "@/lib/kamus-matkul";
+import { isiInggris, isiUlangInggris, kunciKamus, panenKamus, tebakKonsentrasi, type Lingkup } from "@/lib/kamus-matkul";
+import { penggalJudulInggris } from "@/lib/judul-inggris";
 import { periksaSiapArsip, predikatKelulusan, sidikTranskrip } from "@/lib/arsip-transkrip";
 import { concentrationsFor } from "@/lib/academic";
-import { labelTranskrip, pakaiRektorDari, pecahAkreditasi } from "./transkrip-label";
+import { labelSebaris, labelTranskrip, pakaiRektorDari, pecahAkreditasi } from "./transkrip-label";
 import {
   TEMPLATE_BIO_ROWS, TEMPLATE_NILAI_CONTOH, TEMPLATE_NILAI_HEADER,
   TEMPLATE_SHEET_BIO, TEMPLATE_SHEET_NILAI,
@@ -47,12 +48,13 @@ const PRODI = [
   { nama: "Ilmu Komunikasi", kode: "70201" },
 ];
 
-// Konsentrasi Ilmu Komunikasi. Bukan sekadar isian biodata: konsentrasi
-// menentukan kamus mana yang dipakai untuk mengisi kolom Inggris, karena
-// MKPB-051 berarti "Produksi Feature TV" di Broadcasting dan "PKL" di Ilmu
-// Pemerintahan. Isiannya tetap bebas diketik — daftar ini hanya
-// menawarkan ejaan yang sudah dikenali kamus.
-const KONSENTRASI_ILKOM = concentrationsFor("Ilmu Komunikasi");
+// Pilihan konsentrasi diambil dari `concentrationsFor(prodi)` di tempat
+// pemakaiannya — daftarnya ikut prodi yang sedang dipilih, dan Ilmu
+// Pemerintahan memang tidak punya satu pun.
+//
+// Bukan sekadar isian biodata: konsentrasi menentukan kamus mana yang
+// dipakai untuk mengisi kolom Inggris, karena MKPB-051 berarti "Produksi
+// Feature TV" di Broadcasting dan "PKL" di Ilmu Pemerintahan.
 
 function todayID() {
   return new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
@@ -214,6 +216,40 @@ function BiVal({ text }: { text: string }) {
   return en ? <>{id}<i className="bi-en">{en}</i></> : <>{id}</>;
 }
 
+/**
+ * Label biodata: bertingkat atau sebaris menurut daftar pada
+ * `transkrip-label.ts`, bukan menurut pilihan di tempat ini.
+ *
+ * Dulu tiap baris memilih sendiri antara <Lbl> dan <BiIn>, dan pilihan yang
+ * tersebar di dua puluh baris JSX tidak dapat diuji — satu baris yang salah
+ * ikut tercetak tanpa ada yang menahannya.
+ */
+function LblDoc({ kunci, teks }: { kunci: string; teks: string }) {
+  return labelSebaris(kunci) ? <BiIn text={teks} /> : <Lbl text={teks} />;
+}
+
+/**
+ * Judul skripsi: istilah Inggrisnya dicetak miring.
+ *
+ * Kaidah penulisan ilmiah, dan judul pada transkrip harus sama dengan judul
+ * pada skripsi yang sudah disahkan. Daftar istilahnya ada di
+ * `src/lib/judul-inggris.ts`; admin dapat memaksa yang belum terdaftar
+ * dengan menulisnya di antara tanda bintang.
+ */
+function JudulSkripsi({ teks }: { teks: string }) {
+  const penggal = penggalJudulInggris(teks);
+  if (!penggal.length) return null;
+  return (
+    <>
+      {penggal.map((bagian, index) =>
+        bagian.miring
+          ? <i key={index}>{bagian.teks}</i>
+          : <span key={index}>{bagian.teks}</span>,
+      )}
+    </>
+  );
+}
+
 const PRODI_EN: Record<string, string> = {
   "Ilmu Komunikasi": "COMMUNICATION SCIENCE",
   "Ilmu Pemerintahan": "GOVERNMENT SCIENCE",
@@ -328,6 +364,10 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
   const bekuBaru = useRef(false);
   const [rows, setRows] = useState<CourseRow[]>([]);
   const [meta, setMeta] = useState(metaAwal);
+  // Admin sedang mengetik konsentrasi di luar daftar. Disimpan tersendiri,
+  // bukan disimpulkan dari isinya: kolom yang baru dikosongkan untuk diketik
+  // ulang akan langsung melompat kembali ke daftar kalau disimpulkan.
+  const [ketikKonsentrasi, setKetikKonsentrasi] = useState(false);
   // Kamus tambahan hasil koreksi admin sebelumnya. Dibaca sekali saat modul
   // dibuka; kalau gagal, kamus bawaan tetap bekerja.
   const [kamusTambahan, setKamusTambahan] = useState<Record<string, string>>({});
@@ -408,15 +448,22 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
   // seperti sedia kala.
   const pakaiRektor = pakaiRektorDari(meta.ttd);
 
-  // Usul ejaan konsentrasi. Kosong selama kolomnya belum diketik, supaya
-  // daftarnya tidak menyembul sendiri begitu kolomnya disentuh.
-  const usulKonsentrasi = (() => {
-    const diketik = meta.konsentrasi.trim().toLowerCase();
-    if (!diketik || !concentrationsFor(meta.prodi).length) return [];
-    const cocok = KONSENTRASI_ILKOM.filter((nama) => nama.toLowerCase().includes(diketik));
-    // Yang sudah diketik lengkap dan benar tidak perlu diusulkan lagi.
-    return cocok.length === 1 && cocok[0].toLowerCase() === diketik ? [] : cocok;
-  })();
+  // --- Pilihan konsentrasi -----------------------------------------------
+  //
+  // Dulu kolom ini hanya kotak ketik dengan <datalist>, dan daftarnya baru
+  // menyembul sesudah admin mengetik huruf pertama yang benar. Yang tidak
+  // pernah melihat daftarnya menyimpulkan tidak ada pilihan sama sekali,
+  // lalu mengetik ejaan sendiri — dan ejaan yang tidak dikenali kamus
+  // membuat seluruh kolom Inggris diisi kamus inti saja.
+  //
+  // Sekarang daftarnya SELALU terlihat sebagai pilihan, dengan satu jalan
+  // keluar "Lainnya" untuk konsentrasi yang belum terdaftar.
+  const daftarKonsentrasi = concentrationsFor(meta.prodi);
+  // Ejaan dari berkas KUI selalu huruf besar ("ADVERTISING"); yang dicari
+  // adalah pilihan yang sama artinya, bukan yang sama persis hurufnya.
+  const konsentrasiCocok =
+    daftarKonsentrasi.find((nama) => nama.toLowerCase() === meta.konsentrasi.trim().toLowerCase()) || "";
+  const konsentrasiLain = ketikKonsentrasi || (Boolean(meta.konsentrasi.trim()) && !konsentrasiCocok);
 
   /** Lingkup yang sedang tampil di layar — dipakai tombol & penyimpan kamus. */
   const lingkupLayar: Lingkup = { prodi: meta.prodi, konsentrasi: meta.konsentrasi };
@@ -439,6 +486,56 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
     });
   }
 
+  /**
+   * Isi konsentrasi dari DAFTAR MATA KULIAHNYA kalau berkasnya tidak
+   * menyebutkan.
+   *
+   * Base SIMAK mentah memuat PROGRAM STUDI tetapi tidak memuat KONSENTRASI,
+   * dan konsentrasi itulah yang memilih kamus. Selama ia kosong, transkrip
+   * Broadcasting tercetak memakai kamus inti saja — "Produksi Feature TV"
+   * jatuh ke tebakan kata, bukan ke "TV Feature Production".
+   *
+   * Yang ditulis di BERKASNYA selalu menang: tebakan ini hanya mengisi yang
+   * memang kosong. Tebakan yang ragu tidak mengisi apa pun — lihat
+   * `tebakKonsentrasi`.
+   *
+   * Mengubah `bio` di tempat, lalu mengembalikan tebakannya supaya pesan
+   * impor dapat menyebut dari mana konsentrasi itu datang: yang terisi di
+   * sini bacaan mesin, bukan tulisan KUI, dan admin berhak tahu bedanya.
+   */
+  function lengkapiKonsentrasi(bio: Record<string, string>, baris: CourseRow[]) {
+    if (bio.konsentrasi?.trim()) return null;
+    const tebakan = tebakKonsentrasi(baris, bio.prodi?.trim() || meta.prodi);
+    if (!tebakan.konsentrasi) return null;
+    bio.konsentrasi = tebakan.konsentrasi;
+    return tebakan;
+  }
+
+  function ringkasTebakan(tebakan: ReturnType<typeof lengkapiKonsentrasi>) {
+    if (!tebakan) return "";
+    const contoh = tebakan.bukti.join(", ");
+    return `; konsentrasi terbaca sendiri sebagai ${tebakan.konsentrasi} dari mata kuliahnya${contoh ? ` (${contoh})` : ""} — PERIKSA sebelum mencetak`;
+  }
+
+  /** Tombol "Deteksi dari mata kuliah" pada kolom Konsentrasi. */
+  function deteksiKonsentrasi() {
+    const tebakan = tebakKonsentrasi(rows, meta.prodi);
+    if (!tebakan.konsentrasi) {
+      setImportMsg({
+        kind: "err",
+        text: "Konsentrasi tidak dapat dibaca dari daftar mata kuliah ini: tandanya tidak cukup atau terbagi rata. Pilih sendiri pada kolom Konsentrasi.",
+      });
+      return;
+    }
+    setKetikKonsentrasi(false);
+    setMeta((kini) => ({ ...kini, konsentrasi: tebakan.konsentrasi }));
+    setImportMsg({
+      kind: "ok",
+      text: `Konsentrasi dibaca sebagai ${tebakan.konsentrasi} dari ${tebakan.bukti.join(", ")}. ` +
+        "Tekan “Isi ulang kolom Inggris” supaya kamusnya ikut berganti.",
+    });
+  }
+
   function applyBio(bio: Record<string, string>) {
     setMeta((current) => {
       const next = { ...current };
@@ -449,7 +546,10 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
       if (bio.akred) next.akred = bio.akred;
       if (bio.noijazah) next.noijazah = bio.noijazah;
       if (bio.judul) next.judul = bio.judul;
-      if (bio.konsentrasi) next.konsentrasi = bio.konsentrasi;
+      // DITIMPA, bukan hanya diisi kalau ada. Konsentrasi memilih kamus:
+      // yang tertinggal dari impor sebelumnya akan mengganti seluruh kolom
+      // Inggris mahasiswa ini tanpa ada yang mengetik apa pun.
+      next.konsentrasi = bio.konsentrasi || "";
       if (bio.jenjang) next.jenjang = bio.jenjang;
       if (bio.nppt) next.nppt = bio.nppt;
       if (bio.tanggal) next.tanggal = bio.tanggal;
@@ -480,6 +580,10 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
     // tampil di layar: kalau tidak, mahasiswa Ilmu Komunikasi yang diimpor
     // sesudah mahasiswa Ilmu Pemerintahan akan diterjemahkan memakai kamus
     // prodi sebelumnya, dan MKK-012 tercetak "Introduction to Sociology".
+    //
+    // Konsentrasinya dibaca dari daftar mata kuliah SEBELUM kamus dipakai.
+    // Kalau sesudahnya, seluruh kolom Inggris terlanjur diisi kamus inti.
+    const tebakan = lengkapiKonsentrasi(bio, parsed);
     const bahasa = isiInggris(parsed, kamusTambahan, lingkupDari(bio));
     setRows(bahasa.rows);
     applyBio(bio);
@@ -488,6 +592,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
       kind: "ok",
       text: `Sheet "${name}": ${parsed.length} mata kuliah terbaca (dua blok kolom digabung)` +
         (bio.nama ? `; biodata ${bio.nama} ikut terisi` : "") +
+        ringkasTebakan(tebakan) +
         ringkasBahasa(bahasa, lingkupDari(bio)) +
         ". Semua diproses di browser Anda, file tidak diunggah ke mana pun." +
         (dilepas ? " Tata letak kembali ke bentuk bawaan karena isinya diganti." : ""),
@@ -515,6 +620,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
         };
         const parsed = parseTemplateNilai(toAoa(TEMPLATE_SHEET_NILAI));
         const bio = parseTemplateBio(toAoa(TEMPLATE_SHEET_BIO));
+        const tebakan = lengkapiKonsentrasi(bio, parsed);
         const bahasa = isiInggris(parsed, kamusTambahan, lingkupDari(bio));
         setRows(bahasa.rows);
         applyBio(bio);
@@ -523,6 +629,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
           kind: "ok",
           text: `Template SiPaling terbaca: ${parsed.length} mata kuliah` +
             (bio.nama ? `, biodata ${bio.nama} ikut terisi` : "") +
+            ringkasTebakan(tebakan) +
             ringkasBahasa(bahasa, lingkupDari(bio)) +
             ". Semua diproses di browser Anda." +
             (dilepas ? " Tata letak kembali ke bentuk bawaan karena isinya diganti." : ""),
@@ -560,7 +667,12 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
         ["   pada transkrip memakai nama Indonesia."],
         ["6. AM, MK, Total, dan IPK dihitung OTOMATIS oleh sistem - tidak perlu diisi."],
         ["7. Program Studi tulis persis: Ilmu Komunikasi  atau  Ilmu Pemerintahan."],
-        ["8. Simpan file, lalu unggah lewat tombol Impor Excel di dashboard transkrip."],
+        ["8. Konsentrasi (Ilmu Komunikasi saja) tulis salah satu: Public Relations, Advertising,"],
+        ["   atau Broadcasting. Boleh DIKOSONGKAN - sistem membacanya sendiri dari daftar mata"],
+        ["   kuliah, mis. Riset Iklan -> Advertising, Teknik Kamera -> Broadcasting."],
+        ["9. Judul Skripsi: istilah Inggris dicetak miring otomatis. Untuk memaksa istilah yang"],
+        ["   belum dikenali, tulis di antara tanda bintang, mis. *brand ambassador*."],
+        ["10. Simpan file, lalu unggah lewat tombol Impor Excel di dashboard transkrip."],
       ]);
       panduan["!cols"] = [{ wch: 96 }];
       XLSX.utils.book_append_sheet(wb, panduan, "Panduan");
@@ -954,26 +1066,60 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
             </select>
           </label>
           <label>Konsentrasi
-            <input
-              list="tk-konsentrasi"
-              value={meta.konsentrasi}
-              onChange={(e) => setMeta({ ...meta, konsentrasi: e.target.value })}
-              placeholder="mis. Broadcasting"
-              title="Menentukan kamus nama Inggris yang dipakai. Ubah lalu tekan “Isi ulang kolom Inggris”."
-            />
-            {/* Daftar pilihannya BARU muncul sesudah admin mengetik sendiri,
-                dan hanya untuk prodi yang memang berkonsentrasi. Daftar yang
-                menyembul begitu kolomnya disentuh memancing salah klik —
-                dan konsentrasi yang salah mengganti seluruh kolom Inggris,
-                bukan hanya satu baris biodata. */}
-            <datalist id="tk-konsentrasi">
-              {usulKonsentrasi.map((nama) => <option key={nama} value={nama} />)}
-            </datalist>
+            {daftarKonsentrasi.length === 0 ? (
+              /* Ilmu Pemerintahan tidak berkonsentrasi. Kolomnya tetap
+                 terlihat supaya admin tahu ia memang tidak perlu diisi,
+                 bukan hilang dan membuatnya mencari-cari. */
+              <input value={`${meta.prodi} tidak berkonsentrasi`} readOnly tabIndex={-1} />
+            ) : (
+              <select
+                value={konsentrasiLain ? "__lain" : konsentrasiCocok}
+                onChange={(e) => {
+                  const pilih = e.target.value;
+                  setKetikKonsentrasi(pilih === "__lain");
+                  if (pilih !== "__lain") setMeta({ ...meta, konsentrasi: pilih });
+                }}
+                title="Menentukan kamus nama Inggris yang dipakai. Ubah lalu tekan “Isi ulang kolom Inggris”."
+              >
+                <option value="">— belum diisi —</option>
+                {daftarKonsentrasi.map((nama) => <option key={nama} value={nama}>{nama}</option>)}
+                <option value="__lain">Lainnya (ketik sendiri)…</option>
+              </select>
+            )}
+            {daftarKonsentrasi.length > 0 && konsentrasiLain && (
+              <input
+                value={meta.konsentrasi}
+                onChange={(e) => setMeta({ ...meta, konsentrasi: e.target.value })}
+                placeholder="Ketik nama konsentrasi"
+                title="Ejaan di luar daftar tetap dikenali kamus selama memuat kata Public Relations / Broadcasting / Advertising atau padanan Indonesianya."
+              />
+            )}
+            {daftarKonsentrasi.length > 0 && (
+              <button
+                type="button"
+                className="btn btn-light btn-mini"
+                onClick={deteksiKonsentrasi}
+                disabled={rows.length === 0}
+                title="Membaca konsentrasi dari daftar mata kuliah yang sudah terisi, mis. Riset Iklan → Advertising, Teknik Kamera → Broadcasting."
+              >
+                🔎 Deteksi dari mata kuliah
+              </button>
+            )}
           </label>
           <label>Nomor Ijazah Nasional<input value={meta.noijazah} onChange={(e) => setMeta({ ...meta, noijazah: e.target.value })} /></label>
           <label>Tanggal yudisium<input value={meta.yudisium} onChange={(e) => setMeta({ ...meta, yudisium: e.target.value })} /></label>
           <label className="wide">Akreditasi<input value={meta.akred} onChange={(e) => setMeta({ ...meta, akred: e.target.value })} /></label>
-          <label className="wide">Judul skripsi<textarea value={meta.judul} onChange={(e) => setMeta({ ...meta, judul: e.target.value })} /></label>
+          <label className="wide">Judul skripsi
+            <textarea value={meta.judul} onChange={(e) => setMeta({ ...meta, judul: e.target.value })} />
+            {/* Kaidah penulisan ilmiah: istilah asing dicetak miring. Yang
+                terdaftar dimiringkan sendiri; sisanya ditandai admin dengan
+                tanda bintang — dan begitu satu bintang dipakai, hanya yang
+                ditandai itulah yang miring. */}
+            <small className="tpl-catatan">
+              Istilah Inggris yang dikenali dicetak <i>miring</i> otomatis (mis. <i>brand awareness</i>, <i>content creator</i>).
+              Untuk memaksa yang lain, tulis di antara tanda bintang: <code>*brand ambassador*</code> — sejak satu bintang dipakai, hanya yang bertanda itu yang miring.
+            </small>
+          </label>
           <label>Tanggal cetak<input value={meta.tanggal} onChange={(e) => setMeta({ ...meta, tanggal: e.target.value })} /></label>
           <label>Dekan<input value={meta.dekan} onChange={(e) => setMeta({ ...meta, dekan: e.target.value })} /></label>
           <label>NBM Dekan<input value={meta.nbmdekan} onChange={(e) => setMeta({ ...meta, nbmdekan: e.target.value })} /></label>
@@ -1231,10 +1377,10 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
 
             {/* --- blok atas: nomor ijazah / NPPT / yudisium / akreditasi --- */}
             <div className="doc-top">
-              <div className="dt-cell"><span className="dt-lbl"><Lbl text={L.noij} /></span><span className="dt-sep">:</span><span className="dt-val">{meta.noijazah || "................................"}</span></div>
-              <div className="dt-cell"><span className="dt-lbl"><Lbl text={L.nppt} /></span><span className="dt-sep">:</span><span className="dt-val">{meta.nppt}</span></div>
-              <div className="dt-cell"><span className="dt-lbl"><Lbl text={L.yud} /></span><span className="dt-sep">:</span><span className="dt-val">{meta.yudisium || "-"}</span></div>
-              <div className="dt-cell"><span className="dt-lbl"><Lbl text={L.akred} /></span><span className="dt-sep">:</span><span className="dt-val"><AkredVal text={meta.akred} /></span></div>
+              <div className="dt-cell"><span className="dt-lbl"><LblDoc kunci="noij" teks={L.noij} /></span><span className="dt-sep">:</span><span className="dt-val">{meta.noijazah || "................................"}</span></div>
+              <div className="dt-cell"><span className="dt-lbl"><LblDoc kunci="nppt" teks={L.nppt} /></span><span className="dt-sep">:</span><span className="dt-val">{meta.nppt}</span></div>
+              <div className="dt-cell"><span className="dt-lbl"><LblDoc kunci="yud" teks={L.yud} /></span><span className="dt-sep">:</span><span className="dt-val">{meta.yudisium || "-"}</span></div>
+              <div className="dt-cell"><span className="dt-lbl"><LblDoc kunci="akred" teks={L.akred} /></span><span className="dt-sep">:</span><span className="dt-val"><AkredVal text={meta.akred} /></span></div>
             </div>
 
             {/* --- judul --- */}
@@ -1245,14 +1391,14 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
 
             {/* --- biodata DUA kolom, label bertingkat (acuan gambar) --- */}
             <div className="doc-bio2">
-              <div className="bio-cell"><span className="bio-lbl"><Lbl text={L.nama} /></span><span className="bio-sep">:</span><span className="bio-val">{meta.nama || ""}</span></div>
-              <div className="bio-cell"><span className="bio-lbl"><BiIn text={L.fak} /></span><span className="bio-sep">:</span><span className="bio-val"><Lbl text={L.fakval} /></span></div>
-              <div className="bio-cell"><span className="bio-lbl"><Lbl text={L.nim} /></span><span className="bio-sep">:</span><span className="bio-val">{meta.nim || ""}</span></div>
-              <div className="bio-cell"><span className="bio-lbl"><BiIn text={L.jenjangLbl} /></span><span className="bio-sep">:</span><span className="bio-val"><BiIn text={meta.jenjang} /></span></div>
-              <div className="bio-cell"><span className="bio-lbl"><Lbl text={L.ttl} /></span><span className="bio-sep">:</span><span className="bio-val">{meta.ttl || ""}</span></div>
-              <div className="bio-cell"><span className="bio-lbl"><BiIn text={L.kons} /></span><span className="bio-sep">:</span><span className="bio-val"><BiVal text={konsentrasiText} /></span></div>
-              <div className="bio-cell"><span className="bio-lbl"><Lbl text={L.prodi} /></span><span className="bio-sep">:</span><span className="bio-val"><BiVal text={showProdi(meta.prodi)} /></span></div>
-              <div className="bio-cell"><span className="bio-lbl"><Lbl text={L.npps} /></span><span className="bio-sep">:</span><span className="bio-val">{prodiKode}</span></div>
+              <div className="bio-cell"><span className="bio-lbl"><LblDoc kunci="nama" teks={L.nama} /></span><span className="bio-sep">:</span><span className="bio-val">{meta.nama || ""}</span></div>
+              <div className="bio-cell"><span className="bio-lbl"><LblDoc kunci="fak" teks={L.fak} /></span><span className="bio-sep">:</span><span className="bio-val"><Lbl text={L.fakval} /></span></div>
+              <div className="bio-cell"><span className="bio-lbl"><LblDoc kunci="nim" teks={L.nim} /></span><span className="bio-sep">:</span><span className="bio-val">{meta.nim || ""}</span></div>
+              <div className="bio-cell"><span className="bio-lbl"><LblDoc kunci="jenjangLbl" teks={L.jenjangLbl} /></span><span className="bio-sep">:</span><span className="bio-val"><BiIn text={meta.jenjang} /></span></div>
+              <div className="bio-cell"><span className="bio-lbl"><LblDoc kunci="ttl" teks={L.ttl} /></span><span className="bio-sep">:</span><span className="bio-val">{meta.ttl || ""}</span></div>
+              <div className="bio-cell"><span className="bio-lbl"><LblDoc kunci="kons" teks={L.kons} /></span><span className="bio-sep">:</span><span className="bio-val"><BiVal text={konsentrasiText} /></span></div>
+              <div className="bio-cell"><span className="bio-lbl"><LblDoc kunci="prodi" teks={L.prodi} /></span><span className="bio-sep">:</span><span className="bio-val"><BiVal text={showProdi(meta.prodi)} /></span></div>
+              <div className="bio-cell"><span className="bio-lbl"><LblDoc kunci="npps" teks={L.npps} /></span><span className="bio-sep">:</span><span className="bio-val">{prodiKode}</span></div>
             </div>
 
             {/* --- tabel nilai: tanpa garis antar kolom/baris (acuan PDF) --- */}
@@ -1309,7 +1455,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
                 <span className="dt-a"><BiIn text={L.totNilai} /></span><span className="dt-b">{totals.mutu}</span>
                 <span className="dt-c"><BiIn text={L.predLbl} /></span><span className="dt-d"><b>{showPredikat(predikatKelulusan(totals.ipk, meta.judul))}</b></span>
               </div>
-              <div className="dtot-judul"><span><BiVal text={L.judul} /></span><span>{meta.judul || ""}</span></div>
+              <div className="dtot-judul"><span><BiVal text={L.judul} /></span><span><JudulSkripsi teks={meta.judul} /></span></div>
             </div>
 
             {/* --- tanda tangan dua kolom (acuan gambar) --- */}

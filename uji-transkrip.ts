@@ -11,12 +11,19 @@
 
 import { readFileSync } from "node:fs";
 import { extractBio, parseSheetRows, computeTotals, type Aoa } from "./src/app/dashboard/template/transkrip-parse";
-import { labelTranskrip, pakaiRektorDari, pecahAkreditasi } from "./src/app/dashboard/template/transkrip-label";
+import {
+  labelTranskrip, pakaiRektorDari, pecahAkreditasi,
+  labelSebaris, LABEL_SEBARIS, LABEL_BERTINGKAT,
+} from "./src/app/dashboard/template/transkrip-label";
+import { TEMPLATE_BIO_ROWS } from "./src/app/dashboard/template/transkrip-template";
 import {
   isiInggris, isiUlangInggris, terjemahkanMatkul, rapikanNama, rapikanKode, panenKamus,
-  rantaiLingkup, lingkupUtama, kunciKamus, kodeBentrok, KAMUS_KODE,
-  LINGKUP_PEMERINTAHAN, LINGKUP_ILKOM, LINGKUP_ILKOM_BC,
+  rantaiLingkup, lingkupUtama, kunciKamus, kodeBentrok, KAMUS_KODE, tebakKonsentrasi,
+  NAMA_KONSENTRASI, LINGKUP_PEMERINTAHAN, LINGKUP_ILKOM, LINGKUP_ILKOM_BC,
+  LINGKUP_ILKOM_PR, LINGKUP_ILKOM_ADV,
 } from "./src/lib/kamus-matkul";
+import { penggalJudulInggris, judulBerbahasaIndonesia } from "./src/lib/judul-inggris";
+import { concentrationsFor } from "./src/lib/academic";
 
 const IP = { prodi: "Ilmu Pemerintahan" };
 
@@ -448,6 +455,165 @@ benar("spasi berlebih tetap dikenali", !pakaiRektorDari("  dekan  "));
 // bukan tiba-tiba kehilangan tanda tangan Rektor.
 benar("isian lama tanpa saklar tetap dua tanda tangan", pakaiRektorDari(undefined));
 benar("isian kosong pun tetap dua tanda tangan", pakaiRektorDari(""));
+
+
+console.log("\n=== LABEL SEBARIS vs BERTINGKAT ===\n");
+
+// Acuannya transkrip KUI yang sudah tercetak: label pendek sebaris dengan
+// pasangan Inggrisnya, label panjang dipatahkan. Dikunci di sini karena
+// pilihan yang tersebar di dua puluh baris JSX tidak dapat diperiksa mata.
+benar("TERAKREDITASI sebaris dengan ACCREDITATION", labelSebaris("akred"));
+benar("FAKULTAS sebaris", labelSebaris("fak"));
+benar("JENJANG sebaris", labelSebaris("jenjangLbl"));
+benar("KONSENTRASI sebaris", labelSebaris("kons"));
+for (const kunci of ["noij", "nppt", "yud", "nama", "nim", "ttl", "prodi", "npps"]) {
+  benar(`${kunci} tetap bertingkat`, !labelSebaris(kunci));
+}
+// Tidak boleh ada label yang lupa didaftar, dan tidak boleh ada yang masuk
+// dua daftar sekaligus — keduanya berakhir sebagai tata letak yang diam-diam
+// ikut selera komponennya lagi.
+const KUNCI_LABEL = [...LABEL_SEBARIS, ...LABEL_BERTINGKAT];
+sama("tidak ada label yang masuk dua daftar", new Set(KUNCI_LABEL).size, KUNCI_LABEL.length);
+benar("setiap label yang didaftar memang ada pada kamus label",
+  KUNCI_LABEL.every((kunci) => typeof (EN_LBL as Record<string, unknown>)[kunci] === "string"),
+  KUNCI_LABEL.filter((kunci) => typeof (EN_LBL as Record<string, unknown>)[kunci] !== "string").join(", "));
+// Label yang tercetak di blok atas & biodata, seluruhnya, harus terdaftar.
+const LABEL_DICETAK = ["noij", "nppt", "yud", "akred", "nama", "fak", "nim", "jenjangLbl", "ttl", "kons", "prodi", "npps"];
+benar("seluruh label biodata sudah dipilah sebaris/bertingkat",
+  LABEL_DICETAK.every((kunci) => KUNCI_LABEL.includes(kunci as never)),
+  LABEL_DICETAK.filter((kunci) => !KUNCI_LABEL.includes(kunci as never)).join(", "));
+
+console.log("\n=== UNGGUL TERTULIS LANGSUNG DI TEMPLATE ===\n");
+
+// Template unduhan adalah yang disalin admin apa adanya. Kalau peringkatnya
+// tidak tertulis di situ, setiap transkrip menuntut koreksi tangan yang sama.
+const akredTemplate = TEMPLATE_BIO_ROWS.find(([label]) => /akredit/i.test(label))?.[1] || "";
+sama("template memuat peringkat UNGGUL apa adanya, tanpa tanda kutip",
+  akredTemplate, "UNGGUL LAMSPAK Nomor 156/AK.03.05/2026");
+sama("dan terpenggal benar saat dicetak",
+  pecahAkreditasi(akredTemplate).join(" ¶ "), "UNGGUL ¶ LAMSPAK Nomor 156/AK.03.05/2026");
+benar("konsentrasi contoh pada template termasuk yang dikenali kamus",
+  Boolean(lingkupUtama({ prodi: "Ilmu Komunikasi", konsentrasi: TEMPLATE_BIO_ROWS.find(([l]) => /^konsentrasi/i.test(l))?.[1] })));
+
+console.log("\n=== KONSENTRASI TERBACA DARI MATA KULIAHNYA ===\n");
+
+// Nama konsentrasi yang ditulis ke biodata harus sama persis dengan daftar
+// yang ditawarkan formulir — kalau berselisih, yang ditebak mesin tidak akan
+// cocok dengan pilihan mana pun di layar.
+sama("nama konsentrasi sama dengan daftar prodi",
+  Object.values(NAMA_KONSENTRASI).slice().sort().join(", "),
+  concentrationsFor("Ilmu Komunikasi").slice().sort().join(", "));
+
+const BERKAS_KONSENTRASI: Array<[string, string, string]> = [
+  ["advertising", "Advertising", LINGKUP_ILKOM_ADV],
+  ["broadcasting", "Broadcasting", LINGKUP_ILKOM_BC],
+  ["public-relations", "Public Relations", LINGKUP_ILKOM_PR],
+];
+for (const [berkas, nama, lingkup] of BERKAS_KONSENTRASI) {
+  const lembar = JSON.parse(readFileSync(`./uji-berkas-contoh/transkrip-ilkom-${berkas}.json`, "utf8")) as Aoa;
+  const baris = parseSheetRows(lembar);
+  const tebakan = tebakKonsentrasi(baris, "Ilmu Komunikasi");
+  sama(`${nama}: terbaca dari berkas KUI`, tebakan.konsentrasi, nama);
+  sama(`${nama}: lingkup kamusnya ikut benar`, tebakan.lingkup, lingkup);
+  benar(`${nama}: buktinya ikut disebut`, tebakan.bukti.length > 0);
+  // Base SIMAK mentah tidak membawa kolom Inggris sama sekali.
+  sama(`${nama}: tetap terbaca tanpa kolom Inggris`,
+    tebakKonsentrasi(baris.map((r) => ({ ...r, en: "" })), "ILMU KOMUNIKASI").konsentrasi, nama);
+  // Berkas yang kodenya berganti kurikulum: namanya saja harus cukup.
+  sama(`${nama}: tetap terbaca tanpa kode mata kuliah`,
+    tebakKonsentrasi(baris.map((r) => ({ ...r, kode: "" })), "Ilmu Komunikasi").konsentrasi, nama);
+}
+
+// Contoh yang diminta Admin Akademik, dengan nama Inggrisnya saja.
+const dariNama = (...nama: string[]) =>
+  tebakKonsentrasi(nama.map((n) => ({ kode: "", nama: n, en: "" })), "Ilmu Komunikasi").konsentrasi;
+sama("Advertising Management + Advertising Research", dariNama("Advertising Management", "Advertising Research"), "Advertising");
+sama("Radio Broadcast Production + Camera Techniques", dariNama("Radio Broadcast Production", "Camera Techniques"), "Broadcasting");
+sama("Cyber Public Relations + Public Relations Campaign Strategy",
+  dariNama("Cyber Public Relations", "Public Relations Campaign Strategy"), "Public Relations");
+// Padanan Indonesianya harus sama kuat.
+sama("Riset Iklan + Managemen Periklanan", dariNama("Riset Iklan", "Managemen Periklanan"), "Advertising");
+sama("Produksi Siaran Radio + Teknik Kamera", dariNama("Produksi Siaran Radio", "Teknik Kamera"), "Broadcasting");
+sama("Penulisan Naskah Kehumasan + Protokoler", dariNama("Penulisan Naskah Kehumasan", "Protokoler"), "Public Relations");
+
+// Mata kuliah INTI diambil KETIGA konsentrasi. Memakainya sebagai tanda
+// membuat setiap mahasiswa terbaca Advertising sekaligus Public Relations.
+sama("mata kuliah inti tidak menjadi tanda",
+  dariNama("Dasar Dasar Periklanan", "Dasar Dasar Public Relations"), "");
+// Satu mata kuliah yang HANYA ada di satu konsentrasi sudah menyimpulkan:
+// tidak ada mahasiswa Broadcasting yang mengambil "Riset Iklan".
+sama("satu mata kuliah khas sudah cukup", dariNama("Riset Iklan"), "Advertising");
+// Sebaliknya, satu kata kunci pada mata kuliah yang tidak dikenal kamus mana
+// pun BELUM cukup — kurikulum baru dapat menaruh kata itu di mana saja.
+sama("satu kata kunci saja belum cukup", dariNama("Manajemen Iklan Digital"), "");
+sama("tanda yang terbagi rata tidak ditebak",
+  dariNama("Riset Iklan", "Managemen Periklanan", "Teknik Kamera", "Produksi Siaran Radio"), "");
+sama("daftar kosong tidak ditebak", tebakKonsentrasi([], "Ilmu Komunikasi").konsentrasi, "");
+
+// MKPB-051 di Ilmu Pemerintahan adalah PKL, bukan Produksi Feature TV.
+// Menebak lintas prodi persis melahirkan kembali kekeliruan yang memaksa
+// kamus ini dipecah.
+sama("Ilmu Pemerintahan tidak pernah ditebak konsentrasinya",
+  tebakKonsentrasi(rows, "Ilmu Pemerintahan").konsentrasi, "");
+sama("prodi kosong pun tidak ditebak", tebakKonsentrasi(rows, "").konsentrasi, "");
+
+console.log("\n=== ISTILAH INGGRIS PADA JUDUL SKRIPSI DICETAK MIRING ===\n");
+
+const dicetak = (judul: string) =>
+  penggalJudulInggris(judul).map((p) => (p.miring ? `<i>${p.teks}</i>` : p.teks)).join("");
+
+sama("brand awareness dimiringkan utuh, bukan sepotong",
+  dicetak("Pengaruh Brand Awareness terhadap Minat Beli"),
+  "Pengaruh <i>Brand Awareness</i> terhadap Minat Beli");
+sama("ungkapan panjang menang atas kata pendek di dalamnya",
+  dicetak("Peran Cyber Public Relations dalam Membangun Citra"),
+  "Peran <i>Cyber Public Relations</i> dalam Membangun Citra");
+sama("dua istilah berbeda dimiringkan sendiri-sendiri",
+  dicetak("Analisis Personal Branding Content Creator di TikTok"),
+  "Analisis <i>Personal Branding</i> <i>Content Creator</i> di TikTok");
+
+// Kata serapan yang sudah baku ditulis tegak. Memiringkannya sama kelirunya
+// dengan membiarkan istilah asing tegak.
+for (const kata of ["Media", "Publik", "Digital", "Televisi", "Strategi", "Komunikasi", "Program", "Produksi"]) {
+  const judul = `Peran ${kata} dalam Pembangunan Daerah`;
+  benar(`kata serapan "${kata}" tetap tegak`, dicetak(judul) === judul, dicetak(judul));
+}
+benar("judul tanpa istilah asing tidak disentuh sama sekali",
+  dicetak("Upaya Meminimalisir Angka Putus Sekolah di SMKN Kota Tangerang") ===
+    "Upaya Meminimalisir Angka Putus Sekolah di SMKN Kota Tangerang");
+
+// Tanda bintang admin menang penuh: yang miring persis yang ia tandai.
+sama("admin dapat memaksa istilah yang belum terdaftar",
+  dicetak("Pengaruh *Brand Ambassador* terhadap Minat Beli"),
+  "Pengaruh <i>Brand Ambassador</i> terhadap Minat Beli");
+sama("sejak satu bintang dipakai, daftar tidak ikut bekerja",
+  dicetak("Pengaruh *Brand Ambassador* terhadap Brand Awareness"),
+  "Pengaruh <i>Brand Ambassador</i> terhadap Brand Awareness");
+sama("tanda bintangnya sendiri tidak ikut tercetak",
+  penggalJudulInggris("Pengaruh *Brand Ambassador* terhadap Minat Beli").map((p) => p.teks).join(""),
+  "Pengaruh Brand Ambassador terhadap Minat Beli");
+
+// Judul transkrip berbahasa Inggris seluruhnya TIDAK dimiringkan: memiringkan
+// seluruh kalimat bukan lagi penanda istilah asing.
+benar("judul yang seluruhnya Inggris dibiarkan tegak",
+  penggalJudulInggris("The Influence of Social Media Marketing on Purchase Intention")
+    .every((p) => !p.miring));
+benar("judul Indonesia dikenali sebagai Indonesia",
+  judulBerbahasaIndonesia("Pengaruh Brand Awareness terhadap Minat Beli"));
+benar("judul Inggris tidak dikenali sebagai Indonesia",
+  !judulBerbahasaIndonesia("The Influence of Social Media on Purchase Intention"));
+sama("judul kosong tidak menghasilkan penggalan apa pun", penggalJudulInggris("").length, 0);
+sama("judul berisi spasi saja pun kosong", penggalJudulInggris("   ").length, 0);
+// Seluruh huruf judul harus utuh: satu huruf yang hilang ikut dicetak dan
+// ikut dilegalisir.
+for (const judul of [
+  "Pengaruh Brand Awareness terhadap Minat Beli Konsumen pada Media Sosial",
+  "Analisis Personal Branding Content Creator di TikTok",
+  "Upaya Meminimalisir Angka Putus Sekolah di SMKN Kota Tangerang",
+]) {
+  sama(`judul utuh: "${judul.slice(0, 28)}…"`,
+    penggalJudulInggris(judul).map((p) => p.teks).join(""), judul);
+}
 
 console.log(`\n${lulus} periksa lulus`);
 if (gagal.length > 0) {

@@ -124,7 +124,17 @@ export const TEMPLATE_BIO_ROWS: Array<[string, string]> = [
   ["Nomor Ijazah Nasional", ""],
   ["NPPT", "041051"],
   ["Tanggal Yudisium", "9 Juli 2026"],
-  ["Akreditasi", '"UNGGUL" LAMSPAK Nomor 099/AK.03.05/2026'],
+  // Peringkat akreditasi ditulis LANGSUNG di template, tanpa tanda kutip,
+  // dan dengan nomor SK yang sedang berlaku — sama persis dengan bawaan
+  // transkrip di layar. Sebelumnya template membawa tanda kutip dan nomor SK
+  // lama, jadi setiap admin yang mengunduhnya menyalin isian yang kemudian
+  // harus dibetulkan tangan satu per satu sebelum cetak.
+  //
+  // Satu sel untuk keduanya: peringkat di depan, rujukan SK di belakang.
+  // `pecahAkreditasi` yang memisahkannya menjadi dua baris saat dicetak —
+  // memecahnya menjadi dua kolom di sini akan membuat impor kehilangan
+  // salah satunya.
+  ["Akreditasi", "UNGGUL LAMSPAK Nomor 156/AK.03.05/2026"],
   ["Judul Skripsi", ""],
   ["Tanggal Surat", ""],
   ["Dekan", "Dr. H. Achmad Kosasih, MM."],
