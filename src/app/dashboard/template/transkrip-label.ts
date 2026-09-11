@@ -36,8 +36,9 @@ export function labelTranskrip(EN: boolean) {
         nppt: "NOMOR POKOK PERGURUAN TINGGI /|NATIONAL HIGHER EDUCATION INSTITUTION CODE",
         yud: "TANGGAL YUDISIUM /|DATE OF DEGREE CONFERRAL", akred: "TERAKREDITASI /|ACCREDITATION",
         nama: "NAMA MAHASISWA /|STUDENT NAME",
-        // Tiga label ini dicetak KUI pada satu baris, tidak bertingkat seperti
-        // label kolom kiri. Dirender dengan <BiIn>, bukan <Lbl>.
+        // Sebagian label dicetak KUI pada SATU baris, tidak bertingkat —
+        // daftarnya ada pada `LABEL_SEBARIS` di bawah, bukan ditebak di
+        // tempat pemakaiannya.
         fak: "FAKULTAS /|FACULTY",
         fakval: "ILMU SOSIAL DAN ILMU POLITIK /|SOCIAL AND POLITICAL SCIENCES",
         nim: "NOMOR INDUK MAHASISWA /|STUDENT IDENTIFICATION NUMBER",
@@ -113,4 +114,40 @@ export function pecahAkreditasi(nilai: string): [peringkat: string, sk: string] 
  */
 export function pakaiRektorDari(ttd: string | undefined): boolean {
   return String(ttd || "").trim().toLowerCase() !== "dekan";
+}
+
+/**
+ * Label mana yang tercetak SEBARIS, label mana yang BERTINGKAT.
+ *
+ * Pada transkrip KUI, bagian Inggris label TIDAK selalu turun ke baris
+ * bawah. Yang menentukan bukan selera, melainkan panjang labelnya: yang
+ * pendek muat sebaris dengan pasangan Inggrisnya, yang panjang dipatahkan
+ * supaya kolom nilainya tidak ikut terdorong ke kanan.
+ *
+ *     TERAKREDITASI / ACCREDITATION   :  UNGGUL          <- sebaris
+ *     FAKULTAS / FACULTY              :  ILMU SOSIAL …   <- sebaris
+ *     JENJANG / DEGREE LEVEL          :  SARJANA / …     <- sebaris
+ *     KONSENTRASI / CONCENTRATION     :  ADVERTISING     <- sebaris
+ *
+ *     NAMA MAHASISWA /                :  LUTFI ALHABSY   <- bertingkat
+ *     STUDENT NAME
+ *     NOMOR INDUK MAHASISWA /         :  2270201140      <- bertingkat
+ *     STUDENT IDENTIFICATION NUMBER
+ *
+ * "TERAKREDITASI" sempat ikut dipatahkan padahal pada transkrip acuan ia
+ * sebaris — dan patahan yang salah menggeser nomor SK akreditasi satu baris
+ * ke bawah, tepat di tempat yang paling sering dibaca pemeriksa ijazah.
+ *
+ * Didaftar di sini, bukan ditebak dari panjang teksnya: yang tercetak harus
+ * sama dengan acuan KUI, dan acuan tidak dapat dihitung dari jumlah huruf.
+ */
+export const LABEL_SEBARIS = ["akred", "fak", "jenjangLbl", "kons"] as const;
+
+export const LABEL_BERTINGKAT = [
+  "noij", "nppt", "yud", "nama", "nim", "ttl", "prodi", "npps",
+] as const;
+
+/** Apakah label ini dicetak sebaris dengan pasangan Inggrisnya? */
+export function labelSebaris(kunci: string): boolean {
+  return (LABEL_SEBARIS as readonly string[]).includes(kunci);
 }

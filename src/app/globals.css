@@ -719,6 +719,10 @@ table.qt td small { display: block; color: var(--muted); font-size: 9px; margin-
 .tpl-fields textarea { height: auto; min-height: 52px; padding: 7px 9px; resize: vertical; line-height: 1.45; }
 .tpl-fields input:focus, .tpl-fields select:focus, .tpl-fields textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(21, 101, 216, 0.12); }
 .tpl-hint { margin: 0 0 8px; color: var(--muted); font-size: 10px; }
+/* Catatan kecil di bawah satu kolom isian — mis. cara memaksa huruf miring
+   pada Judul skripsi. Huruf tipis supaya tidak terbaca sebagai label. */
+.tpl-fields .tpl-catatan { color: var(--muted); font-size: 9.5px; font-weight: 500; line-height: 1.45; }
+.tpl-fields .tpl-catatan code { background: #f1f5f9; border-radius: 4px; padding: 0 3px; }
 .tpl-rows { display: flex; flex-direction: column; gap: 6px; max-height: 330px; overflow: auto; padding-right: 4px; }
 .tpl-row { display: grid; grid-template-columns: 74px 1fr 52px 52px 28px; gap: 5px; }
 .tpl-row input, .tpl-row select { border: 1px solid #dbe3ee; border-radius: 7px; height: 30px; padding: 0 7px; font-size: 10.5px; outline: none; }
