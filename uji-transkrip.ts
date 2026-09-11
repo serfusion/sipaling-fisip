@@ -12,8 +12,12 @@
 import { readFileSync } from "node:fs";
 import { extractBio, parseSheetRows, computeTotals, type Aoa } from "./src/app/dashboard/template/transkrip-parse";
 import {
-  isiInggris, terjemahkanMatkul, rapikanNama, rapikanKode, panenKamus, KAMUS_KODE,
+  isiInggris, isiUlangInggris, terjemahkanMatkul, rapikanNama, rapikanKode, panenKamus,
+  rantaiLingkup, lingkupUtama, kunciKamus, kodeBentrok, KAMUS_KODE,
+  LINGKUP_PEMERINTAHAN, LINGKUP_ILKOM, LINGKUP_ILKOM_BC,
 } from "./src/lib/kamus-matkul";
+
+const IP = { prodi: "Ilmu Pemerintahan" };
 
 let lulus = 0;
 const gagal: string[] = [];
@@ -78,7 +82,7 @@ benar("tidak ada satu pun nama Inggris satu-dua huruf",
 
 console.log("\n=== KAMUS: BERKAS INDONESIA JADI DWIBAHASA ===\n");
 
-const hasil = isiInggris(rows);
+const hasil = isiInggris(rows, {}, IP);
 sama("seluruh 53 baris terisi bahasa Inggris", hasil.rows.filter((r) => r.en).length, 53);
 sama("semuanya dari kamus, bukan tebakan kata", hasil.dariKasar, 0);
 sama("tidak ada yang perlu dicek manual", hasil.perluDicek.length, 0);
@@ -97,20 +101,21 @@ console.log("\n=== ATURAN KAMUS ===\n");
 
 // Kode didahulukan atas nama: kode unik per kurikulum, sedangkan nama dapat
 // ditulis berbeda oleh operator yang berbeda.
-sama("kode menang atas nama", terjemahkanMatkul("MKK-011", "Nama Yang Salah Ketik").sumber, "kode");
-sama("nama dipakai bila kodenya asing", terjemahkanMatkul("XXX-999", "Kewirausahaan").sumber, "nama");
-sama("ejaan berbeda tetap ketemu", terjemahkanMatkul("", "MANAJEMEN KONFLIK").en, "Conflict Management");
-sama("spasi berlebih tidak masalah", terjemahkanMatkul("", "  Kepemimpinan  ").en, "Leadership");
-sama("kode berspasi tetap ketemu", terjemahkanMatkul(" mkk-011 ", "").en, "Basic Cultural Sciences");
+sama("kode menang atas nama", terjemahkanMatkul("MKK-011", "Nama Yang Salah Ketik", {}, IP).sumber, "kode");
+sama("nama dipakai bila kodenya asing", terjemahkanMatkul("XXX-999", "Kewirausahaan", {}, IP).sumber, "nama");
+sama("ejaan berbeda tetap ketemu", terjemahkanMatkul("", "MANAJEMEN KONFLIK", {}, IP).en, "Conflict Management");
+sama("spasi berlebih tidak masalah", terjemahkanMatkul("", "  Kepemimpinan  ", {}, IP).en, "Leadership");
+sama("kode berspasi tetap ketemu", terjemahkanMatkul(" mkk-011 ", "", {}, IP).en, "Basic Cultural Sciences");
 
 // Yang tidak dikenal tetap mendapat sesuatu yang terbaca, DAN ditandai.
-const asing = terjemahkanMatkul("ZZZ-001", "Sistem Pemerintahan Antariksa");
+const asing = terjemahkanMatkul("ZZZ-001", "Sistem Pemerintahan Antariksa", {}, IP);
 sama("mata kuliah asing ditandai sebagai tebakan", asing.sumber, "kasar");
 benar("tebakannya tetap terbaca", asing.en.includes("Government System"), asing.en);
-sama("nama kosong tidak menghasilkan apa-apa", terjemahkanMatkul("", "").sumber, "kosong");
+sama("nama kosong tidak menghasilkan apa-apa", terjemahkanMatkul("", "", {}, IP).sumber, "kosong");
 
 // Terjemahan resmi dari KUI SELALU menang atas kamus.
-const sudahInggris = isiInggris([{ kode: "MKK-011", nama: "Ilmu Budaya Dasar", en: "Terjemahan Resmi KUI" }]);
+const sudahInggris = isiInggris(
+  [{ kode: "MKK-011", nama: "Ilmu Budaya Dasar", en: "Terjemahan Resmi KUI" }], {}, IP);
 sama("yang sudah berisi tidak ditimpa", sudahInggris.rows[0].en, "Terjemahan Resmi KUI");
 sama("dan dihitung sebagai sudah ada", sudahInggris.sudahAda, 1);
 
@@ -131,13 +136,28 @@ console.log("\n=== KAMUS YANG TUMBUH DARI KOREKSI ADMIN ===\n");
 
 // Koreksi tangan admin harus menang atas daftar bawaan — daftar bawaan
 // ditulis sekali, koreksinya dibuat orang yang sedang melihat berkasnya.
+const koreksiIP = { [kunciKamus(LINGKUP_PEMERINTAHAN, "MKK-011")]: "Introduction to Culture" };
 sama("kamus tambahan mengalahkan bawaan",
-  terjemahkanMatkul("MKK-011", "Ilmu Budaya Dasar", { "MKK-011": "Introduction to Culture" }).en,
-  "Introduction to Culture");
+  terjemahkanMatkul("MKK-011", "Ilmu Budaya Dasar", koreksiIP, IP).en, "Introduction to Culture");
 sama("dan tetap ditandai berasal dari kode",
-  terjemahkanMatkul("MKK-011", "", { "MKK-011": "Introduction to Culture" }).sumber, "kode");
+  terjemahkanMatkul("MKK-011", "", koreksiIP, IP).sumber, "kode");
 sama("kode yang tidak ada di tambahan jatuh ke bawaan",
-  terjemahkanMatkul("MKK-012", "", { "MKK-011": "X" }).en, "Introduction to Sociology");
+  terjemahkanMatkul("MKK-012", "", koreksiIP, IP).en, "Introduction to Sociology");
+
+// Koreksi berlingkup TIDAK boleh bocor ke prodi lain: MKK-011 Ilmu
+// Pemerintahan dan kamus Ilmu Komunikasi adalah dua laci yang berbeda.
+sama("koreksi Ilmu Pemerintahan tidak mengubah Ilmu Komunikasi",
+  terjemahkanMatkul("MKK-012", "Ilmu Budaya Dasar", koreksiIP, { prodi: "Ilmu Komunikasi" }).en,
+  "Basic Cultural Studies");
+
+// Kunci lama tanpa lingkup tetap terpakai — tetapi hanya untuk kode yang
+// kamus bawaan memang tidak punya, bukan menimpa transkrip resmi.
+sama("kunci lama mengisi kode yang belum dikenal",
+  terjemahkanMatkul("ZZZ-777", "", { "ZZZ-777": "Legacy Course" }, IP).en, "Legacy Course");
+sama("kunci lama TIDAK menimpa nama resmi konsentrasi",
+  terjemahkanMatkul("MKPB-051", "Produksi Feature TV", { "MKPB-051": "Field Work Practice (Internship)" },
+    { prodi: "Ilmu Komunikasi", konsentrasi: "Broadcasting" }).en,
+  "TV Feature Production");
 
 // Yang dipanen hanya yang BERBEDA dari bawaan; menyimpan ulang yang sama
 // hanya menggelembungkan penyimpanan tanpa mengubah hasil apa pun.
@@ -146,14 +166,164 @@ const panen = panenKamus([
   { kode: "ZZZ-001", nama: "Mata Kuliah Baru", en: "Brand New Course" },
   { kode: "ZZZ-002", nama: "Tanpa Inggris", en: "" },
   { kode: "", nama: "Tanpa Kode", en: "No Code" },
-]);
+], IP);
 sama("hanya satu pasangan yang layak diingat", panen.length, 1);
 sama("dan itu yang benar-benar baru", panen[0].kode, "ZZZ-001");
+sama("lingkupnya ikut dipanen", panen[0].lingkup, LINGKUP_PEMERINTAHAN);
 sama("kode kembar tidak dipanen dua kali",
   panenKamus([
     { kode: "ZZZ-003", nama: "A", en: "Alpha" },
     { kode: "zzz-003", nama: "A", en: "Alpha" },
-  ]).length, 1);
+  ], IP).length, 1);
+
+// Tanpa prodi, koreksinya tidak punya laci. Menyimpannya datar persis
+// melahirkan kembali bug yang memaksa kamus ini dipecah.
+sama("tanpa prodi tidak ada yang dipanen",
+  panenKamus([{ kode: "ZZZ-004", nama: "B", en: "Beta" }]).length, 0);
+sama("konsentrasi ikut menentukan laci",
+  panenKamus([{ kode: "ZZZ-005", nama: "C", en: "Gamma" }],
+    { prodi: "Ilmu Komunikasi", konsentrasi: "Broadcasting" })[0].lingkup,
+  LINGKUP_ILKOM_BC);
+
+console.log("\n=== ILMU KOMUNIKASI: TIGA KONSENTRASI ===\n");
+
+// Bahannya transkrip dwibahasa RESMI fakultas untuk ketiga konsentrasi, tanpa
+// nama dan NIM mahasiswanya. Kolom Inggris pada berkas itu adalah jawaban
+// yang benar; uji ini membuang kolom tersebut, mengisinya kembali dari kamus,
+// lalu menuntut hasilnya sama persis. Kalau kamus bergeser satu kata pun dari
+// yang dicetak fakultas, uji ini gagal.
+const KONSENTRASI: Array<[string, string]> = [
+  ["public-relations", "Public Relations"],
+  ["broadcasting", "Broadcasting"],
+  ["advertising", "Advertising"],
+];
+
+// Ketiga berkas resmi itu TIDAK seragam satu sama lain: lima kode ditulis
+// berbeda di salah satu berkas. Kamus memakai bunyi yang muncul pada
+// MAYORITAS berkas, dan yang menyimpang didaftar di sini — bukan disembunyikan
+// di balik uji yang longgar. Daftar ini ikut diperiksa: kalau salah satunya
+// ternyata tidak lagi menyimpang, uji ini gagal dan daftarnya harus dirapikan.
+const MENYIMPANG: Record<string, Record<string, string>> = {
+  // Dua berkas lain menulis "Islamic and Muhammadiyah Studies III/IV/V"
+  // polos, sama seperti AIKA I dan II di berkas ini sendiri.
+  "public-relations": {
+    "MPK-003": "Al-Islam and Kemuhammadiyahan III (Islamic and Muhammadiyah Studies III)",
+    "MPK-004": "Al-Islam and Kemuhammadiyahan IV (Islamic and Muhammadiyah Studies IV)",
+    "MPK-005": "Al-Islam and Kemuhammadiyahan V (Islamic and Muhammadiyah Studies V)",
+  },
+  // "Sociology and System Social Indonesia" bukan bahasa Inggris yang benar;
+  // dua berkas lain menulis "Sociology and Indonesian Social System".
+  // "Komunikasi Sosial Pembangunan" ditulis "Development Communication" pada
+  // dua berkas lain — yang itu betul-betul pilihan kata, bukan salah tulis.
+  broadcasting: {
+    "MPK-011": "Sociology and System Social Indonesia",
+    "MKB-011": "Social Development Communication",
+  },
+  advertising: {},
+};
+
+for (const [berkas, konsentrasi] of KONSENTRASI) {
+  const lembar = JSON.parse(
+    readFileSync(`./uji-berkas-contoh/transkrip-ilkom-${berkas}.json`, "utf8"),
+  ) as Aoa;
+  const bioIlkom = extractBio(lembar);
+  const barisIlkom = parseSheetRows(lembar);
+  const lingkup = { prodi: bioIlkom.prodi, konsentrasi: bioIlkom.konsentrasi };
+
+  sama(`${konsentrasi}: prodi terbaca`, bioIlkom.prodi, "ILMU KOMUNIKASI");
+  // Label pada berkas fakultas tertulis "KONSETRASI" — salah ketik yang sudah
+  // dipakai bertahun-tahun. Pembacanya harus tetap mengenalinya.
+  sama(`${konsentrasi}: konsentrasi terbaca meski labelnya salah ketik`,
+    bioIlkom.konsentrasi, konsentrasi.toUpperCase());
+  sama(`${konsentrasi}: 52 mata kuliah terbaca`, barisIlkom.length, 52);
+
+  // Mata kuliah yang nama Indonesia dan Inggrisnya SAMA PERSIS ("Media
+  // Relations", "Digital Editing", "Public Speaking") tidak punya baris
+  // Inggris tersendiri untuk dibaca — pembacanya menolak menyalin nama ke
+  // dirinya sendiri. Yang seperti itu diisi kamus, dan hasilnya sama saja.
+  const resmi = new Map(barisIlkom.filter((r) => r.en).map((r) => [r.kode, r.en]));
+  benar(`${konsentrasi}: sebagian besar kolom Inggris terbaca dari berkasnya`,
+    resmi.size >= 49, `${resmi.size} dari 52`);
+
+  const diisi = isiUlangInggris(barisIlkom, {}, lingkup);
+  sama(`${konsentrasi}: seluruh 52 baris terisi`, diisi.rows.filter((r) => r.en).length, 52);
+  sama(`${konsentrasi}: tidak ada yang cuma tebakan kata`, diisi.dariKasar, 0);
+
+  const simpang = MENYIMPANG[berkas];
+  const beda = diisi.rows.filter((r) => resmi.has(r.kode) && r.en !== resmi.get(r.kode));
+  const takTerduga = beda.filter((r) => simpang[r.kode] === undefined);
+  benar(`${konsentrasi}: nama Inggris sama persis dengan transkrip resmi`,
+    takTerduga.length === 0,
+    takTerduga.map((r) => `${r.kode} "${r.nama}": kamus "${r.en}" ≠ resmi "${resmi.get(r.kode)}"`).join(" | "));
+
+  // Daftar penyimpangan diperiksa dua arah supaya tidak menjadi karpet.
+  for (const [kode, tertulis] of Object.entries(simpang)) {
+    sama(`${konsentrasi}: ${kode} memang ditulis lain di berkas ini`, resmi.get(kode), tertulis);
+    benar(`${konsentrasi}: ${kode} dipakai versi mayoritas`,
+      diisi.rows.find((r) => r.kode === kode)?.en !== tertulis);
+  }
+}
+
+console.log("\n=== KODE YANG BERTABRAKAN ANTAR PRODI ===\n");
+
+// Inilah sebabnya kamus dipecah. Kesepuluh kode ini dipakai OLEH KEDUA prodi
+// untuk mata kuliah yang berbeda; sebelum diperbaiki, transkrip Ilmu
+// Komunikasi tercetak dengan nama mata kuliah Ilmu Pemerintahan.
+const BENTROK: Array<[string, string, string]> = [
+  ["MKK-012", "Introduction to Sociology", "Basic Cultural Studies"],
+  ["MKK-020", "Fundamentals of Logic", "Computer and Multimedia"],
+  ["MPK-001", "Al-Islam and Kemuhammadiyahan I", "Islamic and Muhammadiyah Studies I"],
+  ["MPK-010", "Philosophy of Science", "Philosophy of Knowledge and Fundamentals of Logic"],
+];
+const BC = { prodi: "Ilmu Komunikasi", konsentrasi: "Broadcasting" };
+for (const [kode, ip, ilkom] of BENTROK) {
+  sama(`${kode} di Ilmu Pemerintahan`, terjemahkanMatkul(kode, "", {}, IP).en, ip);
+  sama(`${kode} di Ilmu Komunikasi`, terjemahkanMatkul(kode, "", {}, BC).en, ilkom);
+}
+
+// MKPB-051/052 adalah tabrakan yang paling mahal: di Ilmu Pemerintahan itu
+// PKL dan KKN, di Broadcasting itu dua mata kuliah produksi televisi.
+sama("MKPB-051 di Ilmu Pemerintahan", terjemahkanMatkul("MKPB-051", "", {}, IP).en,
+  "Field Work Practice (Internship)");
+sama("MKPB-051 di Broadcasting", terjemahkanMatkul("MKPB-051", "", {}, BC).en, "TV Feature Production");
+sama("MKPB-052 di Ilmu Pemerintahan", terjemahkanMatkul("MKPB-052", "", {}, IP).en,
+  "Community Service Program");
+sama("MKPB-052 di Broadcasting", terjemahkanMatkul("MKPB-052", "", {}, BC).en,
+  "Production and Post-Production");
+
+// Tanpa prodi, kode yang bertabrakan TIDAK ditebak. Menebak berarti mencetak
+// nama mata kuliah prodi lain pada dokumen resmi yang ikut dilegalisir.
+sama("tanpa prodi, kode bentrok tidak dijawab dari kode",
+  terjemahkanMatkul("MKPB-051", "").sumber, "kosong");
+benar("daftar kode bentrok memuat kesepuluhnya",
+  kodeBentrok().length === 10, kodeBentrok().join(", "));
+// Kode yang berarti sama di mana pun tetap dijawab tanpa prodi.
+sama("tanpa prodi, kode yang tidak bentrok tetap dijawab",
+  terjemahkanMatkul("MKB-044", "").en, "Undergraduate Thesis");
+
+console.log("\n=== RANTAI LINGKUP ===\n");
+
+// Konsentrasi yang tertulis selalu di depan; dua konsentrasi lain tetap ikut
+// ditelusuri supaya mata kuliah lintas konsentrasi tidak jatuh ke tebakan.
+sama("konsentrasi tertulis berada paling depan", rantaiLingkup(BC)[0], LINGKUP_ILKOM_BC);
+sama("lalu inti Ilmu Komunikasi", rantaiLingkup(BC)[1], LINGKUP_ILKOM);
+sama("rantai Broadcasting memuat keempat kamus", rantaiLingkup(BC).length, 4);
+sama("mata kuliah lintas konsentrasi tetap ketemu",
+  terjemahkanMatkul("MKSA-048", "Managemen Periklanan", {}, BC).en, "Advertising Management");
+sama("ejaan konsentrasi bebas — 'BROADCASTING' huruf besar",
+  lingkupUtama({ prodi: "ILMU KOMUNIKASI", konsentrasi: "BROADCASTING" }), LINGKUP_ILKOM_BC);
+sama("ejaan Indonesia pun dikenali — 'Penyiaran'",
+  lingkupUtama({ prodi: "Ilmu Komunikasi", konsentrasi: "Penyiaran" }), LINGKUP_ILKOM_BC);
+sama("konsentrasi kosong jatuh ke inti Ilmu Komunikasi",
+  lingkupUtama({ prodi: "Ilmu Komunikasi" }), LINGKUP_ILKOM);
+sama("Ilmu Pemerintahan tidak punya konsentrasi", rantaiLingkup(IP).length, 1);
+sama("prodi asing menghasilkan rantai kosong", rantaiLingkup({ prodi: "Ilmu Hukum" }).length, 0);
+
+// Konsentrasi yang belum tertulis tetap menjangkau ketiganya — base SIMAK
+// mentah memuat PROGRAM STUDI tetapi tidak selalu memuat KONSENTRASI.
+sama("tanpa konsentrasi, mata kuliah Advertising tetap ketemu",
+  terjemahkanMatkul("MKSA-046", "", {}, { prodi: "Ilmu Komunikasi" }).en,
+  "Visual Communication Design I");
 
 console.log(`\n${lulus} periksa lulus`);
 if (gagal.length > 0) {

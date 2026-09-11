@@ -6,8 +6,9 @@ import { useAutoLogout } from "@/lib/use-auto-logout";
 import { sanitizeLetterHtml } from "@/lib/sanitize-html";
 import { DEFAULT_LETTER_HTML, LETTER_TITLES, type LetterSlug } from "./letter-defaults";
 import { AM, HMS, computeTotals, extractBio, parseSheetRows, type Aoa, type CourseRow } from "./transkrip-parse";
-import { isiInggris, panenKamus } from "@/lib/kamus-matkul";
+import { isiInggris, isiUlangInggris, kunciKamus, panenKamus, type Lingkup } from "@/lib/kamus-matkul";
 import { periksaSiapArsip, predikatKelulusan, sidikTranskrip } from "@/lib/arsip-transkrip";
+import { concentrationsFor } from "@/lib/academic";
 import {
   TEMPLATE_BIO_ROWS, TEMPLATE_NILAI_CONTOH, TEMPLATE_NILAI_HEADER,
   TEMPLATE_SHEET_BIO, TEMPLATE_SHEET_NILAI,
@@ -44,6 +45,13 @@ const PRODI = [
   { nama: "Ilmu Pemerintahan", kode: "65201" },
   { nama: "Ilmu Komunikasi", kode: "70201" },
 ];
+
+// Konsentrasi Ilmu Komunikasi. Bukan sekadar isian biodata: konsentrasi
+// menentukan kamus mana yang dipakai untuk mengisi kolom Inggris, karena
+// MKPB-051 berarti "Produksi Feature TV" di Broadcasting dan "PKL" di Ilmu
+// Pemerintahan. Isiannya tetap bebas diketik — daftar ini hanya
+// menawarkan ejaan yang sudah dikenali kamus.
+const KONSENTRASI_ILKOM = concentrationsFor("Ilmu Komunikasi");
 
 function todayID() {
   return new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
@@ -143,8 +151,17 @@ export default function TemplateApp({ profile, initialJenis, initialArsip }: { p
  * ikut dilegalisir; admin harus tahu baris mana yang perlu ia lihat sendiri
  * sebelum mencetaknya.
  */
-function ringkasBahasa(hasil: { dariKamus: number; dariKasar: number; sudahAda: number; perluDicek: string[] }) {
+function ringkasBahasa(
+  hasil: { dariKamus: number; dariKasar: number; sudahAda: number; perluDicek: string[] },
+  lingkup?: Lingkup,
+) {
   const bagian: string[] = [];
+  // Kamus MANA yang dipakai ikut disebut. Kode mata kuliah tidak unik antar
+  // prodi, jadi kalau prodi atau konsentrasinya salah terbaca, seluruh kolom
+  // Inggris ikut salah — dan satu-satunya cara admin menangkapnya sebelum
+  // mencetak adalah melihat kamus mana yang dipilih.
+  const kamus = [lingkup?.prodi, lingkup?.konsentrasi].filter(Boolean).join(" — ");
+  if (kamus) bagian.push(`kamus ${kamus}`);
   if (hasil.dariKamus > 0) bagian.push(`${hasil.dariKamus} nama Inggris terisi dari kamus`);
   if (hasil.sudahAda > 0) bagian.push(`${hasil.sudahAda} sudah berbahasa Inggris di filenya`);
   if (hasil.dariKasar > 0) {
@@ -381,6 +398,43 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
   const half = Math.ceil(rows.length / 2);
   const columns = [rows.slice(0, half), rows.slice(half)];
 
+  /**
+   * Lingkup kurikulum untuk satu berkas: prodi + konsentrasi.
+   *
+   * Yang tertulis DI BERKASNYA selalu menang. Isian layar hanya dipakai
+   * untuk yang tidak disebut berkasnya sama sekali — base SIMAK mentah
+   * memuat "PROGRAM STUDI" tetapi tidak selalu memuat "KONSENTRASI".
+   * Kalau ternyata keliru, admin membetulkan biodatanya lalu menekan
+   * "Isi ulang kolom Inggris"; tidak ada yang terkunci.
+   */
+  function lingkupDari(bio: Record<string, string> = {}): Lingkup {
+    return {
+      prodi: bio.prodi?.trim() || meta.prodi,
+      konsentrasi: bio.konsentrasi?.trim() || meta.konsentrasi,
+    };
+  }
+
+  /** Lingkup yang sedang tampil di layar — dipakai tombol & penyimpan kamus. */
+  const lingkupLayar: Lingkup = { prodi: meta.prodi, konsentrasi: meta.konsentrasi };
+
+  /**
+   * Terjemahkan ulang SELURUH kolom Inggris memakai prodi & konsentrasi yang
+   * sekarang tertulis di biodata.
+   *
+   * Ditekan sendiri oleh admin, tidak berjalan otomatis: menimpa kolom
+   * Inggris tanpa diminta akan menghapus koreksi tangan yang baru saja ia
+   * ketik, dan terjemahan resmi KUI yang ikut terbaca dari berkas dwibahasa.
+   */
+  function terjemahUlang() {
+    if (rows.length === 0) return;
+    const hasil = isiUlangInggris(rows, kamusTambahan, lingkupLayar);
+    setRows(hasil.rows);
+    setImportMsg({
+      kind: "ok",
+      text: `Kolom Inggris diisi ulang: ${rows.length} baris` + ringkasBahasa(hasil, lingkupLayar) + ".",
+    });
+  }
+
   function applyBio(bio: Record<string, string>) {
     setMeta((current) => {
       const next = { ...current };
@@ -417,7 +471,12 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
     // Berkas mentah dari SIMAK hanya berbahasa Indonesia. Kolom Inggrisnya
     // diisi dari kamus supaya transkrip English tidak perlu menunggu kiriman
     // KUI; yang sudah berisi — berkas dwibahasa — tidak pernah ditimpa.
-    const bahasa = isiInggris(parsed, kamusTambahan);
+    //
+    // Lingkupnya diambil dari BIODATA BERKAS INI, bukan dari yang sedang
+    // tampil di layar: kalau tidak, mahasiswa Ilmu Komunikasi yang diimpor
+    // sesudah mahasiswa Ilmu Pemerintahan akan diterjemahkan memakai kamus
+    // prodi sebelumnya, dan MKK-012 tercetak "Introduction to Sociology".
+    const bahasa = isiInggris(parsed, kamusTambahan, lingkupDari(bio));
     setRows(bahasa.rows);
     applyBio(bio);
     const dilepas = lepasTataLetak();
@@ -425,7 +484,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
       kind: "ok",
       text: `Sheet "${name}": ${parsed.length} mata kuliah terbaca (dua blok kolom digabung)` +
         (bio.nama ? `; biodata ${bio.nama} ikut terisi` : "") +
-        ringkasBahasa(bahasa) +
+        ringkasBahasa(bahasa, lingkupDari(bio)) +
         ". Semua diproses di browser Anda, file tidak diunggah ke mana pun." +
         (dilepas ? " Tata letak kembali ke bentuk bawaan karena isinya diganti." : ""),
     });
@@ -452,7 +511,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
         };
         const parsed = parseTemplateNilai(toAoa(TEMPLATE_SHEET_NILAI));
         const bio = parseTemplateBio(toAoa(TEMPLATE_SHEET_BIO));
-        const bahasa = isiInggris(parsed, kamusTambahan);
+        const bahasa = isiInggris(parsed, kamusTambahan, lingkupDari(bio));
         setRows(bahasa.rows);
         applyBio(bio);
         const dilepas = lepasTataLetak();
@@ -460,7 +519,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
           kind: "ok",
           text: `Template SiPaling terbaca: ${parsed.length} mata kuliah` +
             (bio.nama ? `, biodata ${bio.nama} ikut terisi` : "") +
-            ringkasBahasa(bahasa) +
+            ringkasBahasa(bahasa, lingkupDari(bio)) +
             ". Semua diproses di browser Anda." +
             (dilepas ? " Tata letak kembali ke bentuk bawaan karena isinya diganti." : ""),
         });
@@ -519,7 +578,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
    */
   async function ingatKamus() {
     try {
-      const pasangan = panenKamus(rows);
+      const pasangan = panenKamus(rows, lingkupLayar);
       if (pasangan.length === 0) return 0;
       const balas = await fetch("/api/kamus-matkul", {
         method: "PUT",
@@ -530,7 +589,10 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
       if (!isi.success) return 0;
       setKamusTambahan((kini) => {
         const berikut = { ...kini };
-        for (const p of pasangan) berikut[p.kode] = p.en;
+        // Kuncinya berlingkup, sama persis dengan yang disimpan server —
+        // kalau tidak, koreksi Ilmu Komunikasi ikut mengubah transkrip Ilmu
+        // Pemerintahan sampai halaman ini dimuat ulang.
+        for (const p of pasangan) berikut[kunciKamus(p.lingkup, p.kode)] = p.en;
         return berikut;
       });
       return isi.baru ?? 0;
@@ -887,7 +949,18 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
               {PRODI.map((item) => <option key={item.kode}>{item.nama}</option>)}
             </select>
           </label>
-          <label>Konsentrasi<input value={meta.konsentrasi} onChange={(e) => setMeta({ ...meta, konsentrasi: e.target.value })} placeholder="mis. Broadcasting" /></label>
+          <label>Konsentrasi
+            <input
+              list="tk-konsentrasi"
+              value={meta.konsentrasi}
+              onChange={(e) => setMeta({ ...meta, konsentrasi: e.target.value })}
+              placeholder="mis. Broadcasting"
+              title="Menentukan kamus nama Inggris yang dipakai. Ubah lalu tekan “Isi ulang kolom Inggris”."
+            />
+            <datalist id="tk-konsentrasi">
+              {KONSENTRASI_ILKOM.map((nama) => <option key={nama} value={nama} />)}
+            </datalist>
+          </label>
           <label>Nomor Ijazah Nasional<input value={meta.noijazah} onChange={(e) => setMeta({ ...meta, noijazah: e.target.value })} /></label>
           <label>Tanggal yudisium<input value={meta.yudisium} onChange={(e) => setMeta({ ...meta, yudisium: e.target.value })} /></label>
           <label className="wide">Akreditasi<input value={meta.akred} onChange={(e) => setMeta({ ...meta, akred: e.target.value })} /></label>
@@ -934,6 +1007,15 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
           ))}
         </div>
         <button type="button" className="btn btn-light" onClick={() => setRows((current) => [...current, { kode: "", nama: "", en: "", hm: "", k: 3 }])}>+ Tambah baris (mengisi atas → bawah)</button>
+        <button
+          type="button"
+          className="btn btn-light"
+          onClick={terjemahUlang}
+          disabled={rows.length === 0}
+          title="Menimpa SELURUH kolom Inggris memakai kamus prodi & konsentrasi yang tertulis pada Biodata. Koreksi tangan yang belum disimpan ikut tertimpa."
+        >
+          🔤 Isi ulang kolom Inggris (ikut prodi &amp; konsentrasi)
+        </button>
 
         <div className="tpl-actions">
           <button type="button" className="btn btn-primary" onClick={() => window.print()}>🖨 Cetak tanpa kop (Legal 21,59×35,56 cm)</button>
