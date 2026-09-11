@@ -33,13 +33,17 @@
 //
 // ---------- ASAL DATANYA ----------
 //
-// Nama Inggris Ilmu Komunikasi disalin dari transkrip dwibahasa resmi
-// fakultas untuk ketiga konsentrasi (Public Relations, Broadcasting,
-// Advertising) — bukan terjemahan yang dikarang di sini. Ketika ketiga
-// berkas itu berselisih untuk kode yang sama, yang dipakai adalah bunyi
-// yang muncul pada mayoritas berkas; selisihnya dicatat di
-// UPDATE-V32-KAMUS-PER-KONSENTRASI.md supaya dapat ditimpa admin kalau
-// fakultas memutuskan lain.
+// Nama Inggris Ilmu Komunikasi disalin dari transkrip dwibahasa resmi KUI
+// untuk ketiga konsentrasi (Public Relations, Broadcasting, Advertising) —
+// bukan terjemahan yang dikarang di sini.
+//
+// Ketiga berkas itu berselisih pada lima kode. Yang dipakai adalah bunyi
+// yang tertulis DI BERKAS KONSENTRASI ITU SENDIRI, apa adanya — termasuk
+// yang tampak janggal seperti "Sociology and System Social Indonesia".
+// Kamus ini tidak berwenang merapikan bahasa KUI: transkrip yang tercetak
+// harus sama dengan yang dikeluarkan KUI, dan selisih antar konsentrasi
+// adalah keputusan KUI, bukan galat yang perlu diseragamkan di sini.
+// Kalau KUI merapikannya kelak, barisnya dibetulkan di layar lalu disimpan.
 //
 // ---------- TIGA LAPIS ----------
 //
@@ -196,6 +200,13 @@ const ILKOM_INTI: Entri[] = [
 
 // Mata kuliah konsentrasi Public Relations.
 const ILKOM_PR: Entri[] = [
+  // Berkas KUI Public Relations menulis AIKA III-V dengan bunyi Indonesianya
+  // di depan, berbeda dari dua berkas konsentrasi lain — dan berbeda pula
+  // dari AIKA I-II di berkas itu sendiri. Bukan tugas kode ini merapikannya:
+  // yang tercetak harus sama dengan yang dikirim KUI.
+  ["MPK-003", "AIKA III", "Al-Islam and Kemuhammadiyahan III (Islamic and Muhammadiyah Studies III)"],
+  ["MPK-004", "AIKA IV",  "Al-Islam and Kemuhammadiyahan IV (Islamic and Muhammadiyah Studies IV)"],
+  ["MPK-005", "AIKA V",   "Al-Islam and Kemuhammadiyahan V (Islamic and Muhammadiyah Studies V)"],
   ["MKPP-001","Managemen Krisis",                  "Crisis Management"],
   ["MKPP-002","Media Relations",                   "Media Relations"],
   ["MKSP-001","Protokoler",                        "Protocol Affairs"],
@@ -208,6 +219,11 @@ const ILKOM_PR: Entri[] = [
 
 // Mata kuliah konsentrasi Broadcasting.
 const ILKOM_BC: Entri[] = [
+  // Dua mata kuliah inti yang berkas KUI Broadcasting tulis berbeda dari dua
+  // berkas konsentrasi lain. Dipertahankan apa adanya, termasuk susunan
+  // "System Social Indonesia" — transkrip harus sama dengan kiriman KUI.
+  ["MPK-011", "Sosiologi Dan Sistem Sosial Indonesia", "Sociology and System Social Indonesia"],
+  ["MKB-011", "Komunikasi Sosial Pembangunan",         "Social Development Communication"],
   ["MKPB-051","Produksi Feature TV",            "TV Feature Production"],
   ["MKPB-052","Produksi Dan Pasca Produksi",    "Production and Post-Production"],
   ["MKSB-045","Managemen Penerbitan Elektronik","Electronic Publishing Management"],

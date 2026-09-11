@@ -1,4 +1,4 @@
-# v32: Nama Inggris transkrip Ilmu Komunikasi — per konsentrasi
+# v32: Transkrip — kamus per konsentrasi, header & footer sesuai KUI
 
 ## Yang salah
 
@@ -78,32 +78,77 @@ Menebak di sini berarti mencetak nama mata kuliah prodi lain pada dokumen
 resmi. Kolom yang kosong menuntut admin mengetik satu baris; kolom yang salah
 menuntut ijazah dicetak ulang.
 
-### 3. Datanya disalin dari transkrip resmi fakultas, bukan dikarang
+### 3. Datanya disalin dari KUI apa adanya
 
-Seluruh 68 nama Inggris Ilmu Komunikasi disalin dari transkrip dwibahasa resmi
-fakultas untuk ketiga konsentrasi. Bukan terjemahan yang disusun di sini.
+Seluruh 68 nama Inggris Ilmu Komunikasi disalin dari transkrip dwibahasa KUI
+untuk ketiga konsentrasi. Bukan terjemahan yang disusun di sini.
 
-**Ketiga berkas itu tidak seragam satu sama lain.** Lima kode ditulis berbeda
-di salah satu berkas. Yang dipakai adalah bunyi yang muncul pada **mayoritas**
-berkas, dan yang menyimpang dicatat — bukan disembunyikan:
+**Ketiga berkas itu berselisih pada lima kode** — dan selisihnya
+**dipertahankan**, tidak diseragamkan:
 
-| Kode | Mata kuliah | Dipakai | Menyimpang di |
-| --- | --- | --- | --- |
-| MPK-003/004/005 | AIKA III–V | `Islamic and Muhammadiyah Studies III–V` | Public Relations menulis `Al-Islam and Kemuhammadiyahan III (Islamic and Muhammadiyah Studies III)` |
-| MPK-011 | Sosiologi Dan Sistem Sosial Indonesia | `Sociology and Indonesian Social System` | Broadcasting menulis `Sociology and System Social Indonesia` |
-| MKB-011 | Komunikasi Sosial Pembangunan | `Development Communication` | Broadcasting menulis `Social Development Communication` |
+| Kode | Mata kuliah | Public Relations | Broadcasting | Advertising |
+| --- | --- | --- | --- | --- |
+| MPK-003/004/005 | AIKA III–V | `Al-Islam and Kemuhammadiyahan III (Islamic and Muhammadiyah Studies III)` | `Islamic and Muhammadiyah Studies III` | sama seperti Broadcasting |
+| MPK-011 | Sosiologi Dan Sistem Sosial Indonesia | `Sociology and Indonesian Social System` | `Sociology and System Social Indonesia` | sama seperti PR |
+| MKB-011 | Komunikasi Sosial Pembangunan | `Development Communication` | `Social Development Communication` | sama seperti PR |
 
-Dua yang pertama tampak salah tulis — AIKA I dan II pada berkas Public
-Relations itu sendiri ditulis polos, dan "Sociology and System Social
-Indonesia" bukan susunan bahasa Inggris yang benar. Yang ketiga, MKB-011,
-betul-betul pilihan kata: dua berkas memilih `Development Communication`, satu
-memilih `Social Development Communication`.
+Kamus ini **tidak berwenang merapikan bahasa KUI**. Transkrip yang tercetak
+harus sama dengan yang dikeluarkan KUI untuk konsentrasi itu — termasuk bunyi
+yang tampak janggal seperti `Sociology and System Social Indonesia`. Selisih
+antar konsentrasi adalah keputusan KUI, bukan galat yang perlu diperbaiki di
+sini. Kalau KUI kelak merapikannya, barisnya dibetulkan di layar lalu disimpan
+(lihat nomor 6).
 
-**Kalau fakultas memutuskan lain, tidak perlu mengubah kode.** Betulkan
-barisnya di layar lalu simpan — koreksinya diingat untuk unggahan berikutnya
-(lihat nomor 5).
+### 4. Header dan footer dibetulkan mengikuti transkrip KUI
 
-### 4. Tombol "Isi ulang kolom Inggris"
+Label transkrip ikut dilegalisir dan ikut dibaca kampus luar negeri. Enam di
+antaranya keliru:
+
+| Baris | Sebelumnya | Sekarang (sesuai KUI) |
+| --- | --- | --- |
+| Nomor Ijazah Nasional | DEGREE CERTIFICATE NUMBER | **NATIONAL DIPLOMA NUMBER** |
+| Nomor Pokok Perguruan Tinggi | INSTITUTIONAL REGISTRATION NUMBER | **NATIONAL HIGHER EDUCATION INSTITUTION CODE** |
+| Tanggal Yudisium | DEGREE CONFERRAL DATE | **DATE OF DEGREE CONFERRAL** |
+| Terakreditasi | ACCREDITED | **ACCREDITATION** |
+| Nama Mahasiswa | COMPLETE NAME | **STUDENT NAME** |
+| Nomor Induk Mahasiswa | STUDENT REGISTRATION NUMBER | **STUDENT IDENTIFICATION NUMBER** |
+| Nomor Pokok Program Studi | STUDY PROGRAM IDENTIFICATION NUMBER | **NATIONAL STUDY PROGRAM CODE** |
+| Jenjang | COURSE | **DEGREE LEVEL** |
+| Tempat, Tgl Lahir | PLACE AND DATE OF BIRTH | **PLACE, DATE OF BIRTH** |
+| Total Kredit | Total Credits Accomplished | **Total Credits** |
+| Total Nilai | Total Grade Points | **Total Quality Points** |
+| Indeks Prestasi Kumulatif | Grade Point Average (GPA) | **Cumulative Grade Point Average (GPA)** |
+
+`FAKULTAS / FACULTY`, `JENJANG / DEGREE LEVEL`, dan `KONSENTRASI /
+CONCENTRATION` sekarang dicetak **satu baris**, seperti pada transkrip KUI —
+bukan bertingkat seperti label kolom kiri.
+
+**Singkatan kolom nilai tergeser satu kolom.** AM (Angka Mutu) berlabel `CR`,
+K (Kredit) berlabel `WM`, M (Mutu) berlabel `GP`:
+
+```
+sebelum:  HM/LG   AM/CR   K/WM   M/GP      ← CR di kolom Angka Mutu
+sesudah:  HM/LG   AM/GP   K/CR   M/QP
+```
+
+`CR` dan `QP` mengikuti bunyi yang dipakai KUI sendiri pada baris total —
+*Total Credits* dan *Total Quality Points*. Singkatan `WM` yang tidak punya
+acuan dibuang.
+
+Predikat kelulusan dicetak **satu istilah**, bukan pasangan Indonesia/Inggris:
+transkrip KUI berbunyi `Cum Laude`, bukan `Dengan Pujian / Cum Laude (With
+Honors)`. Lembar Indonesia memakai ejaan `IJAZAH`, bukan `Ijasah`, dan seluruh
+labelnya diseragamkan huruf besar.
+
+Akreditasi bawaan mengikuti yang sekarang berlaku: `UNGGUL LAMSPAK Nomor
+156/AK.03.05/2026`.
+
+**Satu lembar untuk kedua prodi.** Ilmu Pemerintahan memakai label yang sama
+persis — perbaikan di atas berlaku untuk transkrip Ilmu Pemerintahan juga,
+bukan hanya Ilmu Komunikasi. Labelnya dipisah ke
+`src/app/dashboard/template/transkrip-label.ts` supaya dapat diuji sendirian.
+
+### 5. Tombol "Isi ulang kolom Inggris"
 
 Di bawah tabel nilai, di samping "+ Tambah baris":
 
@@ -121,7 +166,7 @@ Inggris, dan keterangannya mengatakan begitu sebelum ditekan.
 Kolom Konsentrasi sekarang menawarkan ketiga ejaan resmi lewat daftar pilihan,
 tetapi tetap bebas diketik.
 
-### 5. Koreksi admin ikut berlingkup
+### 6. Koreksi admin ikut berlingkup
 
 Kamus yang tumbuh dari koreksi admin (`app_settings['kamus_matkul']`) dulu
 juga datar. Artinya koreksi yang benar untuk Ilmu Komunikasi akan **mengubah
@@ -141,7 +186,7 @@ sekali: laci "entah prodi mana" persis melahirkan kembali kamus datar ini.
 
 ## Yang diperiksa
 
-`npx tsx uji-transkrip.ts` — **114 pemeriksaan** (sebelumnya 52).
+`npx tsx uji-transkrip.ts` — **148 pemeriksaan** (sebelumnya 52).
 
 Yang baru, dan yang paling menentukan: ketiga transkrip dwibahasa resmi
 fakultas dipakai sebagai bahan uji, tanpa nama dan NIM mahasiswanya
@@ -149,9 +194,9 @@ fakultas dipakai sebagai bahan uji, tanpa nama dan NIM mahasiswanya
 pada berkas itu, mengisinya kembali dari kamus, lalu menuntut hasilnya sama
 persis**. Bergeser satu kata pun, ujinya gagal.
 
-Daftar penyimpangan antar berkas ikut diperiksa **dua arah**: kalau salah satu
-ternyata tidak lagi menyimpang, ujinya gagal dan daftarnya harus dirapikan.
-Daftar itu tidak bisa menjadi karpet.
+Tanpa pengecualian satu pun: kelima selisih antar konsentrasi ikut dituntut
+sama persis, dan diperiksa lagi tersendiri supaya jelas selisihnya memang
+disengaja, bukan lolos dari uji.
 
 Selain itu:
 
@@ -162,7 +207,10 @@ Selain itu:
 - kunci lama tanpa lingkup mengisi kode yang belum dikenal, tetapi tidak
   menimpa nama resmi konsentrasi;
 - ejaan konsentrasi bebas — `BROADCASTING`, `Broadcasting`, `Penyiaran`;
-- label `KONSETRASI` yang salah ketik pada berkas fakultas tetap terbaca.
+- label `KONSETRASI` yang salah ketik pada berkas fakultas tetap terbaca;
+- seluruh label header & footer dikunci bunyinya, dan sepuluh bunyi lama yang
+  terbukti keliru diperiksa **tidak boleh kembali**;
+- singkatan kolom lurus dengan arti kolomnya, dan `WM` tidak dipakai lagi.
 
 `npx tsx uji-arsip-transkrip.ts` — 61 pemeriksaan, tetap lulus.
 `npm run lint`, `npm run typecheck`, `npx next build` — bersih.
@@ -175,6 +223,7 @@ Selain itu:
 | --- | --- |
 | `src/lib/kamus-matkul.ts` | kamus dipecah per lingkup; `terjemahkanMatkul`/`isiInggris`/`panenKamus` menerima lingkup; tambahan `isiUlangInggris`, `rantaiLingkup`, `lingkupUtama`, `kunciKamus`, `kodeBentrok` |
 | `src/app/api/kamus-matkul/route.ts` | kunci koreksi admin berlingkup; lingkup tak dikenal ditolak |
-| `src/app/dashboard/template/template-app.tsx` | lingkup diambil dari biodata berkas; tombol isi ulang; daftar pilihan konsentrasi |
-| `uji-transkrip.ts` | 52 → 114 pemeriksaan |
+| `src/app/dashboard/template/template-app.tsx` | lingkup diambil dari biodata berkas; tombol isi ulang; daftar pilihan konsentrasi; singkatan kolom dibetulkan; predikat satu istilah |
+| `src/app/dashboard/template/transkrip-label.ts` | **baru** — label header & footer, dipisah agar dapat diuji |
+| `uji-transkrip.ts` | 52 → 148 pemeriksaan |
 | `uji-berkas-contoh/transkrip-ilkom-*.json` | tiga bahan uji baru dari transkrip resmi fakultas |

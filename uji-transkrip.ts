@@ -11,6 +11,7 @@
 
 import { readFileSync } from "node:fs";
 import { extractBio, parseSheetRows, computeTotals, type Aoa } from "./src/app/dashboard/template/transkrip-parse";
+import { labelTranskrip } from "./src/app/dashboard/template/transkrip-label";
 import {
   isiInggris, isiUlangInggris, terjemahkanMatkul, rapikanNama, rapikanKode, panenKamus,
   rantaiLingkup, lingkupUtama, kunciKamus, kodeBentrok, KAMUS_KODE,
@@ -198,29 +199,6 @@ const KONSENTRASI: Array<[string, string]> = [
   ["advertising", "Advertising"],
 ];
 
-// Ketiga berkas resmi itu TIDAK seragam satu sama lain: lima kode ditulis
-// berbeda di salah satu berkas. Kamus memakai bunyi yang muncul pada
-// MAYORITAS berkas, dan yang menyimpang didaftar di sini — bukan disembunyikan
-// di balik uji yang longgar. Daftar ini ikut diperiksa: kalau salah satunya
-// ternyata tidak lagi menyimpang, uji ini gagal dan daftarnya harus dirapikan.
-const MENYIMPANG: Record<string, Record<string, string>> = {
-  // Dua berkas lain menulis "Islamic and Muhammadiyah Studies III/IV/V"
-  // polos, sama seperti AIKA I dan II di berkas ini sendiri.
-  "public-relations": {
-    "MPK-003": "Al-Islam and Kemuhammadiyahan III (Islamic and Muhammadiyah Studies III)",
-    "MPK-004": "Al-Islam and Kemuhammadiyahan IV (Islamic and Muhammadiyah Studies IV)",
-    "MPK-005": "Al-Islam and Kemuhammadiyahan V (Islamic and Muhammadiyah Studies V)",
-  },
-  // "Sociology and System Social Indonesia" bukan bahasa Inggris yang benar;
-  // dua berkas lain menulis "Sociology and Indonesian Social System".
-  // "Komunikasi Sosial Pembangunan" ditulis "Development Communication" pada
-  // dua berkas lain — yang itu betul-betul pilihan kata, bukan salah tulis.
-  broadcasting: {
-    "MPK-011": "Sociology and System Social Indonesia",
-    "MKB-011": "Social Development Communication",
-  },
-  advertising: {},
-};
 
 for (const [berkas, konsentrasi] of KONSENTRASI) {
   const lembar = JSON.parse(
@@ -249,20 +227,33 @@ for (const [berkas, konsentrasi] of KONSENTRASI) {
   sama(`${konsentrasi}: seluruh 52 baris terisi`, diisi.rows.filter((r) => r.en).length, 52);
   sama(`${konsentrasi}: tidak ada yang cuma tebakan kata`, diisi.dariKasar, 0);
 
-  const simpang = MENYIMPANG[berkas];
+  // TANPA pengecualian satu pun. Kamus tidak berwenang merapikan bahasa KUI:
+  // yang tercetak harus sama dengan yang dikeluarkan KUI untuk konsentrasi
+  // ini, termasuk bunyi yang berbeda dari dua konsentrasi lain.
   const beda = diisi.rows.filter((r) => resmi.has(r.kode) && r.en !== resmi.get(r.kode));
-  const takTerduga = beda.filter((r) => simpang[r.kode] === undefined);
-  benar(`${konsentrasi}: nama Inggris sama persis dengan transkrip resmi`,
-    takTerduga.length === 0,
-    takTerduga.map((r) => `${r.kode} "${r.nama}": kamus "${r.en}" ≠ resmi "${resmi.get(r.kode)}"`).join(" | "));
-
-  // Daftar penyimpangan diperiksa dua arah supaya tidak menjadi karpet.
-  for (const [kode, tertulis] of Object.entries(simpang)) {
-    sama(`${konsentrasi}: ${kode} memang ditulis lain di berkas ini`, resmi.get(kode), tertulis);
-    benar(`${konsentrasi}: ${kode} dipakai versi mayoritas`,
-      diisi.rows.find((r) => r.kode === kode)?.en !== tertulis);
-  }
+  benar(`${konsentrasi}: nama Inggris sama persis dengan kiriman KUI`,
+    beda.length === 0,
+    beda.map((r) => `${r.kode} "${r.nama}": kamus "${r.en}" ≠ KUI "${resmi.get(r.kode)}"`).join(" | "));
 }
+
+// Lima kode yang KUI tulis berbeda antar konsentrasi. Diperiksa tersendiri
+// supaya jelas bahwa selisihnya memang disengaja, bukan lolos dari uji.
+console.log("\n=== SELISIH ANTAR KONSENTRASI, DIPERTAHANKAN ===\n");
+const PR = { prodi: "Ilmu Komunikasi", konsentrasi: "Public Relations" };
+const BC = { prodi: "Ilmu Komunikasi", konsentrasi: "Broadcasting" };
+const ADV = { prodi: "Ilmu Komunikasi", konsentrasi: "Advertising" };
+sama("AIKA III di Public Relations", terjemahkanMatkul("MPK-003", "", {}, PR).en,
+  "Al-Islam and Kemuhammadiyahan III (Islamic and Muhammadiyah Studies III)");
+sama("AIKA III di Advertising", terjemahkanMatkul("MPK-003", "", {}, ADV).en,
+  "Islamic and Muhammadiyah Studies III");
+sama("MPK-011 di Broadcasting", terjemahkanMatkul("MPK-011", "", {}, BC).en,
+  "Sociology and System Social Indonesia");
+sama("MPK-011 di Public Relations", terjemahkanMatkul("MPK-011", "", {}, PR).en,
+  "Sociology and Indonesian Social System");
+sama("MKB-011 di Broadcasting", terjemahkanMatkul("MKB-011", "", {}, BC).en,
+  "Social Development Communication");
+sama("MKB-011 di Advertising", terjemahkanMatkul("MKB-011", "", {}, ADV).en,
+  "Development Communication");
 
 console.log("\n=== KODE YANG BERTABRAKAN ANTAR PRODI ===\n");
 
@@ -275,7 +266,6 @@ const BENTROK: Array<[string, string, string]> = [
   ["MPK-001", "Al-Islam and Kemuhammadiyahan I", "Islamic and Muhammadiyah Studies I"],
   ["MPK-010", "Philosophy of Science", "Philosophy of Knowledge and Fundamentals of Logic"],
 ];
-const BC = { prodi: "Ilmu Komunikasi", konsentrasi: "Broadcasting" };
 for (const [kode, ip, ilkom] of BENTROK) {
   sama(`${kode} di Ilmu Pemerintahan`, terjemahkanMatkul(kode, "", {}, IP).en, ip);
   sama(`${kode} di Ilmu Komunikasi`, terjemahkanMatkul(kode, "", {}, BC).en, ilkom);
@@ -295,8 +285,15 @@ sama("MKPB-052 di Broadcasting", terjemahkanMatkul("MKPB-052", "", {}, BC).en,
 // nama mata kuliah prodi lain pada dokumen resmi yang ikut dilegalisir.
 sama("tanpa prodi, kode bentrok tidak dijawab dari kode",
   terjemahkanMatkul("MKPB-051", "").sumber, "kosong");
-benar("daftar kode bentrok memuat kesepuluhnya",
-  kodeBentrok().length === 10, kodeBentrok().join(", "));
+// Daftar lengkapnya dikunci, bukan sekadar jumlahnya: kode yang diam-diam
+// masuk atau keluar daftar ini mengubah transkrip yang sudah dicetak.
+// Sepuluh yang pertama bentrok ANTAR PRODI; MKB-011 dan MPK-011 bentrok di
+// dalam Ilmu Komunikasi sendiri, karena KUI menulisnya lain di berkas
+// Broadcasting.
+sama("daftar kode bentrok persis seperti yang didata",
+  kodeBentrok().join(", "),
+  "MKB-011, MKK-012, MKK-020, MKPB-051, MKPB-052, " +
+    "MPK-001, MPK-002, MPK-003, MPK-004, MPK-005, MPK-010, MPK-011");
 // Kode yang berarti sama di mana pun tetap dijawab tanpa prodi.
 sama("tanpa prodi, kode yang tidak bentrok tetap dijawab",
   terjemahkanMatkul("MKB-044", "").en, "Undergraduate Thesis");
@@ -324,6 +321,67 @@ sama("prodi asing menghasilkan rantai kosong", rantaiLingkup({ prodi: "Ilmu Huku
 sama("tanpa konsentrasi, mata kuliah Advertising tetap ketemu",
   terjemahkanMatkul("MKSA-046", "", {}, { prodi: "Ilmu Komunikasi" }).en,
   "Visual Communication Design I");
+
+console.log("\n=== LABEL HEADER & FOOTER TRANSKRIP ===\n");
+
+// Label transkrip ikut dilegalisir dan ikut dibaca kampus luar negeri, jadi
+// bunyinya dikunci di sini — bukan sekadar terlihat benar sekali di layar.
+// Acuannya transkrip resmi KUI yang sudah tercetak dan ditandatangani.
+const EN_LBL = labelTranskrip(true);
+const ID_LBL = labelTranskrip(false);
+const sisiEn = (teks: string) => (teks.includes("|") ? teks.split("|")[1] : teks.split("/").slice(1).join("/")).trim();
+
+sama("judul Inggris", EN_LBL.subtitle, "OFFICIAL ACADEMIC TRANSCRIPT");
+sama("Nomor Ijazah Nasional", sisiEn(EN_LBL.noij), "NATIONAL DIPLOMA NUMBER");
+sama("Nomor Pokok Perguruan Tinggi", sisiEn(EN_LBL.nppt), "NATIONAL HIGHER EDUCATION INSTITUTION CODE");
+sama("Tanggal Yudisium", sisiEn(EN_LBL.yud), "DATE OF DEGREE CONFERRAL");
+sama("Terakreditasi", sisiEn(EN_LBL.akred), "ACCREDITATION");
+sama("Nama Mahasiswa", sisiEn(EN_LBL.nama), "STUDENT NAME");
+sama("Nomor Induk Mahasiswa", sisiEn(EN_LBL.nim), "STUDENT IDENTIFICATION NUMBER");
+sama("Tempat, Tgl Lahir", sisiEn(EN_LBL.ttl), "PLACE, DATE OF BIRTH");
+sama("Program Studi", sisiEn(EN_LBL.prodi), "STUDY PROGRAM");
+sama("Nomor Pokok Program Studi", sisiEn(EN_LBL.npps), "NATIONAL STUDY PROGRAM CODE");
+sama("Fakultas", sisiEn(EN_LBL.fak), "FACULTY");
+sama("nilai Fakultas", sisiEn(EN_LBL.fakval), "SOCIAL AND POLITICAL SCIENCES");
+sama("Jenjang", sisiEn(EN_LBL.jenjangLbl), "DEGREE LEVEL");
+sama("Konsentrasi", sisiEn(EN_LBL.kons), "CONCENTRATION");
+sama("Total Kredit", sisiEn(EN_LBL.totKredit), "Total Credits");
+sama("Total Nilai", sisiEn(EN_LBL.totNilai), "Total Quality Points");
+sama("Indeks Prestasi Kumulatif", sisiEn(EN_LBL.ipkLbl), "Cumulative Grade Point Average (GPA)");
+sama("Predikat Kelulusan", sisiEn(EN_LBL.predLbl), "Graduation Honors");
+sama("Judul Skripsi", sisiEn(EN_LBL.judul), "THESIS TITLE:");
+
+// Bunyi yang dipakai sebelumnya dan terbukti keliru tidak boleh kembali.
+const KELIRU = [
+  "DEGREE CERTIFICATE NUMBER", "COMPLETE NAME", "STUDENT REGISTRATION NUMBER",
+  "INSTITUTIONAL REGISTRATION NUMBER", "STUDY PROGRAM IDENTIFICATION NUMBER",
+  "DEGREE CONFERRAL DATE", "Total Grade Points", "Total Credits Accomplished",
+  "JENJANG/COURSE", "ACCREDITED",
+];
+const semuaLabel = Object.values(EN_LBL).flat().join(" | ");
+for (const salah of KELIRU) {
+  benar(`label lama "${salah}" tidak dipakai lagi`, !semuaLabel.includes(salah));
+}
+
+// Singkatan kolom pernah tergeser satu kolom: AM berlabel CR, K berlabel WM,
+// M berlabel GP. Pasangannya harus lurus dengan arti kolomnya.
+sama("kolom K = Credits", EN_LBL.th[3], "K|CR");
+sama("kolom HM = Letter Grade", EN_LBL.th[4], "HM|LG");
+sama("kolom AM = Grade Point", EN_LBL.th[5], "AM|GP");
+sama("kolom M = Quality Points", EN_LBL.th[6], "M|QP");
+benar("singkatan lama WM sudah tidak dipakai", !semuaLabel.includes("WM"));
+
+// Satu lembar untuk kedua prodi: label yang sama persis, hanya isinya beda.
+// Kalau suatu saat label dipecah per prodi, uji ini yang pertama gagal.
+sama("label tidak bercabang per prodi", typeof labelTranskrip(true).nama, "string");
+benar("lembar Indonesia memakai label yang seragam huruf besar",
+  [ID_LBL.noij, ID_LBL.nppt, ID_LBL.yud, ID_LBL.akred, ID_LBL.nama, ID_LBL.nim,
+    ID_LBL.ttl, ID_LBL.prodi, ID_LBL.npps, ID_LBL.fak, ID_LBL.jenjangLbl, ID_LBL.kons]
+    .every((teks) => teks === teks.toUpperCase()),
+  [ID_LBL.noij, ID_LBL.nppt, ID_LBL.fak].join(" / "));
+sama("ejaan Ijazah, bukan Ijasah", ID_LBL.noij, "NOMOR IJAZAH NASIONAL");
+benar("tidak ada lagi ejaan 'Ijasah' di label mana pun",
+  !`${semuaLabel} ${Object.values(ID_LBL).flat().join(" ")}`.toLowerCase().includes("ijasah"));
 
 console.log(`\n${lulus} periksa lulus`);
 if (gagal.length > 0) {

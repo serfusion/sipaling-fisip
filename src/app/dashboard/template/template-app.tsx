@@ -9,6 +9,7 @@ import { AM, HMS, computeTotals, extractBio, parseSheetRows, type Aoa, type Cour
 import { isiInggris, isiUlangInggris, kunciKamus, panenKamus, type Lingkup } from "@/lib/kamus-matkul";
 import { periksaSiapArsip, predikatKelulusan, sidikTranskrip } from "@/lib/arsip-transkrip";
 import { concentrationsFor } from "@/lib/academic";
+import { labelTranskrip } from "./transkrip-label";
 import {
   TEMPLATE_BIO_ROWS, TEMPLATE_NILAI_CONTOH, TEMPLATE_NILAI_HEADER,
   TEMPLATE_SHEET_BIO, TEMPLATE_SHEET_NILAI,
@@ -209,8 +210,11 @@ const PRODI_EN: Record<string, string> = {
   "Ilmu Pemerintahan": "GOVERNMENT SCIENCE",
 };
 
+// Predikat pada transkrip KUI dicetak SATU istilah, bukan pasangan
+// "Indonesia / Inggris" seperti jenjang dan prodi: transkrip contoh dari KUI
+// berbunyi "Cum Laude" saja, bukan "Dengan Pujian / Cum Laude (With Honors)".
 const PREDIKAT_EN: Record<string, string> = {
-  "Dengan Pujian": "Cum Laude (With Honors)",
+  "Dengan Pujian": "Cum Laude",
   "Sangat Memuaskan": "Very Satisfactory",
   "Memuaskan": "Satisfactory",
   "Lulus": "Pass",
@@ -229,7 +233,7 @@ function metaAwal() {
     noijazah: "",
     nppt: "041051",
     yudisium: "",
-    akred: "LAMSPAK Nomor 099/AK.03.05/2026",
+    akred: "UNGGUL LAMSPAK Nomor 156/AK.03.05/2026",
     nama: "",
     nim: "",
     prodi: PRODI[0].nama,
@@ -276,38 +280,9 @@ function tanggalSingkat(waktu: string | null) {
 function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: string }) {
   const EN = lang === "en";
   const customSlug: LetterSlug = EN ? "transkrip-en" : "transkrip-custom";
-  const L = EN
-    ? {
-        title: "TRANSKRIP NILAI", subtitle: "OFFICIAL ACADEMIC TRANSCRIPT",
-        noij: "NOMOR IJAZAH NASIONAL/|DEGREE CERTIFICATE NUMBER", nppt: "NOMOR POKOK PERGURUAN TINGGI/|INSTITUTIONAL REGISTRATION NUMBER",
-        yud: "TANGGAL YUDISIUM/|DEGREE CONFERRAL DATE", akred: "TERAKREDITASI/|ACCREDITED",
-        nama: "NAMA MAHASISWA/|COMPLETE NAME", fak: "FAKULTAS/FACULTY",
-        fakval: "ILMU SOSIAL DAN ILMU POLITIK/|SOCIAL AND POLITICAL SCIENCES",
-        nim: "NOMOR INDUK MAHASISWA/|STUDENT REGISTRATION NUMBER", npps: "NOMOR POKOK PROGRAM STUDI/|STUDY PROGRAM IDENTIFICATION NUMBER",
-        prodi: "PROGRAM STUDI/|STUDY PROGRAM",
-        ttl: "TEMPAT, TGL LAHIR|PLACE AND DATE OF BIRTH", jenjangLbl: "JENJANG/COURSE", kons: "KONSENTRASI/CONCENTRATION",
-        th: ["NO", "KODE MK|Course", "NAMA MATA KULIAH|Descriptions", "K|CR", "HM|LG", "AM|GP", "MK|WM"],
-        totKredit: "Total Kredit / Total Credits Accomplished", totNilai: "Total Nilai / Total Grade Points", ipkLbl: "Indeks Prestasi Kumulatif / Grade Point Average (GPA)", predLbl: "Predikat Kelulusan / Graduation Honors",
-        judul: "JUDUL SKRIPSI/ THESIS TITLE:", ket: "",
-        ketval: "K = Kredit/Credits · HM = Huruf Mutu/Grade · AM = Angka Mutu/Grade Point · MK = Mutu Kredit/Quality Points (K × AM)",
-        meng: "Mengetahui / Acknowledged by,", rektor: "Rektor / Rector,", dekan: "Dekan / Dean,",
-      }
-    : {
-        title: "TRANSKRIP NILAI", subtitle: "",
-        noij: "Nomor Ijasah Nasional", nppt: "Nomor Pokok Perguruan Tinggi",
-        yud: "Tanggal Yudisium", akred: "Terakreditasi",
-        nama: "NAMA MAHASISWA",
-        jenjangLbl: "JENJANG", fak: "Fakultas", fakval: "Ilmu Sosial Dan Ilmu Politik",
-        nim: "NOMOR INDUK MAHASISWA", npps: "Nomor Pokok Program Studi", prodi: "PROGRAM STUDI",
-        ttl: "TEMPAT, TGL LAHIR", kons: "KONSENTRASI",
-        th: ["NO", "KODE MK", "NAMA MATA KULIAH", "K", "HM", "AM", "MK"],
-        totKredit: "Total Kredit", totNilai: "Total Nilai", ipkLbl: "Indeks Prestasi Kumulatif", predLbl: "Predikat Kelulusan",
-        judul: "JUDUL SKRIPSI/ THESIS TITLE:", ket: "",
-        ketval: "K = Kredit/SKS · HM = Huruf Mutu (A,B,C,D) · AM = Angka Mutu (1,2,3,4) · MK = Mutu Kredit (K × AM)",
-        meng: "Mengetahui,", rektor: "Rektor,", dekan: "Dekan,",
-      };
+  const L = labelTranskrip(EN);
   const showIpk = (value: number) => (EN ? value.toFixed(2) : fmtIPK(value));
-  const showPredikat = (value: string) => (EN && PREDIKAT_EN[value] ? `${value} / ${PREDIKAT_EN[value]}` : value);
+  const showPredikat = (value: string) => (EN && PREDIKAT_EN[value] ? PREDIKAT_EN[value] : value);
   const showProdi = (value: string) => (PRODI_EN[value] ? `${value.toUpperCase()} / ${PRODI_EN[value]}` : value.toUpperCase());
 
   const [customMode, setCustomMode] = useState(false);
@@ -1227,11 +1202,11 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
             {/* --- biodata DUA kolom, label bertingkat (acuan gambar) --- */}
             <div className="doc-bio2">
               <div className="bio-cell"><span className="bio-lbl"><Lbl text={L.nama} /></span><span className="bio-sep">:</span><span className="bio-val">{meta.nama || ""}</span></div>
-              <div className="bio-cell"><span className="bio-lbl"><Lbl text={L.fak} /></span><span className="bio-sep">:</span><span className="bio-val"><Lbl text={L.fakval} /></span></div>
+              <div className="bio-cell"><span className="bio-lbl"><BiIn text={L.fak} /></span><span className="bio-sep">:</span><span className="bio-val"><Lbl text={L.fakval} /></span></div>
               <div className="bio-cell"><span className="bio-lbl"><Lbl text={L.nim} /></span><span className="bio-sep">:</span><span className="bio-val">{meta.nim || ""}</span></div>
-              <div className="bio-cell"><span className="bio-lbl"><Lbl text={L.jenjangLbl} /></span><span className="bio-sep">:</span><span className="bio-val"><BiVal text={meta.jenjang} /></span></div>
+              <div className="bio-cell"><span className="bio-lbl"><BiIn text={L.jenjangLbl} /></span><span className="bio-sep">:</span><span className="bio-val"><BiVal text={meta.jenjang} /></span></div>
               <div className="bio-cell"><span className="bio-lbl"><Lbl text={L.ttl} /></span><span className="bio-sep">:</span><span className="bio-val">{meta.ttl || ""}</span></div>
-              <div className="bio-cell"><span className="bio-lbl"><Lbl text={L.kons} /></span><span className="bio-sep">:</span><span className="bio-val"><BiVal text={konsentrasiText} /></span></div>
+              <div className="bio-cell"><span className="bio-lbl"><BiIn text={L.kons} /></span><span className="bio-sep">:</span><span className="bio-val"><BiVal text={konsentrasiText} /></span></div>
               <div className="bio-cell"><span className="bio-lbl"><Lbl text={L.prodi} /></span><span className="bio-sep">:</span><span className="bio-val"><BiVal text={showProdi(meta.prodi)} /></span></div>
               <div className="bio-cell"><span className="bio-lbl"><Lbl text={L.npps} /></span><span className="bio-sep">:</span><span className="bio-val">{prodiKode}</span></div>
             </div>
@@ -1244,13 +1219,18 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
                   <table className="doc-table" key={columnIndex}>
                     <thead>
                       <tr>
+                        {/* Singkatan Inggrisnya pernah tergeser satu kolom:
+                            AM (Angka Mutu) berlabel CR, K (Kredit) berlabel
+                            WM, M (Mutu) berlabel GP. CR dan QP mengikuti
+                            bunyi yang dipakai KUI sendiri pada baris total —
+                            "Total Credits" dan "Total Quality Points". */}
                         <th className="c-no">No</th>
                         <th className="c-kode">Kode MK<i>Course</i></th>
                         <th className="c-nama">Nama Mata Kuliah<i>Descriptions</i></th>
                         <th className="c-n">HM<i className="pl">LG</i></th>
-                        <th className="c-n">AM<i className="pl">CR</i></th>
-                        <th className="c-n">K<i className="pl">WM</i></th>
-                        <th className="c-n">M<i className="pl">GP</i></th>
+                        <th className="c-n">AM<i className="pl">GP</i></th>
+                        <th className="c-n">K<i className="pl">CR</i></th>
+                        <th className="c-n">M<i className="pl">QP</i></th>
                       </tr>
                     </thead>
                     <tbody>
