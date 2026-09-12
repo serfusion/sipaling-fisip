@@ -12,10 +12,10 @@
 // tercetak pada naskah yang dibagikan ke peserta.
 // ============================================================
 import {
-  JENIS_LABEL, KEADAAN_JAWAB_LABEL, keadaanJawab,
+  JENIS_LABEL, KEADAAN_JAWAB_LABEL, keadaanJawab, labelStatusPeserta, statistikNilai,
   type JenisSoal, type Media, type Pasangan,
 } from "@/lib/cbt";
-import { jamIndonesia } from "@/lib/waktu-indonesia";
+import { ejaSelisih, jamIndonesia } from "@/lib/waktu-indonesia";
 
 export type SoalCetak = {
   id: number;
@@ -102,6 +102,11 @@ const GAYA = `
   table.nilai { width: 100%; border-collapse: collapse; font-size: 11pt; }
   table.nilai th, table.nilai td { border: 1px solid #555; padding: 5px 7px; text-align: left; }
   table.nilai th { background: #eee; }
+  /* Daftar nilai memuat delapan kolom, dua di antaranya jam lengkap. Pada 11pt
+     ia melebar melewati batas kertas dan yang pertama terpotong adalah nama —
+     kolom yang justru dicocokkan dengan daftar hadir. */
+  table.daftar-nilai { font-size: 9.5pt; }
+  table.daftar-nilai th, table.daftar-nilai td { padding: 3px 5px; }
   /* Benar hijau, salah merah — sama seperti di layar pengajar.
      print-color-adjust WAJIB ada: tanpa itu peramban membuang seluruh warna
      latar saat mencetak, dan yang tersisa di kertas hanya kata "benar" dan
@@ -401,15 +406,49 @@ export type BeritaAcara = {
   berjalan: number;
   pelanggaran: number;
   catatan: string;
+  /** Batas lulus ujiannya, dipakai kolom keterangan pada daftar nilai. */
+  passing: number;
   peserta: Array<{
     nim: string; nama: string; status: string;
     pindahTab: number; keluarFullscreen: number;
+    /**
+     * Nilai akhir, atau null bila belum ada — peserta yang masih mengerjakan,
+     * dan peserta yang lembarnya belum selesai dinilai.
+     */
+    nilai: number | null;
+    /** Saat tombol MULAI ditekan, ISO. */
+    mulai: string;
+    /** Saat lembarnya dikumpulkan, ISO. null bila belum. */
+    kumpul: string | null;
+    /** Essay yang masih menunggu koreksi pengajar. */
+    tertunda?: number;
     /** Skor integritas 0–100. Tidak ada pada ujian dari sebelum pengawasan. */
     integritas?: number;
     /** Terisi bila ujiannya dihentikan aturan pengawasan. */
     dihentikan?: string | null;
   }>;
 };
+
+/** Jam pendek untuk sel tabel: "10 Sep 09.20 WIB". */
+function jamPendek(iso?: string | null) {
+  return jamIndonesia(iso ?? null);
+}
+
+/**
+ * Lama pengerjaan satu peserta.
+ *
+ * Dihitung dari dua saat yang tercatat server, bukan dari durasi ujiannya:
+ * yang ditanyakan ketika hasil ujian dipersoalkan adalah berapa lama lembar
+ * ITU dikerjakan — dan peserta yang masuk terlambat mengerjakannya lebih
+ * singkat daripada durasi yang tertulis di jadwal.
+ */
+function lamaKerja(mulai: string, kumpul: string | null): string {
+  if (!kumpul) return "-";
+  const a = new Date(mulai).getTime();
+  const b = new Date(kumpul).getTime();
+  if (Number.isNaN(a) || Number.isNaN(b) || b < a) return "-";
+  return ejaSelisih(Math.round((b - a) / 1000));
+}
 
 /**
  * Berita acara pelaksanaan ujian.
@@ -449,6 +488,85 @@ export function beritaAcaraHtml(ujian: UjianCetak, acara: BeritaAcara): string {
       pengawasan masing-masing peserta. Penentuan pelanggaran tetap pada pengawas dan pengajar
       pengampu.</p>`;
 
+  // ---------- DAFTAR NILAI DAN JAM PENGUMPULAN ----------
+  // Diurutkan menurut nomor pesertanya, bukan menurut siapa yang masuk lebih
+  // dulu. Berita acara dicocokkan baris demi baris dengan daftar hadir dan
+  // daftar peserta dari akademik, dan daftar yang urutannya ditentukan jam
+  // kedatangan tidak dapat dicocokkan dengan apa pun.
+  const urutNilai = [...acara.peserta].sort(
+    (a, b) =>
+      String(a.nim).localeCompare(String(b.nim), "id", { numeric: true }) ||
+      String(a.nama).localeCompare(String(b.nama), "id"),
+  );
+
+  // Nilai yang ikut dihitung rata-ratanya hanya nilai yang sudah ada: peserta
+  // yang masih mengerjakan bukan peserta bernilai nol, dan memasukkannya
+  // menarik rata-rata seluruh kelas ke bawah pada berita acara yang dibuat
+  // sebelum semua orang mengumpulkan.
+  const angka = urutNilai
+    .filter((p) => p.status !== "berjalan" && typeof p.nilai === "number")
+    .map((p) => p.nilai as number);
+  const statistik = statistikNilai(angka, acara.passing);
+  const menunggu = urutNilai.reduce((jumlah, p) => jumlah + (p.tertunda ?? 0), 0);
+
+  const barisNilai = urutNilai
+    .map((p, urut) => {
+      // Keterangan menjawab satu pertanyaan: nilai ini sudah boleh dipakai
+      // atau belum. Peserta yang essaynya belum dikoreksi BUKAN peserta yang
+      // nilainya rendah, dan berita acara yang menyamakan keduanya adalah
+      // dokumen yang menyesatkan — lalu ditandatangani.
+      // Keadaan peserta ikut ke dalam kolom ini, bukan ke kolom sendiri:
+      // sembilan kolom tidak muat pada satu halaman A4 tegak, dan yang
+      // pertama kali terpotong adalah nama.
+      const bagian: string[] = [];
+      if (p.status === "berjalan") bagian.push("Masih mengerjakan");
+      if (p.status === "waktu_habis") bagian.push("Waktu habis, dikumpulkan otomatis");
+      if (p.status !== "berjalan") {
+        if ((p.tertunda ?? 0) > 0) {
+          bagian.push(`${p.tertunda} essay menunggu koreksi — nilai belum tetap`);
+        } else if (typeof p.nilai === "number") {
+          bagian.push(p.nilai >= acara.passing ? "Lulus" : "Belum lulus");
+        } else {
+          bagian.push("Belum dinilai");
+        }
+      }
+      const keterangan = bagian.join(" · ") || labelStatusPeserta(p.status);
+      return `<tr>
+        <td>${urut + 1}</td>
+        <td>${lolos(p.nim)}</td>
+        <td>${lolos(p.nama)}</td>
+        <td>${lolos(jamPendek(p.mulai))}</td>
+        <td>${p.kumpul ? lolos(jamPendek(p.kumpul)) : "<i>belum dikumpulkan</i>"}</td>
+        <td>${lolos(lamaKerja(p.mulai, p.kumpul))}</td>
+        <td><b>${typeof p.nilai === "number" ? p.nilai : "-"}</b></td>
+        <td>${lolos(keterangan)}</td>
+      </tr>`;
+    })
+    .join("");
+
+  const daftarNilai = urutNilai.length === 0
+    ? "<p>Belum ada peserta yang masuk ke ujian ini.</p>"
+    : `<table class="nilai daftar-nilai">
+        <tr><th>No</th><th>NIM / No.</th><th>Nama</th><th>Mulai</th>
+          <th>Dikumpulkan</th><th>Lama</th><th>Nilai</th><th>Keterangan</th></tr>
+        ${barisNilai}
+      </table>
+      <table class="nilai" style="margin-top:8px">
+        <tr><th>Batas lulus</th><td>${acara.passing}</td>
+          <th>Sudah dinilai</th><td>${statistik.peserta} orang</td></tr>
+        <tr><th>Nilai rata-rata</th><td>${statistik.peserta ? statistik.rata : "-"}</td>
+          <th>Median</th><td>${statistik.peserta ? statistik.median : "-"}</td></tr>
+        <tr><th>Tertinggi / terendah</th>
+          <td>${statistik.peserta ? `${statistik.tertinggi} / ${statistik.terendah}` : "-"}</td>
+          <th>Lulus</th><td>${statistik.peserta ? `${statistik.lulus} dari ${statistik.peserta} (${statistik.persenLulus}%)` : "-"}</td></tr>
+      </table>${menunggu > 0 ? `
+      <p class="media-catatan">Masih ada ${menunggu} butir essay yang menunggu koreksi pengajar.
+      Nilai peserta yang bertanda demikian pada kolom keterangan BELUM TETAP dan akan berubah
+      sesudah essaynya dikoreksi; angka rata-rata di atas ikut berubah bersamanya.</p>` : ""}
+      <p class="media-catatan">Jam pada daftar ini jam server, bukan jam perangkat peserta.
+      Lamanya dihitung dari saat tombol MULAI ditekan sampai lembarnya dikumpulkan, sehingga
+      peserta yang masuk terlambat tercatat mengerjakan lebih singkat daripada durasi ujiannya.</p>`;
+
   const isi = `
 ${kop(ujian, "BERITA ACARA PELAKSANAAN UJIAN")}
 ${barisKeterangan([
@@ -473,7 +591,10 @@ ${barisKeterangan([
 <h3>B. Catatan pelanggaran sistem</h3>
 ${daftarLanggar}
 
-<h3>C. Catatan pengawas</h3>
+<h3>C. Daftar nilai dan jam pengumpulan</h3>
+${daftarNilai}
+
+<h3>D. Catatan pengawas</h3>
 <div class="petunjuk" style="min-height:70px">${acara.catatan ? lolos(acara.catatan) : "-"}</div>
 
 <p>Demikian berita acara ini dibuat dengan sebenarnya untuk dipergunakan sebagaimana mestinya.</p>
