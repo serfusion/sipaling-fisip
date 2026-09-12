@@ -8,7 +8,7 @@ import { DEFAULT_LETTER_HTML, LETTER_TITLES, type LetterSlug } from "./letter-de
 import { AM, HMS, computeTotals, extractBio, parseSheetRows, type Aoa, type CourseRow } from "./transkrip-parse";
 import { isiInggris, isiUlangInggris, kunciKamus, panenKamus, tebakKonsentrasi, type Lingkup } from "@/lib/kamus-matkul";
 import { penggalJudulInggris } from "@/lib/judul-inggris";
-import { periksaSiapArsip, predikatKelulusan, sidikTranskrip } from "@/lib/arsip-transkrip";
+import { PREDIKAT, periksaSiapArsip, predikatKelulusan, predikatTercetak, sidikTranskrip } from "@/lib/arsip-transkrip";
 import { concentrationsFor } from "@/lib/academic";
 import {
   AKREDITASI_BAWAAN, labelSebaris, labelTranskrip, lengkapiAkreditasi,
@@ -258,16 +258,13 @@ const PRODI_EN: Record<string, string> = {
   "Ilmu Pemerintahan": "GOVERNMENT SCIENCE",
 };
 
-// Predikat pada transkrip KUI dicetak SATU istilah, bukan pasangan
-// "Indonesia / Inggris" seperti jenjang dan prodi: transkrip contoh dari KUI
-// berbunyi "Cum Laude" saja, bukan "Dengan Pujian / Cum Laude (With Honors)".
-//
-// Hanya dua predikat yang dipakai (lihat `predikatKelulusan`), dan "Cum Laude"
-// sudah berbahasa Latin di kedua transkrip — jadi yang perlu padanan Inggris
-// tinggal satu.
-const PREDIKAT_EN: Record<string, string> = {
-  "Sangat Memuaskan": "Very Satisfactory",
-};
+// Predikat TIDAK diterjemahkan. Transkrip KUI mencetak satu istilah, bukan
+// pasangan "Indonesia / Inggris" seperti jenjang dan prodi, dan istilah yang
+// dipakai unit ini ("Cum Laude", "Dengan Pujian", "Sangat Memuaskan",
+// "Memuaskan") adalah yang tercetak pada transkrip Indonesia maupun Inggris.
+// Padanan Inggris yang dipilih sistem sendiri — "Very Satisfactory" — hanya
+// membuat satu mahasiswa memegang dua dokumen bertanda tangan Dekan yang
+// predikatnya berbunyi lain.
 
 /**
  * Biodata bawaan satu transkrip kosong.
@@ -292,6 +289,10 @@ function metaAwal() {
     konsentrasi: "",
     jenjang: "SARJANA / BACHELOR DEGREE (S-1)",
     judul: "",
+    // Kosong berarti "ikut usulan IPK". Yang tersimpan hanya pilihan yang
+    // benar-benar ditetapkan admin, jadi arsip lama tetap mengikuti aturan
+    // yang berlaku saat ia dicetak ulang.
+    predikat: "",
     tanggal: todayID(),
     dekan: "Dr. H. Achmad Kosasih, MM.",
     nbmdekan: "739.574",
@@ -338,7 +339,6 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
   const customSlug: LetterSlug = EN ? "transkrip-en" : "transkrip-custom";
   const L = labelTranskrip(EN);
   const showIpk = (value: number) => (EN ? value.toFixed(2) : fmtIPK(value));
-  const showPredikat = (value: string) => (EN && PREDIKAT_EN[value] ? PREDIKAT_EN[value] : value);
   const showProdi = (value: string) => (PRODI_EN[value] ? `${value.toUpperCase()} / ${PRODI_EN[value]}` : value.toUpperCase());
 
   const [customMode, setCustomMode] = useState(false);
@@ -560,6 +560,10 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
       // yang tertinggal dari impor sebelumnya akan mengganti seluruh kolom
       // Inggris mahasiswa ini tanpa ada yang mengetik apa pun.
       next.konsentrasi = bio.konsentrasi || "";
+      // Sama alasannya: predikat yang tadi dipilih tangan untuk mahasiswa
+      // sebelumnya akan tercetak pada mahasiswa ini tanpa ada yang
+      // menyentuhnya. Setiap berkas baru mulai dari usulan IPK-nya sendiri.
+      next.predikat = "";
       if (bio.jenjang) next.jenjang = bio.jenjang;
       if (bio.nppt) next.nppt = bio.nppt;
       if (bio.tanggal) next.tanggal = bio.tanggal;
@@ -1121,6 +1125,20 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
           </label>
           <label>Nomor Ijazah Nasional<input value={meta.noijazah} onChange={(e) => setMeta({ ...meta, noijazah: e.target.value })} /></label>
           <label>Tanggal yudisium<input value={meta.yudisium} onChange={(e) => setMeta({ ...meta, yudisium: e.target.value })} /></label>
+          {/* "Cum Laude" dan "Dengan Pujian" menandai jenjang yang sama, jadi
+              tidak ada batas IPK yang dapat memilihkannya. Yang memilih
+              fakultas, dan pilihannya ikut tersimpan ke arsip. */}
+          <label>Predikat kelulusan
+            <select
+              value={meta.predikat}
+              onChange={(e) => setMeta({ ...meta, predikat: e.target.value })}
+              title="Dibiarkan otomatis, predikat mengikuti IPK. Pilih sendiri bila fakultas memakai istilah yang lain untuk jenjang yang sama."
+            >
+              <option value="">Otomatis dari IPK ({predikatKelulusan(totals.ipk, meta.judul)})</option>
+              {PREDIKAT.map((nama) => <option key={nama} value={nama}>{nama}</option>)}
+            </select>
+            <small className="tpl-catatan">Tercetak apa adanya pada transkrip Indonesia maupun Inggris.</small>
+          </label>
           <label className="wide">Akreditasi<input value={meta.akred} onChange={(e) => setMeta({ ...meta, akred: e.target.value })} /></label>
           <label className="wide">Judul skripsi
             <textarea value={meta.judul} onChange={(e) => setMeta({ ...meta, judul: e.target.value })} />
@@ -1470,7 +1488,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
               </div>
               <div className="dtot-row">
                 <span className="dt-a"><BiIn text={L.totNilai} /></span><span className="dt-b">{totals.mutu}</span>
-                <span className="dt-c"><BiIn text={L.predLbl} /></span><span className="dt-d"><b>{showPredikat(predikatKelulusan(totals.ipk, meta.judul))}</b></span>
+                <span className="dt-c"><BiIn text={L.predLbl} /></span><span className="dt-d"><b>{predikatTercetak(meta.predikat, totals.ipk, meta.judul)}</b></span>
               </div>
               <div className="dtot-judul"><span><BiVal text={L.judul} /></span><span><JudulSkripsi teks={meta.judul} /></span></div>
             </div>

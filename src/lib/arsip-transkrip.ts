@@ -51,26 +51,64 @@ const teks = (nilai: unknown, batas: number) =>
   String(nilai ?? "").replace(/\s+/g, " ").trim().slice(0, batas);
 
 /**
- * Predikat kelulusan menurut IPK — DUA istilah saja.
+ * Empat predikat kelulusan yang boleh tercetak. Tidak ada istilah kelima.
  *
- * FISIP hanya memakai dua predikat pada transkrip dan pada lembar kelulusan
- * yang dikirim ke PDDIKTI: "Cum Laude" untuk IPK 3,51 ke atas, dan "Sangat
- * Memuaskan" untuk selebihnya. Itu pula yang tercetak pada transkrip contoh
- * dari KUI ("Sangat Memuaskan" pada IPK 3,43) dan pada lembar fakultas
- * ("CUM LAUDE" pada IPK 3,74).
+ * Urutannya menurun: "Cum Laude" yang tertinggi, "Memuaskan" yang terendah.
+ * Daftar inilah yang mengisi kolom pilihan Predikat kelulusan pada Biodata,
+ * dan daftar ini pula yang menyaring kiriman peramban: apa pun di luar
+ * keempatnya diabaikan. Yang tercetak di baris ini ditandatangani Dekan dan
+ * dilegalisir, jadi ejaannya tidak boleh datang dari isian bebas.
  *
- * Tiga istilah lain yang dulu ikut dihitung — "Dengan Pujian", "Memuaskan",
- * dan "Lulus" — sengaja dihapus. Istilah yang tidak pernah dipakai unit ini
- * hanya melahirkan transkrip yang berbunyi lain dari lembar kelulusannya.
- *
- * Tanda "-" bukan predikat: itu penampung untuk lembar yang memang belum
- * berisi apa pun. Selama judul skripsi belum diisi dan belum ada nilai yang
- * masuk, transkripnya belum bisa disebut lulus.
+ * "Cum Laude" dan "Dengan Pujian" adalah dua bunyi untuk jenjang yang sama.
+ * Keduanya disediakan karena yang memilih bunyi mana yang dipakai adalah
+ * fakultas, bukan angka IPK.
  */
-export function predikatKelulusan(ipk: number, judul: string) {
+export const PREDIKAT = ["Cum Laude", "Dengan Pujian", "Sangat Memuaskan", "Memuaskan"] as const;
+
+/**
+ * Penampung lembar yang memang belum berisi apa pun. Bukan predikat kelima:
+ * selama judul skripsi belum diisi dan belum ada nilai yang masuk,
+ * transkripnya belum bisa disebut lulus.
+ *
+ * Tanda hubung biasa, BUKAN tanda pisah panjang: seluruh teks yang tampil di
+ * web sudah dibersihkan dari tanda itu atas permintaan pemilik sistem.
+ */
+export const PREDIKAT_KOSONG = "-";
+
+/**
+ * USULAN predikat menurut IPK. Yang tercetak belum tentu ini: lihat
+ * `predikatTercetak`.
+ *
+ * Batasnya mengikuti tiga jenjang yang lazim dipakai, dengan istilah yang
+ * memang tercetak pada berkas FISIP: "Cum Laude" pada IPK 3,51 ke atas
+ * (lembar kelulusan PDDIKTI berbunyi "CUM LAUDE" pada IPK 3,74), "Sangat
+ * Memuaskan" pada 3,01 sampai 3,50 (transkrip contoh dari KUI berbunyi
+ * begitu pada IPK 3,43), dan "Memuaskan" untuk selebihnya.
+ *
+ * "Dengan Pujian" tidak pernah lahir dari angka. Ia dan "Cum Laude" menandai
+ * jenjang yang sama, jadi tidak ada batas IPK yang dapat memisahkan keduanya;
+ * yang memilih adalah admin, lewat kolom Predikat kelulusan pada Biodata.
+ */
+export function predikatKelulusan(ipk: number, judul: string): string {
   if (ipk >= 3.51) return "Cum Laude";
-  if (ipk >= 2.76 || judul) return "Sangat Memuaskan";
-  return "-";
+  if (ipk >= 3.01) return "Sangat Memuaskan";
+  if (ipk >= 2.76 || judul) return "Memuaskan";
+  return PREDIKAT_KOSONG;
+}
+
+/**
+ * Predikat yang benar-benar tercetak: pilihan admin kalau kolomnya diisi,
+ * usulan IPK kalau dibiarkan kosong.
+ *
+ * Pilihan dicocokkan dengan `PREDIKAT` tanpa membedakan huruf besar kecil,
+ * dan yang dikembalikan selalu ejaan resmi dari daftar. Isian di luar daftar
+ * TIDAK ikut tercetak; ia jatuh kembali ke usulan IPK. Kolom itu memang
+ * berupa pilihan di layar, tetapi `bersihkanMeta` di server meloloskan teks
+ * apa pun untuk kunci yang dikenal, jadi penyaringnya harus di sini juga.
+ */
+export function predikatTercetak(pilihan: string | undefined | null, ipk: number, judul: string): string {
+  const bersih = String(pilihan ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+  return PREDIKAT.find((nama) => nama.toLowerCase() === bersih) || predikatKelulusan(ipk, judul);
 }
 
 /**
@@ -151,7 +189,7 @@ export function ringkasTranskrip(meta: MetaTranskrip, rows: CourseRow[]): Ringka
     sks: total.sks,
     mutu: total.mutu,
     ipk,
-    predikat: predikatKelulusan(ipk, judul),
+    predikat: predikatTercetak(meta.predikat, ipk, judul),
   };
 }
 
