@@ -128,6 +128,34 @@ export type SoalTampil = {
   petaPilihan: number[];
 };
 
+/**
+ * Keadaan satu peserta pada ujian yang sedang atau sudah berlangsung.
+ *
+ * Labelnya ada di sini, bukan di panel pengajar, karena keadaan yang sama
+ * dibaca di dua tempat yang berbeda pemakainya: papan pantau di layar, dan
+ * berita acara yang dicetak lalu ditandatangani. Dua tempat yang mengarang
+ * labelnya sendiri pada akhirnya akan menyebut keadaan yang sama dengan dua
+ * nama — pada dokumen yang justru dipakai ketika hasil ujian dipersoalkan.
+ */
+export type StatusPeserta = "berjalan" | "selesai" | "waktu_habis";
+
+export const STATUS_PESERTA_LABEL: Record<StatusPeserta, string> = {
+  berjalan: "Mengerjakan",
+  selesai: "Selesai",
+  waktu_habis: "Waktu habis",
+};
+
+/**
+ * Label keadaan peserta dari untai apa pun yang tersimpan.
+ *
+ * Status dibaca dari kolom varchar, jadi nilai dari versi lama basis data
+ * mungkin tidak dikenal lagi. Yang tidak dikenal disebut "Selesai" — sama
+ * seperti papan pantau — bukan dibiarkan kosong pada berita acara.
+ */
+export function labelStatusPeserta(status: string): string {
+  return STATUS_PESERTA_LABEL[status as StatusPeserta] ?? STATUS_PESERTA_LABEL.selesai;
+}
+
 export type StatusUjian = "draf" | "menunggu" | "terjadwal" | "berlangsung" | "selesai";
 
 export const STATUS_LABEL: Record<StatusUjian, string> = {
@@ -409,6 +437,161 @@ export function jawabanKosong(jenis: JenisSoal, jawaban: string): boolean {
   return false;
 }
 
+// ---------- JAWABAN YANG DAPAT DIBACA ORANG ----------
+//
+// Jawaban dan kunci tersimpan sebagai NOMOR — "2,3" dan "0,2" — karena itulah
+// satu-satunya bentuk yang tetap benar ketika pengajar membetulkan satu huruf
+// pada teks pilihannya. Nomor itu benar untuk mesin penilai dan tidak berarti
+// apa pun bagi orang: pengajar yang membuka lembar jawaban membaca
+// "jawaban 2,3 / kunci 0,2", dua deret angka yang bahkan tidak dapat
+// dibandingkan satu sama lain — yang pertama nomor pilihan DI LAYAR PESERTA
+// (sudah teracak), yang kedua nomor pada bank soal.
+//
+// Karena itu penerjemahannya tinggal DI SINI, bersama mesin penilainya, bukan
+// di panel React maupun di modul cetak: keduanya membaca jawaban yang sama dan
+// keduanya harus mengurutkan pilihan dengan cara yang sama dengan yang dipakai
+// ketika nilainya dihitung.
+
+/**
+ * Nomor pilihan yang DILIHAT peserta, dikembalikan ke nomornya pada bank soal.
+ *
+ * Satu fungsi untuk dua jalur yang wajib sepakat: yang menghitung nilai, dan
+ * yang menampilkan jawabannya kembali kepada pengajar. Ketika keduanya
+ * memetakan sendiri-sendiri, lembar jawaban dapat menyebut pilihan B sementara
+ * yang dinilai benar pilihan D — dan yang dipercaya orang adalah lembarnya.
+ */
+export function keUrutanBank(petaPilihan: number[] | undefined, tampil: number): number {
+  return petaPilihan && petaPilihan.length > tampil && tampil >= 0 ? petaPilihan[tampil] : tampil;
+}
+
+/**
+ * Huruf pilihan: 0 menjadi "A".
+ *
+ * Di atas 26 pilihan ia beralih ke nomor. String.fromCharCode(65 + 26)
+ * menghasilkan "[", dan lembar jawaban yang menyebut kunci "[" tidak dapat
+ * dibaca siapa pun.
+ */
+export function hurufOpsi(indeks: number): string {
+  if (!Number.isInteger(indeks) || indeks < 0) return "?";
+  return indeks < 26 ? String.fromCharCode(65 + indeks) : `#${indeks + 1}`;
+}
+
+/** Secukupnya untuk menyebutkan jawaban — dipakai juga oleh soal hasil impor. */
+export type SoalTerbaca = Pick<Soal, "jenis" | "pilihan" | "kunci" | "pasangan">;
+
+/**
+ * Satu pilihan sebagaimana disebut di lembar jawaban: "B. Kultivasi".
+ *
+ * Hurufnya mengikuti urutan BANK SOAL, bukan urutan yang dilihat peserta:
+ * pilihan diacak berbeda untuk tiap peserta, jadi huruf yang dilihat peserta
+ * tidak ada gunanya bagi pengajar yang membaca satu lembar demi satu lembar —
+ * sedangkan huruf bank soal sama dengan yang tercetak pada naskah dan pada
+ * daftar bank soal di layarnya.
+ *
+ * Benar/Salah dikecualikan: "A. Benar" menambah satu huruf yang tidak pernah
+ * ditanyakan siapa pun.
+ */
+function sebutOpsi(soal: SoalTerbaca, indeks: number): string {
+  const teks = String(soal.pilihan[indeks] ?? "").trim();
+  if (soal.jenis === "benar_salah") return teks || hurufOpsi(indeks);
+  return teks ? `${hurufOpsi(indeks)}. ${teks}` : hurufOpsi(indeks);
+}
+
+/** Pemisah antar jawaban jamak. Bukan koma: teks pilihan sendiri memuat koma. */
+const PEMISAH = "; ";
+
+/**
+ * Jawaban peserta sebagai kalimat yang dapat dibaca pengajar.
+ *
+ * Mengembalikan untai kosong untuk jawaban yang kosong ATAU yang tidak dapat
+ * dibaca lagi — sama dengan yang disimpulkan `jawabanKosong`, supaya lembar
+ * jawaban tidak menyebut "tidak dijawab" pada butir yang berpoin, atau
+ * sebaliknya.
+ */
+export function jawabanTerbaca(
+  soal: SoalTerbaca,
+  jawaban: string,
+  petaPilihan?: number[],
+): string {
+  const isi = String(jawaban ?? "").trim();
+  if (isi === "") return "";
+  if (soal.jenis === "essay" || soal.jenis === "isian") return isi;
+
+  if (soal.jenis === "pg" || soal.jenis === "benar_salah") {
+    const tampil = Number(isi);
+    if (!Number.isInteger(tampil) || tampil < 0) return "";
+    return sebutOpsi(soal, keUrutanBank(petaPilihan, tampil));
+  }
+
+  if (soal.jenis === "pg_kompleks") {
+    const dipilih = [...uraiKunciJamak(isi)]
+      .map((n) => keUrutanBank(petaPilihan, n))
+      .sort((a, b) => a - b);
+    return dipilih.map((n) => sebutOpsi(soal, n)).join(PEMISAH);
+  }
+
+  if (soal.jenis === "penjodohan") {
+    const dijawab = uraiJodoh(isi);
+    if (dijawab.size === 0) return "";
+    // Seluruh pasangan disebut, termasuk yang dilewati peserta. Menampilkan
+    // hanya yang terjawab membuat lembar jawaban terlihat lengkap padahal dua
+    // pasangan dibiarkan kosong — dan itulah yang ditanyakan ketika nilainya
+    // dipersoalkan.
+    return soal.pasangan
+      .map((pas, urut) => {
+        const pilih = dijawab.get(urut);
+        const kanan = pilih === undefined ? "(kosong)" : sebutOpsi(soal, keUrutanBank(petaPilihan, pilih));
+        return `${pas.kiri} → ${kanan}`;
+      })
+      .join(PEMISAH);
+  }
+
+  return isi;
+}
+
+/**
+ * Kunci jawaban sebagai kalimat yang dapat dibaca pengajar.
+ *
+ * Kosong untuk essay — yang tidak punya kunci, dan kunci palsu di lembar
+ * koreksi essay hanya akan disalahartikan sebagai jawaban yang dituntut.
+ */
+export function kunciTerbaca(soal: SoalTerbaca): string {
+  if (soal.jenis === "essay") return "";
+
+  if (soal.jenis === "isian") {
+    // Beberapa kemungkinan dipisah "|" pada penyimpanannya. Yang dibaca
+    // pengajar "agenda setting / pengaturan agenda", bukan pipanya.
+    return String(soal.kunci || "")
+      .split("|")
+      .map((k) => k.trim())
+      .filter(Boolean)
+      .join(" / ");
+  }
+
+  if (soal.jenis === "penjodohan") {
+    return soal.pasangan
+      .map((pas) => `${pas.kiri} → ${sebutOpsi(soal, pas.kanan)}`)
+      .join(PEMISAH);
+  }
+
+  if (soal.jenis === "pg_kompleks") {
+    return [...uraiKunciJamak(soal.kunci)]
+      .sort((a, b) => a - b)
+      .map((n) => sebutOpsi(soal, n))
+      .join(PEMISAH);
+  }
+
+  // Kunci kosong diperiksa SEBELUM Number(): Number("") bernilai 0, dan 0
+  // adalah bilangan bulat yang sah — sehingga soal dari bank lama yang
+  // kuncinya hilang akan menyebut pilihan A sebagai kunci, dengan tenang, pada
+  // lembar yang dipakai mengoreksi.
+  const mentah = String(soal.kunci ?? "").trim();
+  if (mentah === "") return "";
+  const nomor = Number(mentah);
+  if (!Number.isInteger(nomor) || nomor < 0) return "";
+  return sebutOpsi(soal, nomor);
+}
+
 export type HasilSatuSoal = { benar: boolean | null; poin: number };
 
 /**
@@ -465,8 +648,10 @@ export function nilaiJawaban(soal: Soal, jawaban: string, petaPilihan?: number[]
   if (!isi) return { benar: false, poin: 0 };
 
   // Nomor pilihan yang dilihat peserta dikembalikan ke nomor pada banknya.
-  const keAsli = (tampil: number) =>
-    petaPilihan && petaPilihan.length > tampil && tampil >= 0 ? petaPilihan[tampil] : tampil;
+  // Lewat fungsi bersama, bukan rumus yang ditulis ulang di sini: lembar
+  // jawaban yang dibaca pengajar memetakannya dengan fungsi yang sama, dan
+  // dua rumus yang sama pada akhirnya akan berbeda.
+  const keAsli = (tampil: number) => keUrutanBank(petaPilihan, tampil);
 
   if (soal.jenis === "pg" || soal.jenis === "benar_salah") {
     const dipilih = Number(isi);
@@ -479,12 +664,9 @@ export function nilaiJawaban(soal: Soal, jawaban: string, petaPilihan?: number[]
     const kunci = uraiKunciJamak(soal.kunci);
     if (kunci.size === 0) return { benar: false, poin: 0 };
 
-    const dipilih = new Set(
-      isi.split(",")
-        .map((n) => Number(n.trim()))
-        .filter((n) => Number.isInteger(n) && n >= 0)
-        .map(keAsli),
-    );
+    // Dibaca pembaca yang sama dengan yang membaca kuncinya, dan yang sama
+    // pula dengan yang dipakai `jawabanKosong` serta lembar jawaban pengajar.
+    const dipilih = new Set([...uraiKunciJamak(isi)].map(keAsli));
 
     let tepat = 0;
     let keliru = 0;

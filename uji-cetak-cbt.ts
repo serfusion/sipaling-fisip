@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { MEDIA_KOSONG } from "./src/lib/cbt";
 import {
   beritaAcaraHtml, laporanPesertaHtml, lolos, naskahSoalHtml,
-  type SoalCetak, type UjianCetak,
+  type BeritaAcara, type SoalCetak, type UjianCetak,
 } from "./src/lib/cetak-cbt";
 
 let lulus = 0;
@@ -129,19 +129,47 @@ cek("isinya tetap terbaca sebagai teks", jahat.includes("Berapa 2 &lt; 3 &amp; 4
 
 // ---------- BERITA ACARA ----------
 bagian("Berita acara");
+
+type PesertaAcara = BeritaAcara["peserta"][number];
+const MULAI = "2026-09-10T02:05:00.000Z";
+const KUMPUL = "2026-09-10T03:10:00.000Z";
+
+/**
+ * Satu peserta berita acara, yang perlu saja ditimpa.
+ *
+ * Bawaannya peserta yang wajar: sudah mengumpulkan, bersih, dan bernilai —
+ * supaya tiap uji di bawah menyebutkan HANYA hal yang sedang diujinya.
+ */
+function hadir(isi: Partial<PesertaAcara> & { nim: string; nama: string }): PesertaAcara {
+  return {
+    status: "selesai", pindahTab: 0, keluarFullscreen: 0,
+    nilai: 75, mulai: MULAI, kumpul: KUMPUL, ...isi,
+  };
+}
+
 const acara = beritaAcaraHtml(ujian, {
   pengawas: "Dr. Ayu", ruang: "Lab Komputer 2",
   hadir: 28, terdaftar: 30, selesai: 19, berjalan: 9, pelanggaran: 24,
+  passing: 70,
   catatan: "Listrik sempat padam 5 menit pada pukul 09.20.",
   peserta: [
-    { nim: "111", nama: "Budi", status: "selesai", pindahTab: 3, keluarFullscreen: 1 },
-    { nim: "222", nama: "Citra", status: "selesai", pindahTab: 0, keluarFullscreen: 0 },
+    hadir({ nim: "111", nama: "Budi", pindahTab: 3, keluarFullscreen: 1, nilai: 80 }),
+    hadir({ nim: "222", nama: "Citra", nilai: 65 }),
   ],
 });
 cek("menyebut pengawas", acara.includes("Dr. Ayu"));
 cek("menyebut ruang", acara.includes("Lab Komputer 2"));
 cek("angka kehadiran tercetak", acara.includes("28 orang"));
-cek("hanya yang melanggar yang didaftar", acara.includes("Budi") && !acara.includes(">Citra<"));
+// Diperiksa PADA POTONGAN BAGIAN B, bukan pada seluruh berkas. Sejak daftar
+// nilai ikut tercetak, setiap peserta memang muncul di berkas ini — dan uji
+// yang mencari namanya di seluruh halaman tidak lagi mengatakan apa pun
+// tentang tabel yang sedang diujinya.
+const bagianLanggar = acara.slice(
+  acara.indexOf("B. Catatan pelanggaran"),
+  acara.indexOf("C. Daftar nilai"),
+);
+cek("tabel pelanggaran hanya memuat yang melanggar",
+    bagianLanggar.includes("Budi") && !bagianLanggar.includes("Citra"));
 cek("jumlah pelanggaran per orang tercetak", acara.includes("3×"));
 cek("catatan pengawas ikut", acara.includes("Listrik sempat padam"));
 cek("ada blok tanda tangan", acara.includes("Pengawas Ujian"));
@@ -154,45 +182,119 @@ cek("menegaskan catatan sistem bukan putusan", acara.includes("bukan putusan"));
 const acara2 = beritaAcaraHtml(ujian, {
   pengawas: "Dr. Ayu", ruang: "Daring",
   hadir: 3, terdaftar: 3, selesai: 3, berjalan: 0, pelanggaran: 2,
+  passing: 70,
   catatan: "",
   peserta: [
     // Tidak pernah pindah tab, tetapi menempel jawaban berkali-kali.
-    { nim: "333", nama: "Dewi", status: "selesai", pindahTab: 0, keluarFullscreen: 0, integritas: 50 },
+    hadir({ nim: "333", nama: "Dewi", integritas: 50 }),
     // Bersih betul.
-    { nim: "444", nama: "Eka", status: "selesai", pindahTab: 0, keluarFullscreen: 0, integritas: 100 },
+    hadir({ nim: "444", nama: "Eka", integritas: 100 }),
     // Dihentikan pengawasan.
-    {
-      nim: "555", nama: "Fajar", status: "waktu_habis", pindahTab: 5, keluarFullscreen: 0,
+    hadir({
+      nim: "555", nama: "Fajar", status: "waktu_habis", pindahTab: 5,
       integritas: 20, dihentikan: "Dihentikan pengawasan: tab melampaui batas.",
-    },
+    }),
   ],
 });
-cek("yang menempel tanpa pindah tab tetap terdaftar", acara2.includes("Dewi"));
-cek("yang bersih tetap tidak terdaftar", !acara2.includes(">Eka<"));
+const bagianLanggar2 = acara2.slice(
+  acara2.indexOf("B. Catatan pelanggaran"),
+  acara2.indexOf("C. Daftar nilai"),
+);
+cek("yang menempel tanpa pindah tab tetap terdaftar", bagianLanggar2.includes("Dewi"));
+cek("yang bersih tetap tidak masuk tabel pelanggaran", !bagianLanggar2.includes("Eka"));
 cek("skor integritas tercetak", acara2.includes("50/100"));
 cek("sebab pemutusan ikut tercetak", acara2.includes("melampaui batas"));
 // Yang paling perlu dibaca harus berada di baris pertama: berita acara dibaca
 // dari atas, dan baris kedua puluh jarang sampai terbaca.
 cek("diurutkan dari yang paling rendah skornya",
-  acara2.indexOf("Fajar") < acara2.indexOf("Dewi"));
+  bagianLanggar2.indexOf("Fajar") < bagianLanggar2.indexOf("Dewi"));
 cek("menegaskan skor bukan nilai ujian", acara2.includes("BUKAN nilai ujian"));
 
 // Ujian lama, dari sebelum pengawasan ada, tidak punya skor sama sekali.
 // Ia tidak boleh dianggap bersih maupun dianggap melanggar.
 const acara3 = beritaAcaraHtml(ujian, {
   pengawas: "", ruang: "", hadir: 1, terdaftar: 1, selesai: 1, berjalan: 0,
-  pelanggaran: 0, catatan: "",
-  peserta: [{ nim: "666", nama: "Gita", status: "selesai", pindahTab: 0, keluarFullscreen: 0 }],
+  pelanggaran: 0, passing: 70, catatan: "",
+  peserta: [hadir({ nim: "666", nama: "Gita" })],
 });
 cek("peserta lama tanpa skor tidak didaftar sebagai pelanggar",
   acara3.includes("Tidak ada pelanggaran"));
 
 const acaraBersih = beritaAcaraHtml(ujian, {
   pengawas: "", ruang: "", hadir: 5, terdaftar: 5, selesai: 5, berjalan: 0, pelanggaran: 0,
-  catatan: "", peserta: [{ nim: "1", nama: "A", status: "selesai", pindahTab: 0, keluarFullscreen: 0 }],
+  passing: 70, catatan: "", peserta: [hadir({ nim: "1", nama: "A" })],
 });
 cek("tanpa pelanggaran dinyatakan tegas", acaraBersih.includes("Tidak ada pelanggaran"));
 cek("moda daring jadi bawaan bila ruang kosong", acaraBersih.includes("Daring"));
+
+// ---------- DAFTAR NILAI DAN JAM PENGUMPULAN ----------
+//
+// Inilah yang dahulu tidak ada, dan ketiadaannya memaksa pengawas menyalin
+// nilai satu per satu dari layar ke dokumen yang ditandatanganinya — salah
+// ketik yang tidak pernah ada yang tahu, pada berkas yang dipakai justru
+// ketika nilai dipersoalkan.
+bagian("Berita acara: daftar nilai dan jam pengumpulan");
+const acaraNilai = beritaAcaraHtml(ujian, {
+  pengawas: "Dr. Ayu", ruang: "Lab Komputer 2",
+  hadir: 4, terdaftar: 4, selesai: 3, berjalan: 1, pelanggaran: 0, passing: 70,
+  catatan: "",
+  peserta: [
+    // Sengaja TIDAK berurutan nimnya, dan yang terakhir masuk justru bernilai
+    // paling tinggi: berita acara diurutkan menurut nim supaya dapat
+    // dicocokkan baris demi baris dengan daftar hadir.
+    hadir({ nim: "222", nama: "Citra", nilai: 90, kumpul: "2026-09-10T03:00:00.000Z" }),
+    hadir({ nim: "111", nama: "Budi", nilai: 60, kumpul: "2026-09-10T02:50:00.000Z" }),
+    // Essaynya belum dikoreksi: nilainya ada, tetapi belum tetap.
+    hadir({ nim: "333", nama: "Dewi", nilai: 40, tertunda: 2 }),
+    // Masih mengerjakan saat berita acaranya dibuat.
+    hadir({ nim: "444", nama: "Eka", status: "berjalan", nilai: null, kumpul: null }),
+  ],
+});
+const bagianNilai = acaraNilai.slice(
+  acaraNilai.indexOf("C. Daftar nilai"),
+  acaraNilai.indexOf("D. Catatan pengawas"),
+);
+cek("ada bagian daftar nilai", bagianNilai.includes("Daftar nilai dan jam pengumpulan"));
+cek("seluruh peserta masuk daftar, termasuk yang bersih",
+    ["Budi", "Citra", "Dewi", "Eka"].every((n) => bagianNilai.includes(n)));
+cek("nilai tiap peserta tercetak",
+    bagianNilai.includes("<b>90</b>") && bagianNilai.includes("<b>60</b>"));
+cek("diurutkan menurut nim, bukan jam kedatangan",
+    bagianNilai.indexOf("Budi") < bagianNilai.indexOf("Citra"));
+cek("jam pengumpulan tercetak beserta zonanya", /09\.50 WIB/.test(bagianNilai) || /09\.50/.test(bagianNilai));
+cek("jam mulai ikut tercetak", bagianNilai.includes("09.05"));
+cek("lama pengerjaan dihitung", bagianNilai.includes("45 menit"));
+cek("yang belum mengumpulkan tidak diberi jam palsu",
+    bagianNilai.includes("belum dikumpulkan"));
+cek("yang masih mengerjakan tidak dibaca bernilai nol",
+    bagianNilai.includes("Masih mengerjakan") && bagianNilai.includes("<b>-</b>"));
+cek("essay yang menunggu ditandai pada barisnya",
+    bagianNilai.includes("2 essay menunggu koreksi"));
+cek("nilai yang belum tetap dinyatakan tegas", bagianNilai.includes("BELUM TETAP"));
+cek("kelulusan per baris disimpulkan dari batas lulus",
+    bagianNilai.includes("Lulus") && bagianNilai.includes("Belum lulus"));
+cek("batas lulus tercetak", bagianNilai.includes("Batas lulus"));
+// Rata-rata dihitung dari yang SUDAH dinilai saja. Memasukkan peserta yang
+// masih mengerjakan sebagai nol membuat berita acara yang dibuat sebelum semua
+// orang mengumpulkan menyatakan rata-rata kelas jauh lebih rendah daripada
+// yang sebenarnya.
+cek("rata-rata tidak menghitung yang masih mengerjakan",
+    bagianNilai.includes("63.3"), "rata-rata dari 90, 60, dan 40");
+cek("jumlah yang sudah dinilai dinyatakan", bagianNilai.includes("3 orang"));
+cek("jam dinyatakan jam server", bagianNilai.includes("jam server"));
+
+const acaraKosong = beritaAcaraHtml(ujian, {
+  pengawas: "", ruang: "", hadir: 0, terdaftar: 0, selesai: 0, berjalan: 0,
+  pelanggaran: 0, passing: 70, catatan: "", peserta: [],
+});
+cek("ujian tanpa peserta tidak mencetak tabel nilai kosong",
+    acaraKosong.includes("Belum ada peserta"));
+cek("nama peserta pada daftar nilai ikut diloloskan",
+    beritaAcaraHtml(ujian, {
+      pengawas: "", ruang: "", hadir: 1, terdaftar: 1, selesai: 1, berjalan: 0,
+      pelanggaran: 0, passing: 70, catatan: "",
+      peserta: [hadir({ nim: "1", nama: "<script>alert(1)</script>" })],
+    }).includes("&lt;script&gt;"));
 
 // ---------- LAPORAN PER PESERTA ----------
 bagian("Laporan per peserta");
@@ -262,13 +364,13 @@ const semuaBerkas = [
   naskahSoalHtml(ujian, soal, { denganKunci: true }),
   beritaAcaraHtml(ujian, {
     pengawas: "Dr. Ayu", ruang: "Daring", hadir: 1, terdaftar: 1, selesai: 1,
-    berjalan: 0, pelanggaran: 0, catatan: "",
-    peserta: [{ nim: "1", nama: "A", status: "selesai", pindahTab: 0, keluarFullscreen: 0 }],
+    berjalan: 0, pelanggaran: 0, passing: 70, catatan: "",
+    peserta: [hadir({ nim: "1", nama: "A" })],
   }),
   beritaAcaraHtml(ujian, {
     pengawas: "Dr. Ayu", ruang: "Daring", hadir: 1, terdaftar: 1, selesai: 1,
-    berjalan: 0, pelanggaran: 1, catatan: "",
-    peserta: [{ nim: "2", nama: "B", status: "selesai", pindahTab: 4, keluarFullscreen: 1, integritas: 60 }],
+    berjalan: 0, pelanggaran: 1, passing: 70, catatan: "",
+    peserta: [hadir({ nim: "2", nama: "B", pindahTab: 4, keluarFullscreen: 1, integritas: 60 })],
   }),
   laporanPesertaHtml(ujian, {
     nim: "3", nama: "C", nilai: 80, benar: 4, salah: 1, kosong: 0, tertunda: 0,

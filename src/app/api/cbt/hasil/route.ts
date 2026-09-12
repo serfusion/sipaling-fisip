@@ -13,8 +13,8 @@ import { getCurrentProfile } from "@/lib/supabase-server";
 import { getSupabaseSecretKey, getSupabaseUrl } from "@/lib/supabase-config";
 import { explainServerError } from "@/lib/api-errors";
 import {
-  analisisSoal, angkaParam, bolehCbt, bolehPantau, bolehUbah, sisaDetik,
-  statistikNilai, statusUjian,
+  analisisSoal, angkaParam, bolehCbt, bolehPantau, bolehUbah, jawabanTerbaca,
+  kunciTerbaca, sisaDetik, statistikNilai, statusUjian,
 } from "@/lib/cbt";
 import { bacaLembar, soalUjian } from "@/lib/cbt-store";
 
@@ -167,7 +167,6 @@ export async function GET(request: Request) {
           if (!soal) return null;
           const j = petaJawab.get(l.id);
           const dipilih = j ? j.answer : "";
-          const nomorAsli = l.peta.length && dipilih !== "" ? l.peta[Number(dipilih)] : Number(dipilih);
           return {
             nomor: urut + 1,
             id: soal.id,
@@ -178,10 +177,16 @@ export async function GET(request: Request) {
             kunci: soal.kunci,
             pembahasan: soal.pembahasan,
             jawaban: dipilih,
-            jawabanTeks:
-              soal.jenis === "pg" || soal.jenis === "benar_salah"
-                ? (soal.pilihan[nomorAsli] ?? "")
-                : dipilih,
+            // Jawaban DAN kuncinya diterjemahkan di sini, bukan di panel
+            // pengajar. Yang tersimpan hanya nomor pilihan, dan nomor pada
+            // jawaban peserta adalah nomor LAYARNYA — yang sudah teracak —
+            // sedangkan nomor pada kunci adalah nomor bank soal. Panel yang
+            // menerjemahkannya sendiri hanya memegang setengah keterangan yang
+            // diperlukan (`peta` tidak pernah ikut ke peramban), dan itu
+            // membuat lembar jawaban menyebut "jawaban 2,3 / kunci 0,2" — dua
+            // deret angka yang bahkan tidak sebanding.
+            jawabanTeks: jawabanTerbaca(soal, dipilih, l.peta),
+            kunciTeks: kunciTerbaca(soal),
             benar: j ? j.isCorrect : null,
             poin: j ? j.points : 0,
             catatan: j?.feedback || "",

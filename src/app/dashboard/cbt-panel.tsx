@@ -19,8 +19,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ejaWaktu, JENIS_LABEL, KEADAAN_JAWAB_LABEL, keadaanJawab, MEDIA_KOSONG, SEMUA_JENIS,
-  STATUS_LABEL, uraiKunciJamak,
+  ejaWaktu, JENIS_LABEL, KEADAAN_JAWAB_LABEL, keadaanJawab, kunciTerbaca, labelStatusPeserta,
+  MEDIA_KOSONG, SEMUA_JENIS, STATUS_LABEL, uraiKunciJamak,
   type JenisSoal, type Media, type Pasangan, type StatusUjian,
 } from "@/lib/cbt";
 import { imporDariExcel, imporDariWord, type SoalImpor, type Aoa } from "@/lib/impor-soal";
@@ -78,6 +78,14 @@ type Rincian = {
   nomor: number; id: number; jenis: JenisSoal; pertanyaan: string;
   pilihan: string[]; bobot: number; kunci: string; pembahasan: string | null;
   jawaban: string; jawabanTeks: string;
+  /**
+   * Kunci yang sudah dirangkai server menjadi kalimat: "B. Kultivasi;
+   * D. Spiral of silence". Sengaja tidak dirakit di sini — jawaban peserta dan
+   * kuncinya harus diurutkan dengan cara yang sama dengan yang dipakai ketika
+   * nilainya dihitung, dan peta pengacakan pilihannya tidak pernah ikut ke
+   * peramban.
+   */
+  kunciTeks: string;
   benar: boolean | null; poin: number; catatan: string;
 };
 
@@ -1701,7 +1709,7 @@ export default function CbtPanel({ role }: { role: string }) {
 
   function cetakBeritaAcara(kunciTombol = "acara") {
     const info = keteranganUjian();
-    if (!info) return;
+    if (!info || !terbuka) return;
     bukaCetak(
       beritaAcaraHtml(info, {
         pengawas: acara.pengawas,
@@ -1716,9 +1724,17 @@ export default function CbtPanel({ role }: { role: string }) {
         // sementara ada peserta yang menempel jawaban delapan kali adalah
         // dokumen yang menyesatkan, dan ia ditandatangani.
         pelanggaran: peserta.filter((p) => typeof p.integritas === "number" && p.integritas < 100).length,
+        passing: terbuka.passingGrade,
+        // Nilai dan jam pengumpulan tiap peserta ikut. Keduanya memang sudah
+        // ada di papan pantau, tetapi papan pantau tidak dapat ditandatangani
+        // dan tidak dapat dilampirkan: yang diserahkan ke akademik adalah
+        // berita acaranya, dan berita acara tanpa daftar nilai memaksa
+        // pengawas menyalin satu per satu dari layar — pekerjaan yang salah
+        // ketik tanpa ada yang tahu.
         peserta: peserta.map((p) => ({
           nim: p.nim, nama: p.nama, status: p.status,
           pindahTab: p.pindahTab, keluarFullscreen: p.keluarFullscreen,
+          nilai: p.nilai, mulai: p.mulai, kumpul: p.kumpul, tertunda: p.tertunda,
           integritas: p.integritas, dihentikan: p.dihentikan,
         })),
       }),
@@ -2512,10 +2528,13 @@ export default function CbtPanel({ role }: { role: string }) {
                         <li key={i}>
                           <span className={`pill cbt-t-${q.tingkat}`}>{JENIS_LABEL[q.jenis]} · {q.bobot} poin</span>
                           <p>{q.pertanyaan.slice(0, 110)}{q.pertanyaan.length > 110 ? "…" : ""}</p>
-                          {q.pilihan.length > 0 && (
-                            <small>Kunci: {String.fromCharCode(65 + Number(q.kunci))}. {q.pilihan[Number(q.kunci)]}</small>
-                          )}
-                          {q.jenis === "isian" && <small>Kunci: {q.kunci}</small>}
+                          {/* Lewat kunciTerbaca, bukan Number(q.kunci) apa adanya:
+                              kunci PG kompleks berbentuk "0,2" sehingga
+                              Number()-nya NaN, dan String.fromCharCode(65 + NaN)
+                              mencetak aksara kosong — pratinjau impornya dulu
+                              berbunyi "Kunci: ." pada setiap soal jawaban jamak
+                              dan setiap soal penjodohan. */}
+                          {kunciTerbaca(q) !== "" && <small>Kunci: {kunciTerbaca(q)}</small>}
                         </li>
                       ))}
                       {imporSoal.length > 5 && <li className="cbt-impor-sisa">…dan {imporSoal.length - 5} soal lagi.</li>}
@@ -2998,7 +3017,7 @@ export default function CbtPanel({ role }: { role: string }) {
                         </td>
                         <td>
                           <span className={`pill cbt-p-${p.status}`}>
-                            {p.status === "berjalan" ? "Mengerjakan" : p.status === "waktu_habis" ? "Waktu habis" : "Selesai"}
+                            {labelStatusPeserta(p.status)}
                           </span>
                           {p.status === "berjalan" && p.diamDetik !== null && p.diamDetik > AMBANG_TERPUTUS && (
                             <small className="cbt-putus">⚠ terputus {Math.round(p.diamDetik / 60)} menit</small>
@@ -3055,7 +3074,10 @@ export default function CbtPanel({ role }: { role: string }) {
             <div className="panel cbt-acara">
               <div className="cbt-impor-kepala">
                 <b>Berita acara pelaksanaan</b>
-                <span>Kehadiran dan pelanggaran diambil dari sistem. Isi tiga kolom di bawah.</span>
+                <span>
+                  Kehadiran, pelanggaran, nilai, dan jam pengumpulan tiap peserta diambil
+                  dari sistem. Isi tiga kolom di bawah.
+                </span>
               </div>
               <div className="cbt-baris">
                 <label><span>Nama pengawas</span>
@@ -3126,79 +3148,94 @@ export default function CbtPanel({ role }: { role: string }) {
               ) : rincian.length === 0 ? (
                 <div className="dempty">Lembar jawabannya kosong.</div>
               ) : (
-                <ol className="cbt-lembar-daftar">
-                  {rincian.map((r) => {
-                    const belumDikoreksi = r.jenis === "essay" && r.benar === null;
-                    return (
-                      <li key={r.id} className={belumDikoreksi ? "cbt-perlu-koreksi" : ""}>
-                        <div className="cbt-lembar-kepala">
-                          <span className="cbt-lembar-nomor">Soal {r.nomor}</span>
-                          <span className={`pill cbt-nilai-${keadaanJawab(r)}`}>
-                            {KEADAAN_JAWAB_LABEL[keadaanJawab(r)]}
-                          </span>
-                          <span className="cbt-lembar-poin">{r.poin} / {r.bobot} poin</span>
-                        </div>
-                        <p className="cbt-soal-tanya">{r.pertanyaan}</p>
-
-                        <div className="cbt-lembar-jawab">
-                          <small>Jawaban peserta</small>
-                          <p>{r.jawabanTeks || <i>tidak dijawab</i>}</p>
-                        </div>
-
-                        {r.jenis !== "essay" && r.kunci !== "" && (
-                          <p className="cbt-soal-kunci">
-                            Kunci: {r.pilihan.length > 0 ? (r.pilihan[Number(r.kunci)] ?? r.kunci) : r.kunci}
-                          </p>
-                        )}
-
-                        {/* Kotak nilai hanya untuk essay, dan hanya bagi pengajar
-                            pemiliknya — inilah satu-satunya jalan agar essay
-                            yang dikerjakan peserta berhenti menggantung
-                            sebagai "menunggu koreksi". */}
-                        {r.jenis === "essay" && terbuka.bolehUbah && (
-                          <div className="cbt-koreksi">
-                            <label>
-                              <span>Nilai (0–{r.bobot})</span>
-                              <input
-                                type="number"
-                                min={0}
-                                max={r.bobot}
-                                value={draftKoreksi[r.id]?.poin ?? "0"}
-                                onChange={(e) =>
-                                  setDraftKoreksi((kini) => ({
-                                    ...kini,
-                                    [r.id]: { poin: e.target.value, catatan: kini[r.id]?.catatan ?? "" },
-                                  }))
-                                }
-                              />
-                            </label>
-                            <label className="cbt-koreksi-catatan">
-                              <span>Catatan untuk peserta</span>
-                              <input
-                                value={draftKoreksi[r.id]?.catatan ?? ""}
-                                onChange={(e) =>
-                                  setDraftKoreksi((kini) => ({
-                                    ...kini,
-                                    [r.id]: { poin: kini[r.id]?.poin ?? "0", catatan: e.target.value },
-                                  }))
-                                }
-                                placeholder="Boleh dikosongkan"
-                              />
-                            </label>
-                            <Tbl
-                              kabar={aksi[`koreksi-${r.id}`]}
-                              dasar="btn btn-primary btn-mini"
-                              diam="Simpan nilai"
-                              onClick={() => void koreksi(r.id, r.bobot)}
-                            />
+                <>
+                  {/* Diberitahukan HANYA ketika pilihannya memang diacak.
+                      Huruf yang tertulis pada lembar ini huruf bank soal —
+                      sama dengan naskah cetak — sedangkan peserta melihat
+                      urutan yang lain. Tanpa kalimat ini, pengajar yang
+                      membandingkan lembar ini dengan layar peserta mengira
+                      salah satunya keliru. */}
+                  {terbuka.randomOptions && (
+                    <p className="cbt-catatan">
+                      Huruf pilihan di bawah mengikuti urutan <b>bank soal</b> —
+                      sama dengan naskah cetak. Urutan pilihan di layar peserta
+                      diacak, dan jawabannya sudah dikembalikan ke urutan bank
+                      oleh sistem, dengan cara yang sama seperti ketika nilainya
+                      dihitung.
+                    </p>
+                  )}
+                  <ol className="cbt-lembar-daftar">
+                    {rincian.map((r) => {
+                      const belumDikoreksi = r.jenis === "essay" && r.benar === null;
+                      return (
+                        <li key={r.id} className={belumDikoreksi ? "cbt-perlu-koreksi" : ""}>
+                          <div className="cbt-lembar-kepala">
+                            <span className="cbt-lembar-nomor">Soal {r.nomor}</span>
+                            <span className={`pill cbt-nilai-${keadaanJawab(r)}`}>
+                              {KEADAAN_JAWAB_LABEL[keadaanJawab(r)]}
+                            </span>
+                            <span className="cbt-lembar-poin">{r.poin} / {r.bobot} poin</span>
                           </div>
-                        )}
+                          <p className="cbt-soal-tanya">{r.pertanyaan}</p>
 
-                        {r.catatan && <p className="cbt-lembar-catatan">Catatan pengajar: {r.catatan}</p>}
-                      </li>
-                    );
-                  })}
-                </ol>
+                          <div className="cbt-lembar-jawab">
+                            <small>Jawaban peserta</small>
+                            <p>{r.jawabanTeks || <i>tidak dijawab</i>}</p>
+                          </div>
+
+                          {r.kunciTeks !== "" && (
+                            <p className="cbt-soal-kunci">Kunci: {r.kunciTeks}</p>
+                          )}
+
+                          {/* Kotak nilai hanya untuk essay, dan hanya bagi pengajar
+                              pemiliknya — inilah satu-satunya jalan agar essay
+                              yang dikerjakan peserta berhenti menggantung
+                              sebagai "menunggu koreksi". */}
+                          {r.jenis === "essay" && terbuka.bolehUbah && (
+                            <div className="cbt-koreksi">
+                              <label>
+                                <span>Nilai (0–{r.bobot})</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={r.bobot}
+                                  value={draftKoreksi[r.id]?.poin ?? "0"}
+                                  onChange={(e) =>
+                                    setDraftKoreksi((kini) => ({
+                                      ...kini,
+                                      [r.id]: { poin: e.target.value, catatan: kini[r.id]?.catatan ?? "" },
+                                    }))
+                                  }
+                                />
+                              </label>
+                              <label className="cbt-koreksi-catatan">
+                                <span>Catatan untuk peserta</span>
+                                <input
+                                  value={draftKoreksi[r.id]?.catatan ?? ""}
+                                  onChange={(e) =>
+                                    setDraftKoreksi((kini) => ({
+                                      ...kini,
+                                      [r.id]: { poin: kini[r.id]?.poin ?? "0", catatan: e.target.value },
+                                    }))
+                                  }
+                                  placeholder="Boleh dikosongkan"
+                                />
+                              </label>
+                              <Tbl
+                                kabar={aksi[`koreksi-${r.id}`]}
+                                dasar="btn btn-primary btn-mini"
+                                diam="Simpan nilai"
+                                onClick={() => void koreksi(r.id, r.bobot)}
+                              />
+                            </div>
+                          )}
+
+                          {r.catatan && <p className="cbt-lembar-catatan">Catatan pengajar: {r.catatan}</p>}
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </>
               )}
             </div>
           )}

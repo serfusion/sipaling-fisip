@@ -7,7 +7,8 @@
 // peserta yang menghitung ulang sendiri.
 // ============================================================
 import {
-  hitungNilai, jawabanKosong, nilaiJawaban, susunPaket, uraiJodoh, uraiKunciJamak,
+  hitungNilai, hurufOpsi, jawabanKosong, jawabanTerbaca, keUrutanBank, kunciTerbaca,
+  nilaiJawaban, susunPaket, uraiJodoh, uraiKunciJamak,
   MEDIA_KOSONG, type Soal,
 } from "./src/lib/cbt";
 import { bacaJenis, bacaKunciJamak, bacaMedia, bacaPasangan, imporDariExcel, imporDariWord } from "./src/lib/impor-soal";
@@ -188,6 +189,133 @@ const wordAman = imporDariWord([
 ].join("\n"));
 cek('pertanyaan bertanda "=" tidak berubah jadi penjodohan',
     wordAman.soal[0]?.jenis === "pg", JSON.stringify(wordAman.soal[0]));
+
+// ---------- LEMBAR JAWABAN YANG DAPAT DIBACA PENGAJAR ----------
+//
+// Penilaiannya sudah benar sejak awal; yang keliru selama ini
+// PENYEBUTANNYA. Pengajar yang membuka lembar jawaban membaca
+// "jawaban peserta 2,3" dan "Kunci: 0,2" — dua deret angka yang tidak dapat
+// dibandingkan satu sama lain, karena yang pertama nomor pilihan DI LAYAR
+// PESERTA (sudah teracak) dan yang kedua nomor pada bank soal. Yang terlihat
+// dari layar: kunci yang seakan-akan selalu dimulai "0,".
+bagian("Lembar jawaban: jawaban dan kunci yang dapat dibaca orang");
+
+cek("huruf pilihan dimulai dari A", hurufOpsi(0) === "A" && hurufOpsi(3) === "D");
+cek("di atas 26 pilihan beralih ke nomor, bukan aksara ngawur",
+    hurufOpsi(26) === "#27", hurufOpsi(26));
+cek("peta pilihan mengembalikan nomor layar ke nomor bank",
+    keUrutanBank([2, 0, 3, 1], 0) === 2 && keUrutanBank(undefined, 2) === 2);
+
+const kunciKompleks = kunciTerbaca(kompleks);
+cek("kunci PG kompleks tidak lagi berupa deret angka",
+    kunciKompleks === "A. Agenda setting; B. Kultivasi; D. Spiral of silence", kunciKompleks);
+cek("kunci PG kompleks tidak memuat nomor mentahnya", !kunciKompleks.includes("0,1,3"));
+
+// Inilah pemeriksaan yang paling menentukan: yang tertulis pada lembar
+// jawaban harus SEBANDING dengan yang tertulis pada kuncinya. Peserta ini
+// menjawab dengan tepat — hanya saja nomor pilihan di layarnya teracak — dan
+// dahulu lembarnya berbunyi "1,3,2" berhadapan dengan kunci "0,1,3".
+const jawabKompleks = jawabanTerbaca(kompleks, "1,3,2", petaBalik);
+cek("jawaban benar pada pilihan teracak terbaca SAMA dengan kuncinya",
+    jawabKompleks === kunciKompleks, `${jawabKompleks} vs ${kunciKompleks}`);
+cek("dan mesin penilai memang menyebutnya benar",
+    nilaiJawaban(kompleks, "1,3,2", petaBalik).benar === true);
+
+// Lembar dan mesin penilai harus sepakat pada setiap jawaban, bukan hanya
+// pada yang benar: lembar yang menyebut jawaban sama dengan kunci padahal
+// nilainya tidak penuh — atau sebaliknya — akan digugat, dan yang dipercaya
+// orang lembarnya.
+for (const dijawab of ["1,3,2", "1,3", "0", "0,1,2,3", ""]) {
+  const samaDenganKunci = jawabanTerbaca(kompleks, dijawab, petaBalik) === kunciKompleks;
+  const penuh = nilaiJawaban(kompleks, dijawab, petaBalik).benar === true;
+  cek(`lembar dan nilai sepakat untuk jawaban "${dijawab}"`, samaDenganKunci === penuh,
+      `lembar ${samaDenganKunci ? "sama" : "beda"}, nilai ${penuh ? "penuh" : "tidak"}`);
+}
+
+cek("PG kompleks yang tidak dijawab tidak dikarang isinya",
+    jawabanTerbaca(kompleks, "") === "");
+cek("dua yang tercentang disebut dua-duanya",
+    jawabanTerbaca(kompleks, "0,1") === "A. Agenda setting; B. Kultivasi",
+    jawabanTerbaca(kompleks, "0,1"));
+
+const kunciJodoh = kunciTerbaca(jodoh);
+cek("kunci penjodohan disebut pasangan demi pasangan",
+    kunciJodoh === "Agenda setting → A. McCombs & Shaw; Spiral of silence → B. Noelle-Neumann; Kultivasi → C. Gerbner",
+    kunciJodoh);
+
+// Dahulu kolom ini memuat JSON apa adanya — {"0":0,"1":1,"2":3} — dan
+// pengajar yang mengoreksi harus membaca tanda kutipnya sendiri.
+const jawabJodoh = jawabanTerbaca(jodoh, '{"0":0,"1":1,"2":3}');
+cek("jawaban penjodohan tidak lagi berupa JSON mentah", !jawabJodoh.includes('{"0"'), jawabJodoh);
+cek("tiap pasangan disebut beserta yang dipilih peserta",
+    jawabJodoh === "Agenda setting → A. McCombs & Shaw; Spiral of silence → B. Noelle-Neumann; Kultivasi → D. Lasswell",
+    jawabJodoh);
+// Pasangan yang dilewati harus KELIHATAN dilewati. Menyebut hanya yang
+// terjawab membuat lembarnya terlihat lengkap padahal dua baris dibiarkan
+// kosong — dan itulah yang ditanyakan ketika nilainya dipersoalkan.
+cek("pasangan yang dilewati peserta tetap disebut",
+    jawabanTerbaca(jodoh, '{"0":0}').includes("(kosong)"),
+    jawabanTerbaca(jodoh, '{"0":0}'));
+cek("penjodohan yang belum disentuh tidak dikarang isinya",
+    jawabanTerbaca(jodoh, "{}") === "" && jawabanTerbaca(jodoh, "bukan json") === "");
+cek("jawaban penjodohan teracak ikut dipetakan balik",
+    jawabanTerbaca(jodoh, '{"0":1}', [2, 0, 3, 1]).startsWith("Agenda setting → A. McCombs & Shaw"),
+    jawabanTerbaca(jodoh, '{"0":1}', [2, 0, 3, 1]));
+
+const pgSatu: Soal = {
+  ...dasar, id: 7, jenis: "pg", pertanyaan: "Siapa perumus agenda setting?",
+  pilihan: ["McCombs & Shaw", "Lasswell", "Habermas", "Gerbner"], kunci: "0", bobot: 5,
+};
+cek("pilihan ganda disebut beserta hurufnya",
+    kunciTerbaca(pgSatu) === "A. McCombs & Shaw", kunciTerbaca(pgSatu));
+cek("pilihan ganda teracak dipetakan balik",
+    jawabanTerbaca(pgSatu, "1", [3, 0, 2, 1]) === "A. McCombs & Shaw",
+    jawabanTerbaca(pgSatu, "1", [3, 0, 2, 1]));
+cek("pilihan ganda yang tidak dijawab kosong", jawabanTerbaca(pgSatu, "") === "");
+
+const bs: Soal = {
+  ...dasar, id: 8, jenis: "benar_salah", pertanyaan: "Agenda setting dirumuskan 1972.",
+  pilihan: ["Benar", "Salah"], kunci: "0", bobot: 5,
+};
+// "A. Benar" menambah satu huruf yang tidak pernah ditanyakan siapa pun.
+cek("benar/salah disebut tanpa huruf", kunciTerbaca(bs) === "Benar", kunciTerbaca(bs));
+cek("jawaban benar/salah ikut tanpa huruf",
+    jawabanTerbaca(bs, "1") === "Salah", jawabanTerbaca(bs, "1"));
+
+const isianSoal: Soal = {
+  ...dasar, id: 9, jenis: "isian", pertanyaan: "Sebutkan istilahnya.",
+  pilihan: [], kunci: "komunikasi massa|mass communication", bobot: 4,
+};
+cek("kunci isian dibaca tanpa tanda pipa",
+    kunciTerbaca(isianSoal) === "komunikasi massa / mass communication", kunciTerbaca(isianSoal));
+cek("jawaban isian apa adanya", jawabanTerbaca(isianSoal, " Komunikasi Massa ") === "Komunikasi Massa");
+
+const essaySoal: Soal = {
+  ...dasar, id: 10, jenis: "essay", pertanyaan: "Jelaskan.", pilihan: [], kunci: "", bobot: 20,
+};
+// Essay tidak punya kunci. Kunci palsu di lembar koreksi hanya akan
+// disalahartikan sebagai jawaban yang dituntut.
+cek("essay tidak diberi kunci", kunciTerbaca(essaySoal) === "");
+cek("jawaban essay apa adanya", jawabanTerbaca(essaySoal, "Media membentuk agenda.") === "Media membentuk agenda.");
+
+// Soal yang kuncinya rusak — pernah ada pada bank dari versi lama — tidak
+// boleh mencetak "Kunci: undefined" maupun aksara kosong.
+cek("kunci yang rusak tidak mencetak sampah",
+    kunciTerbaca({ ...pgSatu, kunci: "" }) === "" &&
+    kunciTerbaca({ ...pgSatu, kunci: "bukan angka" }) === "");
+cek("pilihan yang hilang jatuh ke hurufnya saja",
+    kunciTerbaca({ ...pgSatu, kunci: "9" }) === "J", kunciTerbaca({ ...pgSatu, kunci: "9" }));
+
+// Yang disebut kosong oleh lembar jawaban harus yang disebut kosong oleh
+// penghitung nilai — supaya tidak ada butir berpoin yang terbaca "tidak
+// dijawab", dan tidak ada butir kosong yang terbaca sudah dijawab.
+for (const [soal, dijawab] of [
+  [kompleks, ""], [kompleks, "0,1"], [jodoh, "{}"], [jodoh, '{"0":0}'],
+  [pgSatu, ""], [pgSatu, "2"], [isianSoal, ""], [isianSoal, "agenda"],
+] as Array<[Soal, string]>) {
+  cek(`kosongnya sepakat: ${soal.jenis} "${dijawab}"`,
+      (jawabanTerbaca(soal, dijawab) === "") === jawabanKosong(soal.jenis, dijawab));
+}
 
 // ---------- JAWABAN KOSONG ----------
 bagian("Jawaban kosong — \"{}\" bukan jawaban");
