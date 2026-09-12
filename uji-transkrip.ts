@@ -12,8 +12,9 @@
 import { readFileSync } from "node:fs";
 import { extractBio, parseSheetRows, computeTotals, type Aoa } from "./src/app/dashboard/template/transkrip-parse";
 import {
-  labelTranskrip, pakaiRektorDari, pecahAkreditasi,
+  labelTranskrip, pakaiRektorDari, pecahAkreditasi, lengkapiAkreditasi,
   labelSebaris, LABEL_SEBARIS, LABEL_BERTINGKAT,
+  AKREDITASI_BAWAAN, PERINGKAT_AKREDITASI,
 } from "./src/app/dashboard/template/transkrip-label";
 import { TEMPLATE_BIO_ROWS } from "./src/app/dashboard/template/transkrip-template";
 import {
@@ -47,6 +48,10 @@ sama("program studi terbaca", bio.prodi, "Ilmu Pemerintahan");
 sama("tempat tanggal lahir terbaca", bio.ttl, "Tangerang, 1 Januari 2000");
 sama("tanggal yudisium terbaca", bio.yudisium, "6 Juli 2026");
 benar("akreditasi terbaca", (bio.akred || "").includes("LAMSPAK"), bio.akred);
+// Berkas SIMAK mengirim nomor SK-nya sendirian. Yang masuk ke kolom
+// Akreditasi — dan yang ikut diarsipkan — harus sudah berperingkat.
+sama("peringkat UNGGUL ditempelkan pada akreditasi dari SIMAK",
+  lengkapiAkreditasi(bio.akred || ""), "UNGGUL LAMSPAK Nomor 099/AK.03.05/2026");
 
 // Judul skripsi ditulis melompat dua baris di kolom kanan; kalau hanya baris
 // pertama yang terbaca, transkrip resmi tercetak dengan judul terpotong.
@@ -435,14 +440,43 @@ sama("bentuk BAN-PT dari base SIMAK",
   "TERAKREDITASI ¶ SK BAN-PT Nomor : 5435/SK/BAN-PT/Ak.KP/S/VIII/2024");
 sama("admin dapat memaksa penggalannya dengan |",
   pecahAkreditasi("BAIK SEKALI|Nomor 123/ABC").join(" ¶ "), "BAIK SEKALI ¶ Nomor 123/ABC");
-// Isian lama yang HANYA memuat nomor SK tetap satu baris: baris atas yang
-// kosong akan tercetak sebagai celah di transkrip resmi.
-sama("tanpa peringkat tetap satu baris",
+// Isian yang HANYA memuat nomor SK — bentuk kiriman SIMAK — tetap tercetak
+// berperingkat: "UNGGUL" dipasang sendiri di baris atas. Admin tidak pernah
+// diminta mengetikkannya lagi.
+sama("tanpa peringkat pun UNGGUL tetap tercetak di baris atas",
   pecahAkreditasi("LAMSPAK Nomor 099/AK.03.05/2026").join(" ¶ "),
-  "LAMSPAK Nomor 099/AK.03.05/2026 ¶ ");
+  "UNGGUL ¶ LAMSPAK Nomor 099/AK.03.05/2026");
+sama("bentuk SK BAN-PT tanpa peringkat ikut ditempeli",
+  pecahAkreditasi("SK BAN-PT Nomor : 5435/SK/BAN-PT/Ak.KP/S/VIII/2024").join(" ¶ "),
+  "UNGGUL ¶ SK BAN-PT Nomor : 5435/SK/BAN-PT/Ak.KP/S/VIII/2024");
 sama("isian kosong tidak menghasilkan apa-apa", pecahAkreditasi("").join(" ¶ "), " ¶ ");
 sama("spasi berlebih dirapikan", pecahAkreditasi("  UNGGUL   LAMSPAK  Nomor 1 ").join(" ¶ "),
   "UNGGUL ¶ LAMSPAK Nomor 1");
+// Isian tanpa rujukan SK sama sekali tetap utuh satu baris: peringkat yang
+// ditulis sendirian bukan nomor yang kehilangan peringkatnya.
+sama("peringkat sendirian tetap satu baris",
+  pecahAkreditasi("BAIK SEKALI").join(" ¶ "), "BAIK SEKALI ¶ ");
+// "|" adalah satu-satunya jalan keluar: kalau admin sengaja mengosongkan
+// peringkatnya, UNGGUL tidak boleh ikut dipasang.
+sama("peringkat kosong yang dipaksa admin dihormati",
+  pecahAkreditasi("|LAMSPAK Nomor 1").join(" ¶ "), " ¶ LAMSPAK Nomor 1");
+
+// Yang DISIMPAN — kolom Akreditasi di layar dan isian yang diarsipkan —
+// berbunyi sama dengan yang tercetak.
+sama("isian SIMAK dilengkapi peringkatnya",
+  lengkapiAkreditasi("LAMSPAK Nomor 099/AK.03.05/2026"),
+  "UNGGUL LAMSPAK Nomor 099/AK.03.05/2026");
+sama("yang sudah berperingkat tidak ditempeli dua kali",
+  lengkapiAkreditasi("UNGGUL LAMSPAK Nomor 156/AK.03.05/2026"),
+  "UNGGUL LAMSPAK Nomor 156/AK.03.05/2026");
+sama("tanda kutip berkas KUI ikut dibuang saat disimpan",
+  lengkapiAkreditasi('"UNGGUL" LAMSPAK Nomor 156/AK.03.05/2026'),
+  "UNGGUL LAMSPAK Nomor 156/AK.03.05/2026");
+sama("peringkat lain tidak diganti UNGGUL",
+  lengkapiAkreditasi("BAIK SEKALI LAMSPAK Nomor 1"), "BAIK SEKALI LAMSPAK Nomor 1");
+sama("penggalan paksa admin tidak ikut diutak-atik",
+  lengkapiAkreditasi("BAIK SEKALI|Nomor 123/ABC"), "BAIK SEKALI|Nomor 123/ABC");
+sama("isian kosong tetap kosong", lengkapiAkreditasi(""), "");
 
 console.log("\n=== SAKLAR REKTOR ===\n");
 
@@ -466,7 +500,16 @@ benar("TERAKREDITASI sebaris dengan ACCREDITATION", labelSebaris("akred"));
 benar("FAKULTAS sebaris", labelSebaris("fak"));
 benar("JENJANG sebaris", labelSebaris("jenjangLbl"));
 benar("KONSENTRASI sebaris", labelSebaris("kons"));
-for (const kunci of ["noij", "nppt", "yud", "nama", "nim", "ttl", "prodi", "npps"]) {
+// Label biodata menyambung dengan pasangan Inggrisnya, tidak lagi dipatahkan
+// ke baris bawah: "NAMA MAHASISWA / STUDENT NAME" pada satu baris.
+benar("NAMA MAHASISWA menyambung dengan STUDENT NAME", labelSebaris("nama"));
+benar("NOMOR INDUK MAHASISWA menyambung dengan STUDENT IDENTIFICATION NUMBER",
+  labelSebaris("nim"));
+benar("TEMPAT, TGL LAHIR menyambung dengan PLACE, DATE OF BIRTH", labelSebaris("ttl"));
+benar("PROGRAM STUDI menyambung dengan STUDY PROGRAM", labelSebaris("prodi"));
+// Yang tersisa bertingkat hanyalah label nomor: pasangan Inggrisnya terlalu
+// panjang dan akan mendorong kolom nilainya ke kanan.
+for (const kunci of ["noij", "nppt", "yud", "npps"]) {
   benar(`${kunci} tetap bertingkat`, !labelSebaris(kunci));
 }
 // Tidak boleh ada label yang lupa didaftar, dan tidak boleh ada yang masuk
@@ -492,6 +535,10 @@ sama("template memuat peringkat UNGGUL apa adanya, tanpa tanda kutip",
   akredTemplate, "UNGGUL LAMSPAK Nomor 156/AK.03.05/2026");
 sama("dan terpenggal benar saat dicetak",
   pecahAkreditasi(akredTemplate).join(" ¶ "), "UNGGUL ¶ LAMSPAK Nomor 156/AK.03.05/2026");
+// Template unduhan dan lembar kosong di layar membaca tetapan yang SAMA:
+// nomor SK yang berganti di satu tempat tidak boleh tertinggal di tempat lain.
+sama("template memakai tetapan bawaan yang sama", akredTemplate, AKREDITASI_BAWAAN);
+benar("tetapan bawaan dibuka peringkatnya", AKREDITASI_BAWAAN.startsWith(PERINGKAT_AKREDITASI));
 benar("konsentrasi contoh pada template termasuk yang dikenali kamus",
   Boolean(lingkupUtama({ prodi: "Ilmu Komunikasi", konsentrasi: TEMPLATE_BIO_ROWS.find(([l]) => /^konsentrasi/i.test(l))?.[1] })));
 

@@ -24,8 +24,9 @@
 //
 // SETIAP garis miring pada label diapit spasi — "NAMA MAHASISWA / STUDENT
 // NAME", bukan "NAMA MAHASISWA/STUDENT NAME". Termasuk yang jatuh di ujung
-// baris karena bagian Inggrisnya turun ke bawah: yang tercetak berbunyi
-// "NAMA MAHASISWA /". Aturan itu dikunci uji, bukan kesepakatan lisan.
+// baris pada label yang bagian Inggrisnya turun ke bawah: yang tercetak
+// berbunyi "NOMOR IJAZAH NASIONAL /". Aturan itu dikunci uji, bukan
+// kesepakatan lisan.
 // ============================================================
 
 export function labelTranskrip(EN: boolean) {
@@ -36,9 +37,9 @@ export function labelTranskrip(EN: boolean) {
         nppt: "NOMOR POKOK PERGURUAN TINGGI /|NATIONAL HIGHER EDUCATION INSTITUTION CODE",
         yud: "TANGGAL YUDISIUM /|DATE OF DEGREE CONFERRAL", akred: "TERAKREDITASI /|ACCREDITATION",
         nama: "NAMA MAHASISWA /|STUDENT NAME",
-        // Sebagian label dicetak KUI pada SATU baris, tidak bertingkat —
-        // daftarnya ada pada `LABEL_SEBARIS` di bawah, bukan ditebak di
-        // tempat pemakaiannya.
+        // Sebaris atau bertingkat ditentukan `LABEL_SEBARIS` di bawah, bukan
+        // ditebak di tempat pemakaiannya. Seluruh label biodata menyambung
+        // dengan pasangan Inggrisnya; yang bertingkat tinggal label nomor.
         fak: "FAKULTAS /|FACULTY",
         fakval: "ILMU SOSIAL DAN ILMU POLITIK /|SOCIAL AND POLITICAL SCIENCES",
         nim: "NOMOR INDUK MAHASISWA /|STUDENT IDENTIFICATION NUMBER",
@@ -71,6 +72,30 @@ export function labelTranskrip(EN: boolean) {
 }
 
 /**
+ * Peringkat akreditasi yang sedang berlaku untuk kedua prodi FISIP.
+ *
+ * Tertempel sendiri: admin tidak pernah diminta mengetik "UNGGUL" lagi, baik
+ * pada template unduhan, pada lembar kosong di layar, maupun pada berkas
+ * SIMAK yang datang hanya membawa nomor SK-nya.
+ */
+export const PERINGKAT_AKREDITASI = "UNGGUL";
+
+/** Nomor SK akreditasi yang sedang berlaku. */
+export const SK_AKREDITASI = "LAMSPAK Nomor 156/AK.03.05/2026";
+
+/**
+ * Isian akreditasi bawaan — satu sel, peringkat di depan nomor SK.
+ *
+ * Dipakai template unduhan MAUPUN lembar kosong di layar. Ditulis sekali di
+ * sini: sewaktu tersebar di dua berkas, nomor SK sempat berganti di satu
+ * tempat saja dan template unduhan berbulan-bulan membawa nomor lama.
+ */
+export const AKREDITASI_BAWAAN = `${PERINGKAT_AKREDITASI} ${SK_AKREDITASI}`;
+
+/** Kata yang MEMULAI rujukan SK akreditasi. */
+const AWAL_SK = /\b(LAMSPAK|BAN-PT|NOMOR|NO\.|SK)\b/i;
+
+/**
  * Pecah isian akreditasi menjadi peringkat dan nomor SK-nya.
  *
  * Transkrip KUI mencetaknya bertingkat, peringkatnya sendirian di baris atas:
@@ -85,6 +110,11 @@ export function labelTranskrip(EN: boolean) {
  * Pemenggalannya jatuh sebelum kata yang MEMULAI rujukan SK — LAMSPAK,
  * BAN-PT, Nomor, No., SK. Admin dapat memaksanya dengan menulis "|".
  *
+ * Isian yang HANYA memuat nomor SK — bentuk yang dikirim SIMAK — tetap
+ * tercetak dengan peringkatnya: `PERINGKAT_AKREDITASI` dipasang sendiri di
+ * baris atas. Sebelumnya yang seperti itu tercetak tanpa peringkat sama
+ * sekali, dan setiap transkrip menuntut koreksi tangan yang sama.
+ *
  * Nomor SK tidak pernah ikut dirapikan spasinya: "156/AK.03.05/2026" adalah
  * nomor, bukan pasangan dwibahasa.
  */
@@ -92,17 +122,40 @@ export function pecahAkreditasi(nilai: string): [peringkat: string, sk: string] 
   const bersih = String(nilai || "").replace(/\s+/g, " ").trim();
   if (!bersih) return ["", ""];
 
+  // Penggalan yang dipaksa admin dihormati apa adanya — termasuk kalau ia
+  // sengaja mengosongkan peringkatnya. Itu satu-satunya jalan keluar dari
+  // peringkat bawaan, jadi tidak boleh ikut diisi sendiri.
   const paksa = bersih.indexOf("|");
   if (paksa >= 0) {
     return [bersih.slice(0, paksa).trim().replace(/^"|"$/g, ""), bersih.slice(paksa + 1).trim()];
   }
 
-  const batas = bersih.search(/\b(LAMSPAK|BAN-PT|NOMOR|NO\.|SK)\b/i);
-  // Tanpa peringkat di depannya tidak ada yang perlu dipenggal: seluruhnya
-  // tetap satu baris, supaya isian lama yang hanya memuat nomor SK tidak
-  // tiba-tiba tercetak dengan baris atas yang kosong.
-  if (batas <= 0) return [bersih.replace(/^"|"$/g, ""), ""];
+  const batas = bersih.search(AWAL_SK);
+  // Tidak ada rujukan SK sama sekali: seluruhnya peringkat, satu baris.
+  if (batas < 0) return [bersih.replace(/^"|"$/g, ""), ""];
+  // Langsung dibuka rujukan SK: peringkatnya yang hilang, bukan nomornya.
+  if (batas === 0) return [PERINGKAT_AKREDITASI, bersih];
   return [bersih.slice(0, batas).trim().replace(/^"|"$/g, ""), bersih.slice(batas).trim()];
+}
+
+/**
+ * Lengkapi isian akreditasi dengan peringkatnya, untuk DISIMPAN — bukan
+ * untuk dicetak.
+ *
+ * Yang tercetak sudah diurus `pecahAkreditasi`. Yang ini dipakai di jalur
+ * impor supaya kolom Akreditasi di layar, dan isian yang ikut diarsipkan,
+ * berbunyi sama dengan yang tercetak: "UNGGUL LAMSPAK Nomor ...", bukan
+ * nomor SK sendirian yang membuat admin mengira peringkatnya belum terisi.
+ *
+ * Tanda kutip bawaan berkas KUI — "UNGGUL" — ikut dibuang di sini, supaya
+ * yang tersimpan sama dengan yang tertulis di template unduhan.
+ */
+export function lengkapiAkreditasi(nilai: string): string {
+  const bersih = String(nilai || "").replace(/\s+/g, " ").trim();
+  if (!bersih) return "";
+  const [peringkat, sk] = pecahAkreditasi(bersih);
+  if (!sk) return bersih;
+  return bersih.startsWith(peringkat) ? bersih : `${peringkat} ${sk}`;
 }
 
 /**
@@ -119,20 +172,29 @@ export function pakaiRektorDari(ttd: string | undefined): boolean {
 /**
  * Label mana yang tercetak SEBARIS, label mana yang BERTINGKAT.
  *
- * Pada transkrip KUI, bagian Inggris label TIDAK selalu turun ke baris
- * bawah. Yang menentukan bukan selera, melainkan panjang labelnya: yang
- * pendek muat sebaris dengan pasangan Inggrisnya, yang panjang dipatahkan
- * supaya kolom nilainya tidak ikut terdorong ke kanan.
+ * Bagian Inggris label TIDAK selalu turun ke baris bawah. Seluruh label
+ * BIODATA menyambung dengan pasangan Inggrisnya pada baris yang sama —
+ * "NAMA MAHASISWA / STUDENT NAME", bukan "STUDENT NAME" yang dipatahkan
+ * sendirian di bawahnya:
  *
- *     TERAKREDITASI / ACCREDITATION   :  UNGGUL          <- sebaris
- *     FAKULTAS / FACULTY              :  ILMU SOSIAL …   <- sebaris
- *     JENJANG / DEGREE LEVEL          :  SARJANA / …     <- sebaris
- *     KONSENTRASI / CONCENTRATION     :  ADVERTISING     <- sebaris
+ *     NAMA MAHASISWA / STUDENT NAME              :  LUTFI ALHABSY
+ *     NOMOR INDUK MAHASISWA /
+ *     STUDENT IDENTIFICATION NUMBER              :  2270201140
+ *     TEMPAT, TGL LAHIR / PLACE, DATE OF BIRTH   :  TANGERANG, 31 MARET 2001
+ *     PROGRAM STUDI / STUDY PROGRAM              :  ILMU KOMUNIKASI
+ *     TERAKREDITASI / ACCREDITATION              :  UNGGUL
+ *     FAKULTAS / FACULTY                         :  ILMU SOSIAL …
+ *     JENJANG / DEGREE LEVEL                     :  SARJANA / …
+ *     KONSENTRASI / CONCENTRATION                :  ADVERTISING
  *
- *     NAMA MAHASISWA /                :  LUTFI ALHABSY   <- bertingkat
- *     STUDENT NAME
- *     NOMOR INDUK MAHASISWA /         :  2270201140      <- bertingkat
- *     STUDENT IDENTIFICATION NUMBER
+ * Yang tersisa BERTINGKAT hanyalah label nomor — nomor ijazah, NPPT,
+ * tanggal yudisium, dan nomor pokok program studi — yang pasangan
+ * Inggrisnya terlalu panjang ("NATIONAL HIGHER EDUCATION INSTITUTION CODE")
+ * sehingga mendorong kolom nilainya ke kanan kalau dipaksa sebaris.
+ *
+ * Yang menyambung tetap dipatahkan sendiri oleh lebar kolomnya kalau tidak
+ * muat — itu patahan alami di tengah label, bukan garis miring yang
+ * menggantung di ujung baris.
  *
  * "TERAKREDITASI" sempat ikut dipatahkan padahal pada transkrip acuan ia
  * sebaris — dan patahan yang salah menggeser nomor SK akreditasi satu baris
@@ -141,11 +203,11 @@ export function pakaiRektorDari(ttd: string | undefined): boolean {
  * Didaftar di sini, bukan ditebak dari panjang teksnya: yang tercetak harus
  * sama dengan acuan KUI, dan acuan tidak dapat dihitung dari jumlah huruf.
  */
-export const LABEL_SEBARIS = ["akred", "fak", "jenjangLbl", "kons"] as const;
-
-export const LABEL_BERTINGKAT = [
-  "noij", "nppt", "yud", "nama", "nim", "ttl", "prodi", "npps",
+export const LABEL_SEBARIS = [
+  "akred", "fak", "jenjangLbl", "kons", "nama", "nim", "ttl", "prodi",
 ] as const;
+
+export const LABEL_BERTINGKAT = ["noij", "nppt", "yud", "npps"] as const;
 
 /** Apakah label ini dicetak sebaris dengan pasangan Inggrisnya? */
 export function labelSebaris(kunci: string): boolean {
