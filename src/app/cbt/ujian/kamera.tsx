@@ -45,11 +45,21 @@ type Sifat = {
   kunciSesi: string;
   /** Melaporkan insiden yang sudah pasti, tanpa gambar dan tanpa model. */
   lapor: (jenis: JenisInsiden, detail?: string) => void;
+  /**
+   * Dipanggil sekali begitu kotak izin kamera selesai — diizinkan, ditolak,
+   * atau gagal; ketiganya sama saja bagi yang menunggunya.
+   *
+   * Yang menunggu adalah penjaga layar: selama kotak izin peramban berdiri di
+   * atas halaman, fokus jendela ada padanya, dan fokus yang hilang karena kotak
+   * itu pernah tercatat sebagai pelanggaran atas nama peserta yang belum
+   * melihat satu soal pun. Lihat `tenang` di penjaga.ts.
+   */
+  selesaiIzin?: () => void;
 };
 
 type Keadaan = "menunggu" | "hidup" | "ditolak" | "gagal";
 
-export default function KameraPengawas({ aktif, kunciSesi, lapor }: Sifat) {
+export default function KameraPengawas({ aktif, kunciSesi, lapor, selesaiIzin }: Sifat) {
   const [keadaan, setKeadaan] = useState<Keadaan>("menunggu");
   const [pesan, setPesan] = useState("");
 
@@ -67,6 +77,12 @@ export default function KameraPengawas({ aktif, kunciSesi, lapor }: Sifat) {
 
   useEffect(() => { laporRef.current = lapor; }, [lapor]);
   useEffect(() => { kunciRef.current = kunciSesi; }, [kunciSesi]);
+
+  // Disalin ke ref supaya menyalakan kamera tidak bergantung pada identitas
+  // fungsinya: pemanggil yang menggambar ulang akan mematikan lalu menyalakan
+  // kameranya sendiri — lampu kamera yang berkedip di tengah ujian.
+  const selesaiRef = useRef(selesaiIzin);
+  useEffect(() => { selesaiRef.current = selesaiIzin; }, [selesaiIzin]);
 
   /** Laporkan satu keadaan, paling sering sekali tiap dua menit. */
   const laporSekali = useCallback((jenis: JenisInsiden, detail: string) => {
@@ -88,6 +104,11 @@ export default function KameraPengawas({ aktif, kunciSesi, lapor }: Sifat) {
           video: { width: LEBAR, height: TINGGI, facingMode: "user" },
           audio: false,
         });
+        // Kotak izinnya sudah ditekan. Dikabarkan SEBELUM apa pun yang lain,
+        // termasuk sebelum penjaga `hidup`: yang menunggu kabar ini hanya ingin
+        // tahu bahwa fokus jendela sudah kembali ke halaman, dan itu benar
+        // bahkan ketika komponennya telanjur dilepas.
+        selesaiRef.current?.();
         if (!hidup) {
           aliran.getTracks().forEach((t) => t.stop());
           return;
@@ -109,6 +130,8 @@ export default function KameraPengawas({ aktif, kunciSesi, lapor }: Sifat) {
           });
         });
       } catch (alasan: unknown) {
+        // Ditolak pun kotak izinnya sudah ditutup, dan fokusnya sudah kembali.
+        selesaiRef.current?.();
         if (!hidup) return;
         const nama = alasan instanceof Error ? alasan.name : "";
         const ditolak = nama === "NotAllowedError" || nama === "SecurityError";

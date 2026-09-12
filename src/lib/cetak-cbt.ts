@@ -15,6 +15,7 @@ import {
   JENIS_LABEL, KEADAAN_JAWAB_LABEL, keadaanJawab,
   type JenisSoal, type Media, type Pasangan,
 } from "@/lib/cbt";
+import { jamIndonesia } from "@/lib/waktu-indonesia";
 
 export type SoalCetak = {
   id: number;
@@ -164,14 +165,17 @@ ${isi}
 </body></html>`;
 }
 
+/**
+ * Tanggal panjang untuk naskah dan berita acara.
+ *
+ * Lewat jamIndonesia, bukan toLocaleString apa adanya, karena berkas cetak ini
+ * juga disusun di server — dan server berjalan pada UTC. Jam yang tercetak pada
+ * berita acara ujian harus jam ruang ujiannya, lengkap dengan huruf zonanya:
+ * lembar itu ditandatangani pengawas dan dibaca kembali ketika hasil ujian
+ * dipersoalkan.
+ */
 function tanggalPanjang(iso?: string | null) {
-  if (!iso) return "-";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "-";
-  return d.toLocaleString("id-ID", {
-    weekday: "long", day: "numeric", month: "long", year: "numeric",
-    hour: "2-digit", minute: "2-digit",
-  });
+  return jamIndonesia(iso ?? null, { hari: true, tahun: true, panjang: true });
 }
 
 /**

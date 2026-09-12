@@ -41,6 +41,7 @@ import {
 import {
   bacaKlien, bolehMasukKlien, periksaKunciKlien, rapikanKlien, rapikanPerangkatKunci,
 } from "@/lib/kunci-layar";
+import { jamIndonesia } from "@/lib/waktu-indonesia";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -318,7 +319,11 @@ export async function POST(request: Request) {
       if (!bolehMasuk({ aktif: true, mulai: ujian.startAt, selesai: ujian.endAt }, sekarang)) {
         const pesan =
           status === "terjadwal"
-            ? `Ujian belum dibuka. Mulai ${ujian.startAt?.toLocaleString("id-ID") ?? "-"}.`
+            // Lewat jamIndonesia, bukan toLocaleString apa adanya: kalimat ini
+            // disusun DI SERVER, dan server berjalan pada UTC. Yang dahulu
+            // sampai ke peserta adalah jam yang lebih cepat tujuh jam daripada
+            // jam ruang ujiannya sendiri.
+            ? `Ujian belum dibuka. Mulai ${jamIndonesia(ujian.startAt, { hari: true })}.`
             : "Ujian ini sudah ditutup.";
         return Response.json({ success: false, message: pesan, status }, { status: 409 });
       }

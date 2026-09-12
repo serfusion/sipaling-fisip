@@ -52,6 +52,7 @@ const POLA = [
   "src/lib/kunci-layar.ts",
   "src/lib/qr-ujian.ts",
   "src/lib/tombol-terlarang.ts",
+  "src/lib/waktu-indonesia.ts",
 ];
 
 const berkas = [...new Set(POLA.flatMap((p) => globSync(p)))].sort();

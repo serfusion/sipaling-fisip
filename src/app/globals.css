@@ -4461,13 +4461,26 @@ a.al-mini:hover { color: var(--al-ink); }
    abu-abu belum dijawab — dan artinya DITULIS pada legenda di bawahnya, bukan
    hanya diwarnai: yang sulit membedakan warna tetap dapat membacanya.
    ------------------------------------------------------------------ */
+/* SATU LAYAR, SELALU.
+
+   Dahulu layar ini setinggi isinya: soal bergambar mendorong tombol "SOAL
+   SELANJUTNYA" ke bawah lipatan, dan peserta harus menggulung dulu untuk
+   menemukannya pada tiap nomor bergambar. Pada ujian berwaktu itu bukan
+   ketidaknyamanan kecil — ia detik yang hilang berkali-kali, dan tangan yang
+   sudah hafal letak tombolnya menekan tempat yang salah.
+
+   Sekarang layarnya persis setinggi jendela dan tidak pernah lebih: kepala
+   soal beserta jam mundurnya menetap di atas, tombol jalan menetap di bawah,
+   dan yang bergulir hanya isi soalnya sendiri — di dalam kartunya. */
 .uj-kerja { --ck-biru: #2b5ba9; --ck-biru-tua: #1f4586; --ck-hijau: #2e9e4f;
   --ck-oranye: #ef8c1c; --ck-abu: #c9ced6; --ck-merah: #d2372f;
-  min-height: 100dvh; padding: 0 0 96px; background: #eceff3; }
+  display: flex; flex-direction: column;
+  height: 100dvh; min-height: 100dvh; max-height: 100dvh;
+  padding: 0; overflow: hidden; background: #eceff3; }
 
 /* --- bilah atas: nama peserta dan tombol keluar --- */
 .ck-bar {
-  position: sticky; top: 0; z-index: 5;
+  flex: 0 0 auto; z-index: 5;
   display: flex; align-items: center; gap: 12px;
   padding: 11px clamp(12px, 3vw, 26px);
   background: var(--ck-biru); color: #fff;
@@ -4489,33 +4502,46 @@ a.al-mini:hover { color: var(--al-ink); }
 }
 .ck-logout:hover { background: rgba(255, 255, 255, .22); }
 
+/* Di ponsel: satu lajur yang bergulir, dan lajur itu dimulai dengan kartu soal
+   setinggi ruang yang tersisa. Kartunya utuh dalam satu layar — pertanyaan,
+   pilihan, dan tombol jalannya — sedangkan palet nomor menunggu satu gulungan
+   di bawahnya, tempat yang memang hanya ditengok sesekali. */
 .ck-layar {
-  display: grid; gap: 16px; align-items: start;
+  flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column; gap: 16px;
   width: 100%; max-width: 76rem; margin: 0 auto; padding: 18px clamp(12px, 3vw, 26px) 28px;
+  overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
 }
-/* Di layar lebar panel sisinya menempel pada tepi bawah kartu yang setinggi
-   layar, jadi jarak bawahnya tidak diperlukan lagi. */
-@media (min-width: 1024px) { .ck-layar { padding-bottom: 0; } }
-@media (min-width: 1024px) { .ck-layar { grid-template-columns: minmax(0, 1fr) 19rem; } }
+/* Di layar lebar keduanya berdampingan dan tidak ada yang bergulir selain isi
+   masing-masing: kartu soal di kirinya, palet nomor di kanannya. */
+@media (min-width: 1024px) {
+  .ck-layar {
+    display: grid; grid-template-columns: minmax(0, 1fr) 19rem; grid-template-rows: 100%;
+    align-items: stretch; padding-bottom: 18px; overflow: hidden;
+  }
+  .ck-sisi { min-height: 0; height: 100%; overflow-y: auto; }
+}
 
-/* --- kartu soal --- */
+/* --- kartu soal ---
+   Tingginya SELALU setinggi ruang yang tersedia, di layar lebar maupun di
+   ponsel. Kartu pendek yang mengambang di tengah halaman kosong membuat tombol
+   "soal selanjutnya" berpindah tempat setiap kali panjang soalnya berubah, dan
+   kartu yang lebih tinggi daripada layar menaruhnya di bawah lipatan. Keduanya
+   dijawab satu hal yang sama: tinggi yang tetap, dengan isi yang bergulir di
+   dalamnya. */
 .ck-kartu {
-  display: flex; flex-direction: column; min-height: 28rem;
+  /* Tanpa tinggi minimum dengan sengaja: pada layar pendek — ponsel yang
+     dimiringkan, jendela peramban yang separuh — tinggi minimum apa pun akan
+     mendorong tombol jalan ke bawah lipatan lagi, dan itu persis hal yang
+     hendak dihapus di sini. */
+  flex: 0 0 auto; height: 100%; min-height: 0;
+  display: flex; flex-direction: column;
   border: 1px solid #d3d8df; border-radius: 6px; background: #fff;
   box-shadow: 0 1px 4px rgba(15, 23, 42, .07); overflow: hidden;
 }
-/* Di layar lebar kartunya dibuat setinggi layar. Kartu pendek yang mengambang
-   di tengah halaman kosong membuat tombol "soal selanjutnya" berpindah tempat
-   setiap kali panjang soalnya berubah — dan tangan yang sudah hafal letaknya
-   jadi menekan yang salah.
-
-   Aturan ini WAJIB berada sesudah .ck-kartu di atas: kekhususan keduanya sama,
-   jadi yang menang adalah yang belakangan. */
-@media (min-width: 1024px) {
-  .ck-kartu { min-height: calc(100dvh - 122px); }
-}
 
 .ck-kartu-kepala {
+  flex: 0 0 auto;
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
   padding: 11px 14px; border-bottom: 1px solid #e2e6ec; background: #f6f8fa;
 }
@@ -4532,7 +4558,13 @@ a.al-mini:hover { color: var(--al-ink); }
 @keyframes ck-denyut { 50% { opacity: .62; } }
 @media (prefers-reduced-motion: reduce) { .ck-lencana-waktu.genting { animation: none; } }
 
-.ck-kartu-isi { flex: 1 1 auto; padding: 20px clamp(14px, 3vw, 26px) 24px; }
+/* Satu-satunya yang bergulir di dalam kartu. Soal panjang, gambar besar, dan
+   essay sepuluh baris semuanya tinggal di sini; kepala dan tombol jalannya
+   tidak pernah ikut bergerak. */
+.ck-kartu-isi {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding: 20px clamp(14px, 3vw, 26px) 24px;
+}
 .ck-tanya { margin: 0 0 20px; color: #26313f; font-size: 15.5px; line-height: 1.8; white-space: pre-line; }
 
 /* Lingkaran radio, persis rujukannya — bukan kotak centang, karena hanya satu
@@ -4570,6 +4602,7 @@ a.al-mini:hover { color: var(--al-ink); }
 
 /* --- tiga tombol di dasar kartu: mundur, ragu-ragu, maju --- */
 .ck-kartu-kaki {
+  flex: 0 0 auto;
   display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center;
   padding: 13px 14px; border-top: 1px solid #e2e6ec; background: #f6f8fa;
 }
@@ -4774,8 +4807,94 @@ a.al-mini:hover { color: var(--al-ink); }
 .cbt-aktivasi-kepala b { display: block; color: var(--navy); font-size: 13.5px; }
 .cbt-aktivasi-kepala span { display: block; margin-top: 4px; max-width: 44rem;
   color: var(--muted); font-size: 12px; line-height: 1.65; }
-.cbt-jadwal-form { align-items: end; }
+/* --- Pemilih jam 24 jam ---
+   Menggantikan <input type="datetime-local">, yang menggambar AM dan PM
+   menurut bahasa sistem operasi pemakainya dan tidak dapat dipaksa berhenti.
+   Lihat PilihJam di src/app/dashboard/cbt-panel.tsx. */
+.cbt-jadwal-form {
+  display: grid; gap: 12px; margin-bottom: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+}
+.cbt-jam { display: grid; gap: 5px; min-width: 0; }
+.cbt-jam-label { color: var(--muted); font-size: 10.5px; font-weight: 800;
+  letter-spacing: .05em; text-transform: uppercase; }
+.cbt-jam-baris { display: flex; align-items: center; gap: 6px; }
+.cbt-jam-baris input[type="date"] {
+  flex: 1 1 9rem; min-width: 0; padding: 9px 11px; border: 1px solid var(--line);
+  border-radius: 9px; background: var(--white); color: var(--ink); font: inherit; font-size: 13px;
+}
+/* Lebar tetap dan angka bertabular: dua pemilih yang lebarnya ikut isinya
+   melompat-lompat setiap kali jamnya berganti. */
+.cbt-jam-baris select {
+  flex: 0 0 auto; width: 4.4rem; padding: 9px 6px 9px 10px; border: 1px solid var(--line);
+  border-radius: 9px; background: var(--white); color: var(--ink);
+  font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; text-align: center;
+}
+.cbt-jam-baris input[type="date"]:focus, .cbt-jam-baris select:focus {
+  outline: none; border-color: var(--navy); box-shadow: 0 0 0 3px rgba(30, 58, 95, .12);
+}
+.cbt-jam-titik { flex: 0 0 auto; margin: 0 -2px; color: var(--ink); font-size: 15px; font-weight: 800; }
+.cbt-jam-zona { flex: 0 0 auto; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .04em; }
+
+/* Tanggal yang dieja kembali di bawah pemilihnya. Kecil, tetapi ia satu-satunya
+   tempat di layar ini yang tidak dapat dibaca terbalik. */
+.cbt-jam-baca { color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+.cbt-jadwal-ringkas {
+  margin: 0 0 10px; padding: 9px 12px; border-radius: 9px;
+  background: var(--blue-soft); color: var(--navy); font-size: 12px; line-height: 1.65;
+}
+/* Alasan tombol aktivasi berwarna abu-abu, ditulis persis di sebelahnya.
+   Tombol mati tanpa alasan hanya memindahkan kebingungan. */
+.cbt-jadwal-halangan {
+  margin: 0 0 10px; padding: 9px 12px; border-radius: 9px;
+  border: 1px solid #f5c99b; background: #fff6ea; color: #92500a;
+  font-size: 12px; font-weight: 600; line-height: 1.65;
+}
 .cbt-jadwal-aksi { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Tombol aktivasi yang syaratnya belum terpenuhi ikut abu-abu sungguhan, dengan
+   alasan yang ditulis di atasnya. Satu tombol biru pucat yang tetap ditekan
+   pengajar lalu menolak sendiri adalah jalan memutar yang hanya menghabiskan
+   menit-menit sebelum ujian. */
+.cbt-jadwal-aksi .btn:disabled {
+  background: #cdd4de; border-color: #cdd4de; color: #5d6773; opacity: 1; cursor: not-allowed;
+}
+
+/* --- Berapa soal yang sudah masuk ---
+   Angkanya sengaja sebesar ini. Ia dibaca oleh orang yang sedang mengetik soal
+   ke-tiga puluh dan hanya ingin tahu satu hal tanpa berhenti mengetik. */
+.cbt-hitung {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 18px;
+  margin-bottom: 14px; border-left: 3px solid var(--primary);
+}
+.cbt-hitung[data-cukup] { border-left-color: var(--green); }
+.cbt-hitung-angka { flex: 0 0 auto; display: grid; gap: 2px; justify-items: center; min-width: 7.5rem; }
+.cbt-hitung-angka b {
+  display: block; color: var(--primary); font-size: 58px; font-weight: 800;
+  line-height: 1; letter-spacing: -.02em; font-variant-numeric: tabular-nums;
+}
+.cbt-hitung[data-cukup] .cbt-hitung-angka b { color: var(--green); }
+.cbt-hitung-angka span {
+  color: var(--muted); font-size: 11px; font-weight: 800;
+  letter-spacing: .05em; text-transform: uppercase; text-align: center;
+}
+.cbt-hitung-rinci { flex: 1 1 16rem; min-width: 0; display: grid; gap: 6px; }
+.cbt-hitung-target { margin: 0; color: var(--ink); font-size: 13px; line-height: 1.6; }
+.cbt-hitung-kabar { margin: 0; font-size: 12px; font-weight: 700; line-height: 1.6; }
+.cbt-hitung-kabar.cukup { color: var(--green); }
+.cbt-hitung-kabar.kurang { color: #b45309; }
+.cbt-hitung-batang {
+  height: 8px; border-radius: 999px; background: var(--line); overflow: hidden;
+}
+.cbt-hitung-batang i { display: block; height: 100%; border-radius: 999px;
+  background: var(--primary); transition: width .25s ease; }
+.cbt-hitung[data-cukup] .cbt-hitung-batang i { background: var(--green); }
+@media (prefers-reduced-motion: reduce) { .cbt-hitung-batang i { transition: none; } }
+@media (max-width: 520px) {
+  .cbt-hitung { gap: 12px; }
+  .cbt-hitung-angka { min-width: 0; justify-items: start; }
+  .cbt-hitung-angka b { font-size: 46px; }
+  .cbt-hitung-angka span { text-align: left; }
+}
 
 .cbt-tab { display: flex; gap: 8px; margin: 14px 0; }
 .cbt-tab button {
@@ -4975,14 +5094,34 @@ a.al-mini:hover { color: var(--al-ink); }
 }
 
 .ck-media { margin: 0 0 20px; }
+/* Tinggi gambar dan video dibatasi terhadap TINGGI JENDELA, bukan terhadap
+   lebarnya sendiri. Gambar potret dari kamera ponsel — dan pengajar memotret
+   soalnya dengan ponsel — muat lebarnya tetapi tingginya dua kali layar, dan
+   dahulu itulah yang mendorong pertanyaan beserta pilihan jawabannya keluar
+   dari pandangan. Yang tersisa dari tinggi itu tetap dapat dilihat dengan
+   menggulung isi kartunya; yang tidak lagi terjadi adalah tombol jalan yang
+   ikut terdorong ke bawah lipatan. */
 .ck-media img, .ck-media video {
-  display: block; max-width: 100%; max-height: 60vh; margin: 0 auto;
+  display: block; max-width: 100%; max-height: min(52dvh, 34rem); margin: 0 auto;
   border: 1px solid #d3d8df; border-radius: 6px; background: #f6f8fa;
 }
-/* Video sematan dijaga nisbahnya, supaya tidak melompat tinggi saat dimuat. */
+/* Video sematan dijaga nisbahnya, supaya tidak melompat tinggi saat dimuat.
+   Lebarnya ikut dibatasi tinggi jendela: bingkai 16:9 selebar kartu pada layar
+   pendek — laptop, dan ponsel yang dimiringkan — sendirian sudah lebih tinggi
+   daripada seluruh ruang yang tersisa. */
 .ck-media-semat iframe {
-  display: block; width: 100%; aspect-ratio: 16 / 9; border: 0;
+  display: block; width: min(100%, calc(52dvh * 16 / 9)); max-width: 100%;
+  aspect-ratio: 16 / 9; margin: 0 auto; border: 0;
   border-radius: 6px; background: #000;
+}
+/* Di ponsel batasnya lebih ketat lagi, dan bukan demi kerapian: gambar yang
+   mengisi seluruh badan kartu membuat pilihan jawaban tepat di bawahnya tidak
+   terlihat sama sekali, dan yang tidak terlihat tidak dicari. Dengan batas ini
+   selalu ada satu baris pilihan yang menyembul — dan satu baris yang menyembul
+   itulah yang memberi tahu bahwa di bawahnya masih ada. */
+@media (max-width: 640px) {
+  .ck-media img, .ck-media video { max-height: min(42dvh, 22rem); }
+  .ck-media-semat iframe { width: min(100%, calc(42dvh * 16 / 9)); }
 }
 .ck-media-ket { margin-top: 7px; color: #6b7684; font-size: 12px; text-align: center; line-height: 1.6; }
 
@@ -5421,7 +5560,15 @@ a.al-mini:hover { color: var(--al-ink); }
   background: #2b3f8f; color: #fff; font: inherit; font-size: 14.5px; font-weight: 800;
   letter-spacing: .04em; text-align: center; cursor: pointer;
 }
-.uj-dalam-rangka .uj-btn-utama:disabled { opacity: .55; cursor: default; }
+/* ABU-ABU SUNGGUHAN, bukan biru yang dipudarkan.
+   Tombol biru yang hanya diturunkan kepekatannya masih terbaca sebagai tombol
+   yang boleh ditekan — dan peserta yang menekannya berkali-kali sebelum jam
+   pembukaan mengira halamannya yang rusak. Warna yang benar-benar berganti
+   mengatakan "belum waktunya" tanpa satu kata pun. */
+.uj-dalam-rangka .uj-btn-utama:disabled,
+.uj-dalam-rangka .uj-btn-mulai:disabled {
+  background: #cdd4de; color: #5d6773; opacity: 1; cursor: not-allowed;
+}
 .uj-dalam-rangka .uj-btn-sunyi {
   display: block; width: 100%; margin-top: 12px; padding: 10px; border: 0; background: none;
   color: #6b7684; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;
@@ -5937,7 +6084,14 @@ table.qt td small { font-size: 11.5px; }
      pencetak tidak terbaca sebagai pencetak yang rusak. */
   .uj-kerja {
     visibility: visible !important;
+    /* Tinggi tetap dan luapan tersembunyi milik layar mengerjakan dilepas di
+       sini. Lembar cetak tidak punya "tinggi jendela", dan yang tersisa bila
+       keduanya dibiarkan adalah halaman yang memotong kalimat di bawah ini. */
+    display: block !important;
+    height: auto !important;
     min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
     padding: 0 !important;
     background: none !important;
   }
