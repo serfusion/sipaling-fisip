@@ -5976,3 +5976,144 @@ table.qt td small { font-size: 11.5px; }
   .uj-tegur-sebab,
   .uj-tegur-tanda { color: #000 !important; background: none !important; }
 }
+
+/* ============================================================
+   OUTREACH ULTRAMAILER SYSTEM (OUS)
+
+   Menumpang pada kelas yang sudah ada sebisanya — .panel, .btn, .qt,
+   .mtp-hero, .mtp-switch — supaya panel baru ini tidak menjadi pulau dengan
+   tata rupa sendiri. Yang ditulis di bawah hanyalah yang memang belum ada.
+   ============================================================ */
+
+.ous-state[data-on="1"] { background: var(--green); color: white; }
+
+/* Deretan angka ringkasan. Dibuat membungkus sendiri, bukan berkolom tetap:
+   yang membacanya sering admin yang sedang memegang ponsel. */
+.ous-angka { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.ous-angka > div { flex: 1 1 96px; padding: 10px 12px; border: 1px solid var(--line);
+  border-radius: 10px; background: var(--canvas); }
+.ous-angka b { display: block; font-size: 20px; line-height: 1.1; color: var(--navy); }
+.ous-angka span { display: block; margin-top: 3px; font-size: 10.5px; color: var(--muted); }
+
+.ous-jujur { margin-top: 14px; line-height: 1.65; background: var(--canvas);
+  border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.ous-jujur b { color: var(--navy); }
+
+.ous-tab { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 12px; }
+.ous-tab button { border: 1px solid var(--line); background: white; color: var(--muted);
+  border-radius: 999px; padding: 7px 15px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.ous-tab button.aktif { background: var(--navy); border-color: var(--navy); color: white; }
+.ous-tab button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+.ous-aksi-baris { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
+.ous-aksi-baris input { flex: 1 1 220px; }
+
+.ous-form { padding: 16px; }
+.ous-form h3 { margin: 0 0 12px; font-size: 14px; color: var(--navy); }
+.ous-label { display: block; margin-bottom: 12px; }
+.ous-label > span { display: block; margin-bottom: 5px; font-size: 11.5px; font-weight: 700; color: var(--navy); }
+.ous-label > span em { color: #b91c1c; font-style: normal; }
+.ous-label input, .ous-label select, .ous-label textarea { width: 100%; }
+.ous-label textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.55; }
+.ous-label input[type="range"] { padding: 0; }
+.ous-dua { display: flex; flex-wrap: wrap; gap: 0 14px; }
+.ous-dua > .ous-label { flex: 1 1 220px; }
+
+.ous-centang { margin: 14px 0; display: grid; gap: 8px; }
+.ous-centang label, .ous-centang-satu { display: flex; gap: 9px; align-items: flex-start;
+  font-size: 11.5px; color: var(--ink); line-height: 1.55; cursor: pointer; }
+.ous-centang-satu { margin: 4px 0 12px; }
+.ous-centang input, .ous-centang-satu input { margin-top: 2px; flex: none; }
+
+.ous-laporan { margin: 12px 0; padding: 12px; border: 1px solid var(--line);
+  border-radius: 10px; background: var(--canvas); }
+.ous-laporan-angka { display: flex; flex-wrap: wrap; gap: 8px; }
+.ous-laporan-angka > div { flex: 1 1 80px; text-align: center; padding: 8px 6px;
+  background: white; border: 1px solid var(--line); border-radius: 8px; }
+.ous-laporan-angka b { display: block; font-size: 18px; color: var(--navy); }
+.ous-laporan-angka span { display: block; font-size: 10px; color: var(--muted); margin-top: 2px; }
+.ous-laporan-angka .baik b { color: var(--green); }
+.ous-laporan-angka .sedang b { color: #c9790d; }
+.ous-laporan-angka .buruk b { color: #b91c1c; }
+.ous-contoh { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+
+/* Pratinjau surat. Sengaja dibuat menyerupai jendela kotak masuk, bukan
+   sekadar kotak berisi HTML: yang perlu diperiksa admin bukan hanya isinya,
+   melainkan bagaimana baris "Dari" dan "Subjek" terbaca penerimanya. */
+.ous-pratinjau { margin: 12px 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.ous-pratinjau-kepala { padding: 12px 14px; background: var(--canvas); border-bottom: 1px solid var(--line); }
+.ous-pratinjau-kepala > div { display: flex; gap: 8px; font-size: 11.5px; margin-bottom: 3px; }
+.ous-pratinjau-kepala span { flex: none; width: 54px; color: var(--muted); }
+.ous-pratinjau-kepala b { color: var(--navy); word-break: break-word; }
+.ous-pratinjau-badan { padding: 18px 16px; background: white; font-family: Georgia, "Times New Roman", serif;
+  font-size: 14px; line-height: 1.65; color: #1a1a1a; max-height: 420px; overflow: auto; }
+.ous-pratinjau-badan a { color: var(--primary); }
+.ous-pratinjau-badan img { max-width: 100%; height: auto; }
+
+.ous-nada { padding: 12px 14px; border-top: 1px solid var(--line); background: var(--canvas); }
+.ous-nada-kepala { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+.ous-nada-kepala b { font-size: 12px; color: var(--navy); }
+.ous-nada ul { margin: 0 0 8px; padding-left: 18px; }
+.ous-nada li { font-size: 11.5px; line-height: 1.6; margin-bottom: 4px; color: var(--ink); }
+.ous-nada li.berat b { color: #b91c1c; }
+.ous-nada li.ringan b { color: #c9790d; }
+
+.ous-pita-baik { background: #e2f8ef; color: #065f46; }
+.ous-pita-sedang { background: #fff1dc; color: #92400e; }
+.ous-pita-buruk { background: #fee2e2; color: #991b1b; }
+
+.ous-bar { height: 7px; border-radius: 999px; background: var(--line); overflow: hidden; max-width: 180px; }
+.ous-bar.besar { max-width: none; height: 11px; margin: 12px 0 6px; }
+.ous-bar i { display: block; height: 100%; background: var(--green); transition: width .3s ease; }
+
+/* Lencana status. Namanya memakai kata Inggris karena itulah yang tersimpan
+   di kolom status — menerjemahkannya di sini hanya akan membuat kelas CSS
+   dan isi basis data tidak lagi dapat dicocokkan dengan mata. */
+.ous-pill { font-size: 10px; }
+.ous-pill.s-draft, .ous-pill.s-queued { background: #e8f0ff; color: #0b4aa8; }
+.ous-pill.s-sending { background: #fff1dc; color: #92400e; }
+.ous-pill.s-sent { background: #e0f7fa; color: #065f66; }
+.ous-pill.s-delivered, .ous-pill.s-completed { background: #e2f8ef; color: #065f46; }
+.ous-pill.s-paused { background: #f1f5f9; color: #475569; }
+.ous-pill.s-failed, .ous-pill.s-bounced, .ous-pill.s-cancelled { background: #fee2e2; color: #991b1b; }
+.ous-pill.s-unsubscribed { background: #efe8ff; color: #5b21b6; }
+
+.ous-detail { padding: 16px; margin-top: 14px; border-color: var(--primary); }
+.ous-detail-kepala { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; justify-content: space-between; }
+.ous-detail-kepala h3 { margin: 0; font-size: 15px; color: var(--navy); }
+.ous-uji { margin: 16px 0; padding: 12px 14px; border: 1px dashed var(--line); border-radius: 10px; }
+.ous-saring { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+
+.ous-ingat { padding: 14px 16px; border-left: 4px solid #c9790d; }
+.ous-ingat b { display: block; font-size: 12.5px; color: var(--navy); margin-bottom: 4px; }
+.ous-ingat span { display: block; font-size: 11.5px; color: var(--muted); line-height: 1.65; }
+
+.ous-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.ous-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px 5px 11px;
+  background: var(--canvas); border: 1px solid var(--line); border-radius: 999px; font-size: 11.5px; }
+.ous-chip button { border: none; background: none; cursor: pointer; color: var(--muted); font-size: 12px; line-height: 1; }
+.ous-chip button:hover { color: #b91c1c; }
+
+.ous-halangan, .ous-catatan { margin: 0 0 10px; padding-left: 18px; }
+.ous-halangan li { font-size: 11.5px; line-height: 1.6; color: #991b1b; margin-bottom: 5px; }
+.ous-catatan li { font-size: 11.5px; line-height: 1.6; color: var(--muted); margin-bottom: 5px; }
+.ous-tahan { color: #991b1b; }
+
+/* ------------------------------------------------------------
+   HALAMAN BERHENTI LANGGANAN
+
+   Dilihat orang di luar kampus yang tidak punya akun dan sedang meminta agar
+   tidak diganggu lagi. Karena itu tidak ada navigasi, tidak ada tawaran lain,
+   dan tidak ada satu pun tautan yang mengajaknya ke tempat lain.
+   ------------------------------------------------------------ */
+.unsub-layar { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; background: var(--canvas); }
+.unsub-kartu { max-width: 520px; width: 100%; background: white; border: 1px solid var(--line);
+  border-radius: 16px; padding: 28px 26px; }
+.unsub-eyebrow { margin: 0 0 12px; font-size: 10px; letter-spacing: .14em; font-weight: 800; color: var(--muted); }
+.unsub-kartu h1 { margin: 0 0 12px; font-size: 19px; line-height: 1.35; color: var(--navy); }
+.unsub-kartu p { margin: 0 0 12px; font-size: 13.5px; line-height: 1.65; color: var(--ink); }
+.unsub-maaf { color: var(--muted); }
+.unsub-tombol { margin-top: 6px; padding: 11px 20px; border: none; border-radius: 10px;
+  background: var(--navy); color: white; font-size: 13px; font-weight: 700; cursor: pointer; }
+.unsub-tombol:disabled { opacity: .6; cursor: wait; }
+.unsub-tombol:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }

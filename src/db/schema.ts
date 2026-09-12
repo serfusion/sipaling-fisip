@@ -805,3 +805,222 @@ export const cbtAnswers = pgTable("cbt_answers", {
   // kegagalannya baru terlihat ketika ada yang benar-benar mengerjakan ujian.
   uniqueIndex("idx_cbt_answers_satu").on(t.attemptId, t.questionId),
 ]);
+
+// ============================================================
+// OUTREACH ULTRAMAILER SYSTEM (OUS)
+//
+// Undangan terpersonalisasi untuk jurnal yang diurus fakultas — NYIMAK lebih
+// dulu. Aturan main yang menentukan isinya ada di src/lib/outreach.ts; di
+// sini hanya bentuk simpanannya.
+//
+// TIGA KEPUTUSAN BENTUK YANG PERLU DIKETAHUI SEBELUM MENGUBAH APA PUN:
+//
+// 1. PENERIMA ADALAH ENTITAS TERSENDIRI, bukan baris di dalam kampanye.
+//    Satu alamat dipakai berkali-kali oleh kampanye yang berbeda, dan status
+//    berhenti langganannya menempel pada ORANGNYA — bukan pada salah satu
+//    kampanye. Tanpa pemisahan ini, orang yang sudah berhenti langganan akan
+//    kembali menerima surat pada kampanye berikutnya, dan itu keluhan yang
+//    dibenarkan sepenuhnya.
+//
+// 2. NASKAH DISALIN KE DALAM KAMPANYE saat kampanye dibuat.
+//    Template boleh disunting kapan saja; kampanye yang sudah berjalan tidak
+//    boleh berubah isinya di tengah jalan. Separuh penerima yang membaca
+//    surat berbeda dari separuh lainnya adalah kekacauan yang tidak dapat
+//    ditelusuri kembali sesudahnya.
+//
+// 3. HASIL RENDER PER PENERIMA TIDAK DISIMPAN.
+//    Blueprint menyediakan kolomnya, dan kolom itu sengaja tidak dipakai:
+//    menyimpan satu salinan HTML untuk tiap penerima berarti seribu salinan
+//    naskah yang sama persis kecuali satu nama. Suratnya dirakit ulang saat
+//    hendak dikirim, dari salinan naskah pada kampanye + data penerimanya —
+//    keduanya sudah ada di sini, dan keduanya tidak berubah.
+// ============================================================
+
+export const outreachRecipients = pgTable("outreach_recipients", {
+  id: serial("id").primaryKey(),
+  /** Selalu tersimpan dalam huruf kecil dan sudah dirapikan. */
+  email: varchar("email", { length: 254 }).notNull().unique(),
+  name: varchar("name", { length: 160 }),
+  institution: varchar("institution", { length: 200 }),
+  field: varchar("field", { length: 160 }),
+  country: varchar("country", { length: 80 }),
+  /** "active" | "unsubscribed" | "suppressed" | "invalid" */
+  status: varchar("status", { length: 20 }).notNull().default("active"),
+  /**
+   * Kunci tautan berhenti langganan. Acak, unik, dan TIDAK memuat alamatnya.
+   *
+   * Tautan berbentuk ?email=john@abc.edu membocorkan alamat penerima ke
+   * setiap perantara yang dilewatinya, termasuk ke log server mana pun yang
+   * mencatat URL lengkap. Token ini tidak membocorkan apa-apa kepada yang
+   * tidak sudah memilikinya.
+   */
+  unsubscribeToken: varchar("unsubscribe_token", { length: 64 }).notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const outreachTemplates = pgTable("outreach_templates", {
+  id: serial("id").primaryKey(),
+  /** Kode tetap untuk naskah bawaan, mis. "nyimak-cfp". Kosong untuk buatan sendiri. */
+  code: varchar("code", { length: 60 }),
+  name: varchar("name", { length: 160 }).notNull(),
+  description: text("description"),
+  subject: varchar("subject", { length: 300 }).notNull(),
+  bodyHtml: text("body_html").notNull(),
+  /** Kosong berarti diturunkan sendiri dari bodyHtml saat dikirim. */
+  bodyText: text("body_text"),
+  active: boolean("active").notNull().default(true),
+  createdBy: varchar("created_by", { length: 160 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  // Naskah bawaan disalin sekali saat panel pertama dibuka. Kunci inilah yang
+  // menjaga salinannya tidak berganda setiap kali panelnya dibuka lagi.
+  //
+  // Tanpa predikat parsial dengan sengaja: di Postgres NULL saling berbeda
+  // pada indeks unik, jadi naskah buatan sendiri yang kodenya kosong tetap
+  // boleh berjumlah banyak.
+  uniqueIndex("idx_outreach_templates_kode").on(t.code),
+]);
+
+export const outreachCampaigns = pgTable("outreach_campaigns", {
+  id: serial("id").primaryKey(),
+  code: varchar("code", { length: 12 }).notNull().unique(),
+  name: varchar("name", { length: 200 }).notNull(),
+  /** Naskah asalnya. Boleh hilang; salinannya di bawah yang menentukan. */
+  templateId: integer("template_id").references(() => outreachTemplates.id, { onDelete: "set null" }),
+  /** Lihat STATUS_KAMPANYE di src/lib/outreach.ts. */
+  status: varchar("status", { length: 20 }).notNull().default("draft"),
+
+  // --- salinan naskah, dibekukan saat kampanye dibuat ---
+  subject: varchar("subject", { length: 300 }).notNull(),
+  bodyHtml: text("body_html").notNull(),
+  bodyText: text("body_text"),
+
+  // --- identitas pengirim, ikut dibekukan ---
+  fromName: varchar("from_name", { length: 80 }).notNull(),
+  fromEmail: varchar("from_email", { length: 254 }).notNull(),
+  replyTo: varchar("reply_to", { length: 254 }),
+
+  /**
+   * Kampanye ini hanya simulasi: antrean bergerak, statistik terisi, dan
+   * tidak satu pun surat benar-benar keluar.
+   *
+   * Dibekukan pada kampanyenya, bukan dibaca dari pengaturan saat mengirim.
+   * Kampanye yang dimulai sebagai simulasi harus tetap simulasi sampai
+   * selesai — saklar yang digeser di tengah jalan tidak boleh mengubah
+   * separuh sisanya menjadi kiriman sungguhan.
+   */
+  simulasi: boolean("simulasi").notNull().default(true),
+
+  totalRecipients: integer("total_recipients").notNull().default(0),
+  queuedCount: integer("queued_count").notNull().default(0),
+  sentCount: integer("sent_count").notNull().default(0),
+  deliveredCount: integer("delivered_count").notNull().default(0),
+  failedCount: integer("failed_count").notNull().default(0),
+  bouncedCount: integer("bounced_count").notNull().default(0),
+  unsubscribedCount: integer("unsubscribed_count").notNull().default(0),
+
+  /** Pemilik kampanye: dosen pengurus jurnal, admin, atau Super Admin. */
+  ownerId: varchar("owner_id", { length: 64 }),
+  ownerName: varchar("owner_name", { length: 160 }),
+  ownerRole: varchar("owner_role", { length: 40 }),
+
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const outreachCampaignRecipients = pgTable("outreach_campaign_recipients", {
+  id: serial("id").primaryKey(),
+  campaignId: integer("campaign_id").notNull().references(() => outreachCampaigns.id, { onDelete: "cascade" }),
+  /**
+   * restrict, BUKAN cascade. Penerima yang dihapus sementara riwayat
+   * kirimnya masih ada akan meninggalkan baris yang tidak dapat dijelaskan
+   * kepada siapa pun — termasuk kepada orang yang menanyakan kenapa ia
+   * menerima surat dari fakultas.
+   */
+  recipientId: integer("recipient_id").notNull().references(() => outreachRecipients.id, { onDelete: "restrict" }),
+  /** Lihat STATUS_PENERIMA di src/lib/outreach.ts. */
+  status: varchar("status", { length: 20 }).notNull().default("queued"),
+  /** Nomor pesan dari penyedia. Inilah jembatan ke webhook yang datang kemudian. */
+  providerMessageId: varchar("provider_message_id", { length: 200 }),
+  attempts: integer("attempts").notNull().default(0),
+  errorCode: varchar("error_code", { length: 60 }),
+  errorMessage: text("error_message"),
+  /**
+   * Boleh dicoba lagi paling cepat kapan.
+   *
+   * Diisi ketika galatnya sesaat. Pekerja hanya mengambil baris yang
+   * kolomnya kosong atau sudah lewat, sehingga percobaan ulang tidak pernah
+   * menumpuk di detik yang sama.
+   */
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
+  queuedAt: timestamp("queued_at", { withTimezone: true }),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+  failedAt: timestamp("failed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  // WAJIB. Pembuatan kampanye menulis penerimanya dengan "on conflict do
+  // nothing"; tanpa indeks ini perintahnya DITOLAK basis data, dan yang
+  // gagal adalah seluruh pembuatan kampanyenya.
+  //
+  // Ia juga yang menjamin satu orang tidak menerima surat yang sama dua kali
+  // dari satu kampanye — jaminan yang tidak boleh bergantung pada ketelitian
+  // kode di atasnya.
+  uniqueIndex("idx_outreach_cr_sekali").on(t.campaignId, t.recipientId),
+  // Jalur baca pekerja antrean: "yang masih queued, yang sudah waktunya".
+  index("idx_outreach_cr_antre").on(t.status, t.nextAttemptAt),
+  index("idx_outreach_cr_kampanye").on(t.campaignId, t.status),
+  // Webhook datang membawa nomor pesan, dan harus menemukan barisnya cepat.
+  index("idx_outreach_cr_pesan").on(t.providerMessageId),
+]);
+
+export const outreachSuppression = pgTable("outreach_suppression", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 254 }).notNull().unique(),
+  /** Lihat ALASAN_CEKAL di src/lib/outreach.ts. */
+  reason: varchar("reason", { length: 30 }).notNull(),
+  /** Dari mana keputusan ini datang: kode kampanye, webhook, atau nama admin. */
+  source: varchar("source", { length: 160 }),
+  note: text("note"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const outreachEvents = pgTable("outreach_events", {
+  id: serial("id").primaryKey(),
+  campaignRecipientId: integer("campaign_recipient_id")
+    .references(() => outreachCampaignRecipients.id, { onDelete: "cascade" }),
+  /**
+   * Nomor peristiwa dari penyedia.
+   *
+   * Penyedia mengirim ulang webhook yang belum dijawab 200, jadi peristiwa
+   * yang sama datang berkali-kali. Indeks unik di bawah membuat yang kedua
+   * ditolak basis data alih-alih menambah satu lagi ke penghitung statistik.
+   */
+  providerEventId: varchar("provider_event_id", { length: 200 }),
+  eventType: varchar("event_type", { length: 40 }).notNull(),
+  /** Muatan mentah dari penyedia, untuk penelusuran bila angkanya diragukan. */
+  payload: text("payload"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("idx_outreach_events_sekali").on(t.providerEventId),
+  index("idx_outreach_events_penerima").on(t.campaignRecipientId, t.createdAt),
+]);
+
+export const outreachAudit = pgTable("outreach_audit", {
+  id: serial("id").primaryKey(),
+  actorId: varchar("actor_id", { length: 64 }),
+  actorName: varchar("actor_name", { length: 160 }),
+  actorRole: varchar("actor_role", { length: 40 }),
+  /** mis. "kampanye.buat", "kampanye.jalan", "saklar.ubah", "cekal.tambah". */
+  action: varchar("action", { length: 60 }).notNull(),
+  resourceType: varchar("resource_type", { length: 40 }),
+  resourceId: integer("resource_id"),
+  metadata: text("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("idx_outreach_audit_waktu").on(t.createdAt),
+]);

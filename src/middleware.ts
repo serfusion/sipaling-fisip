@@ -40,6 +40,13 @@ const TANPA_ORIGIN = [
   "/api/uang/telegram", // secret_token yang dipasang saat mendaftarkan webhook
   "/api/uang/whatsapp", // tanda tangan Meta, atau kata sandi gerbang
   "/api/uang/catat", // kode buku di dalam badan permintaan, dan itu bukan cookie
+  // Webhook penyedia email OUS: tanda tangan HMAC-SHA256 diperiksa sendiri
+  // oleh jalurnya sebelum satu baris pun disentuh.
+  "/api/outreach/webhook",
+  // Berhenti langganan "satu ketukan" (RFC 8058). Yang mengetuk adalah server
+  // Gmail/Outlook, bukan peramban penerimanya, jadi Origin tidak pernah ada.
+  // Wewenangnya datang dari token acak di dalam alamatnya sendiri.
+  "/api/outreach/berhenti",
 ];
 
 /**
