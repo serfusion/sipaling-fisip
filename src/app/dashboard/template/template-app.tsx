@@ -10,7 +10,10 @@ import { isiInggris, isiUlangInggris, kunciKamus, panenKamus, tebakKonsentrasi, 
 import { penggalJudulInggris } from "@/lib/judul-inggris";
 import { periksaSiapArsip, predikatKelulusan, sidikTranskrip } from "@/lib/arsip-transkrip";
 import { concentrationsFor } from "@/lib/academic";
-import { labelSebaris, labelTranskrip, pakaiRektorDari, pecahAkreditasi } from "./transkrip-label";
+import {
+  AKREDITASI_BAWAAN, labelSebaris, labelTranskrip, lengkapiAkreditasi,
+  pakaiRektorDari, pecahAkreditasi,
+} from "./transkrip-label";
 import {
   TEMPLATE_BIO_ROWS, TEMPLATE_NILAI_CONTOH, TEMPLATE_NILAI_HEADER,
   TEMPLATE_SHEET_BIO, TEMPLATE_SHEET_NILAI,
@@ -278,7 +281,9 @@ function metaAwal() {
     noijazah: "",
     nppt: "041051",
     yudisium: "",
-    akred: "UNGGUL LAMSPAK Nomor 156/AK.03.05/2026",
+    // Peringkat + nomor SK sudah terpasang: yang tercetak tidak pernah
+    // menunggu admin mengetik "UNGGUL" lagi.
+    akred: AKREDITASI_BAWAAN,
     nama: "",
     nim: "",
     prodi: PRODI[0].nama,
@@ -543,7 +548,11 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
       if (bio.nim) next.nim = bio.nim;
       if (bio.ttl) next.ttl = bio.ttl;
       if (bio.yudisium) next.yudisium = bio.yudisium;
-      if (bio.akred) next.akred = bio.akred;
+      // Berkas SIMAK mengirim nomor SK-nya sendirian ("LAMSPAK Nomor
+      // 099/…"). Peringkatnya dipasang di sini juga, bukan hanya saat
+      // dicetak, supaya kolom Akreditasi di layar dan isian yang diarsipkan
+      // berbunyi sama dengan yang keluar dari printer.
+      if (bio.akred) next.akred = lengkapiAkreditasi(bio.akred);
       if (bio.noijazah) next.noijazah = bio.noijazah;
       if (bio.judul) next.judul = bio.judul;
       // DITIMPA, bukan hanya diisi kalau ada. Konsentrasi memilih kamus:
