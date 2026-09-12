@@ -44,7 +44,7 @@ export const KAKI_WAJIB = `<hr style="border:none;border-top:1px solid #dddddd;m
 <p style="font-size:12px;color:#666666;line-height:1.6;margin:0">
   You are receiving this message because your published work is publicly
   listed in the field of communication or media studies. If this invitation
-  is not relevant to you, we apologise for the intrusion — you may
+  is not relevant to you, we apologise for the intrusion. You may
   <a href="{{unsubscribe_url}}" style="color:#666666">unsubscribe here</a>
   and you will not be contacted again.
 </p>`;
@@ -69,7 +69,7 @@ export const TEMPLATE_BAWAAN: TemplateBawaan[] = [
     kode: "nyimak-cfp",
     nama: "General Call for Papers",
     keterangan:
-      "Undangan umum. Dipakai bila daftar penerimanya belum terpilah per bidang — paling aman untuk kampanye pertama.",
+      "Undangan umum. Dipakai bila daftar penerimanya belum terpilah per bidang, paling aman untuk kampanye pertama.",
     subjek: "Invitation to Submit Your Research to NYIMAK",
     bodyHtml: `<p style="margin:0 0 18px">Dear {{name}},</p>
 
@@ -106,7 +106,7 @@ ${KAKI_WAJIB}`,
     nama: "International Researchers",
     keterangan:
       "Untuk penerima di luar Indonesia. Menyebut institusi dan negara penerima, sehingga kolom institution/country pada CSV terpakai.",
-    subjek: "Call for Papers — NYIMAK: Journal of Communication",
+    subjek: "Call for Papers, NYIMAK: Journal of Communication",
     bodyHtml: `<p style="margin:0 0 18px">Dear {{name}},</p>
 
 <p style="margin:0 0 18px">
@@ -159,7 +159,7 @@ ${AJAKAN}
 
 <p style="margin:0 0 18px">
   We would be glad to answer any question about scope or format before you
-  prepare a submission — simply reply to this message.
+  prepare a submission. Simply reply to this message.
 </p>
 
 ${TANDA_TANGAN}
