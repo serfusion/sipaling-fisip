@@ -146,6 +146,7 @@ type AttendanceRow = {
 
 import ArsipSkripsi from "./arsip-skripsi";
 import ArsipTranskrip from "./arsip-transkrip";
+import OutreachPanel from "./outreach-panel";
 
 type ViewId =
   | "ringkasan"
@@ -163,6 +164,7 @@ type ViewId =
   | "maintenance"
   | "cakrawala"
   | "cbt"
+  | "outreach"
   | "akun";
 
 const STATUSES = ["Masuk", "Dicek", "Revisi", "Diproses", "Selesai", "Ditolak"];
@@ -297,6 +299,10 @@ const MENU: MenuItem[] = [
   // Menunya ada di portal dosen. Yang MENGAKTIFKAN ujian hanya Super Admin
   // dan Admin — admin bagian sengaja tidak melihat menu ini sama sekali.
   { id: "cbt", icon: "◈", label: "Ujian Online (CBT)", roles: ["super_admin", "admin", "dosen"] },
+  // Outreach Ultramailer. Perannya sengaja dipasang longgar di sini dan
+  // diperketat sekali lagi di bawah: dosen hanya melihatnya bila Super Admin
+  // memang membukakan akun itu, dan yang mengetahui daftarnya adalah server.
+  { id: "outreach", icon: "✉", label: "Outreach Ultramailer", roles: ["super_admin", "admin", "dosen"] },
   { id: "database", icon: "🗄", label: "Database Dokumen", roles: DATABASE_ROLES, grup: "dokumen" },
   { id: "template", icon: "▤", label: "Template Dokumen", roles: ARCHIVE_ROLES, grup: "dokumen" },
   { id: "arsip", icon: "⬢", label: "Arsip Drive", roles: ARCHIVE_ROLES, grup: "dokumen" },
@@ -353,6 +359,7 @@ const VIEW_TITLES: Record<ViewId, string> = {
   maintenance: "Mode Maintenance",
   cakrawala: "Kunci Cakrawala",
   cbt: "Ujian Online (CBT)",
+  outreach: "Outreach Ultramailer (OUS)",
   akun: "Akun",
 };
 
@@ -727,15 +734,44 @@ export default function DashboardApp({
     return () => clearInterval(jam);
   }, [view, profile, muatPesanan]);
 
+  // OUTREACH ULTRAMAILER — menunya tidak ditentukan peran saja.
+  //
+  // Dosen melihatnya hanya bila Super Admin membukakan akunnya satu per satu,
+  // dan daftar itu tinggal di server. Jadi yang menentukan di sini bukan
+  // tebakan dari peran, melainkan jawaban /api/outreach/settings: 200 berarti
+  // boleh, 403 berarti tidak. Selama jawabannya belum datang, menunya belum
+  // ditampilkan — lebih baik menu yang muncul terlambat sedetik daripada menu
+  // yang muncul lalu menolak begitu ditekan.
+  const [ousBoleh, setOusBoleh] = useState(false);
+  useEffect(() => {
+    if (!profile) return;
+    if (!["super_admin", "admin", "dosen"].includes(profile.role)) return;
+    let hidup = true;
+    fetch("/api/outreach/settings", { cache: "no-store" })
+      .then((jawaban) => {
+        if (hidup) setOusBoleh(jawaban.ok);
+      })
+      .catch(() => {
+        // Gagal memuat bukan berarti tidak boleh — tetapi juga bukan berarti
+        // boleh. Menunya tetap tersembunyi, dan muat ulang halaman akan
+        // mencobanya lagi.
+      });
+    return () => {
+      hidup = false;
+    };
+  }, [profile]);
+
   const allowedMenu = useMemo(
     () =>
       MENU.filter(
         (item) =>
           // "Akun" tetap terdaftar demi judul halaman dan hak aksesnya, tetapi
           // tempatnya kini di menu profil, bukan di daftar samping.
-          item.id !== "akun" && profile && (item.roles === "all" || item.roles.includes(profile.role)),
+          item.id !== "akun" &&
+          (item.id !== "outreach" || ousBoleh) &&
+          profile && (item.roles === "all" || item.roles.includes(profile.role)),
       ),
-    [profile],
+    [profile, ousBoleh],
   );
   const barisMenu = useMemo(() => susunMenu(allowedMenu), [allowedMenu]);
 
@@ -1709,6 +1745,10 @@ export default function DashboardApp({
 
           {view === "cbt" && ["super_admin", "admin", "dosen"].includes(profile.role) && (
             <CbtPanel role={profile.role} />
+          )}
+
+          {view === "outreach" && ["super_admin", "admin", "dosen"].includes(profile.role) && (
+            <OutreachPanel role={profile.role} email={profile.email} />
           )}
 
           {view === "cakrawala" && profile.role === "super_admin" && (
