@@ -5856,6 +5856,86 @@ table.qt td small { font-size: 11.5px; }
   color: #93a3b8; font-size: 11.5px; font-weight: 700; letter-spacing: .06em;
 }
 
+/* ---------- KOTAK PASTIKAN ----------
+
+   Pertanyaan sebelum ujian dikumpulkan atau halamannya ditinggalkan.
+
+   Ia ada karena window.confirm() TIDAK BOLEH dipakai di layar ujian: Chrome
+   melepas layar penuh setiap kali sebuah kotak JavaScript berdiri di atas
+   halaman yang sedang layar penuh, dan pelepasan itu tercatat sebagai
+   pelanggaran atas nama peserta yang hanya menekan "AKHIRI UJIAN". Kotak ini
+   satu lapisan di dalam dokumen yang sama, jadi tidak ada satu peristiwa pun
+   yang sampai ke penjaga.
+
+   DI BAWAH tirai (60) dan kotak teguran (70), dan itu disengaja: peserta yang
+   membuka kotak ini lalu keluar dari layar penuh harus tetap mendapat
+   tiraïnya, bukan soal yang terbuka di belakang kotak yang boleh dibiarkan
+   terbuka. */
+.uj-pastikan {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(8, 12, 22, .92);
+  /* Menelan ketukan: tombol jawaban di baliknya tidak boleh dapat ditekan
+     selama pertanyaannya belum dijawab. */
+  pointer-events: auto;
+}
+.uj-pastikan-kotak {
+  max-width: 30rem;
+  width: 100%;
+  padding: 24px 24px 20px;
+  border: 1px solid #24304a;
+  /* Garis atas yang berwarna, dan warnanya menjawab "seberapa besar
+     akibatnya": merah untuk yang menutup ujian, kuning untuk yang hanya
+     meninggalkan halamannya. */
+  border-top: 4px solid #64748b;
+  border-radius: 14px;
+  background: #14161f;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .55);
+}
+.uj-pastikan-akhir .uj-pastikan-kotak { border-top-color: #dc2626; }
+.uj-pastikan-keluar .uj-pastikan-kotak { border-top-color: #d97706; }
+.uj-pastikan-judul {
+  display: block;
+  font-size: 19px; font-weight: 800; letter-spacing: .01em; color: #e8edf7;
+}
+/* Angka-angka yang harus terbaca sebelum jawabannya dipilih — soal yang masih
+   kosong, soal yang ditandai ragu-ragu, waktu yang terus berjalan. Dipisah
+   dari paragraf biasa supaya tidak ikut terlewat oleh mata yang sudah
+   memutuskan. */
+.uj-pastikan-rincian {
+  display: inline-block; margin-top: 12px; padding: 6px 12px;
+  border-radius: 999px;
+  background: #422006; color: #fcd34d;
+  font-size: 12.5px; font-weight: 700; letter-spacing: .01em;
+}
+.uj-pastikan-teks {
+  margin: 12px 0 0;
+  color: #9fb0c6; font-size: 13px; line-height: 1.65;
+}
+.uj-pastikan-tombol {
+  display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end;
+  margin-top: 20px;
+}
+.uj-pastikan-tombol .btn { min-height: 42px; padding: 0 18px; font-size: 12px; }
+.uj-pastikan-batal { color: #dbe4f2; background: #263149; }
+.uj-pastikan-batal:hover { background: #2f3c58; }
+.uj-pastikan-ya { color: #fff; background: #b91c1c; }
+.uj-pastikan-ya:hover { background: #dc2626; }
+.uj-pastikan-keluar .uj-pastikan-ya { background: #b45309; }
+.uj-pastikan-keluar .uj-pastikan-ya:hover { background: #d97706; }
+.uj-pastikan-tombol .btn:disabled { opacity: .6; cursor: default; }
+/* Di ponsel tombolnya melebar penuh dan yang membatalkan berdiri DI BAWAH:
+   ibu jari yang menggapai dari tepi bawah layar mengenai yang aman lebih
+   dulu, bukan yang menutup ujian. */
+@media (max-width: 430px) {
+  .uj-pastikan-tombol { flex-direction: column-reverse; }
+  .uj-pastikan-tombol .btn { width: 100%; }
+}
+
 /* Lencana ringkas di bilah atas layar mengerjakan. Hanya muncul ketika
    penguncian sistemnya memang menyala — lencana "tidak dikunci" di atas layar
    ujian tidak memberi tahu peserta apa pun yang berguna, dan hanya

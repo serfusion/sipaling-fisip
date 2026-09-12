@@ -282,6 +282,33 @@ export function berat(jenis: JenisInsiden) {
   return INSIDEN_BERAT.includes(jenis);
 }
 
+/**
+ * Insiden yang SELALU ikut lahir ketika ujiannya ditutup, dan karena itu tidak
+ * boleh dicatat atas nama peserta selama detik-detik penutupan.
+ *
+ * Dua saja, dan keduanya perbuatan halaman, bukan perbuatan orang:
+ *
+ *   - "fullscreen" — layar penuhnya memang dilepas halaman ujian begitu
+ *     jawabannya terkumpul, supaya pesertanya tidak tertinggal terkunci di
+ *     layar penuh berisi halaman hasil;
+ *   - "blur" — fokusnya berpindah ke layar hasil pada saat yang sama.
+ *
+ * Keluhan yang melahirkan fungsi ini datang dari peserta sungguhan: "baru mau
+ * mengakhiri ujian, malah kena pelanggaran keluar dari layar." Sebab
+ * langsungnya kotak window.confirm() yang di Chrome melepas layar penuh
+ * sebelum ia digambar — itu sudah diganti kotak yang digambar halaman sendiri
+ * (src/app/cbt/ujian/pastikan.tsx) — dan fungsi ini penjaga lapis keduanya,
+ * untuk peristiwa penutupan yang tetap datang sesudahnya.
+ *
+ * Yang TIDAK ada di sini, dan tidak boleh ditambahkan: berpindah tab,
+ * tangkapan layar, tempel, alat pengembang. Tak satu pun dilakukan halaman ini
+ * atas nama siapa pun, jadi yang tercatat selama pengiriman tetap perbuatan
+ * orangnya — juga pada detik terakhir sebuah ujian.
+ */
+export function milikPengakhiran(jenis: JenisInsiden): boolean {
+  return jenis === "fullscreen" || jenis === "blur";
+}
+
 export type HitunganInsiden = Partial<Record<JenisInsiden, number>>;
 
 /**
