@@ -609,27 +609,102 @@ console.log("\n=== ISTILAH INGGRIS PADA JUDUL SKRIPSI DICETAK MIRING ===\n");
 const dicetak = (judul: string) =>
   penggalJudulInggris(judul).map((p) => (p.miring ? `<i>${p.teks}</i>` : p.teks)).join("");
 
+// ---------- lapis 1: ungkapan yang terdaftar ----------
 sama("brand awareness dimiringkan utuh, bukan sepotong",
   dicetak("Pengaruh Brand Awareness terhadap Minat Beli"),
   "Pengaruh <i>Brand Awareness</i> terhadap Minat Beli");
 sama("ungkapan panjang menang atas kata pendek di dalamnya",
   dicetak("Peran Cyber Public Relations dalam Membangun Citra"),
   "Peran <i>Cyber Public Relations</i> dalam Membangun Citra");
-sama("dua istilah berbeda dimiringkan sendiri-sendiri",
+// Dua istilah yang hanya dipisahkan spasi dicetak sebagai SATU penggal
+// miring: satu istilah asing, bukan dua potongan miring yang berjajar.
+sama("istilah bertetangga menjadi satu penggal miring",
   dicetak("Analisis Personal Branding Content Creator di TikTok"),
-  "Analisis <i>Personal Branding</i> <i>Content Creator</i> di TikTok");
+  "Analisis <i>Personal Branding Content Creator</i> di TikTok");
+// Ungkapan menang atas daftar kata serapan: yang miring di sini istilah
+// asingnya, bukan kata "digital" yang sudah baku.
+sama("ungkapan yang memuat kata serapan tetap miring seutuhnya",
+  dicetak("Pengaruh Digital Marketing terhadap Loyalitas Pelanggan"),
+  "Pengaruh <i>Digital Marketing</i> terhadap Loyalitas Pelanggan");
 
-// Kata serapan yang sudah baku ditulis tegak. Memiringkannya sama kelirunya
-// dengan membiarkan istilah asing tegak.
-for (const kata of ["Media", "Publik", "Digital", "Televisi", "Strategi", "Komunikasi", "Program", "Produksi"]) {
+// ---------- lapis 2: kata Inggris yang berdiri sendiri ----------
+//
+// Inilah yang dulu tertinggal tegak: satu judul yang setengah miring
+// setengah tegak lebih buruk daripada tidak dimiringkan sama sekali.
+sama("kata Inggris tunggal ikut miring",
+  dicetak("Pengaruh Engagement dan Insight terhadap Keputusan Pembelian"),
+  "Pengaruh <i>Engagement</i> dan <i>Insight</i> terhadap Keputusan Pembelian");
+sama("kata yang belum masuk ungkapan pun miring",
+  dicetak("Fenomena Flexing dan Hoax pada Media Sosial"),
+  "Fenomena <i>Flexing</i> dan <i>Hoax</i> pada Media Sosial");
+sama("bentuk jamak tidak perlu didaftar dua kali",
+  dicetak("Peran Influencers dan Followers dalam Pemasaran Daerah"),
+  "Peran <i>Influencers</i> dan <i>Followers</i> dalam Pemasaran Daerah");
+
+// ---------- lapis 3: akhiran yang mustahil dalam ejaan Indonesia ----------
+//
+// Bahasa Indonesia menuliskannya -si, -men, -tas, -if, -abel. Kata yang
+// masih berakhiran bentuk Inggrisnya pasti belum diserap.
+for (const kata of [
+  "Sustainability", "Responsiveness", "Trustworthiness", "Entrepreneurship",
+  "Readiness", "Attractiveness", "Creativity", "Continuity", "Photography",
+  "Psychology", "Statehood", "Comparative",
+]) {
+  const judul = `Analisis ${kata} Pemerintah Desa`;
+  sama(`akhiran Inggris "${kata}" dikenali tanpa didaftar`,
+    dicetak(judul), `Analisis <i>${kata}</i> Pemerintah Desa`);
+}
+// Sebaliknya: bentuk Indonesianya TIDAK boleh ikut terbawa.
+for (const kata of [
+  "Efektivitas", "Produktivitas", "Aktivitas", "Identitas", "Dokumen",
+  "Komitmen", "Argumen", "Instrumen", "Nasionalisme", "Efektif",
+  "Variabel", "Reliabel", "Klasifikasi", "Implementasi", "Strategis",
+]) {
+  const judul = `Analisis ${kata} Pemerintah Desa`;
+  sama(`bentuk Indonesia "${kata}" tetap tegak`, dicetak(judul), judul);
+}
+
+// ---------- kata serapan baku ditulis tegak ----------
+//
+// Memiringkannya sama kelirunya dengan membiarkan istilah asing tegak.
+for (const kata of [
+  "Media", "Publik", "Digital", "Televisi", "Strategi", "Komunikasi",
+  "Program", "Produksi", "Massa", "Status", "Target", "Level", "Modern",
+  "Internal", "Gender", "Mental", "Agenda", "Sistem", "Bisnis", "Isu",
+  "Opini", "Data", "Platform", "Konten", "Viral", "Aplikasi",
+]) {
   const judul = `Peran ${kata} dalam Pembangunan Daerah`;
   benar(`kata serapan "${kata}" tetap tegak`, dicetak(judul) === judul, dicetak(judul));
 }
+
+// ---------- nama diri tidak pernah dimiringkan ----------
+for (const nama of [
+  "TikTok", "Instagram", "YouTube", "WhatsApp", "Shopee", "Netflix",
+  "Gojek", "Traveloka", "Google", "Canva", "Tokopedia", "Muhammadiyah",
+]) {
+  const judul = `Analisis Konten ${nama} di Kalangan Remaja`;
+  benar(`nama diri "${nama}" tetap tegak`, dicetak(judul) === judul, dicetak(judul));
+}
+
 benar("judul tanpa istilah asing tidak disentuh sama sekali",
   dicetak("Upaya Meminimalisir Angka Putus Sekolah di SMKN Kota Tangerang") ===
     "Upaya Meminimalisir Angka Putus Sekolah di SMKN Kota Tangerang");
 
-// Tanda bintang admin menang penuh: yang miring persis yang ia tandai.
+// ---------- kata tugas Inggris ----------
+//
+// Ikut miring HANYA kalau terjepit istilah Inggris di kedua sisinya.
+sama("kata tugas yang terjepit ikut miring",
+  dicetak("Analisis Freedom of Speech dalam Pemberitaan Daerah"),
+  "Analisis <i>Freedom of Speech</i> dalam Pemberitaan Daerah");
+sama("kata tugas yang bertetangga sebelah saja tetap tegak",
+  dicetak("Peran Insight on Instagram bagi Pelaku Usaha"),
+  "Peran <i>Insight</i> on Instagram bagi Pelaku Usaha");
+// Tanpa rem itu, singkatan Indonesia ikut tercetak miring.
+benar("singkatan Indonesia tidak tersentuh",
+  dicetak("Peran Divisi IT dalam Pengelolaan Data Kelurahan") ===
+    "Peran Divisi IT dalam Pengelolaan Data Kelurahan");
+
+// ---------- tanda bintang admin menang penuh ----------
 sama("admin dapat memaksa istilah yang belum terdaftar",
   dicetak("Pengaruh *Brand Ambassador* terhadap Minat Beli"),
   "Pengaruh <i>Brand Ambassador</i> terhadap Minat Beli");
@@ -639,6 +714,17 @@ sama("sejak satu bintang dipakai, daftar tidak ikut bekerja",
 sama("tanda bintangnya sendiri tidak ikut tercetak",
   penggalJudulInggris("Pengaruh *Brand Ambassador* terhadap Minat Beli").map((p) => p.teks).join(""),
   "Pengaruh Brand Ambassador terhadap Minat Beli");
+// Sepasang bintang kosong = "jangan miringkan apa pun", dan ia tidak
+// meninggalkan lubang di tempatnya berdiri.
+sama("sepasang bintang kosong mematikan seluruh daftar",
+  dicetak("Pengaruh ** Brand Awareness terhadap Minat Beli"),
+  "Pengaruh Brand Awareness terhadap Minat Beli");
+sama("bintang kosong di ujung judul ikut hilang",
+  dicetak("Pengaruh Brand Awareness terhadap Minat Beli**"),
+  "Pengaruh Brand Awareness terhadap Minat Beli");
+sama("bintang kosong tanpa spasi tidak melekatkan dua kata",
+  dicetak("Pengaruh Brand Awareness** terhadap Minat Beli"),
+  "Pengaruh Brand Awareness terhadap Minat Beli");
 
 // Judul transkrip berbahasa Inggris seluruhnya TIDAK dimiringkan: memiringkan
 // seluruh kalimat bukan lagi penanda istilah asing.
@@ -657,10 +743,16 @@ for (const judul of [
   "Pengaruh Brand Awareness terhadap Minat Beli Konsumen pada Media Sosial",
   "Analisis Personal Branding Content Creator di TikTok",
   "Upaya Meminimalisir Angka Putus Sekolah di SMKN Kota Tangerang",
+  "Strategi Komunikasi Pemerintah Kota Tangerang dalam Sosialisasi Program Smart City",
+  "Pengaruh Body Shaming dan Cyberbullying terhadap Self Esteem Remaja (Studi Kasus SMAN 1)",
+  "Peran Humas dalam Meningkatkan Public Awareness tentang Hoax dan Fake News",
 ]) {
   sama(`judul utuh: "${judul.slice(0, 28)}…"`,
     penggalJudulInggris(judul).map((p) => p.teks).join(""), judul);
 }
+// Tanda baca memutus istilah: yang di seberang koma bukan lagi satu istilah.
+benar("koma tidak menyambung dua penggal miring",
+  dicetak("Peran Insight, Engagement, dan Reach dalam Pemasaran").includes("</i>,"));
 
 console.log(`\n${lulus} periksa lulus`);
 if (gagal.length > 0) {
