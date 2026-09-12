@@ -56,7 +56,7 @@
 // ============================================================
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { aturanMode, type JenisInsiden, type ModePengawasan } from "@/lib/pengawasan";
+import { aturanMode, milikPengakhiran, type JenisInsiden, type ModePengawasan } from "@/lib/pengawasan";
 import { PESAN_TOMBOL, periksaTombol } from "@/lib/tombol-terlarang";
 import {
   bacaKlien, TIRAI_MS, type JembatanKlien, type JenisKlien, type SebabTirai,
@@ -131,6 +131,24 @@ type Opsi = {
    * Pemanggil yang tidak memakai kamera cukup mengisinya true.
    */
   tenang?: boolean;
+  /**
+   * Peserta sudah menekan "kumpulkan", dan pengumpulannya sedang berjalan.
+   *
+   * Sejak ketukan itu, dua hal yang terjadi pada layar BUKAN LAGI PERBUATAN
+   * PESERTA melainkan perbuatan halaman ini sendiri: layar penuhnya dilepas
+   * begitu ujiannya ditutup, dan fokusnya berpindah ke layar hasil. Keduanya
+   * karena itu berhenti dilaporkan selama keadaan ini menyala.
+   *
+   * Yang TIDAK ikut berhenti: berpindah tab, tangkapan layar, tempel, alat
+   * pengembang. Semuanya tetap perbuatan peserta, juga pada detik-detik
+   * pengiriman, dan semuanya tetap tercatat apa adanya.
+   *
+   * Ia menyala hanya selama pengiriman berlangsung. Pengumpulan yang gagal —
+   * jaringan putus, jawaban yang belum sampai — mengembalikannya ke false di
+   * pemanggil, karena pesertanya kembali mengerjakan dan penjagaannya harus
+   * kembali penuh.
+   */
+  mengakhiri?: boolean;
   /** Melaporkan satu insiden ke server. Balasannya dipakai sebagai peringatan. */
   lapor: (jenis: JenisInsiden, detail?: string) => Promise<string> | void;
 };
@@ -142,7 +160,7 @@ function bolehMengetik(sasaran: EventTarget | null): boolean {
   return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable === true;
 }
 
-export function usePenjaga({ aktif, mode, tenang = true, lapor }: Opsi): Penjaga {
+export function usePenjaga({ aktif, mode, tenang = true, mengakhiri = false, lapor }: Opsi): Penjaga {
   const aturan = aturanMode(mode);
 
   const [peringatan, setPeringatan] = useState("");
@@ -220,6 +238,10 @@ export function usePenjaga({ aktif, mode, tenang = true, lapor }: Opsi): Penjaga
   const tenangRef = useRef(tenang);
   useEffect(() => { tenangRef.current = tenang; }, [tenang]);
 
+  // Dibaca dari dalam pendengar peristiwa, jadi ia harus selalu nilai terbaru.
+  const mengakhiriRef = useRef(mengakhiri);
+  useEffect(() => { mengakhiriRef.current = mengakhiri; }, [mengakhiri]);
+
   /**
    * Sedang di dalam detik-detik pembukaan yang tidak boleh dituduhkan kepada
    * siapa pun — lihat JEDA_MULA_MS dan `tenang` di atas.
@@ -237,6 +259,10 @@ export function usePenjaga({ aktif, mode, tenang = true, lapor }: Opsi): Penjaga
   const sudahRef = useRef<Set<string>>(new Set());
 
   const kirim = useCallback((jenis: JenisInsiden, detail?: string) => {
+    // Ujian yang sedang ditutup melepas layar penuhnya sendiri dan memindahkan
+    // fokusnya sendiri. Keduanya berhenti dicatat sejak peserta menekan
+    // "kumpulkan"; sisanya tetap dicatat. Daftarnya di src/lib/pengawasan.ts.
+    if (mengakhiriRef.current && milikPengakhiran(jenis)) return;
     const hasil = laporRef.current(jenis, detail);
     if (hasil && typeof (hasil as Promise<string>).then === "function") {
       void (hasil as Promise<string>).then((pesan) => {

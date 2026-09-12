@@ -25,10 +25,12 @@ import {
   type JembatanKlien,
 } from "@/lib/kunci-layar";
 import { aturanMode, rapikanMode, type JenisInsiden } from "@/lib/pengawasan";
+import { pastikanKeluar, pastikanKumpul } from "@/lib/pastikan";
 import { ejaSelisih, jamIndonesia } from "@/lib/waktu-indonesia";
 import KreditCbt from "../kredit";
 import KameraPengawas from "./kamera";
 import MediaSoal from "./media-soal";
+import Pastikan, { type IsiPastikan } from "./pastikan";
 import { usePenjaga } from "./penjaga";
 import RangkaUjian from "./rangka-ujian";
 import TandaAir from "./tanda-air";
@@ -201,6 +203,25 @@ export default function UjianApp() {
    * ketukan tidak bisa.
    */
   const [teguran, setTeguran] = useState<IsiTeguran | null>(null);
+  /**
+   * Pertanyaan yang sedang menunggu dijawab peserta, beserta apa yang terjadi
+   * bila ia menjawab ya. Null berarti tidak ada.
+   *
+   * Ia menggantikan window.confirm(), dan itu bukan soal selera: kotak bawaan
+   * peramban MELEPAS LAYAR PENUH di Chrome, dan pelepasan itu tercatat sebagai
+   * pelanggaran atas nama peserta yang hanya menekan "AKHIRI UJIAN". Sebabnya
+   * ditulis lengkap di src/app/cbt/ujian/pastikan.tsx.
+   */
+  const [pastikan, setPastikan] = useState<{ isi: IsiPastikan; saat: () => void } | null>(null);
+  /**
+   * Pengumpulan sedang berjalan, dan sejak ketukan itu layar penuh yang lepas
+   * maupun fokus yang berpindah adalah perbuatan HALAMAN INI, bukan
+   * pesertanya. Lihat `mengakhiri` di penjaga.ts — di sanalah akibatnya.
+   *
+   * Ia dikembalikan ke false pada tiap jalan gagal, karena pesertanya kembali
+   * mengerjakan dan penjagaannya harus kembali penuh.
+   */
+  const [mengakhiri, setMengakhiri] = useState(false);
 
   const antreRef = useRef<Map<number, string>>(new Map());
   const jamKirimRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -300,7 +321,7 @@ export default function UjianApp() {
     return () => window.clearTimeout(jam);
   }, [layar, pakaiKamera, kameraBeres]);
 
-  const penjaga = usePenjaga({ aktif: layar === "kerja", mode, tenang, lapor: laporInsiden });
+  const penjaga = usePenjaga({ aktif: layar === "kerja", mode, tenang, mengakhiri, lapor: laporInsiden });
 
   /** Jalur laporan untuk kamera. Balasannya tidak dipakai di sana. */
   const laporKamera = useCallback((jenis: JenisInsiden, detail?: string) => {
@@ -381,6 +402,11 @@ export default function UjianApp() {
         setJawaban(isi.jawaban || {});
         setDitandai(isi.ditandai || []);
         setSisa(isi.sisaDetik || 0);
+        // Lembar yang dibuka lagi adalah lembar yang dijaga lagi. Tanpa baris
+        // ini, peserta yang keluar lewat Logout di tengah ujian lalu masuk
+        // kembali membawa `mengakhiri` yang masih menyala — dan layar penuh
+        // maupun fokusnya tidak lagi dijaga sama sekali sampai ujiannya habis.
+        setMengakhiri(false);
         setLayar("kerja");
       })
       .catch(() => {
@@ -448,6 +474,11 @@ export default function UjianApp() {
   const kumpulkan = useCallback(async (otomatis: boolean) => {
     if (!kunciRef.current) return;
     setSibuk(true);
+    // Sejak baris ini, layar penuh yang lepas dan fokus yang berpindah adalah
+    // perbuatan halaman ini — ujiannya sedang ditutup atas permintaan
+    // pesertanya sendiri — jadi keduanya berhenti dicatat atas namanya. Yang
+    // lain tetap dicatat; lihat `mengakhiri` di penjaga.ts.
+    setMengakhiri(true);
     try {
       // Antrean jawaban dikosongkan lebih dulu, supaya yang barusan diketik
       // ikut terkumpul dan bukan tertinggal di dalam jeda pengiriman.
@@ -475,6 +506,11 @@ export default function UjianApp() {
       // diam. Peserta yang menekan "Kumpulkan" sambil melihat palet hijau
       // berhak tahu bahwa sebagian jawabannya masih tertahan di perangkatnya.
       if (tertinggal > 0 && !otomatis) {
+        // Ujiannya TIDAK jadi ditutup: pesertanya kembali ke soal, jadi
+        // penjagaannya kembali penuh dan pertanyaannya ditutup supaya
+        // keterangan galatnya terbaca.
+        setMengakhiri(false);
+        setPastikan(null);
         setSimpanan("tertunda");
         setGalat(
           `${tertinggal} jawaban belum sampai ke server, sepertinya jaringanmu sedang terputus. ` +
@@ -496,8 +532,13 @@ export default function UjianApp() {
         otomatis ? "Waktu habis. Jawabanmu sudah dikumpulkan otomatis." : "Jawabanmu sudah dikumpulkan.",
       );
       try { window.localStorage.removeItem(KUNCI_SIMPAN); } catch { /* diabaikan */ }
+      setPastikan(null);
       setLayar("selesai");
     } catch (alasan: unknown) {
+      // Gagal berarti pesertanya masih mengerjakan. Penjagaan kembali penuh,
+      // dan pertanyaannya ditutup supaya keterangan galatnya terbaca.
+      setMengakhiri(false);
+      setPastikan(null);
       setGalat(alasan instanceof Error ? alasan.message : "Ujian belum dapat dikumpulkan.");
     } finally {
       setSibuk(false);
@@ -570,6 +611,10 @@ export default function UjianApp() {
       setDitandai(data.ditandai || []);
       setSisa(data.sisaDetik || 0);
       setNomor(0);
+      // Sama seperti pada pemulihan sesi di atas: lembar yang dibuka adalah
+      // lembar yang dijaga penuh, apa pun yang terjadi sebelumnya di halaman
+      // ini.
+      setMengakhiri(false);
       setLayar("kerja");
     } catch (alasan: unknown) {
       // Gagal masuk berarti tidak jadi mengerjakan, jadi layar penuhnya
@@ -704,15 +749,20 @@ export default function UjianApp() {
    * waktunya, dan peserta dapat masuk lagi dengan nomor yang sama untuk
    * menemukan lembar yang persis sama. Yang dihapus hanya ingatan peramban ini.
    * Waktunya tetap berjalan, dan itu dikatakan terus terang di kotak
-   * konfirmasinya, bukan disembunyikan.
+   * pastikannya, bukan disembunyikan.
    */
   function keluar() {
-    const setuju = window.confirm(
-      "Keluar dari halaman ujian?\n\n" +
-        "Jawaban yang sudah tersimpan tidak hilang, dan kamu dapat masuk lagi dengan nomor yang " +
-        "sama. Tetapi WAKTU UJIAN TERUS BERJALAN selama kamu di luar.",
-    );
-    if (!setuju) return;
+    setPastikan({ isi: pastikanKeluar(), saat: jalankanKeluar });
+  }
+
+  function jalankanKeluar() {
+    setPastikan(null);
+    // Layar penuhnya dilepas baris di bawah ini, atas permintaan pesertanya
+    // sendiri. Penjagaan memang berhenti begitu layarnya bukan "kerja" lagi,
+    // tetapi urutan itu bergantung pada kapan React membereskan gambarnya —
+    // dan yang dipertaruhkan sebuah pelanggaran atas nama orang yang tidak
+    // melakukan apa-apa. Jadi ia dikatakan terus terang, bukan diandaikan.
+    setMengakhiri(true);
     penjaga.akhiriLayarPenuh();
     try { window.localStorage.removeItem(KUNCI_SIMPAN); } catch { /* diabaikan */ }
     setKunciSesi("");
@@ -724,18 +774,20 @@ export default function UjianApp() {
     setLayar("kode");
   }
 
-  /** Konfirmasi sebelum mengumpulkan, dengan jumlah soal yang masih kosong. */
+  /**
+   * Pertanyaan sebelum mengumpulkan, beserta jumlah soal yang masih kosong.
+   *
+   * Digambar halaman ini sendiri, BUKAN window.confirm(). Kotak bawaan peramban
+   * melepas layar penuh di Chrome, dan pelepasan itu tercatat sebagai
+   * pelanggaran "keluar dari layar penuh" atas nama peserta yang hanya menekan
+   * "AKHIRI UJIAN" — keluhan yang melahirkan kotak ini. Selengkapnya di
+   * src/app/cbt/ujian/pastikan.tsx.
+   */
   function mintaKumpul() {
-    const kosong = soal.length - terjawab;
-    const ragu = ditandai.length;
-    const rincian = [
-      kosong > 0 ? `${kosong} soal belum dijawab` : null,
-      ragu > 0 ? `${ragu} soal ditandai ragu-ragu` : null,
-    ].filter(Boolean).join(" dan ");
-    const pesan = rincian
-      ? `Masih ada ${rincian}. Hentikan ujian dan kumpulkan sekarang?`
-      : "Hentikan ujian dan kumpulkan jawabanmu sekarang?";
-    if (window.confirm(pesan)) void kumpulkan(false);
+    setPastikan({
+      isi: pastikanKumpul({ kosong: soal.length - terjawab, ragu: ditandai.length }),
+      saat: () => void kumpulkan(false),
+    });
   }
 
   async function tandai(id: number) {
@@ -1135,6 +1187,28 @@ export default function UjianApp() {
           isi={teguran}
           peserta={{ nama, nim, kode: ujian?.kode ?? "" }}
           tutup={() => setTeguran(null)}
+        />
+      )}
+
+      {/* ---------- KOTAK PASTIKAN ----------
+          Pertanyaan sebelum ujian dikumpulkan atau halamannya ditinggalkan.
+
+          Ia digambar halaman ini sendiri dan BUKAN window.confirm(), dan itu
+          seluruh sebab keberadaannya: kotak bawaan peramban melepas layar
+          penuh di Chrome, dan pelepasan itu tercatat sebagai pelanggaran
+          "keluar dari layar penuh" atas nama peserta yang hanya menekan
+          "AKHIRI UJIAN". Selengkapnya di pastikan.tsx.
+
+          DI BAWAH tirai dan kotak teguran — z-index 55 lawan 60 dan 70.
+          Peserta yang membuka kotak ini lalu keluar dari layar penuh tetap
+          mendapat tiraïnya, bukan soal yang terbuka di belakang sebuah kotak
+          yang boleh dibiarkan terbuka. */}
+      {pastikan && (
+        <Pastikan
+          isi={pastikan.isi}
+          sibuk={sibuk}
+          ya={pastikan.saat}
+          tidak={() => setPastikan(null)}
         />
       )}
 
