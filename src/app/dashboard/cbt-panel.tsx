@@ -31,6 +31,9 @@ import {
   type PesertaCetak, type UjianCetak,
 } from "@/lib/cetak-cbt";
 import { gambarQr, namaBerkasQr } from "@/lib/qr-ujian";
+import {
+  HURUF_ZONA, jamIndonesia, pecahWaktuUjian, PILIHAN_JAM, PILIHAN_MENIT, susunWaktuUjian,
+} from "@/lib/waktu-indonesia";
 import { buatDocxTemplate, buatXlsxTemplate } from "@/lib/template-soal";
 import { asalCbt } from "@/lib/situs-cbt";
 import {
@@ -541,19 +544,149 @@ function setelanUjian(u: Ujian) {
   };
 }
 
-/** Ubah tanggal ISO menjadi nilai untuk <input type="datetime-local">. */
-function untukInput(iso: string | null) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+/**
+ * Isian jadwal, terpecah tiga: tanggal, jam, dan menit.
+ *
+ * Dahulu di sini ada satu <input type="datetime-local">, dan dari situlah
+ * "AM/PM" datang: kotak isian itu digambar peramban menurut bahasa sistem
+ * operasinya, dan laptop yang bahasanya English (United States) menggambarnya
+ * dalam jam dua belas. Tidak ada atribut yang dapat memaksanya menjadi jam 24 —
+ * satu-satunya jalan adalah menggambar pemilih jamnya sendiri. Lihat
+ * src/lib/waktu-indonesia.ts.
+ */
+type IsianJam = { tanggal: string; jam: string; menit: string };
+
+const JAM_KOSONG: IsianJam = { tanggal: "", jam: "", menit: "" };
+
+/** Ubah tanggal ISO dari server menjadi isian jadwal dalam jam Indonesia. */
+function untukIsian(iso: string | null): IsianJam {
+  const pecah = pecahWaktuUjian(iso);
+  if (!pecah.tanggal) return { ...JAM_KOSONG };
+  return {
+    tanggal: pecah.tanggal,
+    jam: String(pecah.jam).padStart(2, "0"),
+    menit: String(pecah.menit).padStart(2, "0"),
+  };
+}
+
+/** Isian jadwal menjadi satu saat, atau null bila belum lengkap. */
+function dariIsian(isian: IsianJam): Date | null {
+  if (!isian.tanggal || isian.jam === "" || isian.menit === "") return null;
+  return susunWaktuUjian(isian.tanggal, Number(isian.jam), Number(isian.menit));
 }
 
 function jamRapi(iso: string | null) {
-  if (!iso) return "-";
-  return new Date(iso).toLocaleString("id-ID", {
-    day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
-  });
+  return jamIndonesia(iso);
+}
+
+/**
+ * Mengapa jadwal ini belum boleh diaktifkan — satu kalimat, atau null bila
+ * tidak ada halangan sama sekali.
+ *
+ * Syaratnya sama persis dengan yang dijaga server di
+ * src/app/api/cbt/aktivasi/route.ts, dan itu memang disengaja: yang di sini
+ * MEMATIKAN tombolnya lebih dulu, yang di sana menolak permintaannya. Dahulu
+ * hanya ada yang kedua, dan akibatnya pengajar menekan tombol biru yang
+ * tampak siap lalu membaca penolakan merah — pada jam ketika peserta sudah
+ * duduk di ruangan. Tombol yang abu-abu beserta alasannya menjawab lebih awal:
+ * yang salah terlihat sebelum ada yang ditekan.
+ *
+ * Yang di server tidak boleh ikut dilepas. Halaman dapat diubah dari alat
+ * pengembang; jadwal ujian tidak boleh bergantung pada tombol yang patuh.
+ */
+function halanganJadwal(opsi: {
+  mulai: Date | null;
+  selesai: Date | null;
+  durasi: number;
+  jumlahBank: number;
+  soalDipakai: number;
+}): string | null {
+  const { mulai, selesai, durasi, jumlahBank, soalDipakai } = opsi;
+  if (!mulai || !selesai) return "Tanggal, jam, dan menit — mulai maupun selesai — harus terisi lengkap.";
+  if (selesai.getTime() <= mulai.getTime()) return "Jam selesai harus sesudah jam mulai.";
+
+  const menitJendela = Math.round((selesai.getTime() - mulai.getTime()) / 60_000);
+  if (menitJendela < durasi) {
+    return (
+      `Jendela ujian hanya ${menitJendela} menit, sedangkan durasinya ${durasi} menit. ` +
+      "Peserta akan terpotong waktunya."
+    );
+  }
+  if (jumlahBank === 0) return "Bank soal masih kosong. Isi soalnya dulu.";
+  if (soalDipakai > jumlahBank) {
+    return (
+      `Ujian menuntut ${soalDipakai} soal, sedangkan banknya baru ${jumlahBank}. ` +
+      "Tambah soal, atau turunkan jumlah soal ujiannya."
+    );
+  }
+  return null;
+}
+
+/**
+ * Pemilih tanggal dan jam 24 jam — pengganti <input type="datetime-local">.
+ *
+ * Tanggalnya tetap kotak isian tanggal bawaan peramban: ia menggambar kalender,
+ * dan kalender tidak pernah menuliskan AM maupun PM. Yang diganti hanya JAMNYA,
+ * karena di situlah AM/PM muncul dan tidak ada atribut mana pun yang dapat
+ * memaksanya pergi — peramban menggambar jam menurut bahasa sistem operasinya,
+ * bukan menurut bahasa halamannya.
+ *
+ * Dua pemilih, bukan satu kotak "07:30": pemilih tidak dapat salah ketik, dan
+ * menitnya tidak dapat berisi "7" yang sebenarnya berarti tujuh menit padahal
+ * yang dimaksud tujuh puluh.
+ */
+function PilihJam({
+  label, nilai, ubah,
+}: {
+  label: string;
+  nilai: IsianJam;
+  ubah: (isian: IsianJam) => void;
+}) {
+  // Dibacakan kembali dengan kata, bukan dengan angka.
+  //
+  // Kotak tanggal bawaan peramban menuliskan urutannya menurut bahasa sistem
+  // operasinya juga — "05/12/2026" berarti 5 Desember pada satu laptop dan 12
+  // Mei pada laptop sebelahnya, dan tidak ada atribut yang dapat memaksanya
+  // sama. Yang dapat dilakukan halaman adalah MENGULANG jawabannya dengan
+  // nama bulan yang dieja, sehingga tanggal yang keliru terbaca sebelum
+  // ujiannya dijadwalkan, bukan sesudah pesertanya menunggu di hari yang salah.
+  const terbaca = dariIsian(nilai);
+  return (
+    <div className="cbt-jam">
+      <span className="cbt-jam-label">{label}</span>
+      <div className="cbt-jam-baris">
+        <input
+          type="date"
+          aria-label={`Tanggal ${label.toLowerCase()}`}
+          value={nilai.tanggal}
+          onChange={(e) => ubah({ ...nilai, tanggal: e.target.value })}
+        />
+        <select
+          aria-label={`Jam ${label.toLowerCase()}`}
+          value={nilai.jam}
+          onChange={(e) => ubah({ ...nilai, jam: e.target.value })}
+        >
+          <option value="">--</option>
+          {PILIHAN_JAM.map((j) => <option key={j} value={j}>{j}</option>)}
+        </select>
+        <b className="cbt-jam-titik">.</b>
+        <select
+          aria-label={`Menit ${label.toLowerCase()}`}
+          value={nilai.menit}
+          onChange={(e) => ubah({ ...nilai, menit: e.target.value })}
+        >
+          <option value="">--</option>
+          {PILIHAN_MENIT.map((m) => <option key={m} value={m}>{m}</option>)}
+        </select>
+        <span className="cbt-jam-zona">{HURUF_ZONA}</span>
+      </div>
+      <small className="cbt-jam-baca">
+        {terbaca
+          ? jamIndonesia(terbaca, { hari: true, tahun: true, panjang: true })
+          : "Tanggal, jam, dan menit belum lengkap."}
+      </small>
+    </div>
+  );
 }
 
 export default function CbtPanel({ role }: { role: string }) {
@@ -607,7 +740,10 @@ export default function CbtPanel({ role }: { role: string }) {
   const [imporNama, setImporNama] = useState("");
   const [tersalin, setTersalin] = useState("");
 
-  const [jadwal, setJadwal] = useState({ mulai: "", selesai: "" });
+  const [jadwal, setJadwal] = useState({
+    mulai: { ...JAM_KOSONG } as IsianJam,
+    selesai: { ...JAM_KOSONG } as IsianJam,
+  });
 
   // Pengaturan ujian yang sedang dibuka. Terlipat sampai diminta, tetapi
   // isinya selalu disiapkan begitu ujiannya dibuka: yang membukanya karena
@@ -840,7 +976,7 @@ export default function CbtPanel({ role }: { role: string }) {
     setBukaPeserta(null);
     setRincian([]);
     setSoalBaru({ ...SOAL_KOSONG });
-    setJadwal({ mulai: untukInput(u.startAt), selesai: untukInput(u.endAt) });
+    setJadwal({ mulai: untukIsian(u.startAt), selesai: untukIsian(u.endAt) });
     setSetel(setelanUjian(u));
     setBukaSetel(false);
     setAksi({});
@@ -1138,9 +1274,20 @@ export default function CbtPanel({ role }: { role: string }) {
 
   async function aktifkan() {
     if (!terbuka) return;
-    if (!jadwal.mulai || !jadwal.selesai) {
-      setGalat("Jam mulai dan jam selesai wajib diisi.");
-      kabari("aktif", "gagal", "✕ Jam mulai dan selesai wajib diisi", 5000);
+    const mulai = dariIsian(jadwal.mulai);
+    const selesai = dariIsian(jadwal.selesai);
+    // Tombolnya memang sudah abu-abu ketika ada halangan, jadi baris ini hampir
+    // tidak pernah terpakai. "Hampir" tidak cukup: papan ketik dapat menekan
+    // tombol yang tersembunyi di balik keadaan yang basi sepersekian detik.
+    const halangan = halanganJadwal({
+      mulai, selesai,
+      durasi: terbuka.durationMinutes,
+      jumlahBank: soal.length,
+      soalDipakai: terbuka.questionCount,
+    });
+    if (halangan || !mulai || !selesai) {
+      setGalat(halangan ?? "Jadwal belum lengkap.");
+      kabari("aktif", "gagal", "✕ Jadwal belum memenuhi syarat", 5000);
       return;
     }
     const perbarui = Boolean(terbuka.activatedAt);
@@ -1151,8 +1298,8 @@ export default function CbtPanel({ role }: { role: string }) {
       {
         id: terbuka.id,
         aksi: "aktifkan",
-        mulai: new Date(jadwal.mulai).toISOString(),
-        selesai: new Date(jadwal.selesai).toISOString(),
+        mulai: mulai.toISOString(),
+        selesai: selesai.toISOString(),
       },
       perbarui
         ? { jalan: "Memperbarui jadwal…", oke: "Jadwal diperbarui" }
@@ -1796,6 +1943,28 @@ export default function CbtPanel({ role }: { role: string }) {
   const sedangBerlangsung = terbuka.status === "berlangsung";
   const terkunci = sedangBerlangsung || !terbuka.bolehUbah;
 
+  // Jadwal yang sedang diketik, sudah menjadi saat sungguhan — dipakai tiga
+  // kali: mematikan tombol aktivasi, menuliskan alasannya, dan membacakan
+  // kembali jadwalnya dengan kalimat penuh.
+  const mulaiJadwal = dariIsian(jadwal.mulai);
+  const selesaiJadwal = dariIsian(jadwal.selesai);
+  // Berapa soal yang sudah masuk dibandingkan yang dituntut ujiannya. Bank yang
+  // lebih besar daripada jumlah yang dipakai bukan kelebihan yang salah: soalnya
+  // diacak dari seluruh bank, jadi bank yang lebih besar berarti dua peserta
+  // bersebelahan lebih kecil kemungkinan mendapat lembar yang sama.
+  const cukupSoal = soal.length >= terbuka.questionCount && soal.length > 0;
+  const persenSoal = terbuka.questionCount > 0
+    ? Math.min(100, Math.round((soal.length / terbuka.questionCount) * 100))
+    : soal.length > 0 ? 100 : 0;
+
+  const halanganAktivasi = halanganJadwal({
+    mulai: mulaiJadwal,
+    selesai: selesaiJadwal,
+    durasi: terbuka.durationMinutes,
+    jumlahBank: soal.length,
+    soalDipakai: terbuka.questionCount,
+  });
+
   // Setelan yang isinya berbeda dari yang tersimpan di server. Dipakai dua
   // kali: menyebut jumlahnya pada kepala panel yang terlipat — supaya
   // perubahan yang belum disimpan tidak hilang di balik lipatan — dan menahan
@@ -1944,17 +2113,45 @@ export default function CbtPanel({ role }: { role: string }) {
         </div>
 
         {terbuka.bolehUbah ? (
-          <div className="cbt-baris cbt-jadwal-form">
-            <label><span>Jam mulai</span>
-              <input type="datetime-local" value={jadwal.mulai} onChange={(e) => setJadwal({ ...jadwal, mulai: e.target.value })} />
-            </label>
-            <label><span>Jam selesai</span>
-              <input type="datetime-local" value={jadwal.selesai} onChange={(e) => setJadwal({ ...jadwal, selesai: e.target.value })} />
-            </label>
+          <>
+            <div className="cbt-jadwal-form">
+              <PilihJam
+                label="Jam mulai"
+                nilai={jadwal.mulai}
+                ubah={(mulai) => setJadwal({ ...jadwal, mulai })}
+              />
+              <PilihJam
+                label="Jam selesai"
+                nilai={jadwal.selesai}
+                ubah={(selesai) => setJadwal({ ...jadwal, selesai })}
+              />
+            </div>
+
+            {/* Ringkasan jadwalnya, dibacakan kembali dengan kalimat penuh.
+                Angka pada tiga pemilih terpisah mudah salah baca — tanggal satu
+                hari geser dan menit yang tertinggal pada nilai lama keduanya
+                terlihat benar sampai dibaca seperti kalimat. */}
+            {mulaiJadwal && selesaiJadwal && selesaiJadwal > mulaiJadwal && (
+              <p className="cbt-jadwal-ringkas">
+                Jendela ujian{" "}
+                <b>{ejaWaktu(Math.round((selesaiJadwal.getTime() - mulaiJadwal.getTime()) / 60_000))}</b>
+                {" "}untuk ujian yang dikerjakan {ejaWaktu(terbuka.durationMinutes)}.
+              </p>
+            )}
+
+            {/* Tombolnya abu-abu selama halangannya ada, dan halangannya ditulis
+                persis di sebelahnya. Tombol mati tanpa alasan hanya memindahkan
+                kebingungan, tidak menghapusnya. */}
+            {halanganAktivasi && (
+              <p className="cbt-jadwal-halangan" role="status">⚠ {halanganAktivasi}</p>
+            )}
+
             <div className="cbt-jadwal-aksi">
               <Tbl
                 kabar={aksi.aktif}
                 diam={terbuka.activatedAt ? "Perbarui jadwal" : "Aktifkan ujian"}
+                mati={Boolean(halanganAktivasi)}
+                judul={halanganAktivasi ?? undefined}
                 onClick={() => void aktifkan()}
               />
               {terbuka.activatedAt && (
@@ -1966,7 +2163,7 @@ export default function CbtPanel({ role }: { role: string }) {
                 />
               )}
             </div>
-          </div>
+          </>
         ) : (
           <p className="cbt-catatan">
             Jadwal dan aktivasi dipegang pengajar pemiliknya. Anda memantau peserta dan nilainya di tab sebelah{terbuka.bolehHapus ? ", dan menghapus ujian ini bila memang perlu" : ""}.
@@ -2338,6 +2535,49 @@ export default function CbtPanel({ role }: { role: string }) {
                 )}
               </div>
             )}
+          </div>
+
+          {/* ---------- BERAPA SOAL YANG SUDAH MASUK ----------
+              Angkanya besar, dan itu bukan hiasan. Memasukkan soal adalah
+              pekerjaan berulang yang memakan satu jam penuh: mengetik,
+              menyimpan, mengetik lagi. Yang selalu ditanyakan pengajar di
+              tengahnya satu hal — "sudah berapa?" — dan dahulu jawabannya hanya
+              ada pada angka kecil di dalam kurung pada nama tab, jauh di atas
+              formulir yang sedang diisi, atau harus dihitung sendiri dari daftar
+              di bawahnya.
+
+              Ia berdiri PERSIS DI ATAS formulirnya, sehingga setiap kali satu
+              soal tersimpan, angka yang naik itu berada tepat di tempat mata
+              sedang menatap. */}
+          <div className="panel cbt-hitung" data-cukup={cukupSoal ? "1" : undefined}>
+            <div className="cbt-hitung-angka">
+              <b>{soal.length}</b>
+              <span>soal sudah dimasukkan</span>
+            </div>
+            <div className="cbt-hitung-rinci">
+              <p className="cbt-hitung-target">
+                Ujian ini memakai <b>{terbuka.questionCount}</b> soal dari bank.
+              </p>
+              <p className={`cbt-hitung-kabar ${cukupSoal ? "cukup" : "kurang"}`}>
+                {cukupSoal
+                  ? soal.length > terbuka.questionCount
+                    ? `✓ Cukup, malah berlebih ${soal.length - terbuka.questionCount} soal — yang dipakai diacak dari seluruh bank.`
+                    : "✓ Cukup. Bank soalnya pas dengan jumlah yang dipakai ujian."
+                  : `Kurang ${terbuka.questionCount - soal.length} soal lagi. Ujian belum dapat diaktifkan sebelum banknya cukup.`}
+              </p>
+              {/* Batang yang ikut penuh. Angka menjawab "berapa"; batang
+                  menjawab "tinggal berapa lagi" tanpa seorang pun mengurangi. */}
+              <div
+                className="cbt-hitung-batang"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={terbuka.questionCount || soal.length || 1}
+                aria-valuenow={Math.min(soal.length, terbuka.questionCount || soal.length)}
+                aria-label="Jumlah soal yang sudah dimasukkan"
+              >
+                <i style={{ width: `${persenSoal}%` }} />
+              </div>
+            </div>
           </div>
 
           <div className="panel cbt-form">

@@ -25,6 +25,7 @@ import {
   type JembatanKlien,
 } from "@/lib/kunci-layar";
 import { aturanMode, rapikanMode, type JenisInsiden } from "@/lib/pengawasan";
+import { ejaSelisih, jamIndonesia } from "@/lib/waktu-indonesia";
 import KreditCbt from "../kredit";
 import KameraPengawas from "./kamera";
 import MediaSoal from "./media-soal";
@@ -158,11 +159,18 @@ function ejaMenit(menit: number) {
   return sisa === 0 ? `${jam} jam` : `${jam} jam ${sisa} menit`;
 }
 
+/**
+ * Tanggal dan jam pembukaan ujian, dalam jam Indonesia dan 24 jam.
+ *
+ * Dua hal yang dahulu salah di sini, dan keduanya menimpa peserta yang sedang
+ * menunggu: jamnya ditulis menurut ZONA PERANGKAT masing-masing — sehingga
+ * ponsel yang zonanya tergeser menampilkan jam pembukaan yang berbeda dari yang
+ * dimaksud pengajarnya — dan peramban berbahasa Inggris menuliskannya beserta
+ * "AM"/"PM". Keduanya diurus src/lib/waktu-indonesia.ts, lengkap dengan huruf
+ * zonanya supaya tidak ada jam yang perlu ditebak.
+ */
 function tanggalRapi(iso: string | null) {
-  if (!iso) return "-";
-  return new Date(iso).toLocaleString("id-ID", {
-    weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit",
-  });
+  return jamIndonesia(iso, { hari: true, panjang: true });
 }
 
 export default function UjianApp() {
@@ -264,7 +272,35 @@ export default function UjianApp() {
     }
   }, []);
 
-  const penjaga = usePenjaga({ aktif: layar === "kerja", mode, lapor: laporInsiden });
+  /**
+   * Kotak izin kamera sudah ditekan — atau ujian ini memang tidak memakainya.
+   *
+   * Selama kotak itu masih berdiri, fokus jendela ada padanya, bukan pada
+   * halaman ujian. Dahulu detik-detik itu tercatat sebagai "jendela kehilangan
+   * fokus" atas nama peserta yang belum melihat satu soal pun, dan itulah
+   * keluhan yang melahirkan keadaan ini. Lihat `tenang` di penjaga.ts.
+   */
+  const pakaiKamera = Boolean(ujian?.kamera);
+  const [kameraBeres, setKameraBeres] = useState(false);
+  const tenang = !pakaiKamera || kameraBeres;
+
+  // Tetap sama dari gambar ke gambar. Panggilan balik yang lahir baru pada tiap
+  // gambar akan membuat kameranya dimatikan lalu dinyalakan lagi — lampu kamera
+  // yang berkedip di tengah ujian, dan izin yang ditanyakan dua kali.
+  const tandaiKameraBeres = useCallback(() => setKameraBeres(true), []);
+
+  // Jaring pengaman. Kabar "izin selesai" datang dari satu panggilan balik, dan
+  // panggilan balik yang karena satu dan lain hal tidak pernah sampai akan
+  // mematikan deteksi kehilangan fokus SEPANJANG UJIAN. Dua puluh detik sesudah
+  // ujiannya dimulai, penjagaan berjalan penuh apa pun yang terjadi pada
+  // kameranya.
+  useEffect(() => {
+    if (layar !== "kerja" || !pakaiKamera || kameraBeres) return;
+    const jam = window.setTimeout(() => setKameraBeres(true), 20_000);
+    return () => window.clearTimeout(jam);
+  }, [layar, pakaiKamera, kameraBeres]);
+
+  const penjaga = usePenjaga({ aktif: layar === "kerja", mode, tenang, lapor: laporInsiden });
 
   /** Jalur laporan untuk kamera. Balasannya tidak dipakai di sana. */
   const laporKamera = useCallback((jenis: JenisInsiden, detail?: string) => {
@@ -353,6 +389,51 @@ export default function UjianApp() {
       });
     return () => { hidup = false; };
   }, []);
+
+  // ---------- menunggu jam pembukaan ----------
+  //
+  // Dua penghitung yang berbeda, dan keduanya perlu:
+  //
+  //   JAM LAYAR  — berdetak tiap detik hanya supaya kalimat "terbuka dalam 12
+  //                menit" ikut turun. Ia tidak pernah memutuskan apa pun.
+  //   KABAR SERVER— tiap lima belas detik keterangan ujiannya diambil ulang,
+  //                dan STATUS DARI SERVER itulah yang membuka tombol Mulai.
+  //                Jam peramban dapat meleset dan dapat sengaja dilesetkan;
+  //                kalau tombolnya dibuka oleh jam perangkat, memundurkan jam
+  //                laptop sudah cukup untuk masuk lebih awal — dan peserta yang
+  //                jam ponselnya terlambat sendiri akan menatap tombol abu-abu
+  //                sesudah ujiannya benar-benar dibuka.
+  const [detak, setDetak] = useState(() => Date.now());
+  // Seluruh keadaan sebelum "berlangsung" ikut menunggu, bukan hanya
+  // "terjadwal": ujian yang belum dijadwalkan sama sekali ("draf") dan yang
+  // jadwalnya sudah ada tetapi belum diaktifkan pengajarnya ("menunggu") sama
+  // saja bagi peserta yang sudah memegang tautannya — ia menunggu, dan
+  // tombolnya harus menyala sendiri begitu pengajarnya menekan aktifkan.
+  const menungguJadwal =
+    layar === "identitas" && Boolean(ujian) &&
+    ujian?.status !== "berlangsung" && ujian?.status !== "selesai";
+
+  useEffect(() => {
+    if (!menungguJadwal) return;
+    const jam = window.setInterval(() => setDetak(Date.now()), 1000);
+    return () => window.clearInterval(jam);
+  }, [menungguJadwal]);
+
+  useEffect(() => {
+    if (!menungguJadwal || !ujian?.kode) return;
+    const kodeIni = ujian.kode;
+    const jam = window.setInterval(() => {
+      fetch(`/api/cbt/ikut?kode=${encodeURIComponent(kodeIni)}`, { cache: "no-store" })
+        .then((jawab) => jawab.json())
+        .then((data) => { if (data?.success && data.ujian) setUjian(data.ujian); })
+        .catch(() => {
+          // Jaringan sedang putus. Tombolnya tetap abu-abu, dan itu jawaban
+          // yang benar: yang tidak dapat menghubungi server juga tidak akan
+          // dapat memulai ujiannya.
+        });
+    }, 15_000);
+    return () => window.clearInterval(jam);
+  }, [menungguJadwal, ujian?.kode]);
 
   // ---------- jam mundur ----------
   useEffect(() => {
@@ -739,8 +820,24 @@ export default function UjianApp() {
 
   // ---------- LAYAR: IDENTITAS ----------
   if (layar === "identitas" && ujian) {
-    const belumBuka = ujian.status === "terjadwal";
     const sudahTutup = ujian.status === "selesai";
+    // Belum boleh dikerjakan — apa pun sebabnya. Tiga keadaan bermuara ke sini,
+    // dan bagi peserta ketiganya sama: belum dijadwalkan ("draf"), sudah
+    // dijadwalkan tetapi belum diaktifkan pengajarnya ("menunggu"), dan sudah
+    // diaktifkan tetapi jamnya belum tiba ("terjadwal"). Dahulu hanya yang
+    // ketiga yang ditahan, sehingga dua yang pertama menampilkan tombol biru
+    // yang tampak siap — lalu server menolaknya sesudah ditekan.
+    const belumBuka = !sudahTutup && ujian.status !== "berlangsung";
+    const adaJadwal = Boolean(ujian.mulai);
+
+    // Sisa waktu menuju pembukaan, untuk dibacakan di badan tombol dan di kotak
+    // kabar. Kosong bila jamnya tidak diketahui atau sudah lewat menurut jam
+    // perangkat — yang terakhir bukan berarti terbuka: yang membuka tombolnya
+    // tetap status dari server, dan kalimat "0 detik" yang menetap justru
+    // membuat orang mengira halamannya menggantung.
+    const mulaiMs = ujian.mulai ? Date.parse(ujian.mulai) : Number.NaN;
+    const sisaMenuju = Number.isNaN(mulaiMs) ? 0 : Math.round((mulaiMs - detak) / 1000);
+    const hitungMundur = belumBuka && sisaMenuju > 0 ? ejaSelisih(sisaMenuju) : "";
     return (
       <RangkaUjian
         lencana={ujian.mataKuliah}
@@ -799,14 +896,32 @@ export default function UjianApp() {
 
           {belumBuka && (
             <div className="uj-kabar uj-kabar-tunggu">
-              Ujian ini dibuka <b>{tanggalRapi(ujian.mulai)}</b> dan dikerjakan selama{" "}
-              <b>{ejaMenit(ujian.durasi)}</b>. Halaman ini boleh ditutup dulu, buka lagi saat
-              waktunya tiba.
+              {adaJadwal ? (
+                <>
+                  Ujian ini dibuka <b>{tanggalRapi(ujian.mulai)}</b> dan dikerjakan selama{" "}
+                  <b>{ejaMenit(ujian.durasi)}</b>.
+                  {hitungMundur && <> Terbuka dalam <b>{hitungMundur}</b>.</>}
+                </>
+              ) : (
+                <>Jadwal ujian ini belum disetel pengajarnya.</>
+              )}{" "}
+              Halaman ini boleh dibiarkan terbuka — tombol Mulai menyala sendiri begitu
+              ujiannya dibuka.
             </div>
           )}
           {sudahTutup && <div className="uj-kabar uj-kabar-tutup">Ujian ini sudah ditutup.</div>}
 
-          {!belumBuka && !sudahTutup && (
+          {/* ---------- ISIAN IDENTITAS ----------
+              Dahulu seluruh bagian ini disembunyikan sampai ujiannya terbuka.
+              Yang terjadi: peserta membuka tautannya sepuluh menit lebih awal,
+              melihat halaman tanpa satu pun kolom isian, dan menutupnya — lalu
+              mengetik namanya terburu-buru sesudah ujian berjalan.
+
+              Sekarang kolomnya selalu ada dan boleh diisi lebih dulu; yang
+              menunggu jamnya hanya TOMBOLNYA, dan ia menunggu dengan
+              terlihat: abu-abu, tidak dapat ditekan, dengan alasannya
+              tertulis di badannya sendiri. */}
+          {!sudahTutup && (
             <>
               <label htmlFor="uj-nama">Nama Lengkap</label>
               <input id="uj-nama" className="uj-input" value={nama} onChange={(e) => setNama(e.target.value)} placeholder="Nama sesuai daftar hadir" autoComplete="name" />
@@ -822,11 +937,23 @@ export default function UjianApp() {
               )}
 
               {galat && <p className="uj-galat" role="alert">{galat}</p>}
-              <button type="button" className="uj-btn uj-btn-utama uj-btn-mulai" disabled={sibuk} onClick={() => void mulai()}>
-                {sibuk ? "Menyiapkan…" : "MULAI UJIAN"}
+              <button
+                type="button"
+                className="uj-btn uj-btn-utama uj-btn-mulai"
+                disabled={sibuk || belumBuka}
+                aria-disabled={sibuk || belumBuka}
+                onClick={() => void mulai()}
+              >
+                {belumBuka
+                  ? hitungMundur ? `TERBUKA DALAM ${hitungMundur.toUpperCase()}` : "BELUM DIBUKA"
+                  : sibuk ? "Menyiapkan…" : "MULAI UJIAN"}
               </button>
               <p className="uj-catatan">
-                Waktu {ejaMenit(ujian.durasi)} mulai berjalan begitu tombol ini ditekan. Jawaban tersimpan otomatis.
+                {belumBuka
+                  ? adaJadwal
+                    ? `Tombol ini menyala sendiri pada ${tanggalRapi(ujian.mulai)}. Nama dan nomormu boleh diisi dari sekarang.`
+                    : "Tombol ini menyala sendiri begitu pengajarmu membuka ujiannya. Nama dan nomormu boleh diisi dari sekarang."
+                  : `Waktu ${ejaMenit(ujian.durasi)} mulai berjalan begitu tombol ini ditekan. Jawaban tersimpan otomatis.`}
               </p>
             </>
           )}
@@ -958,7 +1085,12 @@ export default function UjianApp() {
           diawasi kehilangan seluruh daya cegahnya, dan yang menghentikan orang
           bukan kamera yang diam-diam merekam melainkan kamera yang jelas ada. */}
       {ujian?.kamera && (
-        <KameraPengawas aktif={layar === "kerja"} kunciSesi={kunciSesi} lapor={laporKamera} />
+        <KameraPengawas
+          aktif={layar === "kerja"}
+          kunciSesi={kunciSesi}
+          lapor={laporKamera}
+          selesaiIzin={tandaiKameraBeres}
+        />
       )}
 
       {/* ---------- TIRAI ----------

@@ -62,6 +62,39 @@ import {
   bacaKlien, TIRAI_MS, type JembatanKlien, type JenisKlien, type SebabTirai,
 } from "@/lib/kunci-layar";
 
+/**
+ * Berapa lama sesudah layar ujian terbuka semua laporan lingkungan ditahan.
+ *
+ * Detik-detik pertama sebuah ujian BUKAN detik yang tenang, dan tidak satu pun
+ * yang terjadi di dalamnya dilakukan pesertanya:
+ *
+ *   - permintaan layar penuh berpindah mode tampilan, dan sebagian peramban
+ *     melepas fokus jendelanya sesaat ketika itu terjadi;
+ *   - kotak izin kamera muncul di atas halaman dan MENGAMBIL fokusnya sampai
+ *     ditekan — pada mode Sertifikasi ini selalu terjadi;
+ *   - Chrome bahkan melepas layar penuh sendiri ketika menampilkan kotak izin.
+ *
+ * Ketiganya dahulu tercatat sebagai pelanggaran pada peserta yang belum melihat
+ * satu soal pun. Itulah keluhan yang memperbaiki berkas ini: "baru masuk sudah
+ * kehilangan fokus, padahal tidak melakukan apa-apa."
+ *
+ * Lima detik dipilih karena yang ditahan hanyalah laporannya, bukan
+ * penjagaannya: tirai layar penuh tetap menutup soal dan tetap menuntut peserta
+ * kembali, dan berpindah tab tetap dicatat apa adanya sejak detik pertama.
+ */
+const JEDA_MULA_MS = 5000;
+
+/**
+ * Berapa lama fokus harus benar-benar hilang sebelum ia dilaporkan.
+ *
+ * Blur yang datang lalu pulih dalam sekejap bukan orang yang pergi: ia
+ * peralihan layar penuh, kotak izin yang menutup sendiri, notifikasi yang
+ * lewat, atau ketukan pada bingkai video soal. Yang benar-benar berpindah ke
+ * jendela lain tidak kembali dalam satu setengah detik — dan itulah yang tetap
+ * tercatat.
+ */
+const TUNDA_BLUR_MS = 1500;
+
 export type Penjaga = {
   /** Dipanggil dari tombol "Mulai Ujian" — layar penuh menuntut ketukan orang. */
   mulaiLayarPenuh: () => void;
@@ -85,6 +118,19 @@ type Opsi = {
   /** Hanya menyala saat peserta benar-benar sedang mengerjakan. */
   aktif: boolean;
   mode: ModePengawasan;
+  /**
+   * Layarnya sudah tenang: tidak ada lagi kotak izin peramban yang menunggu
+   * ditekan.
+   *
+   * Selama ia masih false, fokus yang hilang BUKAN peserta yang pergi
+   * melainkan kotak izin kamera yang sedang berdiri di atas halaman dan
+   * memegang fokusnya. Jeda mula lima detik tidak cukup menutup itu — peserta
+   * yang membaca dulu kotak izinnya menekan "Izinkan" pada detik kesepuluh,
+   * dan dahulu detik-detik itu menjadi pelanggaran atas namanya.
+   *
+   * Pemanggil yang tidak memakai kamera cukup mengisinya true.
+   */
+  tenang?: boolean;
   /** Melaporkan satu insiden ke server. Balasannya dipakai sebagai peringatan. */
   lapor: (jenis: JenisInsiden, detail?: string) => Promise<string> | void;
 };
@@ -96,7 +142,7 @@ function bolehMengetik(sasaran: EventTarget | null): boolean {
   return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable === true;
 }
 
-export function usePenjaga({ aktif, mode, lapor }: Opsi): Penjaga {
+export function usePenjaga({ aktif, mode, tenang = true, lapor }: Opsi): Penjaga {
   const aturan = aturanMode(mode);
 
   const [peringatan, setPeringatan] = useState("");
@@ -160,6 +206,31 @@ export function usePenjaga({ aktif, mode, lapor }: Opsi): Penjaga {
   const laporRef = useRef(lapor);
   useEffect(() => { laporRef.current = lapor; }, [lapor]);
 
+  /**
+   * Jam ketika layar mengerjakan terbuka. Nol berarti belum terbuka.
+   *
+   * Disimpan di ref, bukan keadaan, karena yang membacanya pendengar peristiwa
+   * yang terpasang sekali dan hidup sepanjang ujian — keadaan yang dibaca dari
+   * sana selalu nilai gambar pertama.
+   */
+  const sejakAktifRef = useRef(0);
+  useEffect(() => { sejakAktifRef.current = aktif ? Date.now() : 0; }, [aktif]);
+
+  // Dibaca dari dalam pendengar peristiwa, jadi ia harus selalu nilai terbaru.
+  const tenangRef = useRef(tenang);
+  useEffect(() => { tenangRef.current = tenang; }, [tenang]);
+
+  /**
+   * Sedang di dalam detik-detik pembukaan yang tidak boleh dituduhkan kepada
+   * siapa pun — lihat JEDA_MULA_MS dan `tenang` di atas.
+   */
+  const masaMula = useCallback(() => {
+    const sejak = sejakAktifRef.current;
+    if (sejak === 0) return true;
+    if (!tenangRef.current) return true;
+    return Date.now() - sejak < JEDA_MULA_MS;
+  }, []);
+
   // Keadaan yang hanya boleh dilaporkan SEKALI. Layar kedua dan alat pengembang
   // bukan perbuatan berulang; melaporkannya tiap dua detik akan menghabiskan
   // skor integritas peserta dalam satu menit karena satu hal yang sama.
@@ -203,12 +274,15 @@ export function usePenjaga({ aktif, mode, lapor }: Opsi): Penjaga {
     if (!aktif || !aturan.layarPenuh) return;
     function berubah() {
       const di = Boolean(document.fullscreenElement);
+      // Tirainya dipasang SELALU, juga pada detik-detik pembukaan. Yang ditahan
+      // masa mula hanya laporannya; soal yang terbuka di luar layar penuh tetap
+      // tidak boleh terlihat, dan pesertanya tetap diminta kembali.
       setKeluarLayarPenuh(!di);
-      if (!di) kirim("fullscreen");
+      if (!di && !masaMula()) kirim("fullscreen");
     }
     document.addEventListener("fullscreenchange", berubah);
     return () => document.removeEventListener("fullscreenchange", berubah);
-  }, [aktif, aturan.layarPenuh, kirim]);
+  }, [aktif, aturan.layarPenuh, masaMula, kirim]);
 
   // ---------- PINDAH TAB DAN HILANG FOKUS ----------
   //
@@ -243,12 +317,50 @@ export function usePenjaga({ aktif, mode, lapor }: Opsi): Penjaga {
     return () => document.removeEventListener("visibilitychange", sembunyi);
   }, [aktif, aturan.jagaTangkapanLayar, kirim]);
 
+  // Blur melewati TIGA saringan sebelum ia menjadi catatan atas nama peserta,
+  // dan ketiganya lahir dari keluhan yang sama: "baru masuk sudah kehilangan
+  // fokus, padahal tidak melakukan apa-apa."
+  //
+  //   1. MASA MULA — peralihan layar penuh dan kotak izin kamera keduanya
+  //      merebut fokus pada detik-detik pertama, dan keduanya bukan perbuatan
+  //      peserta.
+  //   2. BINGKAI SOAL — fokus yang berpindah ke <iframe> DI DALAM halaman ini
+  //      juga memicu blur pada window. Peserta yang menekan tombol putar pada
+  //      video soalnya sedang mengerjakan soal itu, bukan meninggalkannya.
+  //   3. TUNDAAN — yang pulih sendiri dalam satu setengah detik bukan orang
+  //      yang pergi. Yang benar-benar pindah ke jendela lain tidak kembali
+  //      secepat itu, dan ia tetap tercatat.
+  //
+  // Halaman yang tersembunyi juga disaring di sini: berpindah tab memicu blur
+  // DAN visibilitychange sekaligus, dan yang kedua sudah mencatatnya sebagai
+  // "tab" — yang jauh lebih berat. Tanpa saringan itu satu perbuatan tercatat
+  // dua kali.
   useEffect(() => {
     if (!aktif || !aturan.jagaLingkungan) return;
-    function hilang() { kirim("blur"); }
+    let jam: number | null = null;
+    function batalkan() {
+      if (jam !== null) { window.clearTimeout(jam); jam = null; }
+    }
+    function hilang() {
+      if (masaMula()) return;
+      const fokus = document.activeElement;
+      if (fokus && fokus.tagName === "IFRAME") return;
+      batalkan();
+      jam = window.setTimeout(() => {
+        jam = null;
+        if (document.hasFocus()) return;
+        if (document.visibilityState === "hidden") return;
+        kirim("blur");
+      }, TUNDA_BLUR_MS);
+    }
     window.addEventListener("blur", hilang);
-    return () => window.removeEventListener("blur", hilang);
-  }, [aktif, aturan.jagaLingkungan, kirim]);
+    window.addEventListener("focus", batalkan);
+    return () => {
+      batalkan();
+      window.removeEventListener("blur", hilang);
+      window.removeEventListener("focus", batalkan);
+    };
+  }, [aktif, aturan.jagaLingkungan, masaMula, kirim]);
 
   // ---------- SALIN, POTONG, TEMPEL, KLIK KANAN ----------
   useEffect(() => {
