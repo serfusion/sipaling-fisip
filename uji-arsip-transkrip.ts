@@ -14,8 +14,9 @@
 //     tombol menyala yang ditolak di seberang — atau sebaliknya.
 
 import {
-  MAKS_BARIS, MAKS_TATA_LETAK, bersihkanBaris, bersihkanMeta, bersihkanTataLetak,
-  periksaSiapArsip, predikatKelulusan, ringkasTranskrip, sidikTranskrip,
+  MAKS_BARIS, MAKS_TATA_LETAK, PREDIKAT, PREDIKAT_KOSONG, bersihkanBaris, bersihkanMeta,
+  bersihkanTataLetak, periksaSiapArsip, predikatKelulusan, predikatTercetak,
+  ringkasTranskrip, sidikTranskrip,
 } from "./src/lib/arsip-transkrip";
 import { computeTotals, type CourseRow } from "./src/app/dashboard/template/transkrip-parse";
 
@@ -95,30 +96,64 @@ sama("predikat memakai IPK yang sudah dibulatkan",
   ringkasTranskrip({ nama: "A", nim: "1900000001", judul: "J" }, [mk("A", "A", 2), mk("B", "B", 2)]).predikat,
   predikatKelulusan(3.5, "J"));
 
-// FISIP memakai DUA predikat saja: "Cum Laude" dan "Sangat Memuaskan". Itu
-// yang tercetak pada transkrip KUI dan pada lembar kelulusan PDDIKTI;
-// "Dengan Pujian", "Memuaskan", dan "Lulus" tidak dipakai sama sekali.
+// FISIP memakai EMPAT predikat: "Cum Laude", "Dengan Pujian", "Sangat
+// Memuaskan", dan "Memuaskan". Tiga di antaranya dapat diusulkan dari IPK.
+// "Dengan Pujian" tidak pernah lahir dari angka: ia dan "Cum Laude" menandai
+// jenjang yang sama, jadi tidak ada batas yang dapat memisahkan keduanya.
 sama("IPK 3,51 -> Cum Laude", predikatKelulusan(3.51, "J"), "Cum Laude");
 sama("IPK 4,00 -> Cum Laude", predikatKelulusan(4, "J"), "Cum Laude");
 sama("IPK 3,50 -> Sangat Memuaskan", predikatKelulusan(3.5, "J"), "Sangat Memuaskan");
+sama("IPK 3,43 (transkrip KUI) -> Sangat Memuaskan", predikatKelulusan(3.43, "J"), "Sangat Memuaskan");
 sama("IPK 3,01 -> Sangat Memuaskan", predikatKelulusan(3.01, "J"), "Sangat Memuaskan");
-sama("IPK 2,76 -> Sangat Memuaskan", predikatKelulusan(2.76, "J"), "Sangat Memuaskan");
-sama("IPK 2,50 pun Sangat Memuaskan", predikatKelulusan(2.5, "J"), "Sangat Memuaskan");
+sama("IPK 3,00 -> Memuaskan", predikatKelulusan(3, "J"), "Memuaskan");
+sama("IPK 2,76 -> Memuaskan", predikatKelulusan(2.76, "J"), "Memuaskan");
+sama("IPK 2,50 pun Memuaskan", predikatKelulusan(2.5, "J"), "Memuaskan");
 // Tanda hubung biasa, BUKAN tanda pisah panjang. Seluruh teks yang tampil di
 // web sudah dibersihkan dari "—" atas permintaan pemilik sistem, dan
 // penampung kosong seperti ini ikut di dalamnya.
-sama("lembar kosong tanpa judul -> belum lulus", predikatKelulusan(0, ""), "-");
-sama("IPK rendah tanpa judul -> belum lulus", predikatKelulusan(2.5, ""), "-");
+sama("penampung memakai tanda hubung biasa", PREDIKAT_KOSONG, "-");
+sama("lembar kosong tanpa judul -> belum lulus", predikatKelulusan(0, ""), PREDIKAT_KOSONG);
+sama("IPK rendah tanpa judul -> belum lulus", predikatKelulusan(2.5, ""), PREDIKAT_KOSONG);
 
-// Tidak ada IPK mana pun yang dapat melahirkan istilah ketiga. Uji ini yang
-// menahan predikat lama kembali diam-diam lewat satu batas yang terlewat.
-const predikatMungkin = new Set<string>();
+// Sapuan seluruh rentang IPK. Uji ini yang menahan istilah lama kembali
+// diam-diam lewat satu batas yang terlewat.
+const usulanMungkin = new Set<string>();
 for (let angka = 0; angka <= 400; angka += 1) {
-  predikatMungkin.add(predikatKelulusan(angka / 100, "J"));
-  predikatMungkin.add(predikatKelulusan(angka / 100, ""));
+  usulanMungkin.add(predikatKelulusan(angka / 100, "J"));
+  usulanMungkin.add(predikatKelulusan(angka / 100, ""));
 }
-sama("hanya dua predikat dan satu penampung kosong",
-  [...predikatMungkin].sort().join(" | "), "- | Cum Laude | Sangat Memuaskan");
+sama("usulan IPK hanya tiga istilah dan satu penampung kosong",
+  [...usulanMungkin].sort().join(" | "), "- | Cum Laude | Memuaskan | Sangat Memuaskan");
+benar("tidak ada usulan di luar daftar predikat",
+  [...usulanMungkin].every((nama) => nama === PREDIKAT_KOSONG || (PREDIKAT as readonly string[]).includes(nama)),
+  [...usulanMungkin].join(" | "));
+sama("daftar predikat tepat empat istilah",
+  PREDIKAT.join(" | "), "Cum Laude | Dengan Pujian | Sangat Memuaskan | Memuaskan");
+
+// Yang tercetak adalah pilihan admin kalau kolomnya diisi, usulan IPK kalau
+// dibiarkan kosong.
+sama("kolom kosong -> ikut usulan IPK", predikatTercetak("", 3.74, "J"), "Cum Laude");
+sama("kolom tak terisi -> ikut usulan IPK", predikatTercetak(undefined, 3.2, "J"), "Sangat Memuaskan");
+sama("pilihan admin mengalahkan usulan IPK", predikatTercetak("Dengan Pujian", 3.74, "J"), "Dengan Pujian");
+sama("pilihan di bawah usulan pun dipakai", predikatTercetak("Memuaskan", 3.9, "J"), "Memuaskan");
+sama("huruf besar kecil dan spasi tidak membedakan", predikatTercetak("  cum   laude ", 2.9, "J"), "Cum Laude");
+sama("lembar kosong tanpa pilihan tetap penampung", predikatTercetak("", 0, ""), PREDIKAT_KOSONG);
+
+// Kolomnya memang berupa pilihan di layar, tetapi yang sampai ke server
+// hanyalah teks: `bersihkanMeta` meloloskan isi apa pun untuk kunci yang
+// dikenal. Istilah yang tidak dipakai unit ini tidak boleh hidup kembali
+// lewat arsip lama atau lewat kiriman yang dibuat tangan.
+sama("istilah di luar daftar diabaikan", predikatTercetak("Lulus", 3.2, "J"), "Sangat Memuaskan");
+sama("padanan Inggris tidak dikenal lagi", predikatTercetak("Very Satisfactory", 3.2, "J"), "Sangat Memuaskan");
+sama("isian bebas tidak ikut tercetak", predikatTercetak("<b>apa saja</b>", 3.74, "J"), "Cum Laude");
+
+// Pilihan admin ikut ke kolom ringkasan arsip, bukan hanya ke kertasnya.
+// Kalau tidak, daftar arsip akan berbunyi lain dari transkrip yang dicetak
+// dari baris yang sama.
+sama("pilihan admin ikut ke ringkasan arsip",
+  ringkasTranskrip({ ...META_LENGKAP, predikat: "Dengan Pujian" }, BARIS_LENGKAP).predikat, "Dengan Pujian");
+sama("tanpa pilihan, ringkasan ikut usulan IPK",
+  ringkas.predikat, predikatKelulusan(ringkas.ipk, ringkas.judul));
 
 console.log("\n=== KIRIMAN PERAMBAN DIBERSIHKAN ===\n");
 
