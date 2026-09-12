@@ -51,16 +51,26 @@ const teks = (nilai: unknown, batas: number) =>
   String(nilai ?? "").replace(/\s+/g, " ").trim().slice(0, batas);
 
 /**
- * Predikat kelulusan menurut IPK.
+ * Predikat kelulusan menurut IPK — DUA istilah saja.
  *
- * Selama judul skripsi belum diisi dan IPK-nya belum mencapai batas terendah,
- * transkripnya belum bisa disebut lulus — dan tanda "—" itu yang tercetak.
+ * FISIP hanya memakai dua predikat pada transkrip dan pada lembar kelulusan
+ * yang dikirim ke PDDIKTI: "Cum Laude" untuk IPK 3,51 ke atas, dan "Sangat
+ * Memuaskan" untuk selebihnya. Itu pula yang tercetak pada transkrip contoh
+ * dari KUI ("Sangat Memuaskan" pada IPK 3,43) dan pada lembar fakultas
+ * ("CUM LAUDE" pada IPK 3,74).
+ *
+ * Tiga istilah lain yang dulu ikut dihitung — "Dengan Pujian", "Memuaskan",
+ * dan "Lulus" — sengaja dihapus. Istilah yang tidak pernah dipakai unit ini
+ * hanya melahirkan transkrip yang berbunyi lain dari lembar kelulusannya.
+ *
+ * Tanda "-" bukan predikat: itu penampung untuk lembar yang memang belum
+ * berisi apa pun. Selama judul skripsi belum diisi dan belum ada nilai yang
+ * masuk, transkripnya belum bisa disebut lulus.
  */
 export function predikatKelulusan(ipk: number, judul: string) {
-  if (ipk >= 3.51) return "Dengan Pujian";
-  if (ipk >= 3.01) return "Sangat Memuaskan";
-  if (ipk >= 2.76) return "Memuaskan";
-  return judul ? "Lulus" : "-";
+  if (ipk >= 3.51) return "Cum Laude";
+  if (ipk >= 2.76 || judul) return "Sangat Memuaskan";
+  return "-";
 }
 
 /**

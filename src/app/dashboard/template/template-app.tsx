@@ -166,7 +166,7 @@ function ringkasBahasa(
   // prodi, jadi kalau prodi atau konsentrasinya salah terbaca, seluruh kolom
   // Inggris ikut salah — dan satu-satunya cara admin menangkapnya sebelum
   // mencetak adalah melihat kamus mana yang dipilih.
-  const kamus = [lingkup?.prodi, lingkup?.konsentrasi].filter(Boolean).join(" — ");
+  const kamus = [lingkup?.prodi, lingkup?.konsentrasi].filter(Boolean).join(" · ");
   if (kamus) bagian.push(`kamus ${kamus}`);
   if (hasil.dariKamus > 0) bagian.push(`${hasil.dariKamus} nama Inggris terisi dari kamus`);
   if (hasil.sudahAda > 0) bagian.push(`${hasil.sudahAda} sudah berbahasa Inggris di filenya`);
@@ -261,11 +261,12 @@ const PRODI_EN: Record<string, string> = {
 // Predikat pada transkrip KUI dicetak SATU istilah, bukan pasangan
 // "Indonesia / Inggris" seperti jenjang dan prodi: transkrip contoh dari KUI
 // berbunyi "Cum Laude" saja, bukan "Dengan Pujian / Cum Laude (With Honors)".
+//
+// Hanya dua predikat yang dipakai (lihat `predikatKelulusan`), dan "Cum Laude"
+// sudah berbahasa Latin di kedua transkrip — jadi yang perlu padanan Inggris
+// tinggal satu.
 const PREDIKAT_EN: Record<string, string> = {
-  "Dengan Pujian": "Cum Laude",
   "Sangat Memuaskan": "Very Satisfactory",
-  "Memuaskan": "Satisfactory",
-  "Lulus": "Pass",
 };
 
 /**
@@ -519,7 +520,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
   function ringkasTebakan(tebakan: ReturnType<typeof lengkapiKonsentrasi>) {
     if (!tebakan) return "";
     const contoh = tebakan.bukti.join(", ");
-    return `; konsentrasi terbaca sendiri sebagai ${tebakan.konsentrasi} dari mata kuliahnya${contoh ? ` (${contoh})` : ""} — PERIKSA sebelum mencetak`;
+    return `; konsentrasi terbaca sendiri sebagai ${tebakan.konsentrasi} dari mata kuliahnya${contoh ? ` (${contoh})` : ""}; PERIKSA sebelum mencetak`;
   }
 
   /** Tombol "Deteksi dari mata kuliah" pada kolom Konsentrasi. */
@@ -679,8 +680,11 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
         ["8. Konsentrasi (Ilmu Komunikasi saja) tulis salah satu: Public Relations, Advertising,"],
         ["   atau Broadcasting. Boleh DIKOSONGKAN - sistem membacanya sendiri dari daftar mata"],
         ["   kuliah, mis. Riset Iklan -> Advertising, Teknik Kamera -> Broadcasting."],
-        ["9. Judul Skripsi: istilah Inggris dicetak miring otomatis. Untuk memaksa istilah yang"],
-        ["   belum dikenali, tulis di antara tanda bintang, mis. *brand ambassador*."],
+        ["9. Judul Skripsi: istilah Inggris dicetak miring otomatis - ungkapan (brand awareness)"],
+        ["   maupun kata tunggal (engagement, hoax). Kata serapan baku (media, digital) dan nama"],
+        ["   diri (TikTok, Shopee) tetap tegak. Untuk memaksa istilah yang belum dikenali, tulis"],
+        ["   di antara tanda bintang, mis. *brand ambassador*; tulis ** bila tidak boleh ada yang"],
+        ["   miring sama sekali."],
         ["10. Simpan file, lalu unggah lewat tombol Impor Excel di dashboard transkrip."],
       ]);
       panduan["!cols"] = [{ wch: 96 }];
@@ -1090,7 +1094,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
                 }}
                 title="Menentukan kamus nama Inggris yang dipakai. Ubah lalu tekan “Isi ulang kolom Inggris”."
               >
-                <option value="">— belum diisi —</option>
+                <option value="">(belum diisi)</option>
                 {daftarKonsentrasi.map((nama) => <option key={nama} value={nama}>{nama}</option>)}
                 <option value="__lain">Lainnya (ketik sendiri)…</option>
               </select>
@@ -1121,12 +1125,16 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
           <label className="wide">Judul skripsi
             <textarea value={meta.judul} onChange={(e) => setMeta({ ...meta, judul: e.target.value })} />
             {/* Kaidah penulisan ilmiah: istilah asing dicetak miring. Yang
-                terdaftar dimiringkan sendiri; sisanya ditandai admin dengan
-                tanda bintang — dan begitu satu bintang dipakai, hanya yang
-                ditandai itulah yang miring. */}
+                dikenali dimiringkan sendiri — ungkapan maupun kata tunggal;
+                sisanya ditandai admin dengan tanda bintang, dan begitu satu
+                bintang dipakai, hanya yang ditandai itulah yang miring.
+                `**` mematikan seluruh daftar untuk judul itu. */}
             <small className="tpl-catatan">
-              Istilah Inggris yang dikenali dicetak <i>miring</i> otomatis (mis. <i>brand awareness</i>, <i>content creator</i>).
-              Untuk memaksa yang lain, tulis di antara tanda bintang: <code>*brand ambassador*</code> — sejak satu bintang dipakai, hanya yang bertanda itu yang miring.
+              Istilah Inggris dicetak <i>miring</i> otomatis: ungkapan (<i>brand awareness</i>, <i>content creator</i>)
+              maupun kata yang berdiri sendiri (<i>engagement</i>, <i>insight</i>, <i>hoax</i>).
+              Kata serapan baku (media, publik, digital) dan nama diri (TikTok, Shopee) tetap tegak.
+              Untuk memaksa istilah yang belum dikenali, tulis di antara tanda bintang: <code>*brand ambassador*</code>;
+              sejak satu bintang dipakai, hanya yang bertanda itu yang miring. Tulis <code>**</code> bila tidak boleh ada yang miring sama sekali.
             </small>
           </label>
           <label>Tanggal cetak<input value={meta.tanggal} onChange={(e) => setMeta({ ...meta, tanggal: e.target.value })} /></label>

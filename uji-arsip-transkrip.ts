@@ -90,20 +90,35 @@ sama("judul skripsi ikut tercatat", ringkas.judul, "Judul Skripsi Contoh");
 
 // Predikat dihitung dari IPK yang SUDAH dibulatkan. Kalau tidak, transkrip
 // ber-IPK 3,505 bisa tercetak "Sangat Memuaskan" sementara arsipnya menulis
-// "Dengan Pujian".
+// "Cum Laude".
 sama("predikat memakai IPK yang sudah dibulatkan",
   ringkasTranskrip({ nama: "A", nim: "1900000001", judul: "J" }, [mk("A", "A", 2), mk("B", "B", 2)]).predikat,
   predikatKelulusan(3.5, "J"));
 
-sama("IPK 3,51 -> Dengan Pujian", predikatKelulusan(3.51, "J"), "Dengan Pujian");
+// FISIP memakai DUA predikat saja: "Cum Laude" dan "Sangat Memuaskan". Itu
+// yang tercetak pada transkrip KUI dan pada lembar kelulusan PDDIKTI;
+// "Dengan Pujian", "Memuaskan", dan "Lulus" tidak dipakai sama sekali.
+sama("IPK 3,51 -> Cum Laude", predikatKelulusan(3.51, "J"), "Cum Laude");
+sama("IPK 4,00 -> Cum Laude", predikatKelulusan(4, "J"), "Cum Laude");
 sama("IPK 3,50 -> Sangat Memuaskan", predikatKelulusan(3.5, "J"), "Sangat Memuaskan");
 sama("IPK 3,01 -> Sangat Memuaskan", predikatKelulusan(3.01, "J"), "Sangat Memuaskan");
-sama("IPK 2,76 -> Memuaskan", predikatKelulusan(2.76, "J"), "Memuaskan");
-sama("IPK rendah tapi berjudul -> Lulus", predikatKelulusan(2.5, "J"), "Lulus");
+sama("IPK 2,76 -> Sangat Memuaskan", predikatKelulusan(2.76, "J"), "Sangat Memuaskan");
+sama("IPK 2,50 pun Sangat Memuaskan", predikatKelulusan(2.5, "J"), "Sangat Memuaskan");
 // Tanda hubung biasa, BUKAN tanda pisah panjang. Seluruh teks yang tampil di
 // web sudah dibersihkan dari "—" atas permintaan pemilik sistem, dan
 // penampung kosong seperti ini ikut di dalamnya.
+sama("lembar kosong tanpa judul -> belum lulus", predikatKelulusan(0, ""), "-");
 sama("IPK rendah tanpa judul -> belum lulus", predikatKelulusan(2.5, ""), "-");
+
+// Tidak ada IPK mana pun yang dapat melahirkan istilah ketiga. Uji ini yang
+// menahan predikat lama kembali diam-diam lewat satu batas yang terlewat.
+const predikatMungkin = new Set<string>();
+for (let angka = 0; angka <= 400; angka += 1) {
+  predikatMungkin.add(predikatKelulusan(angka / 100, "J"));
+  predikatMungkin.add(predikatKelulusan(angka / 100, ""));
+}
+sama("hanya dua predikat dan satu penampung kosong",
+  [...predikatMungkin].sort().join(" | "), "- | Cum Laude | Sangat Memuaskan");
 
 console.log("\n=== KIRIMAN PERAMBAN DIBERSIHKAN ===\n");
 
