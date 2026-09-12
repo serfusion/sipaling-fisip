@@ -10,7 +10,7 @@
 //      tidak boleh menghasilkan soal yang menyalahkan peserta.
 //   2. Pembaca zip untuk .pptx benar-benar membuka arsip terpampat.
 // ============================================================
-import { readFileSync } from "node:fs";
+import { crc32, deflateRawSync } from "node:zlib";
 import { bacaZip } from "./src/lib/baca-zip";
 import {
   MAKS_SOAL, naskahCukup, periksaJawabanAi, rapikanPermintaan, susunPerintah, SKEMA_JAWABAN,
@@ -156,9 +156,111 @@ cek("tiap soal menuntut kunci dan pasangan",
 
 // ---------- PEMBACA ZIP / PPTX ----------
 bagian("Pembaca zip — .pptx sungguhan yang terpampat deflate");
-const S = "/tmp/claude-0/-home-user-sipaling-fisip/43787386-10d9-5ffb-abce-64323d97478e/scratchpad";
-const mentah = readFileSync(`${S}/bahan.pptx`);
-const buf = mentah.buffer.slice(mentah.byteOffset, mentah.byteOffset + mentah.byteLength) as ArrayBuffer;
+
+// Bahannya DIRAKIT DI SINI, bukan dibaca dari berkas di luar repositori.
+//
+// Sebelumnya ia menumpang pada folder sementara milik satu sesi kerja, dan
+// begitu folder itu hilang seluruh berkas uji ini mati sebelum satu pun
+// periksa di bawahnya sempat berjalan — termasuk yang tidak ada hubungannya
+// dengan zip. Merakitnya di tempat membuat ujinya berdiri sendiri.
+//
+// Yang dirakit bukan zip tiruan: pemampatannya deflate sungguhan dari zlib,
+// dan susunan kepalanya mengikuti spesifikasi yang sama dengan yang ditulis
+// PowerPoint. Satu hal sengaja dibuat lebih keras daripada .pptx biasa, yaitu
+// bagian tambahan pada kepala lokal yang berbeda panjang dari yang tercatat
+// di direktori pusat. Justru itu kasus yang pembacanya klaim tangani, dan
+// tanpa bahan yang memuatnya klaim itu tidak pernah benar-benar diperiksa.
+
+type Bahan = { nama: string; isi: Uint8Array; pampat: boolean };
+
+function rakitZip(bahan: Bahan[]): ArrayBuffer {
+  const potongan: Buffer[] = [];
+  const pusat: Buffer[] = [];
+  let letak = 0;
+  // Stempel waktu bergaya Unix: hanya ada di kepala lokal, seperti yang
+  // ditulis banyak pembuat zip.
+  const tambahanLokal = Buffer.from([0x55, 0x54, 0x05, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00]);
+
+  for (const b of bahan) {
+    const data = b.pampat ? deflateRawSync(b.isi) : Buffer.from(b.isi);
+    const nama = Buffer.from(b.nama, "utf8");
+    const sum = crc32(b.isi);
+
+    const lokal = Buffer.alloc(30);
+    lokal.writeUInt32LE(0x04034b50, 0);
+    lokal.writeUInt16LE(20, 4);
+    lokal.writeUInt16LE(b.pampat ? 8 : 0, 8);
+    lokal.writeUInt32LE(sum, 14);
+    lokal.writeUInt32LE(data.length, 18);
+    lokal.writeUInt32LE(b.isi.length, 22);
+    lokal.writeUInt16LE(nama.length, 26);
+    lokal.writeUInt16LE(tambahanLokal.length, 28);
+
+    const kepala = Buffer.alloc(46);
+    kepala.writeUInt32LE(0x02014b50, 0);
+    kepala.writeUInt16LE(20, 4);
+    kepala.writeUInt16LE(20, 6);
+    kepala.writeUInt16LE(b.pampat ? 8 : 0, 10);
+    kepala.writeUInt32LE(sum, 16);
+    kepala.writeUInt32LE(data.length, 20);
+    kepala.writeUInt32LE(b.isi.length, 24);
+    kepala.writeUInt16LE(nama.length, 28);
+    kepala.writeUInt16LE(0, 30); // sengaja nol: berbeda dari kepala lokal
+    kepala.writeUInt32LE(letak, 42);
+
+    potongan.push(lokal, nama, tambahanLokal, data);
+    pusat.push(kepala, nama);
+    letak += 30 + nama.length + tambahanLokal.length + data.length;
+  }
+
+  const isiPusat = Buffer.concat(pusat);
+  const ekor = Buffer.alloc(22);
+  ekor.writeUInt32LE(0x06054b50, 0);
+  ekor.writeUInt16LE(bahan.length, 8);
+  ekor.writeUInt16LE(bahan.length, 10);
+  ekor.writeUInt32LE(isiPusat.length, 12);
+  ekor.writeUInt32LE(letak, 16);
+
+  const semua = Buffer.concat([...potongan, isiPusat, ekor]);
+  return semua.buffer.slice(semua.byteOffset, semua.byteOffset + semua.byteLength) as ArrayBuffer;
+}
+
+const teks = (s: string) => new TextEncoder().encode(s);
+
+/** Satu salindia, sesederhana yang masih berbentuk salindia sungguhan. */
+function salindia(...baris: string[]): Uint8Array {
+  return teks(
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
+    `<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" ` +
+    `xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">` +
+    `<p:cSld><p:spTree><p:sp><p:txBody>` +
+    baris.map((b) => `<a:p><a:r><a:t>${b}</a:t></a:r></a:p>`).join("") +
+    `</p:txBody></p:sp></p:spTree></p:cSld></p:sld>`,
+  );
+}
+
+// PNG 1x1 yang sah. Disimpan apa adanya, tanpa deflate, persis perlakuan
+// PowerPoint terhadap gambar yang sudah termampat.
+const GAMBAR = new Uint8Array(Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "base64",
+));
+
+const buf = rakitZip([
+  { nama: "[Content_Types].xml", isi: teks('<?xml version="1.0"?><Types/>'), pampat: true },
+  // Entitas XML ditulis apa adanya: "&amp;" harus sampai utuh ke pembacanya,
+  // tidak berubah jadi "&" di tengah jalan.
+  {
+    nama: "ppt/slides/slide1.xml",
+    isi: salindia("Teori Agenda Setting", "Dirumuskan McCombs &amp; Shaw pada 1972."),
+    pampat: true,
+  },
+  { nama: "ppt/slides/slide2.xml", isi: salindia("Fungsi Media Massa"), pampat: true },
+  // slide10 ada justru supaya urutan abjad terbukti keliru di uji bawah.
+  { nama: "ppt/slides/slide10.xml", isi: salindia("Studi Kasus Pemilu"), pampat: true },
+  { nama: "ppt/notesSlides/notesSlide1.xml", isi: salindia("Catatan pengajar."), pampat: true },
+  { nama: "ppt/media/image1.png", isi: GAMBAR, pampat: false },
+]);
 
 async function jalan() {
   const semua = await bacaZip(buf);

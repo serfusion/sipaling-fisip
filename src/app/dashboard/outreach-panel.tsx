@@ -199,7 +199,7 @@ export default function OutreachPanel({ role, email }: { role: string; email: st
   return (
     <section className="ous">
       <p className="section-eyebrow">OUTREACH ULTRAMAILER SYSTEM</p>
-      <h2 className="dsh-title">Undangan Jurnal — OUS</h2>
+      <h2 className="dsh-title">Undangan Jurnal · OUS</h2>
 
       <HeroSaklar
         state={state}
@@ -364,11 +364,11 @@ function HeroSaklar({
 
       <p className="helper ous-jujur">
         <b>Yang perlu dipahami sejak awal:</b> tidak ada perangkat lunak yang dapat menjamin sebuah
-        surat tidak masuk folder spam — yang memutuskan itu Gmail, Outlook, dan server kampus
+        surat tidak masuk folder spam. Yang memutuskan itu Gmail, Outlook, dan server kampus
         penerima, berdasarkan reputasi domain pengirim. Yang dikerjakan OUS adalah seluruh
         bagian yang memang dapat dikerjakan kode: volume kecil dan rata, satu surat satu penerima,
         berhenti langganan yang berfungsi, pantulan dan keluhan langsung dihentikan. Bagian
-        terbesarnya — SPF, DKIM, dan DMARC domain pengirim — dikerjakan sekali di panel DNS, dan
+        terbesarnya (SPF, DKIM, dan DMARC domain pengirim) dikerjakan sekali di panel DNS, dan
         tanpanya seluruh sisanya hampir tidak berarti.
       </p>
     </div>
@@ -567,7 +567,7 @@ function FormKampanye({
         <input
           value={nama}
           maxLength={200}
-          placeholder="mis. International Researchers — Communication 2026"
+          placeholder="mis. International Researchers Communication 2026"
           onChange={(e) => setNama(e.target.value)}
         />
       </label>
@@ -645,7 +645,7 @@ function FormKampanye({
           value={templateId ?? ""}
           onChange={(e) => { setTemplateId(Number(e.target.value) || null); setSudahLihatIsi(false); }}
         >
-          <option value="">— pilih naskah —</option>
+          <option value="">- pilih naskah -</option>
           {naskah.filter((item) => item.active).map((item) => (
             <option key={item.id} value={item.id}>{item.name}</option>
           ))}
@@ -844,7 +844,7 @@ function DetailKampanye({
       <p className="helper">
         {data.ringkasan.diproses} dari {k.totalRecipients} diproses · laju sampai {data.ringkasan.lajuSampai}% ·
         laju pantul {data.ringkasan.lajuPantul}%
-        {data.ringkasan.lajuPantul > 5 && " — di atas 5% sudah merusak reputasi domain; hentikan dan periksa sumber daftarnya."}
+        {data.ringkasan.lajuPantul > 5 && "· di atas 5% sudah merusak reputasi domain; hentikan dan periksa sumber daftarnya."}
       </p>
 
       {/* Tombol kendali ditampilkan apa adanya. Yang menentukan kepemilikan
@@ -888,7 +888,7 @@ function DetailKampanye({
           ✉ Kirim surat uji
         </button>
         <p className="helper">
-          Surat uji dirakit dengan jalur yang sama persis dengan surat sungguhan — termasuk tautan
+          Surat uji dirakit dengan jalur yang sama persis dengan surat sungguhan, termasuk tautan
           berhenti langganan yang benar-benar berfungsi. Tekan tautannya pada surat uji: kalau ia
           tidak bekerja, di sinilah hal itu harus ketahuan.
         </p>
@@ -915,14 +915,14 @@ function DetailKampanye({
             ) : (
               data.recipients.map((item) => (
                 <tr key={item.id}>
-                  <td><b>{item.name || "—"}</b><small>{item.email}</small></td>
+                  <td><b>{item.name || "-"}</b><small>{item.email}</small></td>
                   <td>
                     <span className={`pill ous-pill s-${item.status}`}>
                       {STATUS_PENERIMA_LABEL[item.status as StatusPenerima] || item.status}
                     </span>
                   </td>
                   <td>{item.attempts}</td>
-                  <td>{item.errorMessage ? <small>{item.errorCode}: {item.errorMessage}</small> : "—"}</td>
+                  <td>{item.errorMessage ? <small>{item.errorCode}: {item.errorMessage}</small> : "-"}</td>
                   <td><small>{waktu(item.deliveredAt || item.sentAt)}</small></td>
                 </tr>
               ))
@@ -988,7 +988,7 @@ function TabNaskah({
         <span>
           Naskah bawaan sengaja ditulis datar: tidak ada janji terindeks di mana pun, tidak ada
           tenggat, tidak ada penyebutan biaya. Bukan karena hal-hal itu terlarang, melainkan karena
-          tidak satu pun dapat diverifikasi dari dalam portal — dan undangan jurnal yang memuat
+          tidak satu pun dapat diverifikasi dari dalam portal, dan undangan jurnal yang memuat
           klaim keliru merusak nama jurnalnya jauh lebih dalam daripada undangan tanpa klaim
           apa pun. Cocokkan wording, nomor terbitan, dan kebijakan biaya dengan keterangan resmi
           yang sedang berlaku.
@@ -1106,7 +1106,7 @@ function PenyuntingNaskah({
       </label>
       <label className="ous-centang-satu">
         <input type="checkbox" checked={isi.active} onChange={(e) => setIsi({ ...isi, active: e.target.checked })} />
-        <span>Aktif — muncul pada pilihan naskah saat membuat kampanye</span>
+        <span>Aktif · muncul pada pilihan naskah saat membuat kampanye</span>
       </label>
 
       <Pratinjau naskah={isi} state={state} nada={nada} />
@@ -1185,7 +1185,7 @@ function TabCekal({
           Alamat masuk ke sini karena orangnya menekan &ldquo;berhenti langganan&rdquo;, karena
           suratnya memantul keras, atau karena ia melaporkan kita sebagai spam. Mengirim lagi kepada
           orang yang sudah menolak adalah hal paling merusak yang dapat dilakukan sistem ini
-          terhadap reputasi domainnya sendiri — karena itu yang boleh mengeluarkan alamat dari
+          terhadap reputasi domainnya sendiri. Karena itu yang boleh mengeluarkan alamat dari
           daftar ini hanya Super Admin.
         </span>
       </div>
@@ -1211,7 +1211,7 @@ function TabCekal({
                 <tr key={item.id}>
                   <td><b>{item.email}</b></td>
                   <td>{ALASAN_CEKAL_LABEL[item.reason as AlasanCekal] || item.reason}</td>
-                  <td><small>{item.source || "—"}</small></td>
+                  <td><small>{item.source || "-"}</small></td>
                   <td><small>{waktu(item.createdAt)}</small></td>
                   {superAdmin && (
                     <td>
@@ -1304,7 +1304,7 @@ function TabPengaturan({
       <div className="panel ous-form">
         <h3>Siapa yang boleh memakai OUS</h3>
         <p className="helper">
-          Admin dan Super Admin selalu termasuk. Dosen dibuka satu per satu — menu ini untuk
+          Admin dan Super Admin selalu termasuk. Dosen dibuka satu per satu, menu ini untuk
           pengurus jurnal, bukan untuk seluruh dosen fakultas.
         </p>
         <div className="ous-chips">
@@ -1404,7 +1404,7 @@ function TabPengaturan({
         <label className="ous-centang-satu">
           <input type="checkbox" checked={draf.pemanasan} onChange={(e) => setDraf({ ...draf, pemanasan: e.target.checked })} />
           <span>
-            Pemanasan bertahap — hari 1–2 hanya 20 surat, naik perlahan sampai jatah penuh pada hari
+            Pemanasan bertahap: hari 1–2 hanya 20 surat, naik perlahan sampai jatah penuh pada hari
             kesepuluh. Wajib untuk domain yang belum pernah mengirim apa-apa.
           </span>
         </label>

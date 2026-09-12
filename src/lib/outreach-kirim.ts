@@ -249,7 +249,7 @@ export function periksaKesiapan(state: OusState): Kesiapan {
   }
   if (!process.env.OUTREACH_WEBHOOK_SECRET) {
     catatan.push(
-      "OUTREACH_WEBHOOK_SECRET belum diatur. Tanpa webhook, status hanya sampai \"terkirim\" — pantulan dan keluhan tidak akan pernah tercatat, dan alamat mati tidak terbuang sendiri.",
+      "OUTREACH_WEBHOOK_SECRET belum diatur. Tanpa webhook, status hanya sampai \"terkirim\": pantulan dan keluhan tidak akan pernah tercatat, dan alamat mati tidak terbuang sendiri.",
     );
   }
   if (!state.replyTo) {
