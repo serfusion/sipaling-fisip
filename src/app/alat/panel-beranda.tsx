@@ -19,7 +19,7 @@ export type Tab =
   | "beranda" | "judul" | "referensi" | "struktur" | "inggris"
   | "kemiripan" | "sitasi" | "radar" | "bahasa"
   // Di luar alat naskah, dan sengaja berdiri sendiri di menu.
-  | "uang";
+  | "uang" | "drama";
 
 const JENIS: JenisProject[] = ["skripsi", "jurnal", "makalah"];
 
