@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import Link from "next/link";
-import { Ic, IKON, IKON_UANG } from "./ikon";
+import { Ic, IKON, IKON_DRAMA, IKON_UANG } from "./ikon";
 import { useProject } from "./use-project";
 import { PanelBeranda, type Tab } from "./panel-beranda";
 import { PanelStruktur, PanelInggris } from "./panel-naskah";
@@ -11,6 +11,7 @@ import { PanelReferensi } from "./panel-referensi";
 import { PanelKemiripan } from "./panel-kemiripan";
 import { PanelSitasi, PanelRadar, PanelBahasa } from "./panel-periksa";
 import { PanelUang } from "./panel-uang";
+import { PanelDrama } from "./panel-drama";
 import { JENIS_LABEL } from "@/lib/project";
 import { PenyediaCetak } from "./laporan";
 import Animasi from "../animasi";
@@ -43,6 +44,7 @@ const MENU: Menu[] = [
 // Menambah alat baru cukup menambah satu baris di sini; sisanya mengikuti.
 const MENU_BONUS: Menu[] = [
   { id: "uang", label: "Catatan Uang Bulanan", sub: "Pemasukan dan pengeluaran", ikon: IKON_UANG },
+  { id: "drama", label: "Nonton Drama", sub: "Drama pendek, di situsnya sendiri", ikon: IKON_DRAMA },
 ];
 
 type Tema = "malam" | "terang";
@@ -280,6 +282,7 @@ export default function AlatApp() {
             {tab === "radar" && <PanelRadar project={p.aktif} ubah={p.ubah} />}
             {tab === "bahasa" && <PanelBahasa project={p.aktif} />}
             {tab === "uang" && <PanelUang />}
+            {tab === "drama" && <PanelDrama />}
           </div>
           </PenyediaCetak>
 

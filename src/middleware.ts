@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { rencanaRute } from "@/lib/situs-cbt";
+import { rencanaSitus } from "@/lib/situs";
 
 // PERLINDUNGAN CSRF UNTUK SELURUH API
 //
@@ -78,13 +78,15 @@ function hostOf(value: string) {
 }
 
 // ============================================================
-// DUA SITUS, SATU PENYEBARAN
+// TIGA SITUS, SATU PENYEBARAN
 //
-// CBT sudah pindah ke subdomainnya sendiri. Sejak itu tuan rumah pada
-// permintaanlah yang menentukan situs mana yang dilayani, dan seluruh
-// aturannya tinggal di src/lib/situs-cbt.ts — sebagai fungsi murni yang
-// dapat diuji tanpa menyalakan server. Yang tersisa di sini hanyalah
-// menerjemahkan rencananya menjadi jawaban HTTP.
+// CBT tinggal di subdomainnya sendiri, dan Nonton Drama di domainnya sendiri
+// — sipalingfisip.online. Sejak itu tuan rumah pada permintaanlah yang
+// menentukan situs mana yang dilayani, dan seluruh aturannya tinggal di
+// src/lib/situs-cbt.ts dan src/lib/situs-drama.ts, disusun oleh
+// src/lib/situs.ts — semuanya fungsi murni yang dapat diuji tanpa menyalakan
+// server. Yang tersisa di sini hanyalah menerjemahkan rencananya menjadi
+// jawaban HTTP.
 //
 // Pengalihannya SEMENTARA (307), bukan permanen. Pengalihan permanen
 // mengendap di peramban mahasiswa sampai cache-nya dibuang, dan bila nama
@@ -93,7 +95,7 @@ function hostOf(value: string) {
 // ============================================================
 
 function antarKeSitusnya(request: NextRequest): NextResponse | null {
-  const rencana = rencanaRute(request.headers.get("host"), request.nextUrl.pathname);
+  const rencana = rencanaSitus(request.headers.get("host"), request.nextUrl.pathname);
   if (rencana.tindakan === "lewat") return null;
 
   const alamat = request.nextUrl.clone();
@@ -134,9 +136,10 @@ export function middleware(request: NextRequest) {
   if (keSitusnya) return keSitusnya;
 
   // Perlindungan CSRF tetap HANYA untuk /api, sama seperti sebelum daftar
-  // jalurnya diperluas demi subdomain CBT. Memperluasnya diam-diam ke seluruh
-  // halaman akan mengubah perilaku jalur yang tidak sedang dikerjakan sama
-  // sekali — dan perubahan seperti itu baru ketahuan dari laporan pengguna.
+  // jalurnya diperluas demi subdomain CBT dan domain drama. Memperluasnya
+  // diam-diam ke seluruh halaman akan mengubah perilaku jalur yang tidak
+  // sedang dikerjakan sama sekali — dan perubahan seperti itu baru ketahuan
+  // dari laporan pengguna.
   if (!request.nextUrl.pathname.startsWith("/api/")) return NextResponse.next();
 
   if (!MUTATING.has(request.method)) return NextResponse.next();
@@ -165,7 +168,8 @@ export function middleware(request: NextRequest) {
 export const config = {
   // Dua tugas sekaligus di sini, dan cakupannya berbeda:
   //   - perlindungan CSRF hanya menyentuh /api
-  //   - penulisan ulang subdomain CBT harus menyentuh HALAMAN, bukan API
+  //   - penulisan ulang subdomain CBT dan domain drama harus menyentuh
+  //     HALAMAN, bukan API
   //
   // Karena itu daftarnya diperluas ke seluruh jalur, dengan aset statis
   // dikecualikan lewat pola negatif supaya gambar dan berkas Next.js tidak

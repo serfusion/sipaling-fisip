@@ -41,6 +41,16 @@ export const IKON = {
 export const IKON_UANG =
   "M20 15a2 2 0 0 1-2 2H8l-4 3V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2zM8 9h8M8 12.5h5";
 
+/**
+ * Layar ponsel berdiri dengan tanda putar di tengahnya: lambang Nonton Drama.
+ *
+ * Layarnya sengaja tegak, bukan mendatar seperti lambang video pada umumnya.
+ * Yang ditonton di sana memang drama vertikal, dan lambang yang mendatar akan
+ * menjanjikan bentuk tontonan yang berbeda dari yang benar-benar dibuka.
+ */
+export const IKON_DRAMA =
+  "M8 3h8a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM10.7 9.6l3.6 2.4-3.6 2.4z";
+
 /** Kepala kartu: ikon berbingkai lembut, judul, satu baris penjelas. */
 export function Kepala({ ikon, judul, sub }: { ikon: string; judul: string; sub: string }) {
   return (
