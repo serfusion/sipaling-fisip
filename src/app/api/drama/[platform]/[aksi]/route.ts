@@ -25,13 +25,15 @@ import {
   UA_HULU,
   type Aksi,
   type Permintaan,
+  type Platform,
 } from "@/lib/drama";
 import {
   bacaDaftar,
   bacaDaftarEpisode,
   bacaEpisodeTunggal,
-  bacaKursor,
+  bacaHalaman,
   bacaRinci,
+  type OpsiAliran,
 } from "@/lib/drama-baca";
 
 export const runtime = "nodejs";
@@ -87,11 +89,7 @@ export async function GET(
   }
 
   try {
-    const jawab = await fetch(alamat, {
-      headers: { "User-Agent": UA_HULU, Accept: "application/json,*/*" },
-      cache: "no-store",
-      signal: AbortSignal.timeout(SABAR_MS),
-    });
+    const jawab = await tanyaHulu(alamat);
 
     if (!jawab.ok) {
       // Kode dari hulu diteruskan apa adanya bila ia bercerita (404 berarti
@@ -111,7 +109,7 @@ export async function GET(
       return tolak("Jawaban sumber dramanya tidak terbaca.", 502);
     }
 
-    return Response.json({ success: true, ...rapikan(aksi, isi, minta) });
+    return Response.json({ success: true, ...rapikan(platform, aksi, isi, minta) });
   } catch (error: unknown) {
     // Nama platform ikut dicatat supaya yang mati dapat dikenali dari log
     // tanpa menebak — dan itulah yang dibaca penyelarasan tiga harian.
@@ -126,23 +124,65 @@ export async function GET(
   }
 }
 
+/**
+ * Bertanya ke hulu, dan bila jawabannya kegagalan sesaat, bertanya sekali lagi.
+ *
+ * Ini yang menutup keluhan "kadang bisa, kadang tidak". API hulu sesekali
+ * menjawab 5xx atau memutus sambungan pada permintaan pertama, lalu menjawab
+ * wajar sedetik kemudian; yang menyerah pada percobaan pertama memulangkan
+ * layar kosong untuk gangguan yang sudah lewat.
+ *
+ * Satu ulangan, bukan lebih, dan hanya untuk kegagalan yang memang sesaat:
+ * 404 berarti judulnya tidak ada, dan menanyakannya dua kali tetap tidak ada.
+ */
+async function tanyaHulu(alamat: string): Promise<Response> {
+  let terakhir: unknown = null;
+
+  for (let percobaan = 0; percobaan < 2; percobaan += 1) {
+    try {
+      const jawab = await fetch(alamat, {
+        headers: { "User-Agent": UA_HULU, Accept: "application/json,*/*" },
+        cache: "no-store",
+        signal: AbortSignal.timeout(SABAR_MS),
+      });
+      if (jawab.ok || (jawab.status < 500 && jawab.status !== 429)) return jawab;
+      terakhir = jawab;
+    } catch (error: unknown) {
+      terakhir = error;
+    }
+  }
+
+  if (terakhir instanceof Response) return terakhir;
+  throw terakhir instanceof Error ? terakhir : new Error("Sumber dramanya tidak dapat dihubungi.");
+}
+
 /** Merapikan jawaban hulu menjadi bentuk yang sama untuk seluruh platform. */
-function rapikan(aksi: Aksi, isi: unknown, minta: Permintaan) {
+function rapikan(platform: Platform, aksi: Aksi, isi: unknown, minta: Permintaan) {
+  // Yang diteruskan ke pembaca bukan nama platformnya, melainkan sepotong
+  // datanya. Pembaca jawaban tetap tidak boleh mengenal satu pun nama
+  // platform — itu yang membuat platform kesebelas cukup ditambahkan di tabel.
+  const opsi: OpsiAliran = { kunciLewatHulu: platform.kunciLewatHulu };
+
   if (aksi === "rinci") {
-    return { rinci: bacaRinci(isi, minta.id ?? "") };
+    return { rinci: bacaRinci(isi, minta.id ?? "", null, opsi) };
   }
 
   if (aksi === "episode") {
     const nomor = Math.max(1, Math.floor(Number(minta.episode) || 1));
-    const daftar = bacaDaftarEpisode(isi);
+    const daftar = bacaDaftarEpisode(isi, opsi);
     // Jawaban yang membawa banyak episode sekaligus (DramaBox, GoodShort)
     // dipulangkan utuh, dengan nama kolom sendiri. Menumpangkannya pada
     // "daftar" yang dipakai daftar JUDUL akan membuat layar menerima dua
     // bentuk berbeda di bawah satu nama — dan bentuk yang salah tafsir di
     // sana berakhir sebagai deretan kartu tanpa gambar.
     if (daftar.length > 1) return { daftarEpisode: daftar };
-    return { episode: bacaEpisodeTunggal(isi, nomor) };
+    return { episode: bacaEpisodeTunggal(isi, nomor, opsi) };
   }
 
-  return { daftar: bacaDaftar(isi), kursor: bacaKursor(isi) };
+  // "habis" dipulangkan terpisah dari "kursor" karena keduanya menjawab
+  // pertanyaan yang berbeda, dan gulir tak berhingga memerlukan keduanya:
+  // daftar berhalaman biasa tidak punya kursor sama sekali, tetapi tetap
+  // punya akhir.
+  const halaman = bacaHalaman(isi);
+  return { daftar: bacaDaftar(isi), kursor: halaman.kursor, habis: halaman.habis };
 }

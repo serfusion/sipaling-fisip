@@ -16,7 +16,15 @@
 // ============================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { barisDaftar, platformAktif, type Aksi, type Platform } from "@/lib/drama";
+import {
+  barisDaftar,
+  gulirBerikut,
+  penomoran,
+  platformAktif,
+  type Aksi,
+  type Gulir,
+  type Platform,
+} from "@/lib/drama";
 import type { Episode, Kartu, Rinci } from "@/lib/drama-baca";
 import { Pemutar } from "./pemutar";
 
@@ -26,6 +34,7 @@ type Jawaban = {
   daftar?: Kartu[];
   daftarEpisode?: Episode[];
   kursor?: string;
+  habis?: boolean;
   rinci?: Rinci;
   episode?: Episode;
 };
@@ -34,15 +43,38 @@ type Baris = {
   aksi: Aksi;
   judul: string;
   isi: Kartu[];
+  /** Penanda potongan berikutnya dari hulu; kosong berarti dihitung sendiri. */
   kursor: string;
+  /** Berapa potong yang sudah diminta, termasuk yang pertama. */
+  potong: number;
+  /** Benar bila sudah tidak ada potongan lagi — dari hulu atau karena batas. */
+  habis: boolean;
   sibuk: boolean;
   galat: string;
+  /**
+   * Benar bila platform ini memang melayani potongan kedua untuk baris ini.
+   *
+   * Dibedakan dari `habis`, dan perlu dibedakan: "Baru Masuk" DramaBox sekali
+   * ambil habis, jadi ia tidak pernah punya potongan kedua sejak awal — dan
+   * menawarkan tombol "Muat lebih banyak" untuknya berarti memasang tombol
+   * yang tidak mengerjakan apa pun saat ditekan.
+   */
+  bisaTambah: boolean;
+  /**
+   * Benar untuk baris yang menarik sendiri potongan berikutnya saat digulir.
+   *
+   * HANYA SATU baris yang boleh begitu, dan itu baris terakhir. Dua baris
+   * yang sama-sama menarik sendiri berarti baris pertama tumbuh tanpa henti
+   * dan baris kedua tidak pernah tercapai — pengunjung menggulir selamanya di
+   * dalam satu baris.
+   */
+  gulirSendiri: boolean;
 };
 
 const PLATFORM_TERBUKA = platformAktif();
 
-/** Berapa kartu digambar sekaligus pada satu baris sebelum "lihat semua". */
-const SEPOTONG = 12;
+/** Berapa kartu digambar sekaligus pada baris yang tidak bergulir sendiri. */
+const SEPOTONG = 16;
 
 async function minta(
   platform: string,
@@ -69,34 +101,86 @@ async function minta(
   return isi;
 }
 
-export default function DramaApp() {
-  const [platform, setPlatform] = useState<Platform>(PLATFORM_TERBUKA[0]);
-  const [baris, setBaris] = useState<Baris[]>([]);
-  const [kata, setKata] = useState("");
-  const [cari, setCari] = useState("");
-  const [hasilCari, setHasilCari] = useState<Kartu[] | null>(null);
-  const [sibukCari, setSibukCari] = useState(false);
-  const [terpilih, setTerpilih] = useState<Kartu | null>(null);
+/** Baris-baris kosong sebuah platform, sebelum satu pun jawaban datang. */
+function rencanaAwal(platform: Platform): Baris[] {
+  const rencana = barisDaftar(platform);
+  // Baris yang menarik sendiri saat digulir hanya yang TERAKHIR, dan hanya
+  // bila platformnya memang melayani potongan berikutnya. Pada seluruh
+  // platform yang hidup, baris terakhir itu "Buat Kamu" — sama seperti di
+  // hulu, yang menaruh satu-satunya bagian bergulir di dasar halaman.
+  const terakhir = rencana.length - 1;
 
-  // ---------- DAFTAR ----------
+  return rencana.map((item, nomor) => {
+    const bisaTambah = Boolean(penomoran(platform, item.aksi));
+    return {
+      ...item,
+      isi: [],
+      kursor: "",
+      potong: 0,
+      habis: false,
+      sibuk: true,
+      galat: "",
+      bisaTambah,
+      gulirSendiri: nomor === terakhir && bisaTambah,
+    };
+  });
+}
+
+/** Apa yang diketahui tentang sebuah potongan yang baru saja pulang. */
+function sesudahPotongan(sebelum: Kartu[], jawab: Jawaban): { isi: Kartu[]; habis: boolean } {
+  const adaSudah = new Set(sebelum.map((kartu) => kartu.id));
+  const tambahan = (jawab.daftar ?? []).filter((kartu) => !adaSudah.has(kartu.id));
+  return {
+    isi: [...sebelum, ...tambahan],
+    // Potongan yang tidak menambah satu judul pun berarti hulu sudah
+    // mengulang isi yang sama. Tanpa pemeriksaan ini, gulir tak berhingga
+    // benar-benar tak berhingga: pemicunya tetap terlihat, potongannya terus
+    // diminta, dan layarnya tidak pernah bertambah.
+    habis: Boolean(jawab.habis) || tambahan.length === 0,
+  };
+}
+
+// ============================================================
+// DAFTAR SEBUAH PLATFORM
+//
+// Dipasang dengan kunci berisi nama platformnya, sehingga berpindah platform
+// MEMASANG DAFTAR YANG BENAR-BENAR BARU. Itu bukan penghematan baris: daftar
+// yang disetel ulang dengan tangan selalu menyisakan satu keadaan yang
+// terlupa — dan yang terlupa di sini adalah penanda halaman platform
+// sebelumnya, yang dipakai meminta potongan platform berikutnya.
+// ============================================================
+
+function DaftarBaris({ platform, buka }: { platform: Platform; buka: (kartu: Kartu) => void }) {
+  const [baris, setBaris] = useState<Baris[]>(() => rencanaAwal(platform));
+
+  /**
+   * Cermin keadaan terkini, untuk dibaca pemicu gulir.
+   *
+   * Pemicunya dapat menyala dua kali sebelum gambar berikutnya sempat dibuat.
+   * Yang membaca keadaan dari `baris` akan mengira barisnya belum sibuk pada
+   * nyala kedua, lalu meminta potongan yang sama dua kali — dan potongan
+   * kembar itu tersaring di layar, tetapi tetap terkirim ke hulu.
+   */
+  const cermin = useRef(baris);
+  useEffect(() => {
+    cermin.current = baris;
+  }, [baris]);
 
   useEffect(() => {
     const kendali = new AbortController();
-    const rencana = barisDaftar(platform);
-    setBaris(rencana.map((item) => ({ ...item, isi: [], kursor: "", sibuk: true, galat: "" })));
 
     // Seluruh baris diminta bersamaan. Berurutan akan membuat baris ketiga
     // menunggu baris pertama yang kebetulan lambat, padahal keduanya tidak
     // saling bergantung sama sekali.
-    for (const item of rencana) {
+    for (const item of barisDaftar(platform)) {
       minta(platform.id, item.aksi, {}, kendali.signal)
         .then((jawab) => {
           setBaris((sebelum) =>
-            sebelum.map((satu) =>
-              satu.aksi === item.aksi
-                ? { ...satu, isi: jawab.daftar ?? [], kursor: jawab.kursor ?? "", sibuk: false }
-                : satu,
-            ),
+            sebelum.map((satu) => {
+              if (satu.aksi !== item.aksi) return satu;
+              const sesudah = sesudahPotongan([], jawab);
+              return { ...satu, ...sesudah, kursor: jawab.kursor ?? "", potong: 1, sibuk: false };
+            }),
           );
         })
         .catch((alasan: unknown) => {
@@ -115,75 +199,195 @@ export default function DramaApp() {
   }, [platform]);
 
   const muatLagi = useCallback(
-    async (aksi: Aksi) => {
-      const sekarang = baris.find((item) => item.aksi === aksi);
-      if (!sekarang || sekarang.sibuk) return;
+    (aksi: Aksi) => {
+      const cara = penomoran(platform, aksi);
+      if (!cara) return;
 
-      // Dua cara menandai halaman berikutnya, dan keduanya dipakai hulu:
-      // kursor yang dikirim balik apa adanya, atau nomor halaman yang kita
-      // hitung sendiri dari berapa kali baris ini sudah bertambah.
-      const berikut = sekarang.kursor || String(Math.floor(sekarang.isi.length / 20) + 1);
+      const sekarang = cermin.current.find((item) => item.aksi === aksi);
+      if (!sekarang || sekarang.sibuk || sekarang.habis) return;
+
+      const berikut = gulirBerikut(cara, sekarang);
+      if (!berikut) {
+        setBaris((sebelum) => sebelum.map((item) => (item.aksi === aksi ? { ...item, habis: true } : item)));
+        return;
+      }
+
+      // Cerminnya ditandai sibuk sekarang juga, bukan menunggu gambar
+      // berikutnya. Itulah yang menahan nyala kedua pemicu.
+      cermin.current = cermin.current.map((item) => (item.aksi === aksi ? { ...item, sibuk: true } : item));
       setBaris((sebelum) =>
         sebelum.map((item) => (item.aksi === aksi ? { ...item, sibuk: true, galat: "" } : item)),
       );
 
-      try {
-        const jawab = await minta(platform.id, aksi, { halaman: berikut });
-        setBaris((sebelum) =>
-          sebelum.map((item) => {
-            if (item.aksi !== aksi) return item;
-            const adaSudah = new Set(item.isi.map((kartu) => kartu.id));
-            const tambahan = (jawab.daftar ?? []).filter((kartu) => !adaSudah.has(kartu.id));
-            return {
-              ...item,
-              isi: [...item.isi, ...tambahan],
-              kursor: jawab.kursor ?? "",
-              sibuk: false,
-            };
-          }),
-        );
-      } catch (alasan: unknown) {
-        setBaris((sebelum) =>
-          sebelum.map((item) =>
-            item.aksi === aksi
-              ? { ...item, sibuk: false, galat: alasan instanceof Error ? alasan.message : "Gagal dimuat." }
-              : item,
-          ),
-        );
-      }
+      minta(platform.id, aksi, { halaman: berikut })
+        .then((jawab) => {
+          setBaris((sebelum) =>
+            sebelum.map((item) => {
+              if (item.aksi !== aksi) return item;
+              const sesudah = sesudahPotongan(item.isi, jawab);
+              return { ...item, ...sesudah, kursor: jawab.kursor ?? "", potong: item.potong + 1, sibuk: false };
+            }),
+          );
+        })
+        .catch((alasan: unknown) => {
+          setBaris((sebelum) =>
+            sebelum.map((item) =>
+              item.aksi === aksi
+                ? { ...item, sibuk: false, galat: alasan instanceof Error ? alasan.message : "Gagal dimuat." }
+                : item,
+            ),
+          );
+        });
     },
-    [baris, platform.id],
+    [platform],
   );
 
-  // ---------- PENCARIAN ----------
+  return (
+    <>
+      {baris.map((item) => (
+        <BarisKartu key={item.aksi} baris={item} buka={buka} lagi={muatLagi} />
+      ))}
+    </>
+  );
+}
+
+// ============================================================
+// HASIL PENCARIAN
+//
+// Kuncinya berisi platform DAN kata yang dicari, jadi kata baru berarti
+// layar hasil yang baru — tanpa satu pun sisa halaman pencarian sebelumnya.
+// ============================================================
+
+function HasilCari({
+  platform, kata, buka, tutup,
+}: {
+  platform: Platform;
+  kata: string;
+  buka: (kartu: Kartu) => void;
+  tutup: () => void;
+}) {
+  const [isi, setIsi] = useState<Kartu[] | null>(null);
+  const [sibuk, setSibuk] = useState(true);
+  const [halaman, setHalaman] = useState<Gulir>({ kursor: "", potong: 0, habis: true });
+
+  const cermin = useRef({ sibuk, halaman, isi });
+  useEffect(() => {
+    cermin.current = { sibuk, halaman, isi };
+  }, [sibuk, halaman, isi]);
+
+  useEffect(() => {
+    const kendali = new AbortController();
+    minta(platform.id, "cari", { cari: kata }, kendali.signal)
+      .then((jawab) => {
+        const sesudah = sesudahPotongan([], jawab);
+        setIsi(sesudah.isi);
+        setHalaman({
+          kursor: jawab.kursor ?? "",
+          potong: 1,
+          // Pencarian yang memang tidak berhalaman selesai pada potongan
+          // pertamanya. Menyatakannya begitu sekarang juga membuat pemicunya
+          // tidak pernah digambar — dan pemicu yang digambar untuk daftar yang
+          // tidak dapat bertambah adalah pemicu yang menyala tanpa hasil.
+          habis: sesudah.habis || !penomoran(platform, "cari"),
+        });
+      })
+      .catch(() => {
+        if (!kendali.signal.aborted) setIsi([]);
+      })
+      .finally(() => {
+        if (!kendali.signal.aborted) setSibuk(false);
+      });
+    return () => kendali.abort();
+  }, [platform, kata]);
+
+  /**
+   * Potongan berikutnya dari hasil pencarian.
+   *
+   * Tidak semua platform melayaninya — ReelShort dan DramaNova saja — dan
+   * itulah sebabnya pemicunya dipasang menurut tabel, bukan selalu. Pencarian
+   * yang tidak berhalaman tetap menampilkan hasilnya utuh; yang tidak ada
+   * cukup tidak digambar.
+   */
+  const lagi = useCallback(() => {
+    const cara = penomoran(platform, "cari");
+    const kini = cermin.current;
+    if (!cara || kini.sibuk || kini.halaman.habis) return;
+
+    const berikut = gulirBerikut(cara, kini.halaman);
+    if (!berikut) {
+      setHalaman((sebelum) => ({ ...sebelum, habis: true }));
+      return;
+    }
+
+    cermin.current = { ...kini, sibuk: true };
+    setSibuk(true);
+
+    minta(platform.id, "cari", { cari: kata, halaman: berikut })
+      .then((jawab) => {
+        const sesudah = sesudahPotongan(kini.isi ?? [], jawab);
+        setIsi(sesudah.isi);
+        setHalaman((lalu) => ({ kursor: jawab.kursor ?? "", potong: lalu.potong + 1, habis: sesudah.habis }));
+      })
+      .catch(() => setHalaman((sebelum) => ({ ...sebelum, habis: true })))
+      .finally(() => setSibuk(false));
+  }, [platform, kata]);
+
+  return (
+    <section className="dr-baris">
+      <div className="dr-baris-kepala">
+        <h2>Hasil pencarian “{kata}”</h2>
+        <button type="button" className="dr-link" onClick={tutup}>Kembali ke daftar</button>
+      </div>
+
+      {isi === null ? (
+        <div className="dr-grid">
+          {Array.from({ length: 6 }, (_, nomor) => <span key={nomor} className="dr-kartu dr-rangka" />)}
+        </div>
+      ) : isi.length ? (
+        <>
+          <div className="dr-grid">
+            {isi.map((kartu) => <KartuJudul key={kartu.id} kartu={kartu} buka={buka} />)}
+          </div>
+          {/* Hasil pencarian yang sudah habis tidak perlu diumumkan: yang
+              dicari pengunjung satu judul, bukan panjang daftarnya. Yang
+              digambar hanya pemicunya, dan hanya bila memang masih ada. */}
+          {!halaman.habis && (
+            <KakiDaftar sibuk={sibuk} habis={false} galat="" adaIsi gulirSendiri lagi={lagi} />
+          )}
+        </>
+      ) : (
+        <p className="dr-kosong">Tidak ada judul yang cocok di platform ini. Coba platform lain di atas.</p>
+      )}
+    </section>
+  );
+}
+
+export default function DramaApp() {
+  const [platform, setPlatform] = useState<Platform>(PLATFORM_TERBUKA[0]);
+  const [kata, setKata] = useState("");
+  const [cari, setCari] = useState("");
+  const [terpilih, setTerpilih] = useState<Kartu | null>(null);
 
   // Diketik huruf demi huruf, tetapi tidak dicari huruf demi huruf: tiap
   // ketikan yang langsung dikirim berarti sepuluh permintaan untuk satu kata.
   useEffect(() => {
     const isi = kata.trim();
-    if (!isi) {
-      setHasilCari(null);
-      setCari("");
-      return;
-    }
+    if (!isi) return;
     const jeda = window.setTimeout(() => setCari(isi), 450);
     return () => window.clearTimeout(jeda);
   }, [kata]);
 
-  useEffect(() => {
-    if (!cari) return;
-    const kendali = new AbortController();
-    setSibukCari(true);
-    minta(platform.id, "cari", { cari }, kendali.signal)
-      .then((jawab) => setHasilCari(jawab.daftar ?? []))
-      .catch(() => {
-        if (!kendali.signal.aborted) setHasilCari([]);
-      })
-      .finally(() => {
-        if (!kendali.signal.aborted) setSibukCari(false);
-      });
-    return () => kendali.abort();
-  }, [cari, platform.id]);
+  /**
+   * Satu pintu untuk setiap perubahan isi kotak cari.
+   *
+   * Pengosongannya dikerjakan di sini, seketika, bukan ditunggu jeda 450
+   * milidetik: menghapus kata pencarian adalah permintaan untuk kembali ke
+   * daftar, dan permintaan itu tidak perlu menunggu apa pun.
+   */
+  const ketik = useCallback((nilai: string) => {
+    setKata(nilai);
+    if (!nilai.trim()) setCari("");
+  }, []);
 
   return (
     <div className="dr">
@@ -202,12 +406,12 @@ export default function DramaApp() {
             <input
               type="search"
               value={kata}
-              onChange={(peristiwa) => setKata(peristiwa.target.value)}
+              onChange={(peristiwa) => ketik(peristiwa.target.value)}
               placeholder={`Cari judul di ${platform.nama}…`}
               aria-label="Cari judul drama"
             />
             {kata && (
-              <button type="button" className="dr-cari-hapus" onClick={() => setKata("")} aria-label="Hapus pencarian">
+              <button type="button" className="dr-cari-hapus" onClick={() => ketik("")} aria-label="Hapus pencarian">
                 ×
               </button>
             )}
@@ -224,6 +428,7 @@ export default function DramaApp() {
               onClick={() => {
                 setPlatform(item);
                 setTerpilih(null);
+                ketik("");
               }}
               title={item.catatan}
             >
@@ -239,18 +444,16 @@ export default function DramaApp() {
           <p className="dr-catatan" role="note">{platform.catatan}</p>
         )}
 
-        {hasilCari !== null ? (
+        {cari ? (
           <HasilCari
+            key={`${platform.id}:${cari}`}
+            platform={platform}
             kata={cari}
-            isi={hasilCari}
-            sibuk={sibukCari}
             buka={setTerpilih}
-            tutup={() => setKata("")}
+            tutup={() => ketik("")}
           />
         ) : (
-          baris.map((item) => (
-            <BarisKartu key={item.aksi} baris={item} buka={setTerpilih} lagi={() => void muatLagi(item.aksi)} />
-          ))
+          <DaftarBaris key={platform.id} platform={platform} buka={setTerpilih} />
         )}
       </main>
 
@@ -283,9 +486,130 @@ export default function DramaApp() {
 // BARIS KARTU
 // ============================================================
 
-function BarisKartu({ baris, buka, lagi }: { baris: Baris; buka: (kartu: Kartu) => void; lagi: () => void }) {
+/**
+ * Pemicu gulir tak berhingga.
+ *
+ * Sepetak kosong di bawah daftarnya. Begitu petak itu masuk layar,
+ * potongan berikutnya diminta — jadi yang menentukan bukan tombol yang harus
+ * ditekan, melainkan seberapa jauh pengunjung sudah menggulir.
+ *
+ * `rootMargin` memajukan garis pemicunya setinggi setengah layar ke bawah,
+ * sehingga potongan berikutnya sudah dalam perjalanan sebelum dasar daftarnya
+ * benar-benar terlihat. Tanpa itu, tiap potongan berarti satu jeda kosong
+ * yang dilihat pengunjung — dan jeda itulah yang membuat gulir tak berhingga
+ * terasa lebih lambat daripada tombol.
+ */
+function PemicuGulir({ aktif, onDekat }: { aktif: boolean; onDekat: () => void }) {
+  const petak = useRef<HTMLDivElement | null>(null);
+
+  // Disimpan di ref supaya pengamatnya tidak dibongkar-pasang tiap kali
+  // fungsinya dibuat ulang — dan pembongkaran itulah yang pada sebagian
+  // peramban memicu satu permintaan tambahan tiap gambar.
+  const simpan = useRef(onDekat);
+  // Disegarkan sesudah tiap gambar, bukan saat menggambar: menulis ref di
+  // tengah penggambaran adalah tulisan yang dapat terjadi dua kali untuk satu
+  // gambar. Effect ini ditulis DI ATAS effect pengamatnya, jadi ia sudah
+  // berjalan sebelum pengamatnya mungkin menyala.
+  useEffect(() => {
+    simpan.current = onDekat;
+  });
+
+  useEffect(() => {
+    const sasaran = petak.current;
+    if (!sasaran || !aktif) return;
+
+    // Peramban yang belum mengenal IntersectionObserver tetap kebagian isi
+    // potongan pertama; yang hilang hanya penambahan otomatisnya, dan tombol
+    // di bawahnya tetap ada untuk itu.
+    if (typeof IntersectionObserver === "undefined") return;
+
+    const pengamat = new IntersectionObserver(
+      (masuk) => {
+        if (masuk.some((satu) => satu.isIntersecting)) simpan.current();
+      },
+      { rootMargin: "0px 0px 50% 0px", threshold: 0 },
+    );
+    pengamat.observe(sasaran);
+    return () => pengamat.disconnect();
+  }, [aktif]);
+
+  return <div ref={petak} className="dr-pemicu" aria-hidden="true" />;
+}
+
+/**
+ * Kaki sebuah daftar yang dapat bertambah: pemicu, tanda memuat, dan akhirnya.
+ *
+ * Ketiganya satu tempat karena ketiganya menjawab satu pertanyaan pengunjung —
+ * "masih ada lagi tidak?" — dan jawaban yang terpencar membuat daftar yang
+ * sudah habis tampak seperti daftar yang sedang macet.
+ */
+function KakiDaftar({
+  sibuk, habis, galat, adaIsi, gulirSendiri, lagi,
+}: {
+  sibuk: boolean;
+  habis: boolean;
+  galat: string;
+  adaIsi: boolean;
+  gulirSendiri: boolean;
+  lagi: () => void;
+}) {
+  if (!adaIsi) return null;
+
+  if (sibuk) {
+    return (
+      <div className="dr-tambah">
+        <span className="dr-tambah-putar" aria-hidden="true" />
+        <p className="dr-tambah-teks" role="status">Memuat lebih banyak…</p>
+      </div>
+    );
+  }
+
+  if (galat) {
+    return (
+      <div className="dr-tambah">
+        <p className="dr-galat-kecil">{galat}</p>
+        <button type="button" className="dr-mini" onClick={lagi}>Coba lagi</button>
+      </div>
+    );
+  }
+
+  if (habis) {
+    return (
+      <div className="dr-tambah dr-tambah-habis">
+        <p className="dr-tambah-teks">Semua data telah dimuat</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <PemicuGulir aktif={gulirSendiri} onDekat={lagi} />
+      <div className="dr-tambah">
+        {/* Tombolnya tetap ada di belakang pemicu, dan bukan sebagai hiasan:
+            ia yang melayani peramban tanpa IntersectionObserver, dan ia pula
+            yang dipakai pembaca layar — yang tidak pernah "menggulir sampai
+            dasar" sebagaimana pemicunya mengandaikan. */}
+        <button type="button" className="dr-mini" onClick={lagi}>Muat lebih banyak</button>
+      </div>
+    </>
+  );
+}
+
+function BarisKartu({
+  baris, buka, lagi,
+}: {
+  baris: Baris;
+  buka: (kartu: Kartu) => void;
+  lagi: (aksi: Aksi) => void;
+}) {
   const [semua, setSemua] = useState(false);
-  const tampil = semua ? baris.isi : baris.isi.slice(0, SEPOTONG);
+  const muatBaris = useCallback(() => lagi(baris.aksi), [lagi, baris.aksi]);
+
+  // Baris yang menarik sendiri tidak pernah diringkas: meringkasnya berarti
+  // memindahkan dasar daftarnya ke atas layar, dan pemicunya akan langsung
+  // meminta potongan berikutnya untuk isi yang barusan disembunyikan.
+  const utuh = baris.gulirSendiri || semua;
+  const tampil = utuh ? baris.isi : baris.isi.slice(0, SEPOTONG);
 
   if (!baris.sibuk && !baris.isi.length && baris.galat) {
     return (
@@ -300,7 +624,7 @@ function BarisKartu({ baris, buka, lagi }: { baris: Baris; buka: (kartu: Kartu) 
     <section className="dr-baris">
       <div className="dr-baris-kepala">
         <h2>{baris.judul}</h2>
-        {baris.isi.length > SEPOTONG && (
+        {!baris.gulirSendiri && baris.isi.length > SEPOTONG && (
           <button type="button" className="dr-link" onClick={() => setSemua((nilai) => !nilai)}>
             {semua ? "Ringkas" : `Lihat semua (${baris.isi.length})`}
           </button>
@@ -315,13 +639,15 @@ function BarisKartu({ baris, buka, lagi }: { baris: Baris; buka: (kartu: Kartu) 
           Array.from({ length: 6 }, (_, nomor) => <span key={nomor} className="dr-kartu dr-rangka" />)}
       </div>
 
-      {semua && (
-        <div className="dr-baris-kaki">
-          <button type="button" className="dr-mini" onClick={lagi} disabled={baris.sibuk}>
-            {baris.sibuk ? "Memuat…" : "Muat lebih banyak"}
-          </button>
-          {baris.galat && <span className="dr-galat-kecil">{baris.galat}</span>}
-        </div>
+      {utuh && (
+        <KakiDaftar
+          sibuk={baris.sibuk}
+          habis={baris.habis || !baris.bisaTambah}
+          galat={baris.galat}
+          adaIsi={baris.isi.length > 0}
+          gulirSendiri={baris.gulirSendiri}
+          lagi={muatBaris}
+        />
       )}
     </section>
   );
@@ -341,37 +667,6 @@ function KartuJudul({ kartu, buka }: { kartu: Kartu; buka: (kartu: Kartu) => voi
       </span>
       <span className="dr-kartu-judul">{kartu.judul}</span>
     </button>
-  );
-}
-
-function HasilCari({
-  kata, isi, sibuk, buka, tutup,
-}: {
-  kata: string;
-  isi: Kartu[];
-  sibuk: boolean;
-  buka: (kartu: Kartu) => void;
-  tutup: () => void;
-}) {
-  return (
-    <section className="dr-baris">
-      <div className="dr-baris-kepala">
-        <h2>Hasil pencarian “{kata}”</h2>
-        <button type="button" className="dr-link" onClick={tutup}>Kembali ke daftar</button>
-      </div>
-
-      {sibuk && !isi.length ? (
-        <div className="dr-grid">
-          {Array.from({ length: 6 }, (_, nomor) => <span key={nomor} className="dr-kartu dr-rangka" />)}
-        </div>
-      ) : isi.length ? (
-        <div className="dr-grid">
-          {isi.map((kartu) => <KartuJudul key={kartu.id} kartu={kartu} buka={buka} />)}
-        </div>
-      ) : (
-        <p className="dr-kosong">Tidak ada judul yang cocok di platform ini. Coba platform lain di atas.</p>
-      )}
-    </section>
   );
 }
 
@@ -493,7 +788,6 @@ function LayarJudul({ platform, kartu, tutup }: { platform: Platform; kartu: Kar
               <Pemutar
                 aliran={episode.aliran}
                 platform={platform.id}
-                wadahTersandi={platform.wadahTersandi}
                 onSelesai={() => {
                   if (nomor < jumlah) void putar(nomor + 1);
                 }}

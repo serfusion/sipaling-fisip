@@ -90,6 +90,37 @@ export function daftarPutar(isi: string): boolean {
 }
 
 /**
+ * Apakah sebuah jawaban boleh dibaca sebagai teks?
+ *
+ * Pertanyaannya terdengar remeh dan tidak. Daftar putar HARUS dibaca sebagai
+ * teks — isinya memang disunting sebelum diteruskan. Potongan video TIDAK
+ * BOLEH, dan bukan karena boros: membaca deretan bita sebagai UTF-8 mengganti
+ * tiap bita yang bukan huruf sah dengan tanda tanya, dan bita yang sudah
+ * diganti tidak dapat dikembalikan. Yang sampai ke pemutar bukan video yang
+ * rusak sebagian, melainkan berkas yang tidak lagi berbentuk video sama
+ * sekali.
+ *
+ * Karena itu yang diperiksa awal berkasnya, bukan panjangnya dan bukan jenis
+ * yang disebut hulu: daftar putar HLS selalu dibuka "#EXTM3U", dan tidak ada
+ * potongan video yang kebetulan dibuka begitu.
+ */
+export function tampakDaftarPutar(bita: Uint8Array): boolean {
+  const kepala = bita.subarray(0, 64);
+  let awal = 0;
+  // Ruang kosong dan penanda urutan bita di depan berkas dilewati; keduanya
+  // sah di daftar putar dan keduanya membuat perbandingan mentah meleset.
+  while (awal < kepala.length && (kepala[awal] === 0x20 || kepala[awal] === 0x09 ||
+         kepala[awal] === 0x0a || kepala[awal] === 0x0d)) awal += 1;
+  if (kepala[awal] === 0xef && kepala[awal + 1] === 0xbb && kepala[awal + 2] === 0xbf) awal += 3;
+
+  const tanda = "#EXTM3U";
+  for (let nomor = 0; nomor < tanda.length; nomor += 1) {
+    if (kepala[awal + nomor] !== tanda.charCodeAt(nomor)) return false;
+  }
+  return true;
+}
+
+/**
  * Tuliskan ulang daftar putar HLS supaya seluruh isinya ikut lewat penerus.
  *
  * Yang diubah dua macam baris: baris alamat potongan video, dan atribut

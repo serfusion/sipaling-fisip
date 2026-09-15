@@ -22,6 +22,8 @@ import {
   alamatHulu,
   barisDaftar,
   cariPlatform,
+  gulirBerikut,
+  penomoran,
   PLATFORM,
   platformAktif,
   platformTerbuka,
@@ -30,12 +32,21 @@ import {
   bacaDaftar,
   bacaDaftarEpisode,
   bacaEpisodeTunggal,
+  bacaHalaman,
   bacaKartu,
   bacaKursor,
   bacaRinci,
   kumpulkanAliran,
 } from "@/lib/drama-baca";
-import { alamatPenerus, jenisIsi, tautanAman, tulisUlangDaftarPutar } from "@/lib/drama-aliran";
+import {
+  alamatPenerus,
+  jenisIsi,
+  tampakDaftarPutar,
+  tautanAman,
+  tulisUlangDaftarPutar,
+} from "@/lib/drama-aliran";
+import { berwadahShortmax, bukaWadahShortmax } from "@/lib/drama-wadah";
+import { createCipheriv, randomBytes } from "node:crypto";
 
 let lulus = 0;
 let gagal = 0;
@@ -340,6 +351,204 @@ console.log("\n== MEMBACA RINCIAN JUDUL ==");
   sama("kartu dipakai saat rincian kosong", miskin.judul, "Dari Kartu");
   sama("jumlah episodenya juga", miskin.episode, 12);
   sama("id tetap terisi", miskin.id, "A1");
+}
+
+// ============================================================
+console.log("\n== TAUTAN VIDEO YANG PERNAH HILANG ==");
+//
+// Tiap pemeriksaan di bawah ini mewakili satu platform yang daftarnya tampil
+// rapi tetapi videonya tidak pernah jalan. Semuanya sebab yang sama: nama
+// kolom yang dipakai hulu tidak tercatat di pembaca, sehingga episodenya
+// terbaca sebagai episode tanpa tautan sama sekali.
+// ============================================================
+{
+  const netshort = kumpulkanAliran({
+    episodeList: [{ episodeId: "e9", playVoucher: "https://cdn/ns.m3u8", playVoucherBak: "https://cdn/ns2.m3u8" }],
+  });
+  sama("NetShort: playVoucher terbaca", netshort[0]?.url, "https://cdn/ns.m3u8");
+  cek("NetShort: cadangannya ikut terbawa", netshort.some((item) => item.url === "https://cdn/ns2.m3u8"));
+
+  const melolo = kumpulkanAliran({ data: { main_url_decoded: "https://cdn/ml.mp4", main_url: "tersandi" } });
+  sama("Melolo: alamat yang sudah dipulihkan didahulukan", melolo[0]?.url, "https://cdn/ml.mp4");
+
+  const goodshort = bacaDaftarEpisode(
+    {
+      data: {
+        bookName: "Judul",
+        downloadList: [
+          { chapterId: "g1", chapterIndex: 1, multiVideos: [{ type: "720p", filePath: "https://cdn/gs.m3u8" }] },
+        ],
+      },
+    },
+    { kunciLewatHulu: ["filePath"] },
+  );
+  sama("GoodShort: downloadList terbaca sebagai daftar episode", goodshort.length, 1);
+  sama("GoodShort: tautannya ikut", goodshort[0]?.aliran[0]?.url, "https://cdn/gs.m3u8");
+  cek("GoodShort: filePath selalu disiapkan hulu walau sudah berbentuk alamat",
+    goodshort[0]?.aliran[0]?.lewatHulu === true);
+
+  const dramabox = kumpulkanAliran(
+    { cdnList: [{ videoPathList: [{ quality: 720, videoPath: "https://cdn/db.mp4" }] }] },
+    { kunciLewatHulu: ["videoPath"] },
+  );
+  cek("DramaBox: videoPath berbentuk alamat pun tetap lewat hulu", dramabox[0]?.lewatHulu === true);
+
+  const tanpaTabel = kumpulkanAliran({ cdnList: [{ videoPathList: [{ videoPath: "https://cdn/db.mp4" }] }] });
+  cek("dan tanpa keterangan tabel, alamat biasa tetap dibuka apa adanya",
+    tanpaTabel[0]?.lewatHulu === false);
+
+  const shortmax = kumpulkanAliran({ episode: { videoUrl: { "1080p": "https://cdn/a.m3u8", "540p": "https://cdn/b.m3u8" } } });
+  sama("ShortMax: mutu terbaca dari nama kuncinya", shortmax[0]?.mutu, "1080p");
+  sama("dan mutu kedua juga", shortmax[1]?.mutu, "540p");
+
+  const reelshort = kumpulkanAliran({
+    videoList: [
+      { url: "https://cdn/h265.m3u8", encode: "H265", quality: 1080 },
+      { url: "https://cdn/h264.m3u8", encode: "H264", quality: 720 },
+    ],
+  });
+  sama("ReelShort: H264 didahulukan karena H265 tidak diputar banyak peramban",
+    reelshort[0]?.url, "https://cdn/h264.m3u8");
+  cek("tetapi H265 tidak dibuang, hanya ditaruh di belakang",
+    reelshort.some((item) => item.url === "https://cdn/h265.m3u8"));
+  sama("cara memampatkannya ikut disebut di tombol mutu", reelshort[0]?.mutu, "720p H264");
+}
+
+// ============================================================
+console.log("\n== PENOMORAN DAN GULIR TAK BERHINGGA ==");
+// ============================================================
+{
+  sama("hulu bilang masih ada, kursornya dipulangkan",
+    bacaHalaman({ has_more: true, cursor: "MTA=" }), { kursor: "MTA=", habis: false });
+  sama("hulu bilang habis, kursornya dibuang",
+    bacaHalaman({ has_more: false, cursor: "MTA=" }), { kursor: "", habis: true });
+  sama("Melolo: next_offset terbaca sebagai penanda",
+    bacaHalaman({ has_more: true, next_offset: 20 }), { kursor: "20", habis: false });
+  sama("FreeReels: has_more bersarang di data.page_info ikut terbaca",
+    bacaHalaman({ data: { page_info: { has_more: false, next: "x" } } }), { kursor: "", habis: true });
+  sama("GoodShort: halaman terakhir dikenali dari current dan pages",
+    bacaHalaman({ data: { current: 3, pages: 3, records: [] } }), { kursor: "", habis: true });
+  cek("GoodShort: halaman tengah belum habis",
+    bacaHalaman({ data: { current: 2, pages: 5 } }).habis === false);
+  sama("ShortMax: isEnd menghentikan daftar", bacaHalaman({ isEnd: true }), { kursor: "", habis: true });
+  sama("NetShort: completed juga", bacaHalaman({ completed: true }), { kursor: "", habis: true });
+  sama("geseran nol bukan penanda berikutnya", bacaHalaman({ offset: 0 }).kursor, "");
+  sama("jawaban tanpa keterangan apa pun belum berarti habis",
+    bacaHalaman({ data: [] }), { kursor: "", habis: false });
+
+  const halamanDramaBox = penomoran(cariPlatform("dramabox")!, "lainnya")!;
+  sama("DramaBox memakai nomor halaman", halamanDramaBox.kunci, "page");
+  sama("halaman kedua dihitung sendiri saat hulu tidak menyebutkannya",
+    gulirBerikut(halamanDramaBox, { potong: 1, kursor: "", habis: false }), "2");
+  sama("penanda dari hulu selalu lebih dipercaya",
+    gulirBerikut(halamanDramaBox, { potong: 1, kursor: "77", habis: false }), "77");
+  sama("hulu bilang habis berarti berhenti",
+    gulirBerikut(halamanDramaBox, { potong: 1, kursor: "2", habis: true }), null);
+  sama("batas potongan menghentikannya juga",
+    gulirBerikut(halamanDramaBox, { potong: halamanDramaBox.batas, kursor: "9", habis: false }), null);
+
+  const halamanMelolo = penomoran(cariPlatform("melolo")!, "lainnya")!;
+  sama("Melolo bergeser, bukan berhalaman", halamanMelolo.kunci, "offset");
+  sama("geserannya melompat sebanyak langkahnya",
+    gulirBerikut(halamanMelolo, { potong: 2, kursor: "", habis: false }), "40");
+
+  const halamanPine = penomoran(cariPlatform("pinedrama")!, "lainnya")!;
+  sama("PineDrama memakai kursor", halamanPine.kunci, "cursor");
+  sama("kursor yang habis tidak dapat ditebak sendiri",
+    gulirBerikut(halamanPine, { potong: 1, kursor: "", habis: false }), null);
+  sama("PineDrama berhenti di sepuluh potong, sama seperti hulu", halamanPine.batas, 10);
+
+  sama("baris tanpa penomoran tidak pernah menarik potongan kedua",
+    gulirBerikut(null, { potong: 1, kursor: "x", habis: false }), null);
+  sama("dan Terbaru DramaBox memang begitu", penomoran(cariPlatform("dramabox")!, "terbaru"), null);
+}
+
+// ============================================================
+console.log("\n== MEMBEDAKAN DAFTAR PUTAR DARI POTONGAN VIDEO ==");
+//
+// Inilah pemeriksaan yang menjaga bug terburuk di menu ini: potongan video
+// yang dibaca sebagai teks pulang dalam keadaan rusak permanen, dan yang
+// tampil di layar bukan pesan galat melainkan pemutar yang diam.
+// ============================================================
+{
+  const huruf = (isi: string) => new Uint8Array(Buffer.from(isi, "utf8"));
+
+  cek("daftar putar dikenali", tampakDaftarPutar(huruf("#EXTM3U\n#EXTINF:6,\na.ts")));
+  cek("ruang kosong di depannya dilewati", tampakDaftarPutar(huruf("\n  #EXTM3U\n")));
+  cek("penanda urutan bita di depannya juga",
+    tampakDaftarPutar(new Uint8Array([0xef, 0xbb, 0xbf, ...huruf("#EXTM3U")])));
+
+  // Potongan MPEG-TS sungguhan: bita pertamanya 0x47, sisanya bita apa saja.
+  const potongan = new Uint8Array(1024);
+  potongan[0] = 0x47;
+  potongan[1] = 0x1f;
+  potongan[2] = 0xff;
+  cek("potongan video TIDAK dikenali sebagai daftar putar", !tampakDaftarPutar(potongan));
+  cek("berkas kosong juga tidak", !tampakDaftarPutar(new Uint8Array(0)));
+  cek("teks lain yang kebetulan berawalan pagar juga tidak",
+    !tampakDaftarPutar(huruf("#EXTINF:6,\na.ts")));
+}
+
+// ============================================================
+console.log("\n== MEMBUKA WADAH POTONGAN SHORTMAX ==");
+// ============================================================
+{
+  const biasa = Buffer.alloc(2048);
+  biasa[0] = 0x47;
+  cek("potongan yang sudah siap tidak dikenali berwadah", !berwadahShortmax(biasa));
+  cek("dan dipulangkan apa adanya", bukaWadahShortmax(biasa).equals(biasa));
+
+  const pendek = Buffer.from("shortmax");
+  cek("berkas lebih pendek daripada kepalanya bukan wadah", !berwadahShortmax(pendek));
+
+  const lain = Buffer.alloc(2048);
+  lain.write("bukanini", 0, "ascii");
+  cek("wadah dengan nama lain dilewati", !berwadahShortmax(lain));
+  cek("dan isinya tidak disentuh", bukaWadahShortmax(lain).equals(lain));
+
+  // Wadah yang disusun persis seperti yang dikirim platformnya, lalu dibuka.
+  // Inilah pemeriksaan yang membuktikan pembukanya benar-benar bekerja — bukan
+  // sekadar tidak melempar. Hulu memulihkannya dengan pelucutan ganjal
+  // dinyalakan, dan berkas seperti di bawah ini membuat pustakanya melempar;
+  // di sini ganjalnya dimatikan, sehingga isinya benar-benar pulih.
+  {
+    const AWAL = Buffer.from("shortmax00000000", "ascii");
+    const kunci = randomBytes(16);
+
+    const asliDepan = Buffer.alloc(1040);
+    asliDepan[0] = 0x47;
+    for (let nomor = 1; nomor < 1040; nomor += 1) asliDepan[nomor] = (nomor * 7) % 256;
+    const asliBelakang = randomBytes(2000);
+
+    const penyandi = createCipheriv("aes-128-cbc", kunci, AWAL);
+    penyandi.setAutoPadding(false);
+    const tersandi = Buffer.concat([penyandi.update(asliDepan), penyandi.final()]);
+
+    const posisiKunci = 200;
+    const kepala = Buffer.alloc(1040);
+    kepala.write("shortmax", 0, "ascii");
+    kepala.write(String(posisiKunci).padStart(4, "0"), 16, "ascii");
+    kunci.copy(kepala, 24 + (posisiKunci - 24));
+    tersandi.subarray(0, 16).copy(kepala, 1024);
+
+    const berkas = Buffer.concat([kepala, tersandi.subarray(16), asliBelakang]);
+    const hasil = bukaWadahShortmax(berkas);
+
+    cek("wadah utuh dikenali", berwadahShortmax(berkas));
+    cek("isinya pulih sebagai potongan video yang sah", hasil[0] === 0x47);
+    cek("bagian yang tersandi pulih utuh", hasil.subarray(0, 1040).equals(asliDepan));
+    cek("bagian yang tidak tersandi ikut utuh", hasil.subarray(1040).equals(asliBelakang));
+    sama("panjang isinya benar", hasil.length, 1040 + 2000);
+  }
+
+  // Wadah yang kepalanya cacat: posisi kuncinya menunjuk ke luar kepalanya.
+  const cacat = Buffer.alloc(3072);
+  cacat.write("shortmax", 0, "ascii");
+  cacat.write("9999", 16, "ascii");
+  cacat[1040] = 0x47;
+  const dibuka = bukaWadahShortmax(cacat);
+  sama("kepala yang cacat tetap memulangkan isinya", dibuka.length, 3072 - 1040);
+  cek("dan isinya benar-benar isi, bukan kepalanya", dibuka[0] === 0x47);
 }
 
 // ============================================================

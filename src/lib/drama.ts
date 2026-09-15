@@ -67,11 +67,23 @@ export type IdPlatform =
 /** Yang dapat diminta dari sebuah platform. */
 export type Aksi = "populer" | "terbaru" | "lainnya" | "cari" | "rinci" | "episode";
 
-/** Cara sebuah daftar panjang diminta sepotong demi sepotong. */
-export type Penomoran =
-  | { kunci: "page"; mulai: string }
-  | { kunci: "offset"; mulai: string }
-  | { kunci: "cursor"; mulai: string };
+/**
+ * Cara sebuah daftar panjang diminta sepotong demi sepotong.
+ *
+ * `batas` adalah berapa potong yang boleh diminta sebelum daftarnya dianggap
+ * habis. Angkanya bukan hiasan dan bukan tebakan: hulu memasang batas yang
+ * sama pada tiap platform, dan tanpa batas itu gulir tak berhingga akan terus
+ * meminta halaman yang sudah lama menjawab isi yang sama.
+ *
+ * `langkah` hanya berlaku untuk penomoran bergeser: berapa judul yang dilompati
+ * tiap potong bila hulu tidak menyebutkan sendiri geseran berikutnya.
+ */
+export type Penomoran = {
+  kunci: "page" | "offset" | "cursor";
+  mulai: string;
+  batas: number;
+  langkah?: number;
+};
 
 export type Titik = {
   /** Jalur di API hulu, sesudah alamat dasarnya. */
@@ -133,21 +145,40 @@ export type Platform = {
    */
   jalurAliran?: string;
   /**
-   * Benar bila potongan videonya datang dalam wadah khusus buatan
-   * platformnya, yang perlu dibongkar lebih dulu sebelum dapat diputar.
+   * Nama kolom yang isinya SELALU harus disiapkan hulu lebih dulu, walau
+   * nilainya sudah terlihat seperti alamat biasa.
    *
-   * Pembongkarannya SENGAJA TIDAK disertakan di sini — lihat catatan di
-   * src/app/api/drama/aliran/route.ts. Tandanya tetap dicatat supaya layarnya
-   * dapat berterus terang kepada yang membuka, bukan menampilkan pemutar
-   * hitam tanpa penjelasan.
+   * Dicatat di tabel, bukan disimpulkan dari bentuk nilainya, karena
+   * bentuknya menipu: videoPath DramaBox dan filePath GoodShort sama-sama
+   * kadang datang sebagai alamat utuh yang kelihatan dapat dibuka — dan
+   * sama-sama menjawab 403 bila benar-benar dibuka tanpa disiapkan. Hulu
+   * sendiri tidak pernah membedakan keduanya: ia selalu melewatkan kolom itu
+   * lewat penyiapnya.
    */
-  wadahTersandi?: boolean;
+  kunciLewatHulu?: readonly string[];
+  /**
+   * Nama wadah potongan video, bila potongannya tidak datang sebagai berkas
+   * yang dapat langsung diputar dan harus dibuka lebih dulu.
+   *
+   * Yang membukanya penerus aliran kita, bukan berkas ini — lihat
+   * `bukaWadahShortmax` di src/lib/drama-aliran.ts.
+   */
+  bungkusSegmen?: "shortmax";
   titik: Partial<Record<Aksi, Titik>>;
 };
 
-const HAL_1: Penomoran = { kunci: "page", mulai: "1" };
-const GESER_0: Penomoran = { kunci: "offset", mulai: "0" };
-const KURSOR_1: Penomoran = { kunci: "cursor", mulai: "1" };
+/** Halaman bernomor, mulai dari satu. */
+function halamanNomor(batas: number): Penomoran {
+  return { kunci: "page", mulai: "1", batas };
+}
+/** Geseran, mulai dari nol, melompat `langkah` judul tiap potong. */
+function halamanGeser(batas: number, langkah = 20): Penomoran {
+  return { kunci: "offset", mulai: "0", batas, langkah };
+}
+/** Kursor yang dikirim balik hulu apa adanya. */
+function halamanKursor(batas: number): Penomoran {
+  return { kunci: "cursor", mulai: "1", batas };
+}
 
 // ============================================================
 // TABEL PLATFORM
@@ -166,8 +197,8 @@ export const PLATFORM: Platform[] = [
     aktif: true,
     caraEpisode: "nomor",
     titik: {
-      populer: { jalur: "/pinedrama/trending", berkas: "pinedrama/trending", halaman: KURSOR_1 },
-      lainnya: { jalur: "/pinedrama/foryou", berkas: "pinedrama/foryou", halaman: KURSOR_1 },
+      populer: { jalur: "/pinedrama/trending", berkas: "pinedrama/trending", halaman: halamanKursor(10) },
+      lainnya: { jalur: "/pinedrama/foryou", berkas: "pinedrama/foryou", halaman: halamanKursor(10) },
       cari: { jalur: "/pinedrama/search", berkas: "pinedrama/search", kunciCari: "query" },
       rinci: { jalur: "/pinedrama/detail", berkas: "pinedrama/detail", kunciId: "collection_id" },
       episode: {
@@ -185,10 +216,11 @@ export const PLATFORM: Platform[] = [
     aktif: true,
     caraEpisode: "semua",
     jalurAliran: "/dramabox/decrypt-video",
+    kunciLewatHulu: ["videoPath"],
     titik: {
       terbaru: { jalur: "/dramabox/latest", berkas: "dramabox/latest" },
       populer: { jalur: "/dramabox/trending", berkas: "dramabox/trending" },
-      lainnya: { jalur: "/dramabox/foryou", berkas: "dramabox/foryou", halaman: HAL_1 },
+      lainnya: { jalur: "/dramabox/foryou", berkas: "dramabox/foryou", halaman: halamanNomor(100) },
       cari: { jalur: "/dramabox/search", berkas: "dramabox/search", kunciCari: "query" },
       rinci: { jalur: "/dramabox/detail", berkas: "dramabox/detail/[bookId]", kunciId: "bookId" },
       episode: { jalur: "/dramabox/get-allepisode", berkas: "dramabox/allepisode/[bookId]", kunciId: "bookId" },
@@ -203,8 +235,8 @@ export const PLATFORM: Platform[] = [
     caraEpisode: "nomor",
     titik: {
       terbaru: { jalur: "/reelshort/homepage", berkas: "reelshort/homepage" },
-      lainnya: { jalur: "/reelshort/foryou", berkas: "reelshort/foryou", halaman: HAL_1 },
-      cari: { jalur: "/reelshort/search", berkas: "reelshort/search", kunciCari: "query", halaman: HAL_1 },
+      lainnya: { jalur: "/reelshort/foryou", berkas: "reelshort/foryou", halaman: halamanNomor(100) },
+      cari: { jalur: "/reelshort/search", berkas: "reelshort/search", kunciCari: "query", halaman: halamanNomor(100) },
       rinci: { jalur: "/reelshort/detail", berkas: "reelshort/detail", kunciId: "bookId" },
       episode: {
         jalur: "/reelshort/get-episode", berkas: "reelshort/watch",
@@ -220,15 +252,14 @@ export const PLATFORM: Platform[] = [
     warna: "#7a4ddb",
     aktif: true,
     caraEpisode: "nomor",
-    // Potongan videonya datang dalam wadah buatan ShortMax sendiri. Daftarnya
-    // tetap dapat dijelajahi; pemutarannya yang belum tentu jalan, dan layar
-    // menontonnya mengatakan itu apa adanya.
-    wadahTersandi: true,
-    catatan: "Daftar judul berjalan; potongan videonya berwadah khusus dan belum tentu dapat diputar di sini.",
+    // Potongan videonya datang dalam wadah buatan ShortMax sendiri, dan
+    // dibuka oleh penerus aliran kita sebelum sampai ke pemutar — sama
+    // seperti di hulu.
+    bungkusSegmen: "shortmax",
     titik: {
       terbaru: { jalur: "/shortmax/latest", berkas: "shortmax/latest" },
       populer: { jalur: "/shortmax/rekomendasi", berkas: "shortmax/rekomendasi" },
-      lainnya: { jalur: "/shortmax/foryou", berkas: "shortmax/foryou", halaman: HAL_1 },
+      lainnya: { jalur: "/shortmax/foryou", berkas: "shortmax/foryou", halaman: halamanNomor(100) },
       cari: { jalur: "/shortmax/search", berkas: "shortmax/search", kunciCari: "query" },
       rinci: { jalur: "/shortmax/detail", berkas: "shortmax/detail", kunciId: "shortPlayId" },
       episode: {
@@ -246,10 +277,11 @@ export const PLATFORM: Platform[] = [
     aktif: true,
     caraEpisode: "semua",
     jalurAliran: "/goodshort/decrypt-stream",
+    kunciLewatHulu: ["filePath"],
     titik: {
       terbaru: { jalur: "/goodshort/latest", berkas: "goodshort/latest" },
       populer: { jalur: "/goodshort/trending", berkas: "goodshort/trending" },
-      lainnya: { jalur: "/goodshort/foryou", berkas: "goodshort/foryou", halaman: HAL_1 },
+      lainnya: { jalur: "/goodshort/foryou", berkas: "goodshort/foryou", halaman: halamanNomor(50) },
       cari: { jalur: "/goodshort/search", berkas: "goodshort/search", kunciCari: "query" },
       rinci: { jalur: "/goodshort/detail", berkas: "goodshort/detail", kunciId: "bookId" },
       episode: { jalur: "/goodshort/get-allepisode", berkas: "goodshort/allepisode", kunciId: "bookId" },
@@ -264,7 +296,7 @@ export const PLATFORM: Platform[] = [
     caraEpisode: "nomor",
     titik: {
       populer: { jalur: "/netshort/theaters", berkas: "netshort/theaters" },
-      lainnya: { jalur: "/netshort/foryou", berkas: "netshort/foryou", halaman: HAL_1 },
+      lainnya: { jalur: "/netshort/foryou", berkas: "netshort/foryou", halaman: halamanNomor(100) },
       cari: { jalur: "/netshort/search", berkas: "netshort/search", kunciCari: "query" },
       rinci: { jalur: "/netshort/detail", berkas: "netshort/detail", kunciId: "shortPlayId" },
       episode: {
@@ -288,7 +320,7 @@ export const PLATFORM: Platform[] = [
     titik: {
       terbaru: { jalur: "/melolo/latest", berkas: "melolo/latest" },
       populer: { jalur: "/melolo/trending", berkas: "melolo/trending" },
-      lainnya: { jalur: "/melolo/foryou", berkas: "melolo/foryou", halaman: GESER_0 },
+      lainnya: { jalur: "/melolo/foryou", berkas: "melolo/foryou", halaman: halamanGeser(6) },
       cari: { jalur: "/melolo/search", berkas: "melolo/search", kunciCari: "query" },
       rinci: { jalur: "/melolo/detail", berkas: "melolo/detail", kunciId: "book_id" },
       episode: { jalur: "/melolo/get-episode", berkas: "melolo/stream", kunciId: "videoId" },
@@ -303,7 +335,7 @@ export const PLATFORM: Platform[] = [
     caraEpisode: "dalam-rinci",
     titik: {
       terbaru: { jalur: "/freereels/homepage", berkas: "freereels/home" },
-      lainnya: { jalur: "/freereels/foryou", berkas: "freereels/foryou", halaman: GESER_0 },
+      lainnya: { jalur: "/freereels/foryou", berkas: "freereels/foryou", halaman: halamanGeser(5) },
       cari: { jalur: "/freereels/search", berkas: "freereels/search", kunciCari: "query" },
       rinci: { jalur: "/freereels/detailAndAllEpisode", berkas: "freereels/detail", kunciId: "key" },
     },
@@ -317,7 +349,7 @@ export const PLATFORM: Platform[] = [
     caraEpisode: "nomor",
     titik: {
       terbaru: { jalur: "/flickreels/latest", berkas: "flickreels/latest" },
-      lainnya: { jalur: "/flickreels/foryou", berkas: "flickreels/foryou", halaman: HAL_1 },
+      lainnya: { jalur: "/flickreels/foryou", berkas: "flickreels/foryou", halaman: halamanNomor(50) },
       cari: { jalur: "/flickreels/search", berkas: "flickreels/search", kunciCari: "query" },
       rinci: { jalur: "/flickreels/detail", berkas: "flickreels/detail", kunciId: "playlet_id" },
       episode: {
@@ -347,7 +379,7 @@ export const PLATFORM: Platform[] = [
       // diabaikan — dan penyelaras tiga harian akan melaporkannya sebagai
       // beda yang tidak pernah dapat dibereskan.
       terbaru: { jalur: "/dramanova/home", berkas: "dramanova/home" },
-      cari: { jalur: "/dramanova/search", berkas: "dramanova/search", kunciCari: "query", halaman: HAL_1 },
+      cari: { jalur: "/dramanova/search", berkas: "dramanova/search", kunciCari: "query", halaman: halamanNomor(100) },
       rinci: { jalur: "/dramanova/detail", berkas: "dramanova/detail", kunciId: "dramaId" },
       episode: { jalur: "/dramanova/getvideo", berkas: "dramanova/getvideo", kunciId: "fileId" },
     },
@@ -430,6 +462,40 @@ export function alamatHulu(platform: Platform, aksi: Aksi, minta: Permintaan = {
 /** Nama parameter halaman untuk sebuah aksi; kosong bila sekali ambil habis. */
 export function penomoran(platform: Platform, aksi: Aksi): Penomoran | null {
   return platform.titik[aksi]?.halaman ?? null;
+}
+
+/** Keadaan sebuah daftar yang sedang digulir. */
+export type Gulir = {
+  /** Berapa potong yang sudah diminta, termasuk yang pertama. */
+  potong: number;
+  /** Penanda yang dikirim hulu pada potongan terakhir; boleh kosong. */
+  kursor: string;
+  /** Benar bila hulu sendiri sudah bilang tidak ada lagi. */
+  habis: boolean;
+};
+
+/**
+ * Penanda potongan berikutnya, atau null bila memang tidak ada lagi.
+ *
+ * Satu fungsi untuk tiga cara penomoran sekaligus, dan itu yang membuat layar
+ * tidak perlu tahu bahwa Melolo menghitung geseran sementara DramaBox
+ * menghitung halaman. Yang menghentikannya ada tiga, dan ketiganya perlu:
+ * hulu bilang habis, batas potongan tercapai, atau penomoran kursor yang
+ * kehabisan kursornya — kursor kosong tidak dapat ditebak sendiri, dan
+ * menebaknya berarti meminta halaman pertama berulang kali.
+ */
+export function gulirBerikut(cara: Penomoran | null, sudah: Gulir): string | null {
+  if (!cara) return null;
+  if (sudah.habis) return null;
+  if (sudah.potong >= cara.batas) return null;
+
+  if (cara.kunci === "cursor") return sudah.kursor || null;
+  // Geseran dan halaman sama-sama dapat dihitung sendiri, tetapi angka dari
+  // hulu selalu lebih dipercaya: ia tahu berapa judul yang benar-benar
+  // dikirimkannya, dan kita hanya tahu berapa yang kita minta.
+  if (sudah.kursor) return sudah.kursor;
+  if (cara.kunci === "offset") return String(sudah.potong * (cara.langkah ?? 20));
+  return String(sudah.potong + 1);
 }
 
 /** Aksi daftar yang benar-benar dilayani platform ini, menurut urutan tampil. */
