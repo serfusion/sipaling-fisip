@@ -264,6 +264,11 @@ const KUNCI_DAFTAR = [
 const KUNCI_DAFTAR_EPISODE = [
   "chapterList",
   "chapters",
+  // GoodShort menaruh seluruh episodenya di sini, dan namanya tidak
+  // menyerupai satu pun nama lain di daftar ini. Tanpa barisnya, jawaban
+  // GoodShort jatuh ke penelusuran umum — yang menemukan larik lain lebih
+  // dulu, dan berakhir sebagai judul tanpa satu pun episode.
+  "downloadList",
   "episodeList",
   "episode_list",
   "episodes",
@@ -363,6 +368,89 @@ export function bacaDaftar(payload: unknown): Kartu[] {
   return hasil;
 }
 
+/** Nama kolom yang berarti "masih ada lagi" bila bernilai benar. */
+const KUNCI_MASIH_ADA = ["has_more", "hasMore", "hasNext", "has_next", "more"] as const;
+
+/** Nama kolom yang berarti "sudah habis" bila bernilai benar. */
+const KUNCI_SUDAH_HABIS = ["isEnd", "is_end", "isLast", "completed", "finished", "noMore", "no_more"] as const;
+
+/** Nama kolom yang membawa penanda potongan berikutnya. */
+const KUNCI_PENANDA = [
+  "next_cursor",
+  "nextCursor",
+  "cursor",
+  "next_offset",
+  "nextOffset",
+  "next",
+  "offset",
+] as const;
+
+/**
+ * Simpul-simpul tempat keterangan penomoran biasa bersembunyi.
+ *
+ * Dicari berlapis karena hulu tidak sepakat menaruhnya di mana: PineDrama
+ * menaruh has_more di akar, FreeReels di `data.page_info`, GoodShort menyebut
+ * `data.current` dan `data.pages` alih-alih has_more sama sekali. Membaca akar
+ * saja berarti dua dari tiga platform itu selalu terbaca "masih ada" — dan
+ * gulir tak berhingganya tidak pernah berhenti sendiri.
+ */
+function simpulHalaman(payload: unknown): Objek[] {
+  const akar = objek(payload);
+  if (!akar) return [];
+  const hasil: Objek[] = [akar];
+  for (const kunci of ["data", "page_info", "pageInfo", "page", "meta", "result"]) {
+    const isi = objek(akar[kunci]);
+    if (!isi) continue;
+    hasil.push(isi);
+    for (const dalam of ["page_info", "pageInfo", "page", "meta"]) {
+      const lebihDalam = objek(isi[dalam]);
+      if (lebihDalam) hasil.push(lebihDalam);
+    }
+  }
+  return hasil;
+}
+
+export type Halaman = {
+  /** Penanda potongan berikutnya bila hulu menyebutkannya; boleh kosong. */
+  kursor: string;
+  /** Benar bila hulu sendiri sudah menyatakan tidak ada potongan lagi. */
+  habis: boolean;
+};
+
+/**
+ * Keterangan penomoran di dalam sebuah jawaban daftar.
+ *
+ * Yang dijawab dua hal yang berbeda, dan memisahkannya penting: "penanda
+ * berikutnya" dan "sudah habis". Daftar berhalaman biasa tidak punya penanda
+ * sama sekali — nomornya kita hitung sendiri — tetapi tetap punya akhir; dan
+ * memperlakukan penanda kosong sebagai akhir akan menghentikan DramaBox di
+ * halaman pertama.
+ */
+export function bacaHalaman(payload: unknown): Halaman {
+  const simpul = simpulHalaman(payload);
+  let kursor = "";
+  let habis = false;
+
+  for (const isi of simpul) {
+    if (!kursor) {
+      const penanda = teks(pilih(isi, KUNCI_PENANDA));
+      // Geseran nol adalah geseran awal, bukan penanda berikutnya; hulu
+      // memulangkannya pada jawaban yang justru sudah habis.
+      if (penanda && penanda !== "0") kursor = penanda.slice(0, 200);
+    }
+    if (pilih(isi, KUNCI_MASIH_ADA) === false) habis = true;
+    if (pilih(isi, KUNCI_SUDAH_HABIS) === true) habis = true;
+
+    // Bentuk GoodShort: nomor halaman sekarang dan jumlah halaman seluruhnya.
+    const sekarang = Math.floor(angka(pilih(isi, ["current", "currentPage", "page_num", "pageNum"])));
+    const seluruh = Math.floor(angka(pilih(isi, ["pages", "totalPages", "total_pages", "pageCount"])));
+    if (sekarang > 0 && seluruh > 0 && sekarang >= seluruh) habis = true;
+  }
+
+  if (habis) return { kursor: "", habis: true };
+  return { kursor, habis: false };
+}
+
 /**
  * Penanda halaman berikutnya, untuk platform yang memakai kursor.
  *
@@ -370,11 +458,7 @@ export function bacaDaftar(payload: unknown): Kartu[] {
  * hulu menyebut has_more bernilai salah.
  */
 export function bacaKursor(payload: unknown): string {
-  const isi = objek(payload);
-  if (!isi) return "";
-  const lagi = pilih(isi, ["has_more", "hasMore", "hasNext"]);
-  if (lagi === false) return "";
-  return teks(pilih(isi, ["cursor", "next_cursor", "nextCursor", "offset", "next"]));
+  return bacaHalaman(payload).kursor;
 }
 
 // ============================================================
@@ -393,7 +477,16 @@ const KUNCI_ALIRAN: Record<string, number> = {
   stream_url: 84,
   videoUrl: 82,
   video_url: 82,
+  // NetShort menamai tautan episodenya "playVoucher", dan cadangannya
+  // "playVoucherBak". Namanya tidak menyebut video sama sekali, jadi tanpa
+  // dua baris ini seluruh episode NetShort terbaca sebagai episode tanpa
+  // tautan — persis keluhan "judulnya ada, videonya tidak jalan".
+  playVoucher: 83,
+  playVoucherBak: 66,
   main_url: 78,
+  // Melolo memulangkan alamat yang sudah dipulihkan hulu di kolom terpisah;
+  // yang belum dipulihkan tidak selalu dapat dibuka.
+  main_url_decoded: 80,
   playUrl: 76,
   indo_hd_cdn_urls: 75,
   indo_cdn_urls: 72,
@@ -412,12 +505,61 @@ function berbentukVideo(nilai: string): boolean {
   return /\.(m3u8|mp4|ts)(\?|$)/i.test(nilai);
 }
 
-function mutuDari(induk: Objek): string {
-  const nilai = pilih(induk, ["type", "quality", "resolution", "definition", "name", "label"]);
+/** Teks yang memang berarti mutu gambar, mis. "720p"; kosong bila bukan. */
+function mutuTeks(nilai: unknown): string {
   const sebagaiTeks = teks(nilai);
   if (/^\d{3,4}p?$/i.test(sebagaiTeks)) return sebagaiTeks.endsWith("p") ? sebagaiTeks : `${sebagaiTeks}p`;
   return /\d{3,4}p/i.test(sebagaiTeks) ? sebagaiTeks : "";
 }
+
+/**
+ * Mutu sebuah tautan, dari objek yang membawanya dan dari nama kolomnya.
+ *
+ * Nama kolomnya ikut dibaca karena ShortMax memulangkan tautannya sebagai
+ * objek yang KUNCInya adalah mutunya — `{ "720p": "https://…" }` — sehingga
+ * membaca isinya saja memulangkan tombol mutu tanpa nama.
+ *
+ * Cara memampatkan gambarnya ikut disebut bila hulu menyebutkannya. Itu bukan
+ * hiasan: H265 memang lebih kecil, dan memang tidak dapat diputar di banyak
+ * peramban — yang membuka perlu tahu tombol mana yang ia tekan.
+ */
+function mutuDari(induk: Objek, dariKunci = ""): string {
+  const dasar =
+    mutuTeks(pilih(induk, ["type", "quality", "resolution", "definition", "name", "label"])) ||
+    mutuTeks(dariKunci);
+  const sandi = teks(pilih(induk, ["encode", "codec", "encodeType"])).toUpperCase();
+  const cocok = sandi === "H264" || sandi === "H265" || sandi === "AVC" || sandi === "HEVC";
+  if (!cocok) return dasar;
+  return dasar ? `${dasar} ${sandi}` : sandi;
+}
+
+/**
+ * Seberapa besar kemungkinan sebuah tautan benar-benar dapat diputar peramban.
+ *
+ * Hulu memilih H264 lebih dulu "untuk kecocokan", dan alasannya nyata: Chrome
+ * di Windows tidak memutar H265 sama sekali. Tautan H265 tidak dibuang — ia
+ * hanya ditaruh di belakang, supaya yang dicoba pertama adalah yang paling
+ * mungkin jalan, dan yang lain tetap tersedia sebagai tombol mutu.
+ */
+function condongSandi(induk: Objek): number {
+  const sandi = teks(pilih(induk, ["encode", "codec", "encodeType"])).toUpperCase();
+  if (sandi === "H265" || sandi === "HEVC") return -25;
+  if (sandi === "H264" || sandi === "AVC") return 6;
+  return 0;
+}
+
+/**
+ * Yang perlu diketahui pembaca tentang platform yang sedang dibaca.
+ *
+ * Isinya sengaja sedikit: pembaca ini tetap tidak boleh tahu nama platform
+ * apa pun. Yang diterimanya data dari tabel, bukan percabangan menurut nama —
+ * sehingga menambah platform kesebelas tetap berarti menyunting tabel, bukan
+ * menyunting berkas ini.
+ */
+export type OpsiAliran = {
+  /** Nama kolom yang nilainya selalu harus disiapkan API hulu lebih dulu. */
+  kunciLewatHulu?: readonly string[];
+};
 
 /**
  * Seluruh tautan yang dapat diputar di dalam sebuah jawaban episode.
@@ -428,9 +570,10 @@ function mutuDari(induk: Objek): string {
  * HLS menerima keduanya, tetapi .m3u8 yang datang lebih dulu berarti mutu
  * dapat berpindah sendiri saat jaringannya turun.
  */
-export function kumpulkanAliran(payload: unknown): Aliran[] {
+export function kumpulkanAliran(payload: unknown, opsi: OpsiAliran = {}): Aliran[] {
   type Temuan = { url: string; nilai: number; mutu: string; lewatHulu: boolean };
   const temuan: Temuan[] = [];
+  const selaluLewatHulu = new Set(opsi.kunciLewatHulu ?? []);
 
   /** Satu nilai teks, dinilai menurut nama kolom tempat ia ditemukan. */
   function catat(kunci: string, nilai: string, induk: Objek, dalam: number) {
@@ -439,12 +582,23 @@ export function kumpulkanAliran(payload: unknown): Aliran[] {
 
     const prioritas = KUNCI_ALIRAN[kunci];
     const kenalNama = prioritas !== undefined;
+    const mutu = mutuDari(induk, kunci);
+
+    // Kolom yang tabel platformnya sebut selalu perlu disiapkan hulu tidak
+    // pernah dibuka apa adanya, walau nilainya sudah berbentuk alamat utuh.
+    // Itu bukan kehati-hatian berlebih: videoPath DramaBox dan filePath
+    // GoodShort memang kadang datang sebagai alamat yang tampak wajar, dan
+    // sama-sama menjawab 403 ketika benar-benar dibuka tanpa disiapkan.
+    if (selaluLewatHulu.has(kunci) && bersih.length > 8 && !bersih.includes(" ")) {
+      temuan.push({ url: bersih, nilai: (prioritas ?? 40) - dalam, mutu, lewatHulu: true });
+      return;
+    }
 
     if (tampakTautan(bersih) && (kenalNama || berbentukVideo(bersih))) {
       temuan.push({
         url: bersih,
-        nilai: (prioritas ?? 40) + (berbentukVideo(bersih) ? 5 : 0) - dalam,
-        mutu: mutuDari(induk),
+        nilai: (prioritas ?? 40) + (berbentukVideo(bersih) ? 5 : 0) + condongSandi(induk) - dalam,
+        mutu,
         lewatHulu: false,
       });
       return;
@@ -453,7 +607,7 @@ export function kumpulkanAliran(payload: unknown): Aliran[] {
     // Bukan alamat, tetapi berada di kolom yang memang berisi video: inilah
     // bentuk videoPath DramaBox yang masih perlu disiapkan hulu.
     if (kenalNama && bersih.length > 16 && !bersih.includes(" ")) {
-      temuan.push({ url: bersih, nilai: (prioritas ?? 40) - 20 - dalam, mutu: mutuDari(induk), lewatHulu: true });
+      temuan.push({ url: bersih, nilai: (prioritas ?? 40) - 20 - dalam, mutu, lewatHulu: true });
     }
   }
 
@@ -508,7 +662,7 @@ export function kumpulkanAliran(payload: unknown): Aliran[] {
 // EPISODE
 // ============================================================
 
-function bacaSatuEpisode(item: Objek, urutan: number): Episode {
+function bacaSatuEpisode(item: Objek, urutan: number, opsi: OpsiAliran): Episode {
   const nomorMentah = pilih(item, KUNCI_NOMOR);
   const nomor = Math.floor(angka(nomorMentah));
   return {
@@ -518,14 +672,14 @@ function bacaSatuEpisode(item: Objek, urutan: number): Episode {
     nomor: nomor > 0 ? nomor : urutan + 1,
     nama: teks(pilih(item, KUNCI_NAMA_EPISODE)),
     id: teks(pilih(item, KUNCI_ID_EPISODE)),
-    aliran: kumpulkanAliran(item),
+    aliran: kumpulkanAliran(item, opsi),
   };
 }
 
 /** Daftar episode di dalam sebuah jawaban rinci atau jawaban daftar episode. */
-export function bacaDaftarEpisode(payload: unknown): Episode[] {
+export function bacaDaftarEpisode(payload: unknown, opsi: OpsiAliran = {}): Episode[] {
   const larik = cariLarik(payload, KUNCI_DAFTAR_EPISODE);
-  const hasil = larik.map((item, urutan) => bacaSatuEpisode(item, urutan));
+  const hasil = larik.map((item, urutan) => bacaSatuEpisode(item, urutan, opsi));
 
   // Nomor kembar berarti nomor yang terbaca bukan nomor episode (mis. kolom
   // "sort" yang selalu nol). Dalam keadaan itu urutannyalah yang benar.
@@ -542,8 +696,8 @@ export function bacaDaftarEpisode(payload: unknown): Episode[] {
  * Bila jawabannya justru membawa daftar, yang diambil yang pertama — itulah
  * yang dikirim hulu ketika episode yang diminta tidak ada.
  */
-export function bacaEpisodeTunggal(payload: unknown, nomor: number): Episode {
-  const aliran = kumpulkanAliran(payload);
+export function bacaEpisodeTunggal(payload: unknown, nomor: number, opsi: OpsiAliran = {}): Episode {
+  const aliran = kumpulkanAliran(payload, opsi);
   if (aliran.length) {
     const isi = objek(payload) ?? {};
     return {
@@ -553,7 +707,7 @@ export function bacaEpisodeTunggal(payload: unknown, nomor: number): Episode {
       aliran,
     };
   }
-  const daftar = bacaDaftarEpisode(payload);
+  const daftar = bacaDaftarEpisode(payload, opsi);
   return daftar[0] ?? { nomor, nama: "", id: "", aliran: [] };
 }
 
@@ -569,7 +723,12 @@ export function bacaEpisodeTunggal(payload: unknown, nomor: number): Episode {
  * Kartu yang dikirim layar dipakai sebagai cadangan terakhir, supaya nama
  * judulnya tidak pernah kosong walau jawaban rincinya mengecewakan.
  */
-export function bacaRinci(payload: unknown, id: string, cadangan?: Kartu | null): Rinci {
+export function bacaRinci(
+  payload: unknown,
+  id: string,
+  cadangan?: Kartu | null,
+  opsi: OpsiAliran = {},
+): Rinci {
   const akar = objek(payload) ?? {};
   const kandidat: Objek[] = [akar];
   for (const kunci of ["data", "book", "detail", "result", "info", "collection", "drama"]) {
@@ -591,7 +750,7 @@ export function bacaRinci(payload: unknown, id: string, cadangan?: Kartu | null)
     return undefined;
   }
 
-  const daftar = bacaDaftarEpisode(payload);
+  const daftar = bacaDaftarEpisode(payload, opsi);
   const jumlahMentah = ambil(KUNCI_EPISODE);
   const jumlah = Array.isArray(jumlahMentah) ? jumlahMentah.length : Math.floor(angka(jumlahMentah));
 

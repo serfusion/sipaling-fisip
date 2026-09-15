@@ -6440,6 +6440,29 @@ table.qt td small { font-size: 11.5px; }
 .dr-mini { padding: 8px 14px; border: 1px solid var(--dr-garis); border-radius: 999px;
   background: var(--dr-kartu); color: var(--dr-tinta); font-size: 12px; font-weight: 600; }
 .dr-mini:hover:not(:disabled) { border-color: var(--dr-utama); }
+
+/* ---------- Gulir tak berhingga ----------
+   Petak pemicunya tidak berisi apa pun dan tidak terlihat, tetapi TIDAK boleh
+   setinggi nol: petak setinggi nol tidak pernah dilaporkan "masuk layar" oleh
+   sebagian peramban, dan gulir tak berhingganya diam-diam berhenti bekerja. */
+.dr-pemicu { height: 1px; width: 100%; }
+
+.dr-tambah { margin-top: 22px; padding: 14px 0 6px; display: flex; flex-direction: column;
+  align-items: center; gap: 12px; }
+.dr-tambah-teks { margin: 0; font-size: 13px; font-weight: 600; color: var(--dr-redup); }
+.dr-tambah-habis { margin-top: 26px; padding-top: 24px; border-top: 1px solid var(--dr-garis); }
+.dr-tambah-putar { width: 34px; height: 34px; border: 3px solid rgba(239,106,138,.22);
+  border-top-color: var(--dr-utama); border-radius: 50%; animation: dr-putar .8s linear infinite; }
+/* Tulisannya berdenyut pelan selagi memuat — tanda bahwa yang ditunggu memang
+   sedang berjalan, bukan layar yang membeku. */
+.dr-tambah .dr-tambah-teks { animation: dr-kedip 1.6s ease-in-out infinite; }
+.dr-tambah-habis .dr-tambah-teks { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .dr-tambah-putar { animation-duration: 2.4s; }
+  .dr-tambah .dr-tambah-teks { animation: none; }
+}
+
+.dr-kosong-aksi { margin-top: 12px; display: flex; justify-content: center; }
 .dr-kosong { color: var(--dr-redup); font-size: 13px; line-height: 1.6; margin: 8px 0; }
 .dr-galat { margin: 8px 0; padding: 10px 14px; border-radius: 10px; font-size: 12.5px;
   background: rgba(220,38,38,.12); border: 1px solid rgba(220,38,38,.3); color: #fca5a5; }

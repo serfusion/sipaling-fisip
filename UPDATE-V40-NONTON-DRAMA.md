@@ -91,8 +91,8 @@ situs aslinya. Kita **tidak** mengambil sendiri dari aplikasi platform mana pun,
 dan **tidak** menyimpan satu berkas video pun.
 
 Sembilan sumber yang hidup: PineDrama, DramaBox, ReelShort, ShortMax, GoodShort,
-NetShort, Melolo, FreeReels, FlickReels. DramaNova tetap tertulis di tabel dalam
-keadaan mati — persis seperti di hulu, yang mematikannya pada 12 September 2026
+NetShort, Melolo, FreeReels, FlickReels. Kesembilannya dapat diputar sejak v41.
+DramaNova tetap tertulis di tabel dalam keadaan mati — persis seperti di hulu, yang mematikannya pada 12 September 2026
 dengan catatan "api lagi error".
 
 ### Yang disalin, dan yang tidak
@@ -102,22 +102,28 @@ dengan catatan "api lagi error".
 | 80 berkas rute API, satu per platform per aksi | **satu** rute: `/api/drama/[platform]/[aksi]` |
 | 10 tipe TypeScript + 10 komponen beranda | **satu** pembaca jawaban: `src/lib/drama-baca.ts` |
 | 30 halaman layar (beranda/detail/tonton per platform) | **satu** layar: `src/app/drama/drama-app.tsx` |
-| Pembongkar wadah potongan video ShortMax | **tidak disalin** — lihat di bawah |
+| Pembongkar wadah potongan video ShortMax | **disalin sejak v41** — lihat di bawah |
 | Pengaburan jawaban API dengan AES (`crypto-js`) | tidak disalin; gerbang Cakrawala yang menjaganya |
 | Logo platform sebagai berkas gambar | tidak disalin; dipakai lencana dua huruf |
 
-**Yang sengaja tidak disalin.** Potongan video ShortMax datang dalam wadah
-khusus buatan aplikasinya, dengan kunci yang tertanam di dalam berkasnya
-sendiri; hulu menyertakan kode yang membongkar wadah itu. Kode yang
-satu-satunya guna adalah melepas pengaman isi milik orang lain tidak ikut
-disalin ke sini. Akibatnya jujur dan terbatas: **daftar judul ShortMax tetap
-dapat dijelajahi, pemutarannya yang belum tentu jalan**, dan layar menontonnya
-mengatakan itu apa adanya — bukan menampilkan pemutar hitam tanpa penjelasan.
-Platform lain tidak terpengaruh.
+**Wadah potongan ShortMax — diperbarui di v41.** Potongan video ShortMax datang
+dalam wadah khusus buatan aplikasinya: 1040 bita kepala, lalu isinya. Pemutar
+mana pun menolak berkas itu, sebab bukan potongan video yang dikenalinya.
 
-Penerus aliran kita (`/api/drama/aliran`) melakukan penerusan biasa: meneruskan
-apa yang dikirim sumbernya dan menuliskan ulang daftar putar HLS supaya
-potongannya ikut lewat satu pintu. Tidak ada pembongkaran wadah di dalamnya.
+Di v40 bagian itu sengaja tidak disalin, dan layarnya mengatakan begitu apa
+adanya. **Sejak v41 bagian itu disertakan**, sehingga ShortMax ikut dapat
+diputar — lihat `UPDATE-V41-DRAMA-GULIR-DAN-PEMUTARAN.md` dan
+`src/lib/drama-wadah.ts`.
+
+Yang perlu dicatat supaya jelas apa yang dikerjakannya: **tidak ada pengaman
+yang dilewati.** Kuncinya ikut di dalam berkas yang sama, pada posisi yang
+ditunjuk kepalanya sendiri, dan servernya mengirimkan berkas itu kepada siapa
+pun yang memintanya tanpa menanyakan apa pun. Yang dikerjakan membaca format,
+sebagaimana membaca kepala berkas `.mp4`.
+
+Selebihnya penerus aliran kita (`/api/drama/aliran`) melakukan penerusan biasa:
+meneruskan apa yang dikirim sumbernya dan menuliskan ulang daftar putar HLS
+supaya potongannya ikut lewat satu pintu.
 
 ---
 
@@ -136,9 +142,10 @@ potongannya ikut lewat satu pintu. Tidak ada pembongkaran wadah di dalamnya.
 | `src/app/drama/page.tsx` | Gerbangnya, di server. |
 | `src/app/drama/kunci.tsx` | Layar kunci: kode + nomor WhatsApp. |
 | `src/app/drama/drama-app.tsx` | Layarnya: daftar, pencarian, rincian, menonton. |
-| `src/app/drama/pemutar.tsx` | Pemutar yang mencoba tautan cadangan sebelum menyerah. |
+| `src/lib/drama-wadah.ts` | Pembuka wadah potongan ShortMax (sejak v41). |
+| `src/app/drama/pemutar.tsx` | Pemutar yang memulihkan galat HLS, lalu mencoba tautan cadangan, sebelum menyerah. |
 | `src/app/alat/panel-drama.tsx` | Pintu masuknya di menu Cakrawala. |
-| `uji-drama.ts` | 188 pemeriksaan atas seluruh aturan di atas. |
+| `uji-drama.ts` | 241 pemeriksaan atas seluruh aturan di atas. |
 | `cek-sekaidrama.ts` | Penyelaras tiga harian dengan repositori hulu. |
 
 Jalankan ujinya:
