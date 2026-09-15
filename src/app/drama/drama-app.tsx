@@ -37,7 +37,27 @@ type Jawaban = {
   habis?: boolean;
   rinci?: Rinci;
   episode?: Episode;
+  /**
+   * Benar bila isinya datang dari simpanan karena hulu sedang tidak menjawab.
+   *
+   * Dipulangkan sebagai jawaban yang berhasil, bukan sebagai galat, dan itu
+   * disengaja: isinya memang dapat digambar. Yang perlu diketahui pengunjung
+   * hanya bahwa daftarnya mungkin tertinggal beberapa judul — dan itu
+   * disampaikan sebagai catatan kecil, bukan sebagai layar galat.
+   */
+  basi?: boolean;
+  /** Usia isi simpanan itu dalam detik. */
+  usia?: number;
 };
+
+/** "sekitar 5 menit lalu" dari usia dalam detik. */
+function usiaTerbaca(detik: number | undefined): string {
+  if (!detik || detik < 60) return "barusan";
+  const menit = Math.round(detik / 60);
+  if (menit < 60) return `sekitar ${menit} menit lalu`;
+  const jam = Math.round(menit / 60);
+  return `sekitar ${jam} jam lalu`;
+}
 
 type Baris = {
   aksi: Aksi;
@@ -51,6 +71,10 @@ type Baris = {
   habis: boolean;
   sibuk: boolean;
   galat: string;
+  /** Isinya datang dari simpanan karena hulu sedang tidak menjawab. */
+  basi: boolean;
+  /** Usia isi simpanan itu dalam detik. */
+  usia: number;
   /**
    * Benar bila platform ini memang melayani potongan kedua untuk baris ini.
    *
@@ -120,6 +144,8 @@ function rencanaAwal(platform: Platform): Baris[] {
       habis: false,
       sibuk: true,
       galat: "",
+      basi: false,
+      usia: 0,
       bisaTambah,
       gulirSendiri: nomor === terakhir && bisaTambah,
     };
@@ -166,37 +192,80 @@ function DaftarBaris({ platform, buka }: { platform: Platform; buka: (kartu: Kar
     cermin.current = baris;
   }, [baris]);
 
+  /**
+   * Potongan PERTAMA sebuah baris — saat menu dibuka, dan saat pengunjung
+   * menekan "Coba lagi" sesudah baris itu gagal.
+   *
+   * Dipisahkan justru untuk yang kedua. Sebelum ini, baris yang gagal pada
+   * pemuatan pertama adalah jalan buntu: tidak ada satu pun tombol yang dapat
+   * ditekan, dan satu-satunya jalan keluarnya memuat ulang seluruh halaman.
+   * Padahal kegagalan yang paling sering terjadi di sini justru yang paling
+   * sebentar umurnya — sedetik kemudian hulu sudah menjawab lagi.
+   */
+  const jalankanPertama = useCallback(
+    (aksi: Aksi, tanda?: AbortSignal) => {
+      minta(platform.id, aksi, {}, tanda)
+        .then((jawab) => {
+          setBaris((sebelum) =>
+            sebelum.map((satu) => {
+              if (satu.aksi !== aksi) return satu;
+              const sesudah = sesudahPotongan([], jawab);
+              return {
+                ...satu,
+                ...sesudah,
+                kursor: jawab.kursor ?? "",
+                potong: 1,
+                sibuk: false,
+                galat: "",
+                basi: Boolean(jawab.basi),
+                usia: jawab.usia ?? 0,
+              };
+            }),
+          );
+        })
+        .catch((alasan: unknown) => {
+          if (tanda?.aborted) return;
+          setBaris((sebelum) =>
+            sebelum.map((satu) =>
+              satu.aksi === aksi
+                ? { ...satu, sibuk: false, galat: alasan instanceof Error ? alasan.message : "Gagal dimuat." }
+                : satu,
+            ),
+          );
+        });
+    },
+    [platform],
+  );
+
   useEffect(() => {
     const kendali = new AbortController();
 
     // Seluruh baris diminta bersamaan. Berurutan akan membuat baris ketiga
     // menunggu baris pertama yang kebetulan lambat, padahal keduanya tidak
     // saling bergantung sama sekali.
-    for (const item of barisDaftar(platform)) {
-      minta(platform.id, item.aksi, {}, kendali.signal)
-        .then((jawab) => {
-          setBaris((sebelum) =>
-            sebelum.map((satu) => {
-              if (satu.aksi !== item.aksi) return satu;
-              const sesudah = sesudahPotongan([], jawab);
-              return { ...satu, ...sesudah, kursor: jawab.kursor ?? "", potong: 1, sibuk: false };
-            }),
-          );
-        })
-        .catch((alasan: unknown) => {
-          if (kendali.signal.aborted) return;
-          setBaris((sebelum) =>
-            sebelum.map((satu) =>
-              satu.aksi === item.aksi
-                ? { ...satu, sibuk: false, galat: alasan instanceof Error ? alasan.message : "Gagal dimuat." }
-                : satu,
-            ),
-          );
-        });
-    }
+    //
+    // Yang dipanggil di sini `jalankanPertama`, bukan `muatPertama`: baris
+    // yang baru dipasang SUDAH bersih dan sudah bertanda sibuk (lihat
+    // rencanaAwal), jadi menyetelnya ulang di dalam effect hanya menambah satu
+    // penggambaran yang tidak mengubah apa pun.
+    for (const item of barisDaftar(platform)) jalankanPertama(item.aksi, kendali.signal);
 
     return () => kendali.abort();
-  }, [platform]);
+  }, [platform, jalankanPertama]);
+
+  /** Potongan pertama atas permintaan pengunjung: bersihkan dulu, lalu minta. */
+  const muatPertama = useCallback(
+    (aksi: Aksi) => {
+      cermin.current = cermin.current.map((item) =>
+        item.aksi === aksi ? { ...item, sibuk: true, galat: "" } : item,
+      );
+      setBaris((sebelum) =>
+        sebelum.map((item) => (item.aksi === aksi ? { ...item, sibuk: true, galat: "" } : item)),
+      );
+      jalankanPertama(aksi);
+    },
+    [jalankanPertama],
+  );
 
   const muatLagi = useCallback(
     (aksi: Aksi) => {
@@ -225,7 +294,15 @@ function DaftarBaris({ platform, buka }: { platform: Platform; buka: (kartu: Kar
             sebelum.map((item) => {
               if (item.aksi !== aksi) return item;
               const sesudah = sesudahPotongan(item.isi, jawab);
-              return { ...item, ...sesudah, kursor: jawab.kursor ?? "", potong: item.potong + 1, sibuk: false };
+              return {
+                ...item,
+                ...sesudah,
+                kursor: jawab.kursor ?? "",
+                potong: item.potong + 1,
+                sibuk: false,
+                basi: item.basi || Boolean(jawab.basi),
+                usia: jawab.basi ? (jawab.usia ?? 0) : item.usia,
+              };
             }),
           );
         })
@@ -245,7 +322,7 @@ function DaftarBaris({ platform, buka }: { platform: Platform; buka: (kartu: Kar
   return (
     <>
       {baris.map((item) => (
-        <BarisKartu key={item.aksi} baris={item} buka={buka} lagi={muatLagi} />
+        <BarisKartu key={item.aksi} baris={item} buka={buka} lagi={muatLagi} ulang={muatPertama} />
       ))}
     </>
   );
@@ -268,6 +345,7 @@ function HasilCari({
 }) {
   const [isi, setIsi] = useState<Kartu[] | null>(null);
   const [sibuk, setSibuk] = useState(true);
+  const [galat, setGalat] = useState("");
   const [halaman, setHalaman] = useState<Gulir>({ kursor: "", potong: 0, habis: true });
 
   const cermin = useRef({ sibuk, halaman, isi });
@@ -275,30 +353,53 @@ function HasilCari({
     cermin.current = { sibuk, halaman, isi };
   }, [sibuk, halaman, isi]);
 
+  const jalankanCari = useCallback(
+    (tanda?: AbortSignal) => {
+      minta(platform.id, "cari", { cari: kata }, tanda)
+        .then((jawab) => {
+          const sesudah = sesudahPotongan([], jawab);
+          setIsi(sesudah.isi);
+          setHalaman({
+            kursor: jawab.kursor ?? "",
+            potong: 1,
+            // Pencarian yang memang tidak berhalaman selesai pada potongan
+            // pertamanya. Menyatakannya begitu sekarang juga membuat pemicunya
+            // tidak pernah digambar — dan pemicu yang digambar untuk daftar yang
+            // tidak dapat bertambah adalah pemicu yang menyala tanpa hasil.
+            habis: sesudah.habis || !penomoran(platform, "cari"),
+          });
+        })
+        .catch((alasan: unknown) => {
+          if (tanda?.aborted) return;
+          // Kegagalan TIDAK LAGI dipulangkan sebagai daftar kosong. Sebelum
+          // ini, pencarian yang gagal karena hulu sedang mati terbaca di layar
+          // sebagai "tidak ada judul yang cocok" — kalimat yang salah, dan
+          // salah dengan cara yang paling menyesatkan: pengunjung menyimpulkan
+          // judul yang dicarinya tidak ada, lalu berhenti mencari.
+          setGalat(alasan instanceof Error ? alasan.message : "Pencarian gagal dimuat.");
+        })
+        .finally(() => {
+          if (!tanda?.aborted) setSibuk(false);
+        });
+    },
+    [platform, kata],
+  );
+
   useEffect(() => {
     const kendali = new AbortController();
-    minta(platform.id, "cari", { cari: kata }, kendali.signal)
-      .then((jawab) => {
-        const sesudah = sesudahPotongan([], jawab);
-        setIsi(sesudah.isi);
-        setHalaman({
-          kursor: jawab.kursor ?? "",
-          potong: 1,
-          // Pencarian yang memang tidak berhalaman selesai pada potongan
-          // pertamanya. Menyatakannya begitu sekarang juga membuat pemicunya
-          // tidak pernah digambar — dan pemicu yang digambar untuk daftar yang
-          // tidak dapat bertambah adalah pemicu yang menyala tanpa hasil.
-          habis: sesudah.habis || !penomoran(platform, "cari"),
-        });
-      })
-      .catch(() => {
-        if (!kendali.signal.aborted) setIsi([]);
-      })
-      .finally(() => {
-        if (!kendali.signal.aborted) setSibuk(false);
-      });
+    // Layar hasil dipasang dengan kunci berisi kata yang dicari, jadi yang
+    // baru terpasang selalu sudah bersih: tidak ada yang perlu disetel ulang
+    // sebelum permintaannya dikirim.
+    jalankanCari(kendali.signal);
     return () => kendali.abort();
-  }, [platform, kata]);
+  }, [jalankanCari]);
+
+  /** Pencarian ulang atas permintaan pengunjung. */
+  const cariUlang = useCallback(() => {
+    setSibuk(true);
+    setGalat("");
+    jalankanCari();
+  }, [jalankanCari]);
 
   /**
    * Potongan berikutnya dari hasil pencarian.
@@ -339,7 +440,14 @@ function HasilCari({
         <button type="button" className="dr-link" onClick={tutup}>Kembali ke daftar</button>
       </div>
 
-      {isi === null ? (
+      {galat && !sibuk ? (
+        <>
+          <p className="dr-galat" role="alert">{galat}</p>
+          <div className="dr-tambah">
+            <button type="button" className="dr-mini" onClick={cariUlang}>Coba lagi</button>
+          </div>
+        </>
+      ) : isi === null || (sibuk && !isi?.length) ? (
         <div className="dr-grid">
           {Array.from({ length: 6 }, (_, nomor) => <span key={nomor} className="dr-kartu dr-rangka" />)}
         </div>
@@ -596,14 +704,16 @@ function KakiDaftar({
 }
 
 function BarisKartu({
-  baris, buka, lagi,
+  baris, buka, lagi, ulang,
 }: {
   baris: Baris;
   buka: (kartu: Kartu) => void;
   lagi: (aksi: Aksi) => void;
+  ulang: (aksi: Aksi) => void;
 }) {
   const [semua, setSemua] = useState(false);
   const muatBaris = useCallback(() => lagi(baris.aksi), [lagi, baris.aksi]);
+  const muatUlang = useCallback(() => ulang(baris.aksi), [ulang, baris.aksi]);
 
   // Baris yang menarik sendiri tidak pernah diringkas: meringkasnya berarti
   // memindahkan dasar daftarnya ke atas layar, dan pemicunya akan langsung
@@ -616,6 +726,12 @@ function BarisKartu({
       <section className="dr-baris">
         <h2>{baris.judul}</h2>
         <p className="dr-galat" role="alert">{baris.galat}</p>
+        {/* Tombolnya bukan hiasan: kegagalan yang paling sering terjadi di
+            sini adalah kegagalan yang paling sebentar umurnya, dan tanpa
+            tombol ini satu-satunya jalan keluarnya memuat ulang halaman. */}
+        <div className="dr-tambah">
+          <button type="button" className="dr-mini" onClick={muatUlang}>Coba lagi</button>
+        </div>
       </section>
     );
   }
@@ -630,6 +746,17 @@ function BarisKartu({
           </button>
         )}
       </div>
+
+      {/* Isi dari simpanan diberi tahu, bukan disembunyikan. Daftar yang
+          tertinggal beberapa judul tetap berguna; yang tidak berguna adalah
+          pengunjung yang mengira daftarnya mutakhir padahal tidak. */}
+      {baris.basi && (
+        <p className="dr-catatan" role="status">
+          Sumber dramanya sedang tidak menjawab. Yang ditampilkan simpanan terakhir,
+          diambil {usiaTerbaca(baris.usia)}.{" "}
+          <button type="button" className="dr-link" onClick={muatUlang}>Muat ulang</button>
+        </p>
+      )}
 
       <div className="dr-grid">
         {tampil.map((kartu) => (
@@ -685,10 +812,9 @@ function LayarJudul({ platform, kartu, tutup }: { platform: Platform; kartu: Kar
   /** Episode yang sudah terlanjur diambil sekaligus, untuk platform "semua". */
   const borongan = useRef<Episode[] | null>(null);
 
-  useEffect(() => {
-    const kendali = new AbortController();
-
-    minta(platform.id, "rinci", { id: kartu.id }, kendali.signal)
+  const jalankanRinci = useCallback(
+    (tanda?: AbortSignal) => {
+    minta(platform.id, "rinci", { id: kartu.id }, tanda)
       .then((jawab) => {
         if (!jawab.rinci) throw new Error("Rincian judul ini tidak terbaca.");
         // Yang dikirim hulu kerap lebih miskin daripada kartunya sendiri —
@@ -704,13 +830,28 @@ function LayarJudul({ platform, kartu, tutup }: { platform: Platform; kartu: Kar
         });
       })
       .catch((alasan: unknown) => {
-        if (!kendali.signal.aborted) {
+        if (!tanda?.aborted) {
           setGalat(alasan instanceof Error ? alasan.message : "Rincian judul ini gagal dimuat.");
         }
       });
+    },
+    [platform.id, kartu],
+  );
 
+  useEffect(() => {
+    const kendali = new AbortController();
+    // Layar judul dipasang dengan kunci berisi platform dan id judulnya, jadi
+    // yang baru terpasang selalu sudah bersih — tidak ada galat lama yang
+    // perlu dihapus sebelum permintaannya dikirim.
+    jalankanRinci(kendali.signal);
     return () => kendali.abort();
-  }, [platform.id, kartu]);
+  }, [jalankanRinci]);
+
+  /** Memuat ulang rincian atas permintaan pengunjung. */
+  const muatRinci = useCallback(() => {
+    setGalat("");
+    jalankanRinci();
+  }, [jalankanRinci]);
 
   const jumlah = rinci ? Math.max(rinci.episode, rinci.daftar.length) : kartu.episode;
 
@@ -783,7 +924,20 @@ function LayarJudul({ platform, kartu, tutup }: { platform: Platform; kartu: Kar
             </div>
 
             {sibukEpisode && <p className="dr-kosong">Menyiapkan episode…</p>}
-            {galatEpisode && <p className="dr-galat" role="alert">{galatEpisode}</p>}
+            {galatEpisode && !sibukEpisode && (
+              <>
+                <p className="dr-galat" role="alert">{galatEpisode}</p>
+                <div className="dr-tambah">
+                  {/* Episode yang gagal disiapkan hampir selalu gagal karena
+                      hulu tersendat sesaat. Sebelum ini, satu-satunya jalan
+                      mencobanya lagi adalah menekan nomor episode LAIN lalu
+                      kembali — dan itu tidak pernah terpikir oleh siapa pun. */}
+                  <button type="button" className="dr-mini" onClick={() => void putar(nomor)}>
+                    Coba lagi
+                  </button>
+                </div>
+              </>
+            )}
             {episode && !sibukEpisode && (
               <Pemutar
                 aliran={episode.aliran}
@@ -835,7 +989,14 @@ function LayarJudul({ platform, kartu, tutup }: { platform: Platform; kartu: Kar
           </div>
         </div>
 
-        {galat && <p className="dr-galat" role="alert">{galat}</p>}
+        {galat && (
+          <>
+            <p className="dr-galat" role="alert">{galat}</p>
+            <div className="dr-tambah">
+              <button type="button" className="dr-mini" onClick={muatRinci}>Coba lagi</button>
+            </div>
+          </>
+        )}
 
         {!rinci && !galat && <p className="dr-kosong">Memuat rincian…</p>}
 

@@ -25,12 +25,29 @@
 // ============================================================
 import { cakrawalaAccess } from "@/lib/cakrawala-store";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
-import { alamatAliranHulu, cariPlatform, UA_HULU } from "@/lib/drama";
+import { alamatAliranHuluSemua, cariPlatform, UA_HULU } from "@/lib/drama";
 import { jenisIsi, tampakDaftarPutar, tautanAman, tulisUlangDaftarPutar } from "@/lib/drama-aliran";
 import { pembukaWadah } from "@/lib/drama-wadah";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/**
+ * Berapa lama fungsi ini boleh hidup.
+ *
+ * INI YANG PALING SERING SALAH DIPAHAMI, dan salah paham itu terbaca di layar
+ * sebagai "kadang tidak bisa menonton". Tanpa baris ini Vercel memakai
+ * bawaannya — sepuluh sampai lima belas detik menurut paketnya — dan
+ * hitungannya bukan sampai KEPALA jawaban tiba, melainkan sampai seluruh isi
+ * selesai mengalir. Satu berkas mp4 pada sambungan ponsel yang pelan akan
+ * melewatinya dengan mudah, lalu dihentikan gerbang di tengah jalan: yang
+ * dilihat penonton bukan pesan galat, melainkan video yang berhenti sendiri
+ * dan tidak mau berlanjut.
+ *
+ * Angkanya dibuat lapang karena penerusan video memang lama, dan karena
+ * lamanya itu hampir seluruhnya menunggu jaringan, bukan memakai prosesor.
+ */
+export const maxDuration = 300;
 
 /**
  * Berapa lama menunggu KEPALA jawaban, bukan seluruh berkasnya.
@@ -76,9 +93,18 @@ export async function GET(request: Request) {
 
   // Tautan yang perlu disiapkan hulu dibungkus alamat hulu kita sendiri —
   // jadi yang diperiksa keamanannya alamat hasilnya, bukan isian mentahnya.
-  const tujuan = lewatHulu && platform ? alamatAliranHulu(platform, mentah) : mentah;
-  const alamat = tujuan ? tautanAman(tujuan) : null;
-  if (!alamat) return new Response("Alamat video tidak sah.", { status: 400 });
+  //
+  // Hulu boleh lebih dari satu (lihat daftarApiHulu di src/lib/drama.ts), dan
+  // di sinilah cadangan itu benar-benar terpakai: tautan DramaBox dan
+  // GoodShort tidak dapat dibuka sebelum hulu menyiapkannya, jadi hulu yang
+  // mati berarti episodenya tidak dapat diputar sama sekali — walau berkas
+  // videonya sendiri baik-baik saja.
+  const tujuanSemua = lewatHulu && platform ? alamatAliranHuluSemua(platform, mentah) : [mentah];
+  const alamatSemua = tujuanSemua
+    .map((satu) => (satu ? tautanAman(satu) : null))
+    .filter((satu): satu is URL => satu !== null);
+  if (!alamatSemua.length) return new Response("Alamat video tidak sah.", { status: 400 });
+  const alamat = alamatSemua[0];
 
   const namaJalur = alamat.pathname.toLowerCase();
   const pastiDaftar = namaJalur.endsWith(".m3u8");
@@ -92,7 +118,10 @@ export async function GET(request: Request) {
 
   // Permintaan ke API hulu tetap memakai nama hulu; permintaan ke CDN memakai
   // nama peramban. Keduanya meniru permintaan yang sudah terbukti dilayani.
-  const kepalaMinta: Record<string, string> = {
+  // Kepala permintaan disusun untuk TIAP alamat yang dicoba, bukan sekali di
+  // muka: perujuknya berisi asal alamat itu sendiri, dan asal itu berbeda
+  // antara satu hulu dan cadangannya.
+  const kepalaUntuk = (tujuan: URL): Record<string, string> => ({
     "User-Agent": lewatHulu ? UA_HULU : UA_PERAMBAN,
     Accept: "*/*",
     // Sebagian server potongan menolak permintaan yang isinya dipadatkan
@@ -101,12 +130,12 @@ export async function GET(request: Request) {
     // Perujuk diisi asal tautannya sendiri, bukan alamat kita. Banyak CDN
     // memeriksanya, dan yang dicarinya nama mereka sendiri. Asal kita justru
     // yang ditolak — karena itu Origin sengaja tidak ikut dikirim.
-    Referer: `${alamat.origin}/`,
+    Referer: `${tujuan.origin}/`,
     ...(jangkauan ? { Range: jangkauan } : {}),
-  };
+  });
 
   try {
-    const jawab = await ambilDenganSatuUlangan(alamat.href, kepalaMinta);
+    const jawab = await ambilBerulang(alamatSemua, kepalaUntuk);
 
     if (!jawab.ok && jawab.status !== 206) {
       return new Response("Sumber videonya menolak permintaan.", { status: 502 });
@@ -162,28 +191,55 @@ export async function GET(request: Request) {
   }
 }
 
+/** Jeda sebelum percobaan berikutnya; lihat alasannya di JEDA_ULANG_MS. */
+function tidur(ms: number) {
+  return new Promise((selesai) => setTimeout(selesai, ms));
+}
+
+/** Berapa kali sebuah tautan video dicoba, termasuk percobaan pertama. */
+const MAKS_PERCOBAAN = 3;
+
 /**
- * Minta sekali, dan bila gagal karena keadaan sesaat, minta sekali lagi.
+ * Jeda sebelum mencoba lagi.
  *
- * Satu ulangan, bukan lebih. Kegagalan pertama ke CDN video kerap benar-benar
- * sesaat — sambungan yang putus saat dibuka, atau 5xx yang hilang sendiri
- * sedetik kemudian — dan menyerah pada percobaan pertama itulah yang di layar
- * terbaca sebagai "kadang bisa, kadang tidak". Ulangan kedua tidak dilakukan:
- * yang gagal dua kali biasanya memang gagal, dan menahan pemutar lebih lama
- * hanya menunda pesan yang sama.
+ * Bukan nol. CDN yang barusan menjawab 5xx hampir selalu sedang kewalahan,
+ * dan permintaan susulan pada milidetik yang sama adalah permintaan yang
+ * paling mungkin ikut ditolak. Jeda pendek membuat ulangannya benar-benar
+ * berbeda dari percobaan pertama — dan setengah detik tidak terasa oleh
+ * penonton yang sedang menunggu episode dimuat.
+ */
+const JEDA_ULANG_MS = [500, 1_500];
+
+/**
+ * Minta, dan bila gagal karena keadaan sesaat, minta lagi.
+ *
+ * Kegagalan pertama ke CDN video kerap benar-benar sesaat — sambungan yang
+ * putus saat dibuka, atau 5xx yang hilang sendiri sedetik kemudian — dan
+ * menyerah pada percobaan pertama itulah yang di layar terbaca sebagai
+ * "kadang bisa, kadang tidak".
+ *
+ * Bila alamatnya lebih dari satu (hulu beserta cadangannya), percobaan
+ * berikutnya jatuh ke alamat berikutnya lebih dulu: mesin yang sedang mati
+ * tidak menjadi hidup karena ditanya dua kali.
  *
  * Batas waktunya berlaku untuk KEPALA jawaban saja. Begitu kepalanya tiba,
  * pengatur waktunya dilepas, dan isinya boleh mengalir selama apa pun.
  */
-async function ambilDenganSatuUlangan(alamat: string, kepala: Record<string, string>): Promise<Response> {
+async function ambilBerulang(
+  daftarAlamat: URL[],
+  kepalaUntuk: (tujuan: URL) => Record<string, string>,
+): Promise<Response> {
   let terakhir: unknown = null;
 
-  for (let percobaan = 0; percobaan < 2; percobaan += 1) {
+  for (let percobaan = 0; percobaan < MAKS_PERCOBAAN; percobaan += 1) {
+    if (percobaan > 0) await tidur(JEDA_ULANG_MS[percobaan - 1] ?? 1_500);
+
+    const tujuan = daftarAlamat[percobaan % daftarAlamat.length];
     const kendali = new AbortController();
     const pengatur = setTimeout(() => kendali.abort(new DOMException("Timeout", "TimeoutError")), SABAR_KEPALA_MS);
     try {
-      const jawab = await fetch(alamat, {
-        headers: kepala,
+      const jawab = await fetch(tujuan.href, {
+        headers: kepalaUntuk(tujuan),
         cache: "no-store",
         redirect: "follow",
         signal: kendali.signal,
@@ -194,6 +250,12 @@ async function ambilDenganSatuUlangan(alamat: string, kepala: Record<string, str
       // menghasilkan penolakan yang sama dan menunda pesan ke pengunjung.
       if (jawab.status < 500 && jawab.status !== 429) return jawab;
       terakhir = new Error(`hulu ${jawab.status}`);
+      // Percobaan terakhir memulangkan jawaban hulu apa adanya, supaya
+      // statusnya — dan bukan tebakan kita — yang menentukan pesannya.
+      if (percobaan === MAKS_PERCOBAAN - 1) return jawab;
+      // Isinya dihabiskan supaya sambungannya dilepas dan tidak menggantung
+      // sampai fungsi ini berakhir.
+      void jawab.body?.cancel();
     } catch (error: unknown) {
       clearTimeout(pengatur);
       terakhir = error;

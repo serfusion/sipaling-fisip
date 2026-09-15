@@ -19,15 +19,29 @@ import {
 import { rencanaSitus } from "@/lib/situs";
 import {
   alamatAliranHulu,
+  alamatAliranHuluSemua,
   alamatHulu,
+  alamatHuluSemua,
+  API_HULU_BAWAAN,
   barisDaftar,
   cariPlatform,
+  daftarApiHulu,
   gulirBerikut,
   penomoran,
   PLATFORM,
   platformAktif,
   platformTerbuka,
 } from "@/lib/drama";
+import {
+  ambilJawaban,
+  isiSimpanan,
+  kosongkanSimpanan,
+  kunciSimpanan,
+  nilaiCatatan,
+  simpanJawaban,
+  umurSimpanan,
+  usiaDetik,
+} from "@/lib/drama-simpanan";
 import {
   bacaDaftar,
   bacaDaftarEpisode,
@@ -226,6 +240,124 @@ console.log("\n== ALAMAT API HULU DAPAT DIPINDAH ==");
     alamatHulu(cariPlatform("dramabox")!, "terbaru"), "https://api.contoh.id/v2/dramabox/latest");
   if (semula === undefined) delete process.env.DRAMA_API_BASE;
   else process.env.DRAMA_API_BASE = semula;
+}
+
+// ============================================================
+console.log("\n== HULU BOLEH LEBIH DARI SATU ==");
+//
+// Satu alamat hulu berarti satu titik yang, begitu mati, mematikan seluruh
+// menu. Yang diuji di sini bukan kerapian penguraiannya melainkan janjinya:
+// menyetel cadangan benar-benar melahirkan alamat kedua yang dapat dicoba.
+// ============================================================
+{
+  const semula = process.env.DRAMA_API_BASE;
+  const pakai = (nilai: string | undefined) => {
+    if (nilai === undefined) delete process.env.DRAMA_API_BASE;
+    else process.env.DRAMA_API_BASE = nilai;
+  };
+
+  pakai(undefined);
+  sama("tanpa setelan, satu alamat bawaan", daftarApiHulu(), [API_HULU_BAWAAN]);
+
+  pakai("https://satu.contoh/api, https://dua.contoh/api");
+  sama("dipisah koma", daftarApiHulu(), ["https://satu.contoh/api", "https://dua.contoh/api"]);
+
+  pakai("https://satu.contoh/api/   https://dua.contoh/api//");
+  sama("dipisah spasi, garis miring di ekor dibuang",
+    daftarApiHulu(), ["https://satu.contoh/api", "https://dua.contoh/api"]);
+
+  pakai("https://satu.contoh/api,https://satu.contoh/api");
+  sama("alamat kembar dibuang", daftarApiHulu(), ["https://satu.contoh/api"]);
+
+  pakai("   ");
+  sama("setelan kosong kembali ke bawaan", daftarApiHulu(), [API_HULU_BAWAAN]);
+
+  pakai("https://satu.contoh/api, https://dua.contoh/api");
+  const box = cariPlatform("dramabox")!;
+  sama("tiap hulu dapat alamatnya sendiri",
+    alamatHuluSemua(box, "terbaru"),
+    ["https://satu.contoh/api/dramabox/latest", "https://dua.contoh/api/dramabox/latest"]);
+  sama("yang pertama tetap yang dipulangkan alamatHulu",
+    alamatHulu(box, "terbaru"), "https://satu.contoh/api/dramabox/latest");
+  sama("penyiapan tautan video ikut punya cadangan",
+    alamatAliranHuluSemua(box, "abc"),
+    [
+      "https://satu.contoh/api/dramabox/decrypt-video?url=abc",
+      "https://dua.contoh/api/dramabox/decrypt-video?url=abc",
+    ]);
+
+  const pine = cariPlatform("pinedrama")!;
+  sama("permintaan yang tidak dilayani tetap kosong, bukan daftar alamat",
+    alamatHuluSemua(pine, "terbaru"), []);
+  sama("rincian tanpa id juga kosong", alamatHuluSemua(pine, "rinci", {}), []);
+  sama("platform tanpa jalur aliran tidak mengarang cadangan",
+    alamatAliranHuluSemua(cariPlatform("flickreels")!, "abc"), []);
+
+  pakai(semula);
+}
+
+// ============================================================
+console.log("\n== UMUR SIMPANAN JAWABAN ==");
+//
+// Angka-angkanya mengikuti seberapa cepat isinya benar-benar berubah. Yang
+// paling penting dibuktikan di sini yang PALING PENDEK: tautan video
+// bertanda tangan dan kedaluwarsa sendiri, jadi menyimpannya selama daftar
+// judul berarti menukar satu pesan galat dengan video yang berhenti sendiri.
+// ============================================================
+{
+  const daftar = umurSimpanan("populer");
+  const rinci = umurSimpanan("rinci");
+  const episode = umurSimpanan("episode");
+
+  cek("episode disimpan paling sebentar", episode.basiMs < rinci.basiMs && episode.basiMs < daftar.basiMs);
+  cek("daftar judul boleh basi paling lama", daftar.basiMs >= rinci.basiMs);
+  cek("seluruhnya punya masa segar lebih pendek daripada masa basi",
+    daftar.segarMs < daftar.basiMs && rinci.segarMs < rinci.basiMs && episode.segarMs < episode.basiMs);
+  sama("pencarian sama umurnya dengan daftar lain", umurSimpanan("cari"), umurSimpanan("terbaru"));
+}
+
+console.log("\n== MENILAI CATATAN SIMPANAN ==");
+{
+  const umur = { segarMs: 1_000, basiMs: 10_000 };
+  sama("baru disimpan", nilaiCatatan(1_000, 1_000, umur), "segar");
+  sama("tepat di batas segar", nilaiCatatan(1_000, 2_000, umur), "segar");
+  sama("sedetik sesudahnya sudah basi", nilaiCatatan(1_000, 2_001, umur), "basi");
+  sama("tepat di batas basi masih terpakai", nilaiCatatan(1_000, 11_000, umur), "basi");
+  sama("lewat dari itu tidak terpakai lagi", nilaiCatatan(1_000, 11_001, umur), "kedaluwarsa");
+  // Jam mesin yang mundur di tengah jalan tidak boleh menghapus simpanan
+  // justru pada saat ia paling dibutuhkan.
+  sama("catatan dari masa depan dianggap segar", nilaiCatatan(9_000, 1_000, umur), "segar");
+
+  sama("usia dibulatkan ke bawah", usiaDetik(1_000, 6_900), 5);
+  sama("usia tidak pernah negatif", usiaDetik(9_000, 1_000), 0);
+}
+
+console.log("\n== LEMARI SIMPANAN ==");
+{
+  kosongkanSimpanan();
+  const umur = { segarMs: 1_000, basiMs: 10_000 };
+  const kunci = kunciSimpanan("dramabox", "populer", "/dramabox/trending");
+
+  sama("kunci memuat platform dan aksinya", kunci, "dramabox:populer:/dramabox/trending");
+  sama("yang belum pernah disimpan tidak ada", ambilJawaban(kunci, umur, 1_000), null);
+
+  simpanJawaban(kunci, { daftar: ["a"] }, 1_000);
+  sama("yang baru disimpan kembali utuh dan segar",
+    ambilJawaban(kunci, umur, 1_500), { isi: { daftar: ["a"] }, nilai: "segar", usiaDetik: 0 });
+  sama("sesudah masa segar habis, masih terpakai sebagai basi",
+    ambilJawaban(kunci, umur, 6_000), { isi: { daftar: ["a"] }, nilai: "basi", usiaDetik: 5 });
+  sama("yang sudah terlalu tua tidak dipulangkan sama sekali",
+    ambilJawaban(kunci, umur, 60_000), null);
+  sama("dan sekaligus dibuang dari lemarinya", isiSimpanan(), 0);
+
+  // Menyimpan ulang kunci yang sama menyegarkan waktunya, bukan menambah
+  // catatan kedua.
+  simpanJawaban(kunci, { daftar: ["a"] }, 1_000);
+  simpanJawaban(kunci, { daftar: ["b"] }, 5_000);
+  sama("satu kunci tetap satu catatan", isiSimpanan(), 1);
+  sama("yang tersimpan yang terakhir",
+    ambilJawaban(kunci, umur, 5_000), { isi: { daftar: ["b"] }, nilai: "segar", usiaDetik: 0 });
+  kosongkanSimpanan();
 }
 
 // ============================================================
