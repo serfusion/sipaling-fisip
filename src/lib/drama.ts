@@ -38,14 +38,48 @@ export const SUMBER_HULU = {
   /** Commit hulu yang dibaca saat tabel di bawah disusun. */
   commit: "0481a1c",
   /** Tanggal pembacaan itu, bukan tanggal commit-nya. */
-  dibacaPada: "2026-09-13",
+  dibacaPada: "2026-09-15",
   lisensi: "MIT",
 } as const;
 
-/** Alamat API hulu. Dapat dipindah lewat environment tanpa mengubah kode. */
-export function alamatApiHulu(): string {
+/** Alamat API hulu bila environment tidak menyebutkan yang lain. */
+export const API_HULU_BAWAAN = "https://api.sansekai.my.id/api";
+
+/**
+ * Seluruh alamat API hulu yang boleh dicoba, menurut urutan percobaan.
+ *
+ * Boleh diisi LEBIH DARI SATU, dipisah koma atau spasi. Itulah satu-satunya
+ * hal yang benar-benar dapat kita kerjakan terhadap penyebab keluhan
+ * "sumbernya sedang tidak menjawab": API-nya milik orang lain, berjalan di
+ * satu mesin yang tagihannya dibayar dari donasi, dan hari matinya tidak
+ * pernah diumumkan. Satu alamat berarti satu titik yang, begitu mati,
+ * mematikan seluruh menu.
+ *
+ * Dengan daftar, menyalakan cadangan tidak menuntut penyebaran ulang:
+ *
+ *   DRAMA_API_BASE="https://api.sansekai.my.id/api, https://salinanku.contoh/api"
+ *
+ * Cadangannya dapat berupa SekaiDrama yang dipasang sendiri — repositorinya
+ * terbuka, dan berkas ini memang menyalin alamat-alamatnya apa adanya.
+ *
+ * Yang disetel operator dipakai APA ADANYA, tanpa diam-diam menambahkan
+ * alamat bawaan di belakangnya: memindahkan alamat adalah keputusan, dan
+ * keputusan yang diam-diam dibatalkan lebih buruk daripada yang gagal
+ * terang-terangan.
+ */
+export function daftarApiHulu(): string[] {
   const disetel = (process.env.DRAMA_API_BASE || process.env.NEXT_PUBLIC_DRAMA_API_BASE || "").trim();
-  return (disetel || "https://api.sansekai.my.id/api").replace(/\/+$/, "");
+  const dipecah = disetel
+    .split(/[,\s]+/)
+    .map((satu) => satu.trim().replace(/\/+$/, ""))
+    .filter(Boolean);
+  const unik = [...new Set(dipecah)];
+  return unik.length ? unik : [API_HULU_BAWAAN];
+}
+
+/** Alamat API hulu yang pertama dicoba. */
+export function alamatApiHulu(): string {
+  return daftarApiHulu()[0];
 }
 
 // ============================================================
@@ -426,10 +460,31 @@ export type Permintaan = {
  * tidak digambar.
  */
 export function alamatHulu(platform: Platform, aksi: Aksi, minta: Permintaan = {}): string | null {
+  return alamatHuluPada(alamatApiHulu(), platform, aksi, minta);
+}
+
+/**
+ * Alamat yang sama, untuk SELURUH alamat hulu yang boleh dicoba.
+ *
+ * Kosong berarti platform ini memang tidak melayani permintaannya — sama
+ * seperti `alamatHulu` yang memulangkan null, dan dengan alasan yang sama.
+ */
+export function alamatHuluSemua(platform: Platform, aksi: Aksi, minta: Permintaan = {}): string[] {
+  return daftarApiHulu()
+    .map((dasar) => alamatHuluPada(dasar, platform, aksi, minta))
+    .filter((satu): satu is string => satu !== null);
+}
+
+function alamatHuluPada(
+  dasar: string,
+  platform: Platform,
+  aksi: Aksi,
+  minta: Permintaan,
+): string | null {
   const titik = platform.titik[aksi];
   if (!titik) return null;
 
-  const alamat = new URL(`${alamatApiHulu()}${titik.jalur}`);
+  const alamat = new URL(`${dasar}${titik.jalur}`);
 
   if (titik.kunciCari) {
     const kata = (minta.cari ?? "").trim();
@@ -514,10 +569,17 @@ export function barisDaftar(platform: Platform): Array<{ aksi: Aksi; judul: stri
  * memang tidak memerlukannya.
  */
 export function alamatAliranHulu(platform: Platform, tautan: string): string | null {
-  if (!platform.jalurAliran || !tautan) return null;
-  const alamat = new URL(`${alamatApiHulu()}${platform.jalurAliran}`);
-  alamat.searchParams.set("url", tautan);
-  return alamat.toString();
+  return alamatAliranHuluSemua(platform, tautan)[0] ?? null;
+}
+
+/** Sama, untuk seluruh alamat hulu yang boleh dicoba. */
+export function alamatAliranHuluSemua(platform: Platform, tautan: string): string[] {
+  if (!platform.jalurAliran || !tautan) return [];
+  return daftarApiHulu().map((dasar) => {
+    const alamat = new URL(`${dasar}${platform.jalurAliran}`);
+    alamat.searchParams.set("url", tautan);
+    return alamat.toString();
+  });
 }
 
 /**
