@@ -32,7 +32,10 @@ import {
   kunciNama, nilaiJawaban, periksaGanda, periksaMasuk, rapikanPerangkat, sisaDetik,
   statusUjian, susunPaket, type Soal,
 } from "@/lib/cbt";
-import { attemptDariKunci, bacaLembar, soalUjian, ujianDariKode, type Attempt, type Ujian } from "@/lib/cbt-store";
+import {
+  attemptDariKunci, bacaLembar, mahasiswaDariNim, soalUjian, ujianDariKode,
+  type Attempt, type Ujian,
+} from "@/lib/cbt-store";
 import {
   aturanMode, berat, harusDipaksa, jumlahBerat, kameraMenyala, pesanPeringatan,
   rapikanInsiden, rapikanMode,
@@ -41,6 +44,7 @@ import {
 import {
   bacaKlien, bolehMasukKlien, periksaKunciKlien, rapikanKlien, rapikanPerangkatKunci,
 } from "@/lib/kunci-layar";
+import { periksaKemiripan } from "@/lib/mirip-simpan";
 import { jamIndonesia } from "@/lib/waktu-indonesia";
 
 export const runtime = "nodejs";
@@ -95,6 +99,13 @@ function ringkasUjian(u: Ujian, sekarang: Date) {
     // ia masih sempat mengunduhnya.
     wajibAplikasi: u.requireLockdown === true,
     perangkatAplikasi: rapikanPerangkatKunci(u.lockdownDevice),
+    // Ujian ini merekam suara peserta.
+    //
+    // Dikirim sejak layar identitas, sama seperti kewajiban aplikasi, dan
+    // sebabnya lebih kuat lagi: yang akan direkam suaranya berhak tahu
+    // SEBELUM ia menekan mulai, bukan sesudah kotak izin mikrofon tiba-tiba
+    // muncul di tengah ujian yang waktunya sudah berjalan.
+    rekamSuara: u.recordAudio === true,
   };
 }
 
@@ -292,6 +303,23 @@ async function nilaiDanTutup(
     })
     .where(eq(cbtAttempts.id, attempt.id));
 
+  // PEMERIKSAAN KEMIRIPAN, di dalam permintaan yang sama.
+  //
+  // Dibungkus penangkap galat, dan itu bukan kehati-hatian yang berlebihan:
+  // yang barusan tersimpan di atas adalah NILAI seseorang, dan pemeriksaan
+  // kemiripan yang gagal — tabelnya belum dimigrasikan, basis datanya sedang
+  // sibuk — tidak boleh membuat permintaan ini berakhir dengan galat. Peserta
+  // yang melihat "gagal mengumpulkan" akan menekan tombolnya lagi, atau lebih
+  // buruk, mengira jawabannya hilang.
+  //
+  // Yang hilang bila ia gagal hanyalah satu kolom pada papan pantau, dan
+  // dosen dapat memintanya dihitung ulang kapan saja dari panelnya.
+  try {
+    await periksaKemiripan(ujian, attempt.id);
+  } catch (galat) {
+    console.error("periksa kemiripan", galat);
+  }
+
   return ringkas;
 }
 
@@ -471,6 +499,7 @@ export async function POST(request: Request) {
       const kunciSesi = kunciSesiBaru();
 
       try {
+        const cocok = await mahasiswaDariNim(identitas.nim);
         await db.insert(cbtAttempts).values({
           examId: ujian.id,
           nim: identitas.nim,
@@ -489,6 +518,13 @@ export async function POST(request: Request) {
           deadlineAt: deadline,
           lastSeenAt: sekarang,
           clientType: klien,
+          // Dicocokkan ke daftar mahasiswa DI SERVER, dari nomor yang
+          // benar-benar dipakai masuk — bukan dari apa yang dikirim peramban.
+          // Peserta yang mengetik nomornya sendiri karena itu tetap mendapat
+          // alamat emailnya, dan peramban tidak dapat menitipkan alamat orang
+          // lain sebagai tujuan kiriman laporan nilai.
+          studentId: cocok?.id ?? null,
+          email: cocok?.email ?? null,
         });
       } catch {
         // Indeks unik (ujian, nim, percobaan) menolak dua permintaan yang

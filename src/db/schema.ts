@@ -570,6 +570,49 @@ export const cbtExams = pgTable("cbt_exams", {
   /** Kode tambahan yang diketik mahasiswa. Kosong berarti tanpa kode. */
   token: varchar("token", { length: 12 }),
 
+  // ---------- CBT V1 ----------
+  /**
+   * Rubrik yang dipakai menilai SELURUH soal esai pada ujian ini.
+   *
+   * Satu rubrik untuk satu ujian, bukan satu rubrik untuk satu soal. Rancangan
+   * per soal lebih luwes dan hampir tidak pernah dipakai: dosen yang menyusun
+   * lima soal esai menilai kelimanya dengan ukuran yang sama, dan memintanya
+   * memasangkan rubrik lima kali adalah pekerjaan yang hasilnya selalu sama.
+   *
+   * Null berarti esai dinilai seperti sebelum V1 — dosen mengetik angkanya
+   * sendiri. Itu tetap jalan yang sah dan tetap menjadi bawaannya.
+   */
+  rubricId: integer("rubric_id").references(() => cbtRubrics.id, { onDelete: "set null" }),
+  /**
+   * Merekam suara peserta selama ujian.
+   *
+   * MATI secara bawaan, dan itu tidak dapat ditawar. Menyalakan mikrofon orang
+   * adalah keputusan yang harus diambil seseorang dengan sadar, bukan keadaan
+   * yang diwarisi peserta karena bawaan sistem kebetulan begitu.
+   */
+  recordAudio: boolean("record_audio").notNull().default(false),
+  /**
+   * Memeriksa kemiripan jawaban antarpeserta saat dikumpulkan.
+   *
+   * MENYALA secara bawaan, karena pemeriksaannya berjalan di server tanpa
+   * biaya model, tidak menunda pengumpulan, dan tidak pernah mengubah nilai —
+   * ia hanya menandai lembar mana yang perlu dibaca dosen lebih dulu. Ujian
+   * pilihan ganda murni melewatinya sendiri: tidak ada teks untuk dibandingkan.
+   */
+  checkSimilarity: boolean("check_similarity").notNull().default(true),
+  /** Ambang persen kemiripan yang mulai ditandai "perlu ditinjau". */
+  similarityReview: integer("similarity_review").notNull().default(30),
+  /** Ambang persen kemiripan yang ditandai "tinggi". */
+  similarityHigh: integer("similarity_high").notNull().default(60),
+  /**
+   * Kirim laporan nilai ke email mahasiswa segera sesudah dosen menyetujui.
+   *
+   * Mati secara bawaan. Surat yang terkirim sendiri tidak dapat ditarik
+   * kembali, dan yang paling sering terjadi pada pekan penilaian adalah dosen
+   * menyetujui satu peserta untuk melihat bentuk laporannya.
+   */
+  autoEmail: boolean("auto_email").notNull().default(false),
+
   // Jadwal. Pembukaannya murni dari dua kolom ini.
   startAt: timestamp("start_at", { withTimezone: true }),
   endAt: timestamp("end_at", { withTimezone: true }),
@@ -716,6 +759,40 @@ export const cbtAttempts = pgTable("cbt_attempts", {
   /** Diisi bila ujiannya dikumpulkan paksa oleh aturan pengawasan. */
   forcedReason: varchar("forced_reason", { length: 200 }),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+
+  // ---------- CBT V1 ----------
+  /**
+   * Baris daftar mahasiswa yang dipilih peserta saat masuk, bila ada.
+   *
+   * Nama dan nomornya tetap DISALIN ke kolom di atas, bukan dibaca lewat
+   * sambungan ini. Daftar mahasiswa dapat berubah — nama dibetulkan, baris
+   * dihapus — dan lembar ujian yang identitasnya ikut berubah setahun kemudian
+   * bukan lagi lembar ujian.
+   */
+  studentId: integer("student_id").references(() => students.id, { onDelete: "set null" }),
+  /** Alamat email peserta, untuk mengirimkan laporan nilainya. */
+  email: varchar("email", { length: 160 }),
+  /**
+   * Kemiripan tertinggi jawaban peserta ini dengan peserta lain, 0–100.
+   *
+   * Diringkas di sini supaya papan pantau tidak perlu memindai tabel pasangan
+   * untuk tiap baris. Pasangan yang sebenarnya tetap tersimpan lengkap.
+   */
+  similarityScore: integer("similarity_score").notNull().default(0),
+  /** "bersih" | "rendah" | "tinjau" | "tinggi" */
+  similarityStatus: varchar("similarity_status", { length: 20 }).notNull().default("bersih"),
+  /**
+   * Nilai akhir yang DISETUJUI dosen, 0–100.
+   *
+   * Terpisah dari `score`, yang tetap berisi hitungan mesin. Keduanya ikut ke
+   * laporan, dan keduanya perlu: yang pertama menjawab "berapa nilainya", yang
+   * kedua menjawab "apakah dosennya mengubah sesuatu". Laporan yang hanya
+   * memuat satu angka tidak dapat menjawab pertanyaan kedua.
+   */
+  finalScore: integer("final_score"),
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
+  approvedBy: varchar("approved_by", { length: 120 }),
+  reportSentAt: timestamp("report_sent_at", { withTimezone: true }),
 }, (t) => [
   // Batas percobaan ditegakkan basis data, bukan hanya pemeriksaan di kode:
   // dua permintaan yang datang bersamaan dapat lolos pemeriksaan bersama-sama.
@@ -804,6 +881,243 @@ export const cbtAnswers = pgTable("cbt_answers", {
   // disiapkan dari skema ini saja karena itu berdiri tanpa indeksnya — dan
   // kegagalannya baru terlihat ketika ada yang benar-benar mengerjakan ujian.
   uniqueIndex("idx_cbt_answers_satu").on(t.attemptId, t.questionId),
+]);
+
+// ============================================================
+// CBT V1 — DATA MAHASISWA, RUBRIK, KEMIRIPAN, REKAMAN, LAPORAN
+//
+// Enam kelompok tabel yang menjadikan CBT bukan sekadar tempat mengerjakan
+// soal. Semuanya menempel pada tabel CBT yang sudah ada dan tidak satu pun
+// mengubah bentuk lamanya — ujian yang berjalan sebelum V1 tetap berjalan
+// persis seperti kemarin, dan kolom-kolom baru punya nilai bawaan yang berarti
+// "fitur ini tidak dipakai".
+//
+// Itu syarat yang tidak dapat ditawar. Migrasi yang mengharuskan dosen
+// menyetel sesuatu lebih dulu akan menemukan kelas yang ujiannya pagi ini.
+// ============================================================
+
+/**
+ * Daftar mahasiswa yang dipakai bersama seluruh ujian.
+ *
+ * SATU tabel, bukan modul manajemen mahasiswa lengkap dengan prodi, fakultas,
+ * angkatan, dan mata kuliah sebagai tabel masing-masing. Yang benar-benar
+ * dipakai CBT hanya: menemukan orangnya saat ia mengetik satu huruf, dan
+ * mengetahui ke mana nilainya dikirim. Sisanya keterangan yang ikut tercetak
+ * di laporan, dan keterangan tidak perlu tabel sendiri.
+ *
+ * Tabelnya BOLEH KOSONG. Portal yang belum mengimpor satu baris pun tetap
+ * menjalankan ujian seperti biasa — peserta mengetik nama dan nomornya sendiri,
+ * persis seperti sebelum V1. Daftar ini mempercepat, bukan menggerbangi.
+ */
+export const students = pgTable("students", {
+  id: serial("id").primaryKey(),
+  nim: varchar("nim", { length: 20 }).notNull().unique(),
+  name: varchar("name", { length: 120 }).notNull(),
+  /**
+   * Nama yang sudah diseragamkan untuk pencarian dan pencocokan.
+   *
+   * Disimpan sebagai kolom, bukan dihitung saat mencari, karena pencarian
+   * berjalan pada tiap ketikan: LOWER(name) pada lima ribu baris kali lima
+   * ketikan per detik adalah beban yang tidak perlu ada.
+   */
+  nameKey: varchar("name_key", { length: 120 }).notNull().default(""),
+  email: varchar("email", { length: 160 }),
+  prodi: varchar("prodi", { length: 120 }),
+  className: varchar("class_name", { length: 80 }),
+  angkatan: varchar("angkatan", { length: 10 }),
+  /** "aktif" | "cuti" | "lulus" | "keluar". Hanya keterangan, bukan gerbang. */
+  status: varchar("status", { length: 20 }).notNull().default("aktif"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  // Dua indeks untuk dua jalan masuk pencarian yang berbeda: orang mengetik
+  // huruf depan namanya, atau mengetik angka depan nomornya. Tanpa keduanya
+  // autocomplete sejak satu karakter berarti pemindaian tabel penuh pada tiap
+  // ketikan tiga puluh peserta sekaligus, lima menit sebelum ujian dimulai.
+  index("idx_students_nama").on(t.nameKey),
+  index("idx_students_nim").on(t.nim),
+]);
+
+// ------------------------------------------------------------
+// RUBRIK
+// ------------------------------------------------------------
+
+/**
+ * Satu rubrik penilaian esai.
+ *
+ * Levelnya TIDAK berada di tabel ketiga. Rancangan awal memisahkan
+ * rubrics → criteria → levels, dan pemisahan itu benar secara bentuk tetapi
+ * tidak pernah berguna: tidak ada satu pun pertanyaan yang menanyakan level
+ * tanpa kriterianya. Yang didapat hanyalah tiga sambungan tabel pada tiap
+ * pembacaan dan tiga penulisan pada tiap penyuntingan. Levelnya disimpan
+ * sebagai JSON pada barisnya sendiri.
+ */
+export const cbtRubrics = pgTable("cbt_rubrics", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 160 }).notNull(),
+  description: text("description"),
+  /** Skala level, mis. 1..4. Nilai akhir selalu dikonversi ke 0–100. */
+  scaleMin: integer("scale_min").notNull().default(1),
+  scaleMax: integer("scale_max").notNull().default(4),
+  /** Kriteria beserta bobot dan deskriptor tiap level, sebagai JSON. */
+  criteria: text("criteria").notNull().default("[]"),
+  /** Profil yang membuatnya. Null untuk rubrik bawaan portal. */
+  ownerId: varchar("owner_id", { length: 64 }),
+  createdBy: varchar("created_by", { length: 120 }).notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Skor satu kriteria untuk satu jawaban esai.
+ *
+ * Dua angka disimpan berdampingan dan keduanya diperlukan: `aiLevel` adalah
+ * pembacaan mesin beserta alasannya, `finalLevel` adalah keputusan dosen.
+ * Menimpa yang pertama dengan yang kedua akan menghapus satu-satunya jawaban
+ * atas pertanyaan yang muncul ketika nilai digugat — apakah dosennya benar-benar
+ * memeriksa, atau hanya menekan setuju.
+ */
+export const cbtRubricScores = pgTable("cbt_rubric_scores", {
+  id: serial("id").primaryKey(),
+  attemptId: integer("attempt_id").notNull().references(() => cbtAttempts.id, { onDelete: "cascade" }),
+  questionId: integer("question_id").notNull().references(() => cbtQuestions.id, { onDelete: "cascade" }),
+  /** Urutan kriteria di dalam rubriknya. Bukan id, karena rubrik dapat disunting. */
+  criterionIndex: integer("criterion_index").notNull(),
+  criterionName: varchar("criterion_name", { length: 160 }).notNull().default(""),
+  weight: integer("weight").notNull().default(0),
+  aiLevel: integer("ai_level"),
+  aiReason: text("ai_reason"),
+  /** Keyakinan model 0–100. Rendah berarti "tolong dibaca dosen lebih dulu". */
+  aiConfidence: integer("ai_confidence"),
+  /** Diisi dosen bila ia mengubah pembacaan mesin. */
+  finalLevel: integer("final_level"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("idx_cbt_rubric_scores_satu").on(t.attemptId, t.questionId, t.criterionIndex),
+]);
+
+// ------------------------------------------------------------
+// KEMIRIPAN JAWABAN
+// ------------------------------------------------------------
+
+/**
+ * Sepasang jawaban yang mirip pada satu soal.
+ *
+ * Disimpan SEKALI untuk tiap pasangan, dengan attemptA selalu bernomor lebih
+ * kecil daripada attemptB. Menyimpan dua arah menggandakan barisnya dan
+ * membuka kemungkinan dua baris yang sama mengatakan angka berbeda sesudah
+ * salah satunya dihitung ulang.
+ *
+ * Yang disimpan hanya pasangan yang MELEWATI ambang bawah. Tiga puluh peserta
+ * pada sepuluh soal esai berarti 4.350 pasang; menyimpan seluruhnya berarti
+ * menyimpan ribuan baris bernilai nol persen yang tidak akan pernah dibuka
+ * siapa pun.
+ */
+export const cbtSimilarity = pgTable("cbt_similarity", {
+  id: serial("id").primaryKey(),
+  examId: integer("exam_id").notNull().references(() => cbtExams.id, { onDelete: "cascade" }),
+  questionId: integer("question_id").notNull().references(() => cbtQuestions.id, { onDelete: "cascade" }),
+  attemptA: integer("attempt_a").notNull().references(() => cbtAttempts.id, { onDelete: "cascade" }),
+  attemptB: integer("attempt_b").notNull().references(() => cbtAttempts.id, { onDelete: "cascade" }),
+  /** 0–100. */
+  score: integer("score").notNull().default(0),
+  /** "bersih" | "rendah" | "tinjau" | "tinggi" */
+  status: varchar("status", { length: 20 }).notNull().default("bersih"),
+  /** Rincian sinyal pembentuk skornya, sebagai JSON — supaya angkanya dapat dijelaskan. */
+  signals: text("signals").notNull().default("{}"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("idx_cbt_similarity_pasangan").on(t.questionId, t.attemptA, t.attemptB),
+  index("idx_cbt_similarity_ujian").on(t.examId, t.score),
+]);
+
+// ------------------------------------------------------------
+// REKAMAN SUARA
+// ------------------------------------------------------------
+
+/**
+ * Rekaman suara satu peserta selama ujiannya.
+ *
+ * Satu baris untuk satu attempt; potongannya sendiri tinggal di Storage dengan
+ * nama berurutan. Potongan, bukan satu berkas panjang: koneksi yang putus di
+ * menit ke-70 tidak boleh menghapus tujuh puluh menit yang sudah terkirim —
+ * dan koneksi kampus memang putus.
+ */
+export const cbtRecordings = pgTable("cbt_recordings", {
+  id: serial("id").primaryKey(),
+  attemptId: integer("attempt_id").notNull().references(() => cbtAttempts.id, { onDelete: "cascade" }).unique(),
+  examId: integer("exam_id").notNull().references(() => cbtExams.id, { onDelete: "cascade" }),
+  /** Map di bucket rekaman, mis. "ujian-12/attempt-345". */
+  prefix: varchar("prefix", { length: 200 }).notNull().default(""),
+  chunkCount: integer("chunk_count").notNull().default(0),
+  /** Detik, dijumlahkan dari potongan yang benar-benar diterima server. */
+  durationSec: integer("duration_sec").notNull().default(0),
+  bytes: bigint("bytes", { mode: "number" }).notNull().default(0),
+  /** "menunggu" | "merekam" | "selesai" | "gagal" | "ditolak" */
+  status: varchar("status", { length: 20 }).notNull().default("menunggu"),
+  /** Sebab rekaman tidak ada: izin ditolak, tanpa mikrofon, dsb. */
+  note: varchar("note", { length: 200 }),
+  /** "belum" | "berjalan" | "selesai" | "gagal" | "tidak_tersedia" */
+  transcriptStatus: varchar("transcript_status", { length: 20 }).notNull().default("belum"),
+  /** "bersih" | "tinjau" | "mencurigakan" — hasil pembacaan transkrip. */
+  flagStatus: varchar("flag_status", { length: 20 }).notNull().default("bersih"),
+  flagCount: integer("flag_count").notNull().default(0),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  endedAt: timestamp("ended_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("idx_cbt_recordings_ujian").on(t.examId),
+]);
+
+/**
+ * Satu penggal transkrip beserta jamnya di dalam rekaman.
+ *
+ * Jamnya yang penting, bukan teksnya. Dosen tidak membaca transkrip
+ * sembilan puluh menit; ia menekan satu timestamp yang ditandai dan
+ * mendengarkan sepuluh detik di sekitarnya — dan hanya pendengarannya sendiri
+ * yang menentukan, bukan tulisan mesin.
+ */
+export const cbtTranscriptSegments = pgTable("cbt_transcript_segments", {
+  id: serial("id").primaryKey(),
+  recordingId: integer("recording_id").notNull().references(() => cbtRecordings.id, { onDelete: "cascade" }),
+  /** Detik sejak rekaman dimulai. */
+  startSec: integer("start_sec").notNull().default(0),
+  endSec: integer("end_sec").notNull().default(0),
+  text: text("text").notNull().default(""),
+  /** Kata/frasa yang memicu penandaan. Kosong untuk penggal biasa. */
+  keyword: varchar("keyword", { length: 120 }),
+  /** "bersih" | "rendah" | "tinggi" — sesudah konteksnya ikut dibaca. */
+  risk: varchar("risk", { length: 20 }).notNull().default("bersih"),
+  /** Kenapa penggal ini dinilai begitu, untuk dibaca dosen. */
+  reason: varchar("reason", { length: 300 }),
+}, (t) => [
+  index("idx_cbt_transcript_rekaman").on(t.recordingId, t.startSec),
+]);
+
+// ------------------------------------------------------------
+// PENGIRIMAN NILAI
+// ------------------------------------------------------------
+
+/**
+ * Catatan pengiriman laporan nilai ke mahasiswa.
+ *
+ * Ada supaya pertanyaan "saya tidak menerima email nilai" punya jawaban yang
+ * bukan tebakan. Baris di sini juga yang menahan pengiriman berulang ketika
+ * dosen menekan tombolnya dua kali.
+ */
+export const cbtResultEmails = pgTable("cbt_result_emails", {
+  id: serial("id").primaryKey(),
+  attemptId: integer("attempt_id").notNull().references(() => cbtAttempts.id, { onDelete: "cascade" }),
+  email: varchar("email", { length: 160 }).notNull(),
+  subject: varchar("subject", { length: 240 }).notNull().default(""),
+  /** "terkirim" | "gagal" */
+  status: varchar("status", { length: 20 }).notNull().default("terkirim"),
+  error: varchar("error", { length: 300 }),
+  providerId: varchar("provider_id", { length: 200 }),
+  sentBy: varchar("sent_by", { length: 120 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("idx_cbt_result_emails_attempt").on(t.attemptId, t.createdAt),
 ]);
 
 // ============================================================

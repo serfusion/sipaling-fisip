@@ -7,8 +7,8 @@
 // ============================================================
 import { createClient } from "@supabase/supabase-js";
 import { db } from "@/db";
-import { cbtAnswers, cbtAttempts, cbtExams, cbtIncidents } from "@/db/schema";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { cbtAnswers, cbtAttempts, cbtExams, cbtIncidents, cbtTranscriptSegments } from "@/db/schema";
+import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 import { getCurrentProfile } from "@/lib/supabase-server";
 import { getSupabaseSecretKey, getSupabaseUrl } from "@/lib/supabase-config";
 import { explainServerError } from "@/lib/api-errors";
@@ -16,7 +16,10 @@ import {
   analisisSoal, angkaParam, bolehCbt, bolehPantau, bolehUbah, jawabanTerbaca,
   kunciTerbaca, sisaDetik, statistikNilai, statusUjian,
 } from "@/lib/cbt";
-import { bacaLembar, soalUjian } from "@/lib/cbt-store";
+import { bacaLembar, rekamanAttempt, rubrikUjian, skorRubrikAttempt, soalUjian } from "@/lib/cbt-store";
+import { hitungRubrik, predikat } from "@/lib/rubrik";
+import { pasanganPeserta } from "@/lib/mirip-simpan";
+import { ejaJamRekaman } from "@/lib/rekaman";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -124,17 +127,48 @@ export async function GET(request: Request) {
         .orderBy(cbtIncidents.at)
         .limit(500);
 
+      // ---------- BAHAN LAPORAN CBT V1 ----------
+      // Dikumpulkan di sini, bukan lewat permintaan kedua dari panel, karena
+      // yang memakainya adalah TOMBOL CETAK — dan tombol cetak yang harus
+      // menunggu tiga perjalanan ke server sebelum jendela cetaknya terbuka
+      // akan terasa seperti tombol yang tidak menjawab.
+      const rubrik = await rubrikUjian(ujian.rubricId);
+      const skorRubrik = rubrik ? await skorRubrikAttempt(attempt.id) : null;
+      const rekaman = await rekamanAttempt(attempt.id);
+      const penggalTanda = rekaman
+        ? await db
+            .select()
+            .from(cbtTranscriptSegments)
+            .where(and(
+              eq(cbtTranscriptSegments.recordingId, rekaman.id),
+              ne(cbtTranscriptSegments.risk, "bersih"),
+            ))
+            .orderBy(cbtTranscriptSegments.startSec)
+            .limit(50)
+        : [];
+      const pasangan = await pasanganPeserta(attempt.id);
+
       return Response.json({
         success: true,
         peserta: {
           id: attempt.id, nim: attempt.nim, nama: attempt.name, status: attempt.status,
           nilai: attempt.score, benar: attempt.correct, salah: attempt.wrong,
+          sebagian: attempt.partial,
           kosong: attempt.blank, tertunda: attempt.pending,
           mulai: attempt.startedAt.toISOString(),
           kumpul: attempt.submittedAt ? attempt.submittedAt.toISOString() : null,
           keluarFullscreen: attempt.leftFullscreen, pindahTab: attempt.switchedTab,
           integritas: attempt.integrityScore,
           dihentikan: attempt.forcedReason,
+          // ---------- CBT V1 ----------
+          email: attempt.email || "",
+          nilaiAkhir: attempt.finalScore,
+          predikat: predikat(attempt.finalScore ?? attempt.score ?? 0),
+          disetujuiOleh: attempt.approvedBy || "",
+          disetujuiPada: attempt.approvedAt ? attempt.approvedAt.toISOString() : null,
+          laporanTerkirim: attempt.reportSentAt ? attempt.reportSentAt.toISOString() : null,
+          kemiripan: attempt.similarityScore,
+          statusKemiripan: attempt.similarityStatus,
           pengawasan: {
             tab: attempt.switchedTab,
             fullscreen: attempt.leftFullscreen,
@@ -160,6 +194,73 @@ export async function GET(request: Request) {
             bukti: j.evidence ? await alamatBukti(j.evidence) : null,
           })),
         ),
+
+        // ---------- RUBRIK, UNTUK LEMBAR CETAK ----------
+        namaRubrik: rubrik?.nama ?? "",
+        rubrik: rubrik
+          ? lembar
+              .map((l, urut) => ({ soal: bank.find((s) => s.id === l.id), nomor: urut + 1 }))
+              .filter((x) => x.soal && x.soal.jenis === "essay")
+              .map(({ soal, nomor }) => {
+                const tersimpan = skorRubrik?.get(soal!.id) ?? [];
+                const per = new Map(tersimpan.map((t) => [t.criterionIndex, t]));
+                const hasil = hitungRubrik(
+                  rubrik,
+                  rubrik.kriteria.map((_, i) => ({
+                    aiLevel: per.get(i)?.aiLevel ?? null,
+                    finalLevel: per.get(i)?.finalLevel ?? null,
+                  })),
+                );
+                return {
+                  nomor,
+                  soalId: soal!.id,
+                  pertanyaan: soal!.pertanyaan,
+                  nilai: hasil.nilai,
+                  totalTerbobot: hasil.totalTerbobot,
+                  skalaMax: rubrik.skalaMax,
+                  belumDinilai: hasil.belumDinilai,
+                  catatan: petaJawab.get(soal!.id)?.feedback || "",
+                  kriteria: hasil.kriteria.map((k, i) => ({
+                    nama: k.nama,
+                    bobot: k.bobot,
+                    level: k.level,
+                    terbobot: k.terbobot,
+                    diubahDosen: k.diubahDosen,
+                    alasan: per.get(i)?.aiReason || "",
+                    keyakinan: per.get(i)?.aiConfidence ?? null,
+                  })),
+                };
+              })
+              // Soal yang sama sekali belum dinilai tidak ikut dicetak. Tabel
+              // rubrik penuh tanda hubung tidak mengatakan apa pun selain
+              // bahwa pekerjaannya belum selesai — dan itu sudah terbaca dari
+              // "menunggu koreksi" pada ringkasan nilai.
+              .filter((r) => r.belumDinilai < rubrik.kriteria.length)
+          : [],
+
+        // ---------- REKAMAN ----------
+        rekaman: rekaman
+          ? {
+              ada: rekaman.chunkCount > 0,
+              status: rekaman.status,
+              durasi: rekaman.durationSec,
+              transkrip: rekaman.transcriptStatus,
+              tanda: rekaman.flagStatus,
+              jumlahTanda: rekaman.flagCount,
+              catatan: rekaman.note || "",
+              penanda: penggalTanda.map((p) => ({
+                jam: ejaJamRekaman(p.startSec),
+                detik: p.startSec,
+                kata: p.keyword || "",
+                risiko: p.risk,
+                teks: p.text,
+                alasan: p.reason || "",
+              })),
+            }
+          : null,
+
+        // ---------- KEMIRIPAN ----------
+        pasanganMirip: pasangan,
         // Kunci jawaban baru ikut keluar DI SINI — sesudah ujiannya dikumpulkan,
         // dan hanya kepada pengajar pemiliknya.
         rincian: lembar.map((l, urut) => {
@@ -239,6 +340,14 @@ export async function GET(request: Request) {
         status: statusUjian({ aktif: Boolean(ujian.activatedAt), mulai: ujian.startAt, selesai: ujian.endAt }, sekarang),
         mulai: ujian.startAt ? ujian.startAt.toISOString() : null,
         selesai: ujian.endAt ? ujian.endAt.toISOString() : null,
+        // ---------- CBT V1 ----------
+        // Papan pantau memakai keduanya untuk memutuskan kolom mana yang
+        // muncul. Ujian yang tidak memeriksa kemiripan tidak menampilkan
+        // kolom kosong berisi tanda hubung — kolom kosong menimbulkan
+        // pertanyaan yang jawabannya "memang tidak dipakai".
+        periksaKemiripan: ujian.checkSimilarity,
+        pakaiRubrik: Boolean(ujian.rubricId),
+        rekamSuara: ujian.recordAudio,
       },
       peserta: peserta.map((p) => ({
         id: p.id, nim: p.nim, nama: p.name, status: p.status,
@@ -264,6 +373,12 @@ export async function GET(request: Request) {
         dihentikan: p.forcedReason,
         mulai: p.startedAt.toISOString(),
         kumpul: p.submittedAt ? p.submittedAt.toISOString() : null,
+        // ---------- CBT V1 ----------
+        kemiripan: p.similarityScore,
+        statusKemiripan: p.similarityStatus,
+        nilaiAkhir: p.finalScore,
+        disetujui: p.approvedAt ? p.approvedAt.toISOString() : null,
+        laporanTerkirim: p.reportSentAt ? p.reportSentAt.toISOString() : null,
       })),
       statistik: statistikNilai(nilai, ujian.passingGrade),
       analisis: analisisSoal(

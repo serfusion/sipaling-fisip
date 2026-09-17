@@ -36,6 +36,19 @@ export const dynamic = "force-dynamic";
 const teks = (nilai: unknown, batas: number) =>
   typeof nilai === "string" ? nilai.replace(/\s+/g, " ").trim().slice(0, batas) : "";
 
+/**
+ * Id rubrik dari kiriman layar, atau null.
+ *
+ * Kosong, nol, dan "tanpa rubrik" semuanya berarti hal yang sama: esai dinilai
+ * seperti sebelum V1, dosen mengetik angkanya sendiri. Ketiganya dijadikan
+ * null di satu tempat supaya tidak ada rubrik bernomor nol yang dicari-cari
+ * kemudian di tabel dan tidak pernah ketemu.
+ */
+const idRubrik = (nilai: unknown): number | null => {
+  const angkanya = Number(nilai);
+  return Number.isInteger(angkanya) && angkanya > 0 ? angkanya : null;
+};
+
 const angka = (nilai: unknown, bawaan: number, min: number, maks: number) => {
   const n = Number(nilai);
   if (!Number.isFinite(n)) return bawaan;
@@ -114,6 +127,13 @@ export async function GET() {
         description: cbtExams.description,
         instruction: cbtExams.instruction,
         createdAt: cbtExams.createdAt,
+        // ---------- CBT V1 ----------
+        rubricId: cbtExams.rubricId,
+        recordAudio: cbtExams.recordAudio,
+        checkSimilarity: cbtExams.checkSimilarity,
+        similarityReview: cbtExams.similarityReview,
+        similarityHigh: cbtExams.similarityHigh,
+        autoEmail: cbtExams.autoEmail,
       })
       .from(cbtExams)
       .where(saring)
@@ -219,6 +239,16 @@ export async function POST(request: Request) {
             requireLockdown: body.requireLockdown === true,
             lockdownDevice: rapikanPerangkatKunci(body.lockdownDevice),
             token: teks(body.token, 12).toUpperCase() || null,
+            // ---------- CBT V1 ----------
+            // Seluruhnya punya nilai bawaan yang berarti "seperti sebelum V1",
+            // jadi layar pembuatan ujian yang tidak menyebutkannya sama sekali
+            // tetap menghasilkan ujian yang sah.
+            rubricId: idRubrik(body.rubricId),
+            recordAudio: body.recordAudio === true,
+            checkSimilarity: body.checkSimilarity !== false,
+            similarityReview: angka(body.similarityReview, 30, 1, 99),
+            similarityHigh: angka(body.similarityHigh, 60, 1, 100),
+            autoEmail: body.autoEmail === true,
           })
           .returning({ id: cbtExams.id, code: cbtExams.code });
         return Response.json({ success: true, ujian: dibuat[0] }, { status: 201 });
@@ -296,6 +326,31 @@ export async function PATCH(request: Request) {
     if (body.requireLockdown !== undefined) ubah.requireLockdown = body.requireLockdown === true;
     if (body.lockdownDevice !== undefined) ubah.lockdownDevice = rapikanPerangkatKunci(body.lockdownDevice);
     if (body.token !== undefined) ubah.token = teks(body.token, 12).toUpperCase() || null;
+
+    // ---------- CBT V1 ----------
+    // Rubrik boleh diganti kapan saja, termasuk sesudah sebagian esai dinilai.
+    // Skor yang sudah ada TIDAK ikut terhapus — ia tetap menempel pada nomor
+    // urut kriterianya, dan panel penilaian akan menunjukkan mana yang tidak
+    // lagi cocok dengan rubrik yang sekarang. Menghapusnya diam-diam akan
+    // membuang pekerjaan dosen yang barangkali hanya salah pilih satu kali.
+    if (body.rubricId !== undefined) ubah.rubricId = idRubrik(body.rubricId);
+    // Rekaman suara TIDAK boleh menyala di tengah ujian yang sedang berjalan.
+    // Ini satu-satunya setelan V1 yang ditahan, dan sebabnya bukan teknis:
+    // peserta yang sudah duduk mengerjakan tidak diberi tahu bahwa mikrofonnya
+    // akan dinyalakan, dan persetujuan yang diambil sesudah orangnya duduk
+    // bukan persetujuan. Mematikannya di tengah jalan selalu boleh.
+    if (body.recordAudio !== undefined) {
+      const minta = body.recordAudio === true;
+      const berjalan = statusUjian(
+        { aktif: Boolean(ujian.activatedAt), mulai: ujian.startAt, selesai: ujian.endAt },
+        new Date(),
+      ) === "berlangsung";
+      if (!(minta && berjalan && !ujian.recordAudio)) ubah.recordAudio = minta;
+    }
+    if (body.checkSimilarity !== undefined) ubah.checkSimilarity = body.checkSimilarity !== false;
+    if (body.similarityReview !== undefined) ubah.similarityReview = angka(body.similarityReview, 30, 1, 99);
+    if (body.similarityHigh !== undefined) ubah.similarityHigh = angka(body.similarityHigh, 60, 1, 100);
+    if (body.autoEmail !== undefined) ubah.autoEmail = body.autoEmail === true;
 
     // ---------- SAKLAR KAMERA ----------
     // Satu-satunya setelan di sini yang wewenangnya TIDAK ada pada pemilik

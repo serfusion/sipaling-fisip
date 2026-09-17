@@ -2,9 +2,13 @@
 // CBT — pembacaan basis data yang dipakai bersama beberapa route
 // ============================================================
 import { db } from "@/db";
-import { cbtAnswers, cbtAttempts, cbtExams, cbtQuestions } from "@/db/schema";
+import {
+  cbtAnswers, cbtAttempts, cbtExams, cbtQuestions, cbtRecordings, cbtRubrics,
+  cbtRubricScores, students,
+} from "@/db/schema";
 import { and, asc, eq } from "drizzle-orm";
 import type { JenisMedia, JenisSoal, Pasangan, Soal } from "@/lib/cbt";
+import { bacaKriteria, type Rubrik } from "@/lib/rubrik";
 
 export type Ujian = typeof cbtExams.$inferSelect;
 export type Attempt = typeof cbtAttempts.$inferSelect;
@@ -112,5 +116,81 @@ export function bacaLembar(paper: string): Lembar {
       .filter((item) => Number.isInteger(item.id));
   } catch {
     return [];
+  }
+}
+
+// ============================================================
+// CBT V1 — PEMBACAAN TAMBAHAN
+// ============================================================
+
+/**
+ * Baris daftar mahasiswa yang nomornya sama, bila ada.
+ *
+ * Mengembalikan null — bukan melempar — ketika daftarnya kosong atau nomornya
+ * tidak ada di sana. Portal yang belum mengimpor satu mahasiswa pun harus
+ * tetap menjalankan ujiannya, dan tidak seorang pun boleh tertolak masuk
+ * karena namanya belum sempat didaftarkan bagian akademik.
+ */
+export async function mahasiswaDariNim(nim: string): Promise<{ id: number; email: string | null } | null> {
+  const bersih = String(nim ?? "").replace(/\D/g, "").slice(0, 20);
+  if (!bersih) return null;
+  try {
+    const baris = await db
+      .select({ id: students.id, email: students.email })
+      .from(students)
+      .where(eq(students.nim, bersih))
+      .limit(1);
+    return baris[0] ?? null;
+  } catch {
+    // Tabelnya belum ada karena migrasinya belum dijalankan. Ujian tetap
+    // berjalan; yang hilang hanya pengisian email otomatis.
+    return null;
+  }
+}
+
+export type RubrikBaris = typeof cbtRubrics.$inferSelect;
+
+/** Rubrik satu ujian, sudah berbentuk objek yang dipakai mesin penilai. */
+export async function rubrikUjian(rubricId: number | null): Promise<Rubrik | null> {
+  if (!rubricId) return null;
+  const baris = await db.select().from(cbtRubrics).where(eq(cbtRubrics.id, rubricId)).limit(1);
+  const r = baris[0];
+  if (!r) return null;
+  return {
+    nama: r.name,
+    keterangan: r.description || "",
+    skalaMin: r.scaleMin,
+    skalaMax: r.scaleMax,
+    kriteria: bacaKriteria(r.criteria),
+  };
+}
+
+/** Skor rubrik satu attempt, dikelompokkan per soal lalu per urutan kriteria. */
+export async function skorRubrikAttempt(attemptId: number) {
+  const baris = await db
+    .select()
+    .from(cbtRubricScores)
+    .where(eq(cbtRubricScores.attemptId, attemptId))
+    .orderBy(asc(cbtRubricScores.questionId), asc(cbtRubricScores.criterionIndex));
+  const peta = new Map<number, typeof baris>();
+  for (const b of baris) {
+    const daftar = peta.get(b.questionId);
+    if (daftar) daftar.push(b);
+    else peta.set(b.questionId, [b]);
+  }
+  return peta;
+}
+
+/** Baris rekaman satu attempt, atau null bila ujiannya tidak merekam. */
+export async function rekamanAttempt(attemptId: number) {
+  try {
+    const baris = await db
+      .select()
+      .from(cbtRecordings)
+      .where(eq(cbtRecordings.attemptId, attemptId))
+      .limit(1);
+    return baris[0] ?? null;
+  } catch {
+    return null;
   }
 }
