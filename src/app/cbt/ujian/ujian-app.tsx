@@ -30,9 +30,11 @@ import { ejaSelisih, jamIndonesia } from "@/lib/waktu-indonesia";
 import KreditCbt from "../kredit";
 import KameraPengawas from "./kamera";
 import MediaSoal from "./media-soal";
+import MikrofonPengawas from "./mikrofon";
 import Pastikan, { type IsiPastikan } from "./pastikan";
 import { usePenjaga } from "./penjaga";
 import RangkaUjian from "./rangka-ujian";
+import CariPeserta from "./cari-peserta";
 import TandaAir from "./tanda-air";
 import Tirai from "./tirai";
 import Teguran, { type IsiTeguran } from "./teguran";
@@ -54,6 +56,8 @@ type Ujian = {
   kamera?: boolean;
   /** Ujian ini hanya boleh dikerjakan lewat aplikasi Exam Browser. */
   wajibAplikasi?: boolean;
+  /** Suara peserta direkam selama ujian berlangsung. */
+  rekamSuara?: boolean;
 };
 
 type Soal = {
@@ -303,12 +307,21 @@ export default function UjianApp() {
    */
   const pakaiKamera = Boolean(ujian?.kamera);
   const [kameraBeres, setKameraBeres] = useState(false);
-  const tenang = !pakaiKamera || kameraBeres;
+
+  // Kotak izin MIKROFON menahan hal yang sama persis dengan kotak izin kamera,
+  // dan karena itu ikut menentukan `tenang`. Ujian yang merekam suara tanpa
+  // kamera dahulu akan mencatat satu "kehilangan fokus" pada detik pertama
+  // tiap peserta — atas nama orang yang baru menekan Mulai.
+  const pakaiMik = Boolean(ujian?.rekamSuara);
+  const [mikBeres, setMikBeres] = useState(false);
+
+  const tenang = (!pakaiKamera || kameraBeres) && (!pakaiMik || mikBeres);
 
   // Tetap sama dari gambar ke gambar. Panggilan balik yang lahir baru pada tiap
   // gambar akan membuat kameranya dimatikan lalu dinyalakan lagi — lampu kamera
   // yang berkedip di tengah ujian, dan izin yang ditanyakan dua kali.
   const tandaiKameraBeres = useCallback(() => setKameraBeres(true), []);
+  const tandaiMikBeres = useCallback(() => setMikBeres(true), []);
 
   // Jaring pengaman. Kabar "izin selesai" datang dari satu panggilan balik, dan
   // panggilan balik yang karena satu dan lain hal tidak pernah sampai akan
@@ -320,6 +333,15 @@ export default function UjianApp() {
     const jam = window.setTimeout(() => setKameraBeres(true), 20_000);
     return () => window.clearTimeout(jam);
   }, [layar, pakaiKamera, kameraBeres]);
+
+  // Jaring pengaman yang sama untuk kotak izin mikrofon, dengan alasan yang
+  // sama: panggilan balik yang tidak pernah sampai tidak boleh mematikan
+  // penjagaan fokus sepanjang ujian.
+  useEffect(() => {
+    if (layar !== "kerja" || !pakaiMik || mikBeres) return;
+    const jam = window.setTimeout(() => setMikBeres(true), 20_000);
+    return () => window.clearTimeout(jam);
+  }, [layar, pakaiMik, mikBeres]);
 
   const penjaga = usePenjaga({ aktif: layar === "kerja", mode, tenang, mengakhiri, lapor: laporInsiden });
 
@@ -927,6 +949,30 @@ export default function UjianApp() {
 
           {ujian.instruksi && <div className="uj-instruksi"><b>Instruksi</b><p>{ujian.instruksi}</p></div>}
 
+          {/* ---------- PEMBERITAHUAN PEREKAMAN ----------
+              Kotak ini TIDAK dapat dimatikan pengaturan mana pun, dan itu
+              disengaja. Ujian yang merekam suara harus mengatakannya SEBELUM
+              orangnya menekan mulai — bukan sesudah kotak izin mikrofon
+              muncul di tengah ujian yang waktunya sudah berjalan.
+
+              Bandingkan dengan pengawasan tangkapan layar tepat di bawah,
+              yang sengaja TIDAK diumumkan. Perbedaannya bukan keteledoran:
+              yang satu memakai mikrofon dan merekam suara orang lain di
+              ruangan yang sama, yang satu lagi membaca kejadian di halaman
+              yang sedang dibukanya sendiri. */}
+          {ujian.rekamSuara && (
+            <div className="uj-instruksi uj-rekam-kabar">
+              <b>Ujian ini merekam suara</b>
+              <p>
+                Mikrofon perangkatmu akan menyala selama ujian berlangsung, dan rekamannya
+                hanya dapat dibuka dosen pengampu. Kamu akan diminta memberi izin sesudah menekan
+                MULAI, dan ada tanda menyala di sudut layar selama perekaman berjalan.
+                Bila izinnya ditolak atau mikrofonmu bermasalah, ujian tetap dapat dikerjakan —
+                keadaannya dicatat pada laporan pengawasan.
+              </p>
+            </div>
+          )}
+
           {/* ---------- PENGAWASAN TIDAK DIUMUMKAN ----------
               Dulu di sini ada kotak "Tangkapan layar diawasi" beserta ajakan
               memakai aplikasi terkunci. Keduanya dibuang atas permintaan
@@ -975,11 +1021,16 @@ export default function UjianApp() {
               tertulis di badannya sendiri. */}
           {!sudahTutup && (
             <>
-              <label htmlFor="uj-nama">Nama Lengkap</label>
-              <input id="uj-nama" className="uj-input" value={nama} onChange={(e) => setNama(e.target.value)} placeholder="Nama sesuai daftar hadir" autoComplete="name" />
-
-              <label htmlFor="uj-nim">NIM / Nomor Peserta</label>
-              <input id="uj-nim" className="uj-input" value={nim} onChange={(e) => setNim(e.target.value.replace(/\D/g, ""))} placeholder="Nomor induk atau nomor peserta" inputMode="numeric" autoComplete="off" />
+              {/* Kolom nama yang sekaligus mencari, bila daftar mahasiswa
+                  portal sudah diisi. Kalau belum, ia kolom nama biasa —
+                  lihat catatan di kepala cari-peserta.tsx. */}
+              <CariPeserta
+                kode={ujian?.kode ?? ""}
+                nama={nama}
+                setNama={setNama}
+                nim={nim}
+                setNim={setNim}
+              />
 
               {ujian.pakaiToken && (
                 <>
@@ -1142,6 +1193,19 @@ export default function UjianApp() {
           kunciSesi={kunciSesi}
           lapor={laporKamera}
           selesaiIzin={tandaiKameraBeres}
+        />
+      )}
+
+      {/* ---------- REKAMAN SUARA ----------
+          Sama sikapnya dengan kamera, dan sama sebabnya: lencananya terlihat
+          sepanjang ujian. Yang direkam suaranya berhak tahu bahwa ia sedang
+          direkam — dan perekaman yang terlihat itulah yang mencegah, bukan
+          perekaman yang disembunyikan. */}
+      {ujian?.rekamSuara && (
+        <MikrofonPengawas
+          aktif={layar === "kerja"}
+          kunciSesi={kunciSesi}
+          selesaiIzin={tandaiMikBeres}
         />
       )}
 

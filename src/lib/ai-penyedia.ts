@@ -58,6 +58,22 @@ const MODEL_GEMINI = process.env.CBT_MODEL_GEMINI || "gemini-2.5-flash";
  */
 export type GambarMasuk = { jenis: string; data: string };
 
+/**
+ * Suara yang ikut dikirim bersama perintah. Bentuknya sama dengan gambar:
+ * base64 murni tanpa awalan "data:".
+ *
+ * HANYA GEMINI YANG MENDENGAR. Claude membaca gambar tetapi tidak menerima
+ * masukan suara, jadi permintaan bersuara yang jatuh ke Claude ditolak dengan
+ * keterangan yang menyebut sebabnya — bukan dikirim lalu gagal dengan galat
+ * penyedia yang tidak dapat dibaca siapa pun.
+ */
+export type SuaraMasuk = { jenis: string; data: string };
+
+/** Penyedia mana yang dapat mendengar rekaman. */
+export function penyediaDengar(): NamaPenyedia[] {
+  return penyediaTersedia().filter((p) => p === "gemini");
+}
+
 export async function mintaJson(input: {
   sistem: string;
   perintah: string;
@@ -66,6 +82,8 @@ export async function mintaJson(input: {
   maksKeluaran?: number;
   /** Gambar yang ikut dibaca model. Kosong untuk permintaan teks biasa. */
   gambar?: GambarMasuk[];
+  /** Suara yang ikut didengar model. Hanya Gemini yang menerimanya. */
+  suara?: SuaraMasuk[];
   /**
    * Seberapa dalam model diminta berpikir. "low" untuk pekerjaan yang
    * berulang ribuan kali dan jawabannya pendek — memeriksa satu cuplikan
@@ -82,6 +100,22 @@ export async function mintaJson(input: {
       503,
     );
   }
+
+  // Permintaan bersuara memilih penyedianya sendiri, apa pun yang diminta
+  // pemanggil. Yang meminta transkrip tidak seharusnya perlu tahu penyedia
+  // mana yang kebetulan punya telinga bulan ini.
+  if ((input.suara ?? []).length > 0) {
+    if (!tersedia.includes("gemini")) {
+      throw new GalatModel(
+        "Transkrip rekaman memerlukan GEMINI_API_KEY pada environment — model yang " +
+          "terpasang sekarang tidak dapat mendengar rekaman. Rekamannya tetap tersimpan " +
+          "dan tetap dapat diputar dosen.",
+        503,
+      );
+    }
+    return lewatGemini(input);
+  }
+
   const pilih = input.penyedia && tersedia.includes(input.penyedia) ? input.penyedia : tersedia[0];
   return pilih === "claude" ? lewatClaude(input) : lewatGemini(input);
 }
@@ -181,6 +215,7 @@ async function lewatGemini(input: {
   skema: Record<string, unknown>;
   maksKeluaran?: number;
   gambar?: GambarMasuk[];
+  suara?: SuaraMasuk[];
   usaha?: "low" | "medium" | "high";
 }): Promise<JawabanModel> {
   const kunci = (process.env.GEMINI_API_KEY || "").trim();
@@ -200,6 +235,9 @@ async function lewatGemini(input: {
             parts: [
               ...(input.gambar ?? []).map((g) => ({
                 inline_data: { mime_type: g.jenis, data: g.data },
+              })),
+              ...(input.suara ?? []).map((a) => ({
+                inline_data: { mime_type: a.jenis, data: a.data },
               })),
               { text: input.perintah },
             ],

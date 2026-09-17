@@ -28,7 +28,7 @@ import { sarikanDokumen, type HasilSari } from "@/lib/sari-dokumen";
 import { JENIS_AI, MAKS_SOAL } from "@/lib/ai-soal";
 import {
   beritaAcaraHtml, laporanPesertaHtml, naskahSoalHtml, posterQrHtml,
-  type PesertaCetak, type UjianCetak,
+  type PesertaCetak, type RubrikCetak, type UjianCetak,
 } from "@/lib/cetak-cbt";
 import { gambarQr, namaBerkasQr } from "@/lib/qr-ujian";
 import {
@@ -45,6 +45,11 @@ import {
   tingkatIntegritas, TINGKAT_LABEL, type JenisInsiden, type ModePengawasan,
 } from "@/lib/pengawasan";
 import { KREDIT_CBT } from "../cbt/kredit";
+import {
+  DaftarMirip, LembarRubrik, PanelMahasiswa, PanelRubrik, PemutarRekaman,
+  type PasanganMirip,
+} from "./cbt-v1";
+import { STATUS_MIRIP_LABEL, STATUS_MIRIP_WARNA, type StatusMirip } from "@/lib/mirip-jawaban";
 
 type Ujian = {
   id: number; code: string; title: string; courseName: string; className: string | null;
@@ -71,6 +76,18 @@ type Ujian = {
    * tertulis di satu tempat, dan tempat itu bukan peramban.
    */
   bolehSaklarKamera: boolean;
+
+  // ---------- CBT V1 ----------
+  /** Rubrik yang dipakai menilai esai. null berarti dinilai manual seperti dulu. */
+  rubricId?: number | null;
+  /** Merekam suara peserta selama ujian. */
+  recordAudio?: boolean;
+  /** Memeriksa kemiripan jawaban antarpeserta saat dikumpulkan. */
+  checkSimilarity?: boolean;
+  similarityReview?: number;
+  similarityHigh?: number;
+  /** Kirim laporan nilai segera sesudah pengesahan. */
+  autoEmail?: boolean;
 };
 
 /** Satu jawaban peserta, dibuka pengajar untuk dibaca dan dikoreksi. */
@@ -109,6 +126,16 @@ type Peserta = {
   pengawasan?: Partial<Record<JenisInsiden, number>>;
   /** Perangkat yang dipakai: "peramban" | "android" | "windows". */
   klien?: string;
+  // ---------- CBT V1 ----------
+  /** Kemiripan tertinggi jawaban peserta ini dengan peserta lain, 0–100. */
+  kemiripan?: number;
+  statusKemiripan?: string;
+  /** Nilai yang sudah disahkan dosen, bila ada. */
+  nilaiAkhir?: number | null;
+  disetujui?: string | null;
+  disetujuiOleh?: string;
+  predikat?: { huruf: string; sebutan: string } | null;
+  laporanTerkirim?: string | null;
 };
 
 /** Satu baris garis waktu pengawasan. */
@@ -549,6 +576,13 @@ function setelanUjian(u: Ujian) {
     lockdownDevice: rapikanPerangkatKunci(u.lockdownDevice),
     proctorMode: rapikanMode(u.proctorMode),
     cameraOn: u.cameraOn !== false,
+    // ---------- CBT V1 ----------
+    rubricId: u.rubricId ?? 0,
+    recordAudio: u.recordAudio === true,
+    checkSimilarity: u.checkSimilarity !== false,
+    similarityReview: u.similarityReview ?? 30,
+    similarityHigh: u.similarityHigh ?? 60,
+    autoEmail: u.autoEmail === true,
   };
 }
 
@@ -709,6 +743,25 @@ export default function CbtPanel({ role }: { role: string }) {
   const [galat, setGalat] = useState("");
   const [buka, setBuka] = useState<number | null>(null);
   const [tab, setTab] = useState<"soal" | "pantau">("soal");
+
+  /**
+   * Menu tingkat atas menu CBT: daftar ujian, rubrik, atau data mahasiswa.
+   *
+   * Ketiganya di dalam satu menu, bukan tiga menu terpisah di sidebar
+   * dashboard. Rubrik dan daftar mahasiswa hanya berarti bagi CBT, dan menu
+   * sidebar yang bertambah tiga akan dilihat juga oleh admin bagian yang tidak
+   * pernah menyentuh ujian.
+   */
+  const [menu, setMenu] = useState<"ujian" | "rubrik" | "mahasiswa">("ujian");
+
+  /** Rubrik yang dapat dipilih pada pengaturan ujian. Dimuat sekali. */
+  const [daftarRubrik, setDaftarRubrik] = useState<Array<{ id: number; nama: string; kriteria: unknown[] }>>([]);
+
+  /** Bahan CBT V1 untuk peserta yang sedang dibuka. */
+  const [pasanganMirip, setPasanganMirip] = useState<PasanganMirip[]>([]);
+  const [rubrikCetak, setRubrikCetak] = useState<unknown[]>([]);
+  const [namaRubrikCetak, setNamaRubrikCetak] = useState("");
+  const [rekamanCetak, setRekamanCetak] = useState<unknown>(null);
   const [buatBaru, setBuatBaru] = useState(false);
 
   const [draf, setDraf] = useState({
@@ -763,6 +816,16 @@ export default function CbtPanel({ role }: { role: string }) {
     singleDevice: true, requireLockdown: false,
     lockdownDevice: "semua" as PerangkatKunci,
     proctorMode: "biasa" as ModePengawasan, cameraOn: true,
+    // ---------- CBT V1 ----------
+    // Bawaannya berarti "seperti sebelum V1": tanpa rubrik, tanpa rekaman,
+    // tanpa surat otomatis. Yang menyala hanya pemeriksaan kemiripan, yang
+    // tidak berbiaya, tidak menunda apa pun, dan tidak pernah mengubah nilai.
+    rubricId: 0,
+    recordAudio: false,
+    checkSimilarity: true,
+    similarityReview: 30,
+    similarityHigh: 60,
+    autoEmail: false,
   });
   const [bukaSetel, setBukaSetel] = useState(false);
 
@@ -902,6 +965,27 @@ export default function CbtPanel({ role }: { role: string }) {
     const tunda = window.setTimeout(() => void muatUjian(), 0);
     return () => window.clearTimeout(tunda);
   }, [muatUjian]);
+
+  // Daftar rubrik, untuk pemilih pada Pengaturan Ujian.
+  //
+  // Ditanyakan sekali di awal, bukan saat panel setelan dibuka: yang membuka
+  // panel setelan sedang menyiapkan ujian yang akan dimulai sebentar lagi, dan
+  // satu perjalanan lagi ke server pada saat itu terasa seperti daftar yang
+  // tidak pernah terisi. Gagal memuat didiamkan — pemilihnya hanya akan
+  // menampilkan "tanpa rubrik", dan itu memang pilihan yang sah.
+  useEffect(() => {
+    let hidup = true;
+    void (async () => {
+      try {
+        const jawab = await fetch("/api/cbt/rubrik", { cache: "no-store" });
+        const data = await jawab.json();
+        if (hidup && jawab.ok && data.success) setDaftarRubrik(data.rubrik || []);
+      } catch {
+        // Didiamkan; lihat catatan di atas.
+      }
+    })();
+    return () => { hidup = false; };
+  }, []);
 
   // Ditanyakan sekali di awal: menu AI yang tampil lengkap lalu menjawab
   // "belum ada kunci" sesudah pengajar mengunggah dokumen dan menunggu satu menit
@@ -1389,6 +1473,10 @@ export default function CbtPanel({ role }: { role: string }) {
     setRincian([]);
     setJejak([]);
     setDraftKoreksi({});
+    setPasanganMirip([]);
+    setRubrikCetak([]);
+    setNamaRubrikCetak("");
+    setRekamanCetak(null);
     setMuatRincian(true);
     try {
       const jawab = await fetch(`/api/cbt/hasil?ujian=${terbuka.id}&attempt=${p.id}`, { cache: "no-store" });
@@ -1397,6 +1485,13 @@ export default function CbtPanel({ role }: { role: string }) {
       const isi = (data.rincian || []) as Rincian[];
       setRincian(isi);
       setJejak((data.jejak || []) as Jejak[]);
+      // Bahan CBT V1 ikut datang bersama lembar ini, dalam satu perjalanan.
+      // Tombol cetak memerlukan seluruhnya, dan tombol cetak yang harus
+      // menunggu tiga permintaan lagi terasa seperti tombol yang rusak.
+      setPasanganMirip((data.pasanganMirip || []) as PasanganMirip[]);
+      setRubrikCetak((data.rubrik || []) as unknown[]);
+      setNamaRubrikCetak(String(data.namaRubrik || ""));
+      setRekamanCetak(data.rekaman ?? null);
       // Baris peserta di papan pantau tidak membawa skor integritas maupun
       // rincian insidennya — di sana yang diambil hanya ringkasan. Yang datang
       // bersama lembar ini lebih lengkap, jadi ia yang dipakai.
@@ -1754,6 +1849,32 @@ export default function CbtPanel({ role }: { role: string }) {
       tertunda: bukaPeserta.tertunda,
       mulai: bukaPeserta.mulai, kumpul: bukaPeserta.kumpul,
       pindahTab: bukaPeserta.pindahTab, keluarFullscreen: bukaPeserta.keluarFullscreen,
+
+      // ---------- CBT V1 ----------
+      // Seluruhnya PILIHAN, dan yang tidak terisi tidak mencetak apa-apa.
+      // Ujian tanpa rubrik, tanpa pemeriksaan kemiripan, dan tanpa rekaman
+      // menghasilkan halaman yang sama persis dengan sebelum V1.
+      nilaiAkhir: bukaPeserta.nilaiAkhir ?? null,
+      predikat: bukaPeserta.predikat ?? null,
+      disetujuiOleh: bukaPeserta.disetujuiOleh ?? null,
+      disetujuiPada: bukaPeserta.disetujui ?? null,
+      kemiripan:
+        terbuka.checkSimilarity !== false && (bukaPeserta.kemiripan ?? 0) > 0
+          ? {
+              skor: bukaPeserta.kemiripan ?? 0,
+              status: STATUS_MIRIP_LABEL[(bukaPeserta.statusKemiripan || "bersih") as StatusMirip],
+              lawan: pasanganMirip[0] ? `${pasanganMirip[0].lawanNama} (${pasanganMirip[0].lawanNim})` : undefined,
+            }
+          : null,
+      rekaman: (rekamanCetak as PesertaCetak["rekaman"]) ?? null,
+      // Garis waktu pengawasan ikut tercetak. Angka ringkasannya tidak dapat
+      // menggantikannya: tiga kali pindah tab sepanjang sembilan puluh menit
+      // dan tiga kali dalam empat puluh detik adalah dua hal yang berbeda, dan
+      // hanya yang kedua yang berarti sesuatu.
+      jejak: jejak.slice(0, 100).map((j) => ({
+        jam: jamIndonesia(j.jam),
+        keterangan: `${INSIDEN_LABEL[j.jenis as JenisInsiden] ?? j.jenis}${j.detail ? ` — ${j.detail}` : ""}`,
+      })),
     };
     bukaCetak(
       laporanPesertaHtml(
@@ -1764,6 +1885,8 @@ export default function CbtPanel({ role }: { role: string }) {
           catatan: r.catatan,
         })),
         terbuka.passingGrade,
+        rubrikCetak as RubrikCetak[],
+        namaRubrikCetak,
       ),
       "laporan",
     );
@@ -1847,12 +1970,122 @@ export default function CbtPanel({ role }: { role: string }) {
     kabari("csv", "oke", "✓ CSV terunduh", 3400);
   }
 
+  // Dua angka yang dibaca tombol-tombol sekelas di bawah, dan yang juga
+  // menentukan apakah tombolnya muncul sama sekali.
+  const sudahKumpul = peserta.filter((p) => p.status !== "berjalan").length;
+  const jumlahDisahkan = peserta.filter((p) => Boolean(p.disetujui)).length;
+
+  // ============================================================
+  // PEKERJAAN SEKELAS SEKALIGUS — CBT V1
+  //
+  // Ketiganya berbagi satu bentuk yang sama, dan bentuk itu disengaja:
+  // server mengerjakan sebagian, memberi tahu berapa yang TERSISA, lalu
+  // tombolnya ditekan lagi.
+  //
+  // Terdengar seperti setengah jalan, dan sebenarnya kebalikannya. Empat
+  // puluh peserta dikali lima soal esai adalah dua ratus panggilan model di
+  // dalam satu permintaan HTTP — yang akan menabrak batas waktu fungsi
+  // sesudah membakar separuh biayanya tanpa menyimpan apa pun. Batas itu ada
+  // di server (lihat MAKS_SEKALI_NILAI), dan yang dikerjakan di sini hanya
+  // menyampaikan sisanya kepada yang menekan.
+  // ============================================================
+
+  async function nilaiSemuaEsai() {
+    if (!terbuka) return;
+    kabari("ai-semua", "jalan", "Menilai…");
+    try {
+      const jawab = await fetch("/api/cbt/penilaian", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aksi: "ai", ujian: terbuka.id }),
+      });
+      const data = await jawab.json();
+      if (!jawab.ok || !data.success) throw new Error(data.message || "Gagal menilai.");
+      setPesan(data.pesan || "Penilaian selesai.");
+      if (Array.isArray(data.gagal) && data.gagal.length > 0) setGalat(data.gagal.join(" · "));
+      await muatHasil(terbuka.id);
+      kabari("ai-semua", "oke", data.sisa > 0 ? `↻ Sisa ${data.sisa}` : "✓ Selesai", 6000);
+    } catch (alasan: unknown) {
+      setGalat(alasan instanceof Error ? alasan.message : "Penilaian gagal dijalankan.");
+      kabari("ai-semua", "gagal", "✕ Gagal", 6000);
+    }
+  }
+
+  async function hitungUlangMirip() {
+    if (!terbuka) return;
+    kabari("mirip-ulang", "jalan", "Menghitung…");
+    try {
+      const jawab = await fetch("/api/cbt/penilaian", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aksi: "hitung-kemiripan", ujian: terbuka.id }),
+      });
+      const data = await jawab.json();
+      if (!jawab.ok || !data.success) throw new Error(data.message || "Gagal menghitung.");
+      setPesan(data.pesan || "Kemiripan dihitung ulang.");
+      await muatHasil(terbuka.id);
+      kabari("mirip-ulang", "oke", "✓ Selesai", 4000);
+    } catch (alasan: unknown) {
+      setGalat(alasan instanceof Error ? alasan.message : "Kemiripan gagal dihitung.");
+      kabari("mirip-ulang", "gagal", "✕ Gagal", 6000);
+    }
+  }
+
+  async function kirimSemuaNilai() {
+    if (!terbuka) return;
+    // Surat yang terkirim tidak dapat ditarik kembali, jadi di sinilah satu-
+    // satunya tempat di seluruh panel CBT yang meminta persetujuan dua kali.
+    if (!window.confirm(
+      `Kirim laporan nilai ke ${jumlahDisahkan} mahasiswa yang nilainya sudah disahkan?\n\n` +
+      "Surat yang sudah terkirim tidak dapat ditarik kembali.",
+    )) return;
+
+    kabari("kirim-semua", "jalan", "Mengirim…");
+    try {
+      const jawab = await fetch("/api/cbt/kirim-nilai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aksi: "semua", ujian: terbuka.id }),
+      });
+      const data = await jawab.json();
+      if (!jawab.ok || !data.success) throw new Error(data.message || "Gagal mengirim.");
+      setPesan(data.pesan || "Pengiriman selesai.");
+      if (Array.isArray(data.gagal) && data.gagal.length > 0) setGalat(data.gagal.join(" · "));
+      await muatHasil(terbuka.id);
+      kabari("kirim-semua", "oke", data.sisa > 0 ? `↻ Sisa ${data.sisa}` : "✓ Terkirim", 6000);
+    } catch (alasan: unknown) {
+      setGalat(alasan instanceof Error ? alasan.message : "Laporan gagal dikirim.");
+      kabari("kirim-semua", "gagal", "✕ Gagal", 6000);
+    }
+  }
+
   // ---------- DAFTAR UJIAN ----------
   if (buka === null) {
     return (
       <section>
         <p className="section-eyebrow">{pemantau ? "PENGAJAR & ADMIN" : "PENGAJAR"}</p>
         <h2 className="dsh-title">Ujian Online (CBT)</h2>
+
+        {/* ---------- TIGA MENU, SATU TEMPAT ----------
+            Rubrik dan daftar mahasiswa hanya berarti bagi CBT, jadi keduanya
+            duduk di sini — bukan sebagai dua menu baru di sidebar dashboard
+            yang juga dilihat admin bagian yang tidak pernah menyentuh ujian. */}
+        <div className="cbt-tab cbtv-menu">
+          <button type="button" className={menu === "ujian" ? "on" : ""} onClick={() => setMenu("ujian")}>
+            Ujian ({ujian.length})
+          </button>
+          <button type="button" className={menu === "rubrik" ? "on" : ""} onClick={() => setMenu("rubrik")}>
+            Rubrik penilaian
+          </button>
+          <button type="button" className={menu === "mahasiswa" ? "on" : ""} onClick={() => setMenu("mahasiswa")}>
+            Data mahasiswa
+          </button>
+        </div>
+
+        {menu === "rubrik" && <PanelRubrik />}
+        {menu === "mahasiswa" && <PanelMahasiswa bolehKelola={pemantau} />}
+
+        {menu === "ujian" && (<>
 
         {pesan && <div className="dsh-ok">{pesan}</div>}
         {galat && <div className="dsh-error">{galat}</div>}
@@ -1947,6 +2180,8 @@ export default function CbtPanel({ role }: { role: string }) {
             ))}
           </div>
         )}
+
+        </>)}
       </section>
     );
   }
@@ -2308,6 +2543,104 @@ export default function CbtPanel({ role }: { role: string }) {
                 boleh={terbuka.bolehSaklarKamera}
                 ubah={(nyala) => setSetel({ ...setel, cameraOn: nyala })}
               />
+
+              {/* ---------- SETELAN CBT V1 ----------
+                  Empat baris, dan tiga di antaranya sudah benar sejak awal.
+                  Dosen yang tidak menyentuh satu pun tetap mendapat pemeriksaan
+                  kemiripan dan penilaian manual seperti biasa; yang harus ia
+                  putuskan sendiri hanya dua — rubrik dan perekaman. */}
+              <div className="cbt-mode cbtv-setel">
+                <div className="cbt-mode-kepala">Penilaian &amp; integritas</div>
+
+                <label className="cbtv-setel-baris">
+                  <span>Rubrik penilaian esai</span>
+                  <select
+                    value={setel.rubricId}
+                    onChange={(e) => setSetel({ ...setel, rubricId: Number(e.target.value) })}
+                  >
+                    <option value={0}>Tanpa rubrik — nilai esai diketik sendiri</option>
+                    {daftarRubrik.map((r) => (
+                      <option key={r.id} value={r.id}>{r.nama} ({r.kriteria.length} kriteria)</option>
+                    ))}
+                  </select>
+                </label>
+                <p className="cbt-catatan cbtv-setel-bantu">
+                  Dengan rubrik, tiap esai dinilai per kriteria beserta alasannya — dan AI dapat
+                  mengusulkan levelnya untuk Anda periksa. Belum punya rubrik? Buka menu
+                  <b> Rubrik</b> di daftar ujian; ada beberapa yang tinggal disalin.
+                </p>
+
+                <label className="cbtv-setel-saklar">
+                  <input
+                    type="checkbox"
+                    checked={setel.recordAudio}
+                    onChange={(e) => setSetel({ ...setel, recordAudio: e.target.checked })}
+                  />
+                  <span>
+                    <b>Rekam suara peserta</b>
+                    <small>
+                      Mikrofon menyala sepanjang ujian dan peserta diberi tahu sebelum memulai.
+                      Rekamannya hanya dapat dibuka Anda.
+                      {sedangBerlangsung && !setelanUjian(terbuka).recordAudio && (
+                        <i> Tidak dapat dinyalakan di tengah ujian yang sedang berjalan —
+                        yang sudah duduk mengerjakan tidak diberi tahu sebelumnya.</i>
+                      )}
+                    </small>
+                  </span>
+                </label>
+
+                <label className="cbtv-setel-saklar">
+                  <input
+                    type="checkbox"
+                    checked={setel.checkSimilarity}
+                    onChange={(e) => setSetel({ ...setel, checkSimilarity: e.target.checked })}
+                  />
+                  <span>
+                    <b>Periksa kemiripan jawaban antarpeserta</b>
+                    <small>
+                      Berjalan sendiri saat peserta mengumpulkan, tanpa biaya dan tanpa menunda.
+                      Hanya menandai — tidak pernah mengubah nilai.
+                    </small>
+                  </span>
+                </label>
+
+                {setel.checkSimilarity && (
+                  <div className="cbtv-ambang">
+                    <label>
+                      <span>Perlu ditinjau mulai</span>
+                      <input
+                        type="number" min={1} max={99} value={setel.similarityReview}
+                        onChange={(e) => setSetel({ ...setel, similarityReview: Number(e.target.value) })}
+                      />
+                      <i>%</i>
+                    </label>
+                    <label>
+                      <span>Kemiripan tinggi mulai</span>
+                      <input
+                        type="number" min={1} max={100} value={setel.similarityHigh}
+                        onChange={(e) => setSetel({ ...setel, similarityHigh: Number(e.target.value) })}
+                      />
+                      <i>%</i>
+                    </label>
+                  </div>
+                )}
+
+                <label className="cbtv-setel-saklar">
+                  <input
+                    type="checkbox"
+                    checked={setel.autoEmail}
+                    onChange={(e) => setSetel({ ...setel, autoEmail: e.target.checked })}
+                  />
+                  <span>
+                    <b>Kirim laporan nilai begitu disahkan</b>
+                    <small>
+                      Mati secara bawaan. Surat yang sudah terkirim tidak dapat ditarik kembali,
+                      jadi biarkan mati bila Anda hendak mengesahkan satu-dua orang lebih dulu
+                      untuk melihat bentuk laporannya.
+                    </small>
+                  </span>
+                </label>
+              </div>
 
               <div className="cbt-form-aksi">
                 <Tbl
@@ -2977,6 +3310,37 @@ export default function CbtPanel({ role }: { role: string }) {
                   mati={peserta.length === 0}
                   onClick={() => cetakBeritaAcara("acara-atas")}
                 />
+
+                {/* ---------- PEKERJAAN SEKELAS SEKALIGUS ----------
+                    Ketiganya hanya muncul bila memang berlaku bagi ujian ini,
+                    dan ketiganya menyebut angka pada tombolnya sendiri. Tombol
+                    yang tidak mengatakan berapa banyak yang akan terkena
+                    membuat orang ragu menekannya — lalu mengerjakannya satu
+                    per satu, empat puluh kali. */}
+                {terbuka.rubricId && sudahKumpul > 0 && (
+                  <Tbl
+                    kabar={aksi["ai-semua"]}
+                    dasar="btn btn-light btn-mini"
+                    diam="✨ Nilai esai sekelas"
+                    onClick={() => void nilaiSemuaEsai()}
+                  />
+                )}
+                {terbuka.checkSimilarity !== false && sudahKumpul > 1 && (
+                  <Tbl
+                    kabar={aksi["mirip-ulang"]}
+                    dasar="btn btn-light btn-mini"
+                    diam="⟳ Hitung ulang kemiripan"
+                    onClick={() => void hitungUlangMirip()}
+                  />
+                )}
+                {jumlahDisahkan > 0 && (
+                  <Tbl
+                    kabar={aksi["kirim-semua"]}
+                    dasar="btn btn-light btn-mini"
+                    diam={`✉ Kirim nilai (${jumlahDisahkan} disahkan)`}
+                    onClick={() => void kirimSemuaNilai()}
+                  />
+                )}
               </span>
             </div>
 
@@ -2986,7 +3350,15 @@ export default function CbtPanel({ role }: { role: string }) {
               <div className="qtable-wrap">
                 <table className="qt">
                   <thead>
-                    <tr><th>Mahasiswa / Peserta</th><th>Status</th><th>Progres</th><th>Sisa waktu</th><th>Nilai</th><th>Integritas</th><th /></tr>
+                    <tr>
+                      <th>Mahasiswa / Peserta</th><th>Status</th><th>Progres</th><th>Sisa waktu</th><th>Nilai</th>
+                      {/* Kolom kemiripan hanya muncul bila ujiannya memang
+                          memeriksanya. Kolom kosong berisi tanda hubung
+                          menimbulkan pertanyaan yang jawabannya "memang tidak
+                          dipakai" — dan pertanyaan itu muncul pada tiap
+                          pengawas baru yang membuka papan ini. */}
+                      {terbuka.checkSimilarity !== false && <th>Mirip</th>}
+                      <th>Integritas</th><th /></tr>
                   </thead>
                   <tbody>
                     {peserta.map((p) => (
@@ -3032,9 +3404,27 @@ export default function CbtPanel({ role }: { role: string }) {
                           )}
                         </td>
                         <td>
-                          {p.nilai === null ? "-" : <b>{p.nilai}</b>}
+                          {p.nilaiAkhir !== null && p.nilaiAkhir !== undefined
+                            ? <b className="cbtv-nilai-sah">{p.nilaiAkhir}</b>
+                            : p.nilai === null ? "-" : <b>{p.nilai}</b>}
+                          {p.disetujui && <small className="cbtv-sah-tanda">✓ disahkan{p.laporanTerkirim ? " · terkirim" : ""}</small>}
                           {p.tertunda > 0 && <small className="psn-nama">{p.tertunda} essay menunggu</small>}
                         </td>
+                        {terbuka.checkSimilarity !== false && (
+                          <td>
+                            {p.status === "berjalan" ? (
+                              <small className="psn-nama">-</small>
+                            ) : (
+                              <span
+                                className="cbtv-mirip-sel"
+                                style={{ color: STATUS_MIRIP_WARNA[(p.statusKemiripan || "bersih") as StatusMirip] }}
+                                title={STATUS_MIRIP_LABEL[(p.statusKemiripan || "bersih") as StatusMirip]}
+                              >
+                                {p.kemiripan ?? 0}%
+                              </span>
+                            )}
+                          </td>
+                        )}
                         <td>
                           {/* Satu angka, bukan daftar pelanggaran.
                               Papan ini menampilkan ratusan baris sekaligus, dan
@@ -3141,6 +3531,35 @@ export default function CbtPanel({ role }: { role: string }) {
                   </p>
                   <GarisWaktu jejak={jejak} mulai={bukaPeserta.mulai} />
                 </section>
+              )}
+
+              {/* ---------- BAGIAN CBT V1 ----------
+                  Urutannya mengikuti urutan pekerjaan dosen, bukan urutan
+                  fitur: menilai esainya dulu (itu yang menghasilkan angka),
+                  lalu memeriksa indikasi kemiripan, lalu mendengarkan
+                  rekamannya bila memang ada sesuatu yang perlu didengarkan.
+
+                  Pengesahan nilai berada di dalam LembarRubrik, di paling
+                  bawah bagian penilaian — supaya tidak ada yang menekan
+                  SAHKAN sebelum melewati apa yang disahkannya. */}
+              {!muatRincian && (
+                <LembarRubrik
+                  ujianId={terbuka.id}
+                  attemptId={bukaPeserta.id}
+                  onNilaiBerubah={() => void muatHasil(terbuka.id)}
+                />
+              )}
+
+              {!muatRincian && terbuka.checkSimilarity !== false && (
+                <DaftarMirip
+                  pasangan={pasanganMirip}
+                  skor={bukaPeserta.kemiripan ?? 0}
+                  status={bukaPeserta.statusKemiripan || "bersih"}
+                />
+              )}
+
+              {!muatRincian && terbuka.recordAudio && (
+                <PemutarRekaman ujianId={terbuka.id} attemptId={bukaPeserta.id} />
               )}
 
               {muatRincian ? (

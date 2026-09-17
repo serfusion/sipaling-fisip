@@ -4384,6 +4384,46 @@ a.al-mini:hover { color: var(--al-ink); }
 .uj-input:focus { outline: none; border-color: var(--uj-biru); box-shadow: 0 0 0 3px rgba(21, 103, 200, .16); }
 .uj-input-kode { text-align: center; font-size: 24px; font-weight: 800; letter-spacing: .35em; text-transform: uppercase; }
 
+/* ---------- PENCARIAN PESERTA PADA LAYAR MASUK ----------
+   Daftarnya melayang di atas isian berikutnya, bukan mendorongnya turun:
+   kolom NIM yang melompat ke bawah tiap kali satu huruf diketik membuat
+   tombol MULAI UJIAN ikut berpindah tempat — dan yang menekannya sedang
+   terburu-buru. */
+.uj-cari { position: relative; }
+.uj-cari-kotak { position: relative; }
+.uj-cari-sibuk {
+  position: absolute; right: 13px; top: 50%; width: 14px; height: 14px; margin-top: -7px;
+  border: 2px solid #c4ccd6; border-top-color: var(--uj-biru); border-radius: 50%;
+  animation: uj-cari-putar .7s linear infinite;
+}
+@keyframes uj-cari-putar { to { transform: rotate(360deg); } }
+
+.uj-cari-daftar {
+  position: absolute; z-index: 30; left: 0; right: 0; margin: 4px 0 0; padding: 4px;
+  list-style: none; max-height: 252px; overflow-y: auto;
+  border: 1px solid #c4ccd6; border-radius: 10px; background: #fff;
+  box-shadow: 0 12px 28px rgba(20, 30, 45, .17);
+}
+.uj-cari-daftar li { margin: 0; }
+.uj-cari-daftar button {
+  display: block; width: 100%; padding: 9px 11px; border: 0; border-radius: 7px;
+  background: transparent; text-align: left; font: inherit; cursor: pointer;
+}
+.uj-cari-daftar button:hover, .uj-cari-daftar button.on { background: #eef4fc; }
+.uj-cari-nim {
+  display: inline-block; min-width: 92px; margin-right: 8px;
+  color: var(--uj-biru); font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.uj-cari-nama { color: var(--uj-tinta); font-size: 14.5px; font-weight: 600; }
+.uj-cari-kelas { display: block; margin-top: 2px; color: var(--uj-samar); font-size: 11.5px; }
+.uj-cari-bantu { margin: 7px 0 0; color: var(--uj-samar); font-size: 11.5px; line-height: 1.5; }
+
+@media (prefers-color-scheme: dark) {
+  .uj-cari-daftar { border-color: #3a4350; background: #1d232b; box-shadow: 0 12px 28px rgba(0, 0, 0, .5); }
+  .uj-cari-daftar button:hover, .uj-cari-daftar button.on { background: #27313d; }
+  .uj-cari-nama { color: #e6ebf2; }
+}
+
 .uj-fakta { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 9px; margin: 16px 0; }
 .uj-fakta div { padding: 12px 8px; border-radius: 10px; border: 1px solid var(--uj-garis);
   background: #f6f7f9; text-align: center; }
@@ -6094,6 +6134,52 @@ table.qt td small { font-size: 11.5px; }
   line-height: 1.45;
   color: #fbbf24;
 }
+
+/* ---------- Lencana rekaman suara ----------
+   Duduk di atas kotak kamera bila keduanya menyala, dan menempati sudut yang
+   sama bila hanya ia sendiri. Sama sikapnya dengan kamera: terlihat, kecil,
+   dan tidak dapat ditutup peserta — perekaman yang disembunyikan dari yang
+   direkam membuang seluruh daya cegahnya. */
+.uj-mik {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 23;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.92);
+  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.35);
+  color: #e2e8f0;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+/* Kamera memakai sudut yang sama, jadi lencananya naik ke atasnya. Tinggi
+   kotak kamera + jarak: cukup dihitung sekali di sini. */
+.uj-kam ~ .uj-mik, body:has(.uj-kam) .uj-mik { bottom: 190px; }
+.uj-mik-titik {
+  width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: #64748b;
+}
+.uj-mik-merekam .uj-mik-titik { background: #ef4444; animation: uj-mik-denyut 1.6s ease-in-out infinite; }
+.uj-mik-ditolak .uj-mik-titik, .uj-mik-gagal .uj-mik-titik { background: #f59e0b; }
+.uj-mik-berhenti .uj-mik-titik { background: #22c55e; }
+@keyframes uj-mik-denyut { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+.uj-mik-jam { color: #94a3b8; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Kotak pemberitahuan perekaman pada layar sebelum ujian dimulai. */
+.uj-rekam-kabar { border-color: #f59e0b; background: #fffbeb; }
+.uj-rekam-kabar b { color: #b45309; }
+@media (prefers-color-scheme: dark) {
+  .uj-rekam-kabar { border-color: #b45309; background: #2a2010; }
+  .uj-rekam-kabar b { color: #fbbf24; }
+}
+
+@media (max-width: 640px) {
+  .uj-mik { right: 10px; bottom: 10px; padding: 6px 10px; font-size: 10.5px; }
+  .uj-kam ~ .uj-mik, body:has(.uj-kam) .uj-mik { bottom: 132px; }
+}
 /* Di ponsel ia mengecil, tidak menghilang. Yang menutupi soal membuat peserta
    mencari cara menyingkirkannya; yang terlalu kecil untuk dikenali membatalkan
    gunanya. */
@@ -6605,3 +6691,221 @@ table.qt td small { font-size: 11.5px; }
   text-decoration: none; }
 .al-drama-tombol:hover { background: var(--al-accent-dark); }
 .al-drama-kaki { margin: 12px 0 0; font-size: 11.5px; line-height: 1.65; color: var(--al-samar); }
+
+/* ============================================================
+   CBT V1 — RUBRIK, KEMIRIPAN, REKAMAN, DATA MAHASISWA
+   ============================================================
+   Semuanya menumpang gaya dashboard yang sudah ada (.panel, .dsh-table,
+   .btn) dan hanya menambah yang benar-benar baru. Yang paling sering
+   menghabiskan waktu di sini bukan menulis gaya baru, melainkan memburu
+   selisih dua piksel antara tabel yang menirunya dan tabel aslinya. */
+
+.cbtv-menu { margin-bottom: 14px; }
+
+/* ---------- DATA MAHASISWA ---------- */
+.cbtv-jumlah {
+  padding: 5px 12px; border-radius: 999px; background: #eef2f7;
+  font-size: 12px; font-weight: 800; color: #334155; white-space: nowrap;
+}
+.cbtv-impor { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
+.cbtv-impor-bantu { flex: 1 1 260px; margin: 0; }
+.cbtv-berkas { position: relative; overflow: hidden; cursor: pointer; }
+.cbtv-berkas input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.cbtv-tempel { margin-top: 11px; display: grid; gap: 8px; }
+.cbtv-tempel textarea {
+  width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px;
+}
+.cbtv-pratinjau { margin-top: 12px; padding: 12px 14px; border-radius: 9px; background: #f1f5f9; }
+.cbtv-pratinjau ul { margin: 7px 0 0; padding-left: 18px; font-size: 13px; }
+.cbtv-pratinjau code { font-size: 12px; color: #1d4ed8; }
+.cbtv-pratinjau-tombol { display: flex; gap: 8px; margin-top: 11px; }
+.cbtv-tolak ul { margin: 6px 0 0; padding-left: 18px; font-size: 12.5px; }
+.cbtv-cari {
+  width: 100%; max-width: 360px; margin-bottom: 12px; padding: 9px 13px;
+  border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;
+}
+.cbtv-tabel code { font-size: 12.5px; }
+.cbtv-email { font-size: 12.5px; color: #475569; word-break: break-all; }
+
+/* ---------- RUBRIK ---------- */
+.cbtv-sub { display: block; margin-bottom: 11px; font-size: 13px; color: #334155; }
+.cbtv-bawaan { display: grid; grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); gap: 12px; }
+.cbtv-bawaan-kartu {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 14px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fbfcfd;
+}
+.cbtv-bawaan-kartu b { font-size: 14px; }
+.cbtv-bawaan-kartu p { margin: 0; font-size: 12.5px; line-height: 1.55; color: #475569; }
+.cbtv-bawaan-kartu small { font-size: 11.5px; line-height: 1.5; color: #64748b; }
+.cbtv-bawaan-kartu button { margin-top: auto; align-self: flex-start; }
+
+.cbtv-bobot-kabar {
+  display: flex; align-items: center; gap: 9px; margin: 12px 0;
+  padding: 9px 13px; border-radius: 8px; background: #f1f5f9; font-size: 13px;
+}
+.cbtv-bobot-kabar .ok { color: #15803d; }
+.cbtv-bobot-kabar .salah { color: #b91c1c; }
+.cbtv-kriteria {
+  margin: 12px 0; padding: 13px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fbfcfd;
+}
+.cbtv-bobot { max-width: 108px; }
+.cbtv-buang { align-self: end; }
+.cbtv-level textarea {
+  width: 100%; padding: 8px 11px; border: 1px solid #cbd5e1; border-radius: 7px;
+  font: inherit; font-size: 13px;
+}
+.cbtv-susun-tombol { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.cbtv-daftar-rubrik { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.cbtv-daftar-rubrik li {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 11px 13px; border: 1px solid #e2e8f0; border-radius: 9px;
+}
+.cbtv-daftar-rubrik small { display: block; margin-top: 2px; font-size: 12px; color: #64748b; }
+.cbtv-aksi-rubrik { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ---------- SETELAN V1 PADA PENGATURAN UJIAN ---------- */
+.cbtv-setel { margin-top: 12px; }
+.cbtv-setel-baris { display: block; margin-bottom: 4px; }
+.cbtv-setel-baris > span {
+  display: block; margin-bottom: 5px; font-size: 12px; font-weight: 700; color: #475569;
+}
+.cbtv-setel-baris select {
+  width: 100%; max-width: 460px; padding: 8px 11px;
+  border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; font-size: 13.5px;
+}
+.cbtv-setel-bantu { margin: 0 0 12px; }
+.cbtv-setel-saklar { display: flex; align-items: flex-start; gap: 10px; margin: 11px 0; cursor: pointer; }
+.cbtv-setel-saklar input { margin-top: 3px; flex: 0 0 auto; }
+.cbtv-setel-saklar b { display: block; font-size: 13.5px; }
+.cbtv-setel-saklar small { display: block; margin-top: 2px; font-size: 12px; line-height: 1.55; color: #64748b; }
+.cbtv-setel-saklar i { color: #b45309; font-style: normal; }
+.cbtv-ambang { display: flex; flex-wrap: wrap; gap: 14px; margin: 4px 0 12px 28px; }
+.cbtv-ambang label { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: #475569; }
+.cbtv-ambang input { width: 74px; padding: 6px 9px; border: 1px solid #cbd5e1; border-radius: 7px; }
+
+/* ---------- LEMBAR PENILAIAN RUBRIK ---------- */
+.cbtv-lembar { margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0; }
+.cbtv-lembar-kepala {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 11px;
+  margin-bottom: 6px;
+}
+.cbtv-lembar-kepala small { display: block; margin-top: 2px; font-size: 12px; color: #64748b; }
+.cbtv-prinsip { margin-bottom: 13px; }
+.cbtv-esai { margin: 14px 0; padding: 14px; border: 1px solid #e2e8f0; border-radius: 10px; }
+.cbtv-esai > header {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 10px;
+  margin-bottom: 9px;
+}
+.cbtv-esai-poin { font-size: 12.5px; font-weight: 700; color: #334155; white-space: nowrap; }
+.cbtv-jawaban {
+  max-height: 260px; overflow-y: auto; margin-bottom: 11px; padding: 11px 13px;
+  border-radius: 8px; background: #f8fafc; font-size: 13.5px; line-height: 1.7;
+  white-space: pre-line;
+}
+.cbtv-tabel-rubrik { font-size: 13px; }
+.cbtv-tabel-rubrik select { padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12.5px; max-width: 220px; }
+.cbtv-ka { text-align: right; font-variant-numeric: tabular-nums; }
+.cbtv-alasan { display: block; margin-top: 4px; font-size: 12px; line-height: 1.6; color: #475569; font-style: italic; }
+.cbtv-alasan b { color: #b45309; font-style: normal; }
+.cbtv-berubah { display: block; margin-top: 2px; font-size: 11.5px; color: #b45309; }
+.cbtv-diubah { display: block; margin-top: 3px; font-size: 11px; color: #1d4ed8; }
+.cbtv-catatan-ai {
+  margin-top: 11px; padding: 11px 13px; border-radius: 8px;
+  background: #f0f7ff; border: 1px solid #dbeafe;
+}
+.cbtv-catatan-ai p { margin: 5px 0 0; font-size: 13px; line-height: 1.7; white-space: pre-line; }
+.cbtv-catatan-ai small { display: block; margin-top: 6px; font-size: 11.5px; color: #64748b; }
+
+/* Pengesahan. Sengaja berlatar berbeda dari sekitarnya: ini satu-satunya
+   tombol di seluruh lembar yang membuat sebuah nilai menjadi resmi. */
+.cbtv-sahkan {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 13px;
+  margin-top: 16px; padding: 14px 16px; border-radius: 10px;
+  background: #f8fafc; border: 1px solid #cbd5e1;
+}
+.cbtv-sahkan-kiri { display: flex; flex-wrap: wrap; gap: 13px; align-items: center; font-size: 13px; }
+.cbtv-sahkan-kanan { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.cbtv-nilai-mesin b { font-size: 16px; }
+.cbtv-tunggu { color: #b45309; font-size: 12.5px; }
+.cbtv-nilai-ketik { display: flex; align-items: center; gap: 7px; font-size: 12.5px; }
+.cbtv-nilai-ketik input {
+  width: 82px; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 7px;
+  font-size: 15px; font-weight: 700; text-align: center;
+}
+.cbtv-sudah { font-size: 13px; color: #15803d; }
+.cbtv-nilai-sah { color: #15803d; }
+.cbtv-sah-tanda { display: block; font-size: 11px; color: #15803d; }
+
+/* ---------- KEMIRIPAN ---------- */
+.cbtv-mirip { margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0; }
+.cbtv-mirip-kepala { display: flex; align-items: center; gap: 11px; margin-bottom: 7px; }
+.cbtv-lencana {
+  padding: 4px 11px; border-radius: 999px; color: #fff;
+  font-size: 11.5px; font-weight: 800; white-space: nowrap;
+}
+.cbtv-mirip-sel { font-weight: 800; font-variant-numeric: tabular-nums; }
+.cbtv-mirip-daftar { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 7px; }
+.cbtv-mirip-daftar > li { border: 1px solid #e2e8f0; border-radius: 9px; overflow: hidden; }
+.cbtv-mirip-daftar > li > button {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 13px;
+  border: 0; background: transparent; text-align: left; font: inherit; cursor: pointer;
+}
+.cbtv-mirip-daftar > li > button:hover { background: #f8fafc; }
+.cbtv-mirip-skor { font-size: 15px; font-weight: 800; min-width: 52px; font-variant-numeric: tabular-nums; }
+.cbtv-mirip-lawan { flex: 1; font-size: 13.5px; }
+.cbtv-mirip-lawan code { margin-left: 6px; font-size: 12px; color: #64748b; }
+.cbtv-mirip-status { font-size: 12px; color: #64748b; }
+.cbtv-mirip-rinci { padding: 12px 13px; border-top: 1px solid #e2e8f0; background: #fbfcfd; }
+.cbtv-sinyal { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12.5px; color: #475569; }
+.cbtv-frasa { margin-top: 10px; font-size: 12.5px; }
+.cbtv-frasa ul { margin: 5px 0 0; padding-left: 18px; line-height: 1.7; }
+.cbtv-kata-langka { margin: 9px 0 0; font-size: 12.5px; }
+.cbtv-salinan { margin: 9px 0 0; padding: 8px 11px; border-radius: 7px; background: #fef2f2; color: #991b1b; font-size: 12.5px; }
+
+/* ---------- REKAMAN ---------- */
+.cbtv-rekam { margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0; }
+.cbtv-rekam-kepala {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 11px;
+  margin-bottom: 10px;
+}
+.cbtv-rekam-kepala small { display: block; margin-top: 2px; font-size: 12px; color: #64748b; }
+.cbtv-audio { width: 100%; margin-bottom: 7px; }
+.cbtv-rekam-jam { font-size: 12.5px; color: #475569; font-variant-numeric: tabular-nums; }
+.cbtv-rekam-jam small { margin-left: 10px; color: #94a3b8; }
+.cbtv-rekam-aksi { display: flex; flex-wrap: wrap; gap: 8px; margin: 11px 0; }
+.cbtv-penggal { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.cbtv-penggal li {
+  display: flex; align-items: flex-start; gap: 11px; padding: 9px 12px;
+  border-radius: 8px; background: #f8fafc; border-left: 3px solid #cbd5e1;
+}
+.cbtv-penggal li.cbtv-risiko-tinggi { background: #fef2f2; border-left-color: #dc2626; }
+.cbtv-penggal li.cbtv-risiko-rendah { background: #fffbeb; border-left-color: #f59e0b; }
+.cbtv-jam-tombol {
+  flex: 0 0 auto; padding: 4px 9px; border: 1px solid #cbd5e1; border-radius: 6px;
+  background: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.cbtv-jam-tombol:hover { background: #eef2f7; }
+.cbtv-penggal-teks { display: block; font-size: 13px; line-height: 1.6; }
+.cbtv-penggal-kata { display: inline-block; margin-top: 3px; font-size: 12px; font-weight: 700; color: #b91c1c; }
+.cbtv-penggal-alasan { display: block; margin-top: 3px; font-size: 11.5px; line-height: 1.55; color: #64748b; }
+
+@media (prefers-color-scheme: dark) {
+  .cbtv-jumlah { background: #1f2937; color: #cbd5e1; }
+  .cbtv-bawaan-kartu, .cbtv-kriteria { border-color: #334155; background: #161d27; }
+  .cbtv-bobot-kabar, .cbtv-pratinjau, .cbtv-jawaban, .cbtv-sahkan { background: #161d27; }
+  .cbtv-sahkan { border-color: #334155; }
+  .cbtv-esai, .cbtv-daftar-rubrik li, .cbtv-mirip-daftar > li { border-color: #334155; }
+  .cbtv-mirip-rinci { background: #161d27; border-top-color: #334155; }
+  .cbtv-catatan-ai { background: #14243a; border-color: #1e3a5f; }
+  .cbtv-penggal li { background: #161d27; }
+  .cbtv-penggal li.cbtv-risiko-tinggi { background: #2a1416; }
+  .cbtv-penggal li.cbtv-risiko-rendah { background: #2a2010; }
+  .cbtv-jam-tombol { background: #1f2937; border-color: #334155; color: #e2e8f0; }
+  .cbtv-salinan { background: #2a1416; color: #fca5a5; }
+  .cbtv-tempel textarea, .cbtv-cari, .cbtv-level textarea,
+  .cbtv-setel-baris select, .cbtv-ambang input, .cbtv-nilai-ketik input {
+    background: #111827; border-color: #334155; color: #e2e8f0;
+  }
+}

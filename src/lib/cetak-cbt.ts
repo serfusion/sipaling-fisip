@@ -120,6 +120,22 @@ const GAYA = `
   td.n-salah    { background: #fecaca; color: #7f1d1d; }
   td.n-sebagian { background: #fef3c7; color: #92400e; }
   td.n-tunggu   { background: #e2e8f0; color: #475569; }
+  /* ---------- BAGIAN CBT V1 ---------- */
+  table.nilai td.ka { text-align: right; font-variant-numeric: tabular-nums; }
+  table.nilai td.te { text-align: center; font-weight: bold; }
+  /* Alasan penilaian membentang satu baris penuh di bawah kriterianya, bukan
+     sebagai kolom kelima. Sebagai kolom ia menyempit sampai satu kata per
+     baris, dan yang tercetak adalah lajur tinggi berisi potongan kalimat. */
+  table.nilai td.alasan { font-size: 10pt; font-style: italic; color: #333; padding: 4px 9px 7px; }
+  .soal-rubrik { margin: 14px 0 5px; font-size: 11pt; page-break-after: avoid; }
+  .catatan-rubrik { margin: 5px 0 0; font-size: 10.5pt; white-space: pre-line; }
+  .rumus { margin: 0 0 10px; font-size: 10pt; color: #333; }
+  /* Kalimat yang menjaga angka indikasi supaya tidak terbaca sebagai vonis.
+     Ia dicetak, bukan hanya ditampilkan di layar, karena yang dibawa ke sidang
+     akademik adalah kertasnya. */
+  .peringatan { margin: 6px 0 0; padding: 6px 9px; border-left: 3px solid #666;
+                font-size: 10pt; color: #333; background: #f4f4f4;
+                -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .ttd { margin-top: 34px; width: 100%; }
   .ttd td { width: 50%; vertical-align: top; text-align: center; font-size: 11pt; }
   .ttd .ruang { height: 62px; }
@@ -634,6 +650,42 @@ export type PesertaCetak = {
   kumpul: string | null;
   pindahTab: number;
   keluarFullscreen: number;
+
+  // ---------- CBT V1 ----------
+  //
+  // Seluruhnya PILIHAN. Laporan ujian yang tidak memakai rubrik, tidak
+  // memeriksa kemiripan, dan tidak merekam suara harus tercetak persis seperti
+  // sebelum V1 — bukan dengan tiga bagian kosong bertuliskan "tidak ada data",
+  // yang justru membuat pembacanya bertanya-tanya apa yang hilang.
+  /** Nilai yang disetujui dosen, bila berbeda dari hitungan mesin. */
+  nilaiAkhir?: number | null;
+  predikat?: { huruf: string; sebutan: string } | null;
+  disetujuiOleh?: string | null;
+  disetujuiPada?: string | null;
+  kemiripan?: { skor: number; status: string; lawan?: string } | null;
+  rekaman?: {
+    ada: boolean;
+    durasi: number;
+    transkrip: string;
+    tanda: string;
+    jumlahTanda: number;
+    catatan?: string;
+    /** Penggal yang ditandai, beserta jamnya di dalam rekaman. */
+    penanda?: Array<{ jam: string; kata: string; risiko: string }>;
+  } | null;
+  /** Garis waktu pengawasan, sudah berbentuk jam + keterangan. */
+  jejak?: Array<{ jam: string; keterangan: string }>;
+};
+
+/** Satu jawaban esai beserta rincian rubriknya, untuk dicetak. */
+export type RubrikCetak = {
+  nomor: number;
+  pertanyaan: string;
+  nilai: number;
+  totalTerbobot: number;
+  skalaMax: number;
+  catatan?: string;
+  kriteria: Array<{ nama: string; bobot: number; level: number; terbobot: number; alasan?: string; diubahDosen?: boolean }>;
 };
 
 /** Laporan satu peserta: nilai, rincian jawaban, dan catatan koreksinya. */
@@ -642,8 +694,17 @@ export function laporanPesertaHtml(
   peserta: PesertaCetak,
   rincian: RincianCetak[],
   passing: number,
+  /** Rincian rubrik tiap soal esai. Kosong untuk ujian yang tidak memakainya. */
+  rubrik: RubrikCetak[] = [],
+  namaRubrik = "",
 ): string {
-  const lulus = peserta.nilai !== null && peserta.nilai >= passing;
+  // Nilai yang DIPAKAI menghakimi kelulusan adalah nilai akhir dosen bila ada,
+  // bukan hitungan mesin. Laporan yang menyebut "BELUM LULUS" di bawah angka
+  // yang sudah dinaikkan dosen adalah laporan yang membantah dirinya sendiri —
+  // dan ia dicetak lalu ditandatangani.
+  const nilaiPakai = peserta.nilaiAkhir ?? peserta.nilai;
+  const lulus = nilaiPakai !== null && nilaiPakai !== undefined && nilaiPakai >= passing;
+  const diubah = typeof peserta.nilaiAkhir === "number" && peserta.nilaiAkhir !== peserta.nilai;
   const baris = rincian
     .map((r) => {
       // Keadaannya disimpulkan oleh fungsi yang sama dengan yang dipakai layar
@@ -677,8 +738,10 @@ ${barisKeterangan([
 
 <h3>A. Ringkasan nilai</h3>
 <table class="nilai">
-  <tr><th>Nilai akhir</th><td><b style="font-size:15pt">${peserta.nilai ?? "-"}</b>
-    &nbsp; (batas lulus ${passing}) · <b>${peserta.nilai === null ? "belum dinilai" : lulus ? "LULUS" : "BELUM LULUS"}</b></td></tr>
+  <tr><th>Nilai akhir</th><td><b style="font-size:15pt">${nilaiPakai ?? "-"}</b>
+    ${peserta.predikat ? `&nbsp; <b>${lolos(peserta.predikat.huruf)}</b> — ${lolos(peserta.predikat.sebutan)}` : ""}
+    &nbsp; (batas lulus ${passing}) · <b>${nilaiPakai === null || nilaiPakai === undefined ? "belum dinilai" : lulus ? "LULUS" : "BELUM LULUS"}</b></td></tr>
+  ${diubah ? `<tr><th>Nilai hitungan sistem</th><td>${peserta.nilai ?? "-"} &nbsp;<i>(diubah dosen menjadi ${peserta.nilaiAkhir})</i></td></tr>` : ""}
   <tr><th>Benar</th><td>${peserta.benar} butir</td></tr>
   ${peserta.sebagian ? `<tr><th>Benar sebagian</th><td>${peserta.sebagian} butir</td></tr>` : ""}
   <tr><th>Salah</th><td>${peserta.salah} butir</td></tr>
@@ -692,16 +755,140 @@ ${barisKeterangan([
   ${baris}
 </table>
 
-${peserta.pindahTab > 0 || peserta.keluarFullscreen > 0 ? `
-<h3>C. Catatan sistem</h3>
-<p>Pindah tab ${peserta.pindahTab}×, keluar layar penuh ${peserta.keluarFullscreen}×.
-Catatan ini penanda, bukan putusan.</p>` : ""}
+${bagianRubrik(rubrik, namaRubrik)}
+${bagianIntegritas(peserta)}
+${bagianJejak(peserta)}
+
+<h3>${hurufBagian(rubrik, peserta, "akhir")}. Pengesahan</h3>
+<table class="nilai">
+  <tr><th>Nilai hitungan sistem</th><td>${peserta.nilai ?? "-"}</td></tr>
+  <tr><th>Nilai akhir yang disahkan</th><td><b>${peserta.nilaiAkhir ?? "belum disahkan"}</b></td></tr>
+  <tr><th>Disahkan oleh</th><td>${lolos(peserta.disetujuiOleh || "-")}</td></tr>
+  <tr><th>Tanggal pengesahan</th><td>${peserta.disetujuiPada ? tanggalPanjang(peserta.disetujuiPada) : "-"}</td></tr>
+</table>
 
 <table class="ttd">
   <tr><td>Pengajar Pengampu</td><td>Peserta</td></tr>
   <tr><td class="ruang"></td><td class="ruang"></td></tr>
-  <tr><td>(………………………………)</td><td>(${lolos(peserta.nama)})</td></tr>
+  <tr><td>(${lolos(peserta.disetujuiOleh || "………………………………")})</td><td>(${lolos(peserta.nama)})</td></tr>
 </table>`;
 
   return bungkus(`Laporan: ${peserta.nama}`, isi);
+}
+
+// ------------------------------------------------------------
+// BAGIAN-BAGIAN TAMBAHAN CBT V1
+// ------------------------------------------------------------
+//
+// Masing-masing mengembalikan untai KOSONG ketika datanya tidak ada, dan
+// itulah seluruh caranya menjaga laporan lama tetap seperti semula: ujian
+// tanpa rubrik, tanpa pemeriksaan kemiripan, dan tanpa rekaman mencetak
+// halaman yang sama persis dengan sebelum V1.
+
+/**
+ * Huruf bagian berikutnya, dihitung dari bagian mana saja yang benar-benar ada.
+ *
+ * Penomoran yang ditulis tangan akan melompat begitu satu bagian tidak muncul
+ * — "A, B, D" pada dokumen yang ditandatangani, dan yang membacanya akan
+ * mencari halaman C yang tidak pernah ada.
+ */
+function hurufBagian(rubrik: RubrikCetak[], peserta: PesertaCetak, sampai: "rubrik" | "integritas" | "jejak" | "akhir"): string {
+  const huruf = "ABCDEFGH";
+  let n = 2; // A ringkasan, B rincian jawaban — keduanya selalu ada
+  if (sampai === "rubrik") return huruf[n];
+  if (rubrik.length > 0) n += 1;
+  if (sampai === "integritas") return huruf[n];
+  if (adaIntegritas(peserta)) n += 1;
+  if (sampai === "jejak") return huruf[n];
+  if ((peserta.jejak ?? []).length > 0 || peserta.pindahTab > 0 || peserta.keluarFullscreen > 0) n += 1;
+  return huruf[n];
+}
+
+function adaIntegritas(peserta: PesertaCetak): boolean {
+  return Boolean(peserta.kemiripan) || Boolean(peserta.rekaman);
+}
+
+function bagianRubrik(rubrik: RubrikCetak[], namaRubrik: string): string {
+  if (rubrik.length === 0) return "";
+  const isi = rubrik
+    .map((r) => {
+      const baris = r.kriteria
+        .map(
+          (k) => `<tr>
+        <td>${lolos(k.nama)}</td>
+        <td class="ka">${k.bobot}%</td>
+        <td class="te">${k.level > 0 ? `${k.level} / ${r.skalaMax}` : "—"}${k.diubahDosen ? " *" : ""}</td>
+        <td class="ka">${k.terbobot.toFixed(2)}</td>
+      </tr>${k.alasan ? `<tr><td colspan="4" class="alasan">${lolos(k.alasan)}</td></tr>` : ""}`,
+        )
+        .join("");
+      return `
+<p class="soal-rubrik"><b>Soal ${r.nomor}.</b> ${lolos(r.pertanyaan.slice(0, 220))}${r.pertanyaan.length > 220 ? "…" : ""}</p>
+<table class="nilai">
+  <tr><th>Kriteria</th><th>Bobot</th><th>Level</th><th>Terbobot</th></tr>
+  ${baris}
+  <tr><th colspan="3">Total skor terbobot</th><td class="ka"><b>${r.totalTerbobot.toFixed(2)}</b></td></tr>
+  <tr><th colspan="3">Nilai bagian ini (0–100)</th><td class="ka"><b>${r.nilai}</b></td></tr>
+</table>
+${r.catatan ? `<p class="catatan-rubrik"><b>Catatan:</b> ${lolos(r.catatan)}</p>` : ""}`;
+    })
+    .join("");
+
+  return `
+<h3>C. Penilaian rubrik${namaRubrik ? ` — ${lolos(namaRubrik)}` : ""}</h3>
+<p class="rumus">Nilai = (total skor terbobot ÷ level tertinggi) × 100. Tanda * berarti level ditentukan dosen.</p>
+${isi}`;
+}
+
+function bagianIntegritas(peserta: PesertaCetak): string {
+  if (!adaIntegritas(peserta)) return "";
+  const huruf = hurufBagian([], peserta, "integritas");
+  const bagian: string[] = [];
+
+  if (peserta.kemiripan) {
+    bagian.push(`
+<table class="nilai">
+  <tr><th>Kemiripan tertinggi dengan peserta lain</th><td><b>${peserta.kemiripan.skor}%</b> — ${lolos(peserta.kemiripan.status)}${peserta.kemiripan.lawan ? ` (dengan ${lolos(peserta.kemiripan.lawan)})` : ""}</td></tr>
+</table>
+<p class="peringatan">Angka kemiripan adalah INDIKASI yang perlu diperiksa pengajar, bukan bukti
+penjiplakan. Dua jawaban dapat mirip karena keduanya belajar dari bahan yang sama.</p>`);
+  }
+
+  if (peserta.rekaman) {
+    const r = peserta.rekaman;
+    const penanda = (r.penanda ?? [])
+      .map((p) => `<tr><td>${lolos(p.jam)}</td><td>${lolos(p.kata)}</td><td>${lolos(p.risiko)}</td></tr>`)
+      .join("");
+    bagian.push(`
+<table class="nilai">
+  <tr><th>Rekaman suara</th><td>${r.ada ? `tersedia · ${Math.round(r.durasi / 60)} menit` : `tidak ada${r.catatan ? ` — ${lolos(r.catatan)}` : ""}`}</td></tr>
+  <tr><th>Transkrip</th><td>${lolos(r.transkrip)}</td></tr>
+  <tr><th>Hasil pembacaan</th><td><b>${lolos(r.tanda)}</b>${r.jumlahTanda > 0 ? ` · ${r.jumlahTanda} penggal ditandai` : ""}</td></tr>
+</table>
+${penanda ? `<table class="nilai"><tr><th>Jam</th><th>Kata/frasa</th><th>Risiko</th></tr>${penanda}</table>
+<p class="peringatan">Penandaan berasal dari pembacaan otomatis atas transkrip dan DAPAT KELIRU.
+Yang menentukan adalah rekamannya sendiri, yang harus didengarkan pengajar.</p>` : ""}`);
+  }
+
+  return `<h3>${huruf}. Pemeriksaan integritas</h3>${bagian.join("")}`;
+}
+
+function bagianJejak(peserta: PesertaCetak): string {
+  const jejak = peserta.jejak ?? [];
+  if (jejak.length === 0 && peserta.pindahTab === 0 && peserta.keluarFullscreen === 0) return "";
+  const huruf = hurufBagian([], peserta, "jejak");
+
+  const baris = jejak
+    // Dipotong pada seratus kejadian. Garis waktu yang memakan enam halaman
+    // tidak dibaca siapa pun, dan yang menentukan selalu kejadian pertama.
+    .slice(0, 100)
+    .map((j) => `<tr><td>${lolos(j.jam)}</td><td>${lolos(j.keterangan)}</td></tr>`)
+    .join("");
+
+  return `
+<h3>${huruf}. Jejak pengawasan</h3>
+<p>Pindah tab ${peserta.pindahTab}×, keluar layar penuh ${peserta.keluarFullscreen}×.
+Catatan ini penanda, bukan putusan.</p>
+${baris ? `<table class="nilai"><tr><th>Jam</th><th>Kejadian</th></tr>${baris}</table>` : ""}
+${jejak.length > 100 ? `<p><i>Ditampilkan 100 kejadian pertama dari ${jejak.length}.</i></p>` : ""}`;
 }
