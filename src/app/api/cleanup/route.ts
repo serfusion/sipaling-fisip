@@ -1,11 +1,12 @@
 import { db } from "@/db";
-import { appSettings, cbtQuestions, revisionUploads, serviceRequests } from "@/db/schema";
-import { and, eq, isNotNull, lt, or, sql } from "drizzle-orm";
+import { appSettings, cbtQuestions, requestAttachments, revisionUploads, serviceRequests } from "@/db/schema";
+import { and, eq, inArray, isNotNull, lt, or, sql } from "drizzle-orm";
 import { getSupabaseSecretKey, getSupabaseUrl } from "@/lib/supabase-config";
 import { DOCUMENT_BUCKET } from "@/lib/document-storage";
 import { createClient } from "@supabase/supabase-js";
 import { explainServerError } from "@/lib/api-errors";
 import { HARI_SIMPAN_MEDIA, jalurDariSoal, sapuMedia } from "@/lib/media-cbt";
+import { sapuTransit } from "@/lib/sapu-transit";
 import { BUCKET_MEDIA, daftarMedia, hapusMedia } from "@/lib/media-simpan";
 
 export const dynamic = "force-dynamic";
@@ -93,6 +94,43 @@ export async function GET(request: Request) {
       rowsCleaned += 1;
     }
 
+    // --- RUANG TRANSIT UNGGAHAN LANGSUNG ---
+    //
+    // Berkas yang sudah diunggah peramban tetapi formulirnya tidak pernah
+    // dikirim. Umurnya sehari, bukan setahun seperti lampiran di atas:
+    // berkas yang benar-benar dipakai sudah pindah ke folder tiketnya pada
+    // detik pengajuannya tersimpan.
+    let transitDeleted = 0;
+    try {
+      if (storage) {
+        transitDeleted = await sapuTransit(storage, async (jalur) => {
+          const [lampiran, pengajuan, revisi] = await Promise.all([
+            db
+              .select({ path: requestAttachments.fileStoragePath })
+              .from(requestAttachments)
+              .where(inArray(requestAttachments.fileStoragePath, jalur)),
+            db
+              .select({ path: serviceRequests.fileStoragePath })
+              .from(serviceRequests)
+              .where(inArray(serviceRequests.fileStoragePath, jalur)),
+            db
+              .select({ path: revisionUploads.fileStoragePath })
+              .from(revisionUploads)
+              .where(inArray(revisionUploads.fileStoragePath, jalur)),
+          ]);
+          return new Set(
+            [...lampiran, ...pengajuan, ...revisi]
+              .map((baris) => baris.path)
+              .filter((path): path is string => Boolean(path)),
+          );
+        });
+      }
+    } catch (galat) {
+      // Folder transit boleh saja belum pernah ada. Tidak pernah
+      // menggagalkan pembersihan yang lain.
+      console.error("sapu transit", galat);
+    }
+
     // --- MEDIA SOAL CBT YANG YATIM ---
     //
     // Gambar dan video soal punya umur simpannya sendiri: SATU BULAN, bukan
@@ -134,6 +172,7 @@ export async function GET(request: Request) {
       ranAt: new Date().toISOString(),
       cutoff: cutoff.toISOString(),
       filesDeleted,
+      transitDeleted,
       mediaCbtDeleted,
       rowsCleaned,
       note: rowsCleaned >= BATCH * 2 ? "Masih ada sisa, akan dilanjutkan pada jadwal berikutnya." : "Selesai.",

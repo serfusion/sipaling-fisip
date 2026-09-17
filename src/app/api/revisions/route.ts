@@ -23,12 +23,15 @@ import { explainServerError } from "@/lib/api-errors";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { blockedByMaintenance } from "@/lib/maintenance-gate";
 import { bentukUnggah, periksaBerkasTunggal } from "@/lib/bentuk-unggah";
-import { periksaBerkasBagian } from "@/lib/bukti-penyerahan";
+import { amankanBagian, bacaBagianDariForm } from "@/lib/unggah-klaim";
 import { audienceUntukLayanan, pushNotification } from "@/lib/notify";
 import { gantiBerkasTunggal, gantiLampiranRevisi } from "@/lib/revisi-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Sama alasannya dengan /api/requests: jalur cadangan masih mengangkut berkas
+// di dalam badan permintaan, dan batas bawaan 10 detik memutusnya di tengah.
+export const maxDuration = 60;
 
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const PDF_MIME = "application/pdf";
@@ -82,6 +85,8 @@ export async function POST(request: Request) {
   // Berkas yang berhasil naik dicatat di sini. Bila langkah berikutnya gagal,
   // semuanya dihapus kembali supaya tidak ada berkas yatim yang memakan kuota.
   const naik: string[] = [];
+  // Jalur transit yang sah tetapi batal dipakai, disapu bersama `naik`.
+  const sapuTransit: string[] = [];
 
   try {
     const form = await request.formData();
@@ -139,28 +144,35 @@ export async function POST(request: Request) {
 
     // ---------- BEBERAPA BAGIAN SEKALIGUS ----------
     if (bentuk.jenis === "bagian") {
-      // SELURUH berkas diperiksa lebih dulu, sebelum satu pun diunggah. Kalau
-      // pemeriksaannya diselang-seling dengan unggahan, berkas keempat yang
+      // SELURUH berkas diperiksa lebih dulu, sebelum satu pun disentuh. Kalau
+      // pemeriksaannya diselang-seling dengan pemindahan, berkas keempat yang
       // ditolak meninggalkan tiga berkas yatim di penyimpanan.
-      const dipilih: Array<{ id: string; label: string; urut: number; berkas: File }> = [];
-      for (const [urut, bagian] of bentuk.bagian.entries()) {
-        const berkas = fileValue(form, `bagian_${bagian.id}`);
-        const cek = periksaBerkasBagian(bagian.id, berkas);
-        if (!cek.ok) return Response.json({ success: false, message: cek.pesan }, { status: 400 });
-        dipilih.push({ id: bagian.id, label: bagian.label, urut, berkas: berkas as File });
+      //
+      // Berkasnya sendiri sudah dinaikkan peramban langsung ke penyimpanan —
+      // revisi penyerahan juga empat PDF, dan empat PDF tidak pernah muat di
+      // badan permintaan fungsi serverless. Kiriman lama yang masih membawa
+      // berkasnya sendiri tetap dilayani lewat jalur cadangan.
+      const dibaca = bacaBagianDariForm(form, "revisions", bentuk.bagian);
+      sapuTransit.push(...dibaca.sapu);
+      if (!dibaca.ok) {
+        await Promise.all(sapuTransit.map((p) => removeDocument(p).catch(() => undefined)));
+        return Response.json({ success: false, message: dibaca.pesan }, { status: 400 });
       }
 
-      const barisBaru: Array<{ id: string; label: string; urut: number; berkas: File; jalur: string }> = [];
-      for (const b of dipilih) {
-        const jalur = await uploadDocument({
-          folder: "revisions",
-          ticket,
-          file: b.berkas,
-          contentType: b.berkas.type || PDF_MIME,
-        });
-        naik.push(jalur);
-        barisBaru.push({ ...b, jalur });
+      const diamankan = await amankanBagian({
+        daftar: dibaca.daftar,
+        folder: "revisions",
+        ticket,
+        naik,
+        sapu: sapuTransit,
+      });
+      if (!diamankan.ok) {
+        await Promise.all(
+          [...naik, ...sapuTransit].map((p) => removeDocument(p).catch(() => undefined)),
+        );
+        return Response.json({ success: false, message: diamankan.pesan }, { status: 400 });
       }
+      const barisBaru = diamankan.hasil;
 
       const jalurLama = await gantiLampiranRevisi({
         requestId: service.id,
@@ -171,9 +183,9 @@ export async function POST(request: Request) {
           part: b.id,
           label: b.label,
           sortOrder: b.urut,
-          fileName: b.berkas.name,
-          fileMime: b.berkas.type || PDF_MIME,
-          fileSize: b.berkas.size,
+          fileName: b.nama,
+          fileMime: PDF_MIME,
+          fileSize: b.ukuran,
           fileStoragePath: b.jalur,
         })),
       });
@@ -230,7 +242,7 @@ export async function POST(request: Request) {
     await kabarkanRevisi(service.serviceType, service.serviceNeed, ticket, nim, revisionNumber, 1);
     return Response.json({ success: true, message: "Revisi berhasil dikirim.", ticket, jumlah: 1 });
   } catch (error: unknown) {
-    await Promise.all(naik.map((p) => removeDocument(p).catch(() => undefined)));
+    await Promise.all([...naik, ...sapuTransit].map((p) => removeDocument(p).catch(() => undefined)));
     console.error("upload revision", error);
     return Response.json(
       { success: false, message: explainServerError(error, "Revisi belum tersimpan. Silakan coba lagi.") },
