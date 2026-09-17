@@ -22,6 +22,9 @@ import {
   periksaBerkasTunggal,
   type BentukUnggah,
 } from "@/lib/bentuk-unggah";
+import { muatLewatServerless } from "@/lib/unggah-langsung";
+import { tempelkanBagian, unggahBagianLangsung } from "@/lib/unggah-klien";
+import { pesanStatusHttp } from "@/lib/pesan-http";
 import { LecturerPicker, type LecturerOption } from "./lecturer-picker";
 import TitleProposalForm from "./title-proposal-form";
 import Animasi from "./animasi";
@@ -255,12 +258,25 @@ const DASH_ROLE_LABEL: Record<string, string> = {
 
 const statuses = ["Masuk", "Dicek", "Revisi", "Diproses", "Selesai"];
 
+/**
+ * Baca jawaban API, dan JANGAN menelan sebabnya.
+ *
+ * Sebelum ini setiap jawaban yang gagal diurai berakhir sebagai satu kalimat
+ * yang sama: "Terjadi gangguan. Silakan coba lagi." Yang paling sering
+ * menghasilkannya bukan galat di dalam portal, melainkan jawaban yang tidak
+ * pernah sampai ke portal — 413 karena kiriman melebihi batas fungsi
+ * serverless, 504 karena kelamaan. Keduanya dijawab dengan halaman HTML, dan
+ * kalimat serbaguna itu menyembunyikan keduanya sekaligus.
+ *
+ * Sekarang kode HTTP-nya diterjemahkan (src/lib/pesan-http.ts) sehingga
+ * mahasiswa membaca sebabnya, dan laporannya dapat dicocokkan dengan log.
+ */
 async function readApi<T>(response: Response): Promise<T> {
   const payload = (await response.json().catch(() => null)) as
     | { success?: boolean; message?: string }
     | null;
   if (!response.ok || !payload || payload.success === false) {
-    throw new Error(payload?.message || "Terjadi gangguan. Silakan coba lagi.");
+    throw new Error(payload?.message || pesanStatusHttp(response.status));
   }
   return payload as T;
 }
@@ -611,6 +627,10 @@ export default function SipalingApp() {
   const [proposalData, setProposalData] = useState<ProposalRecord | null>(null);
   const [proposalCode, setProposalCode] = useState("");
   const [fileInfo, setFileInfo] = useState("");
+  // Kabar unggahan empat bagian. Berkasnya naik satu per satu langsung ke
+  // penyimpanan, jadi mahasiswa harus tahu sedang di berkas keberapa —
+  // tanpa ini yang terlihat hanya tombol yang diam selama beberapa menit.
+  const [kabarUnggah, setKabarUnggah] = useState("");
   // Tautan folder Google Drive milik mahasiswa untuk penyerahan skripsi.
   // Empat bagian berkas penyerahan skripsi ke perpustakaan.
   const [bagianBerkas, setBagianBerkas] = useState<Record<string, File | null>>({});
@@ -841,6 +861,7 @@ export default function SipalingApp() {
     // Penyerahan skripsi mengunggah empat bagian sekaligus. Diperiksa di sini
     // supaya mahasiswa tahu masalahnya sebelum menunggu unggahan selesai;
     // server memeriksanya lagi dengan aturan yang sama.
+    const siapPenyerahan: Array<{ id: string; berkas: File }> = [];
     if (isPenyerahan) {
       for (const bagian of BAGIAN_PENYERAHAN) {
         const berkas = bagianBerkas[bagian.id] ?? null;
@@ -849,7 +870,7 @@ export default function SipalingApp() {
           setSubmitError(cek.pesan);
           return;
         }
-        formData.set(`bagian_${bagian.id}`, berkas as File);
+        siapPenyerahan.push({ id: bagian.id, berkas: berkas as File });
       }
       formData.delete("file");
     }
@@ -868,7 +889,33 @@ export default function SipalingApp() {
     }
 
     setIsSubmitting(true);
+    setKabarUnggah("");
     try {
+      // Empat PDF penyerahan naik LANGSUNG ke penyimpanan, bukan menumpang
+      // badan permintaan API: fungsi serverless memotong badan permintaan
+      // pada 4,5 MB, dan satu penyerahan yang wajar jauh melewatinya.
+      // Lihat src/lib/unggah-langsung.ts.
+      if (siapPenyerahan.length > 0) {
+        const naik = await unggahBagianLangsung("requests", siapPenyerahan, (selesai, total, nama) =>
+          setKabarUnggah(
+            selesai >= total
+              ? "Semua berkas terunggah. Menyimpan pengajuan…"
+              : `Mengunggah berkas ${selesai + 1} dari ${total} — ${nama}`,
+          ),
+        );
+        if (naik.mode === "langsung") {
+          tempelkanBagian(formData, naik.hasil);
+        } else {
+          // Jalur cadangan: berkasnya ikut di badan permintaan seperti dulu.
+          // Sanggup hanya untuk kiriman kecil, jadi batasnya disebutkan di
+          // sini alih-alih dibiarkan berakhir sebagai halaman galat Vercel.
+          const muat = muatLewatServerless(siapPenyerahan.map((b) => b.berkas));
+          if (!muat.ok) throw new Error(muat.pesan);
+          for (const b of siapPenyerahan) formData.set(`bagian_${b.id}`, b.berkas);
+          setKabarUnggah("Mengirim berkas lewat jalur cadangan…");
+        }
+      }
+
       const result = await readApi<{ ticket: string }>(
         await fetch("/api/requests", { method: "POST", body: formData }),
       );
@@ -894,6 +941,7 @@ export default function SipalingApp() {
       setSubmitError(error instanceof Error ? error.message : "Pengajuan gagal dikirim.");
     } finally {
       setIsSubmitting(false);
+      setKabarUnggah("");
     }
   }
 
@@ -1002,6 +1050,7 @@ export default function SipalingApp() {
     const catatan = (form.elements.namedItem("note") as HTMLTextAreaElement | null)?.value ?? "";
     formData.set("note", catatan);
 
+    const siapRevisi: Array<{ id: string; berkas: File }> = [];
     if (bentuk.jenis === "bagian") {
       // Diperiksa di peramban lebih dulu supaya mahasiswa tahu berkas mana
       // yang bermasalah sebelum menunggu empat unggahan selesai.
@@ -1012,7 +1061,7 @@ export default function SipalingApp() {
           setRevisionError(cek.pesan);
           return;
         }
-        formData.set(`bagian_${bagian.id}`, berkas as File);
+        siapRevisi.push({ id: bagian.id, berkas: berkas as File });
       }
     } else if (bentuk.jenis === "tunggal") {
       const isi = (form.elements.namedItem(bentuk.nama) as HTMLInputElement | null)?.files?.[0] ?? null;
@@ -1025,7 +1074,28 @@ export default function SipalingApp() {
     }
 
     setIsUploadingRevision(true);
+    setKabarUnggah("");
     try {
+      // Revisi penyerahan juga empat PDF, jadi jalurnya sama: naik langsung ke
+      // penyimpanan, formulir hanya membawa jalurnya.
+      if (siapRevisi.length > 0) {
+        const naik = await unggahBagianLangsung("revisions", siapRevisi, (selesai, total, nama) =>
+          setKabarUnggah(
+            selesai >= total
+              ? "Semua berkas terunggah. Menyimpan revisi…"
+              : `Mengunggah berkas ${selesai + 1} dari ${total} — ${nama}`,
+          ),
+        );
+        if (naik.mode === "langsung") {
+          tempelkanBagian(formData, naik.hasil);
+        } else {
+          const muat = muatLewatServerless(siapRevisi.map((b) => b.berkas));
+          if (!muat.ok) throw new Error(muat.pesan);
+          for (const b of siapRevisi) formData.set(`bagian_${b.id}`, b.berkas);
+          setKabarUnggah("Mengirim berkas lewat jalur cadangan…");
+        }
+      }
+
       const result = await readApi<{ ticket: string; message: string }>(
         await fetch("/api/revisions", { method: "POST", body: formData }),
       );
@@ -1043,6 +1113,7 @@ export default function SipalingApp() {
       setRevisionError(error instanceof Error ? error.message : "Revisi gagal dikirim.");
     } finally {
       setIsUploadingRevision(false);
+      setKabarUnggah("");
     }
   }
 
@@ -1431,6 +1502,7 @@ export default function SipalingApp() {
                 </>
                 )}
               </form>
+              {kabarUnggah && isSubmitting && <p className="kabar-unggah" role="status">{kabarUnggah}</p>}
               {submitError && <ErrorNotice message={submitError} />}
               {submitMessage && <SuccessNotice>{submitMessage}</SuccessNotice>}
             </article>
@@ -1727,6 +1799,7 @@ export default function SipalingApp() {
                   </>
                 )}
               </form>
+              {kabarUnggah && isUploadingRevision && <p className="kabar-unggah" role="status">{kabarUnggah}</p>}
               {revisionError && <ErrorNotice message={revisionError} />}
               {revisionMessage && <SuccessNotice>{revisionMessage}</SuccessNotice>}
             </article>

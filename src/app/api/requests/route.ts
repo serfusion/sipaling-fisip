@@ -13,8 +13,13 @@ import {
   BAGIAN_PENYERAHAN,
   isAbsensiPerpus,
   isPenyerahanPerpus,
-  periksaBerkasBagian,
 } from "@/lib/bukti-penyerahan";
+import {
+  amankanBagian,
+  bacaBagianDariForm,
+  type BagianDiklaim,
+  type BagianTersimpan,
+} from "@/lib/unggah-klaim";
 import { kolomDriveSiap } from "@/lib/kolom-drive";
 import { getCurrentProfile, serviceTypeForProfile } from "@/lib/supabase-server";
 import { explainServerError } from "@/lib/api-errors";
@@ -24,6 +29,11 @@ import { blockedByMaintenance } from "@/lib/maintenance-gate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Jalur cadangan masih boleh mengangkut berkas di dalam badan permintaan, dan
+// unggahannya dikerjakan satu per satu. Batas bawaan 10 detik memutusnya di
+// tengah jalan, dan yang sampai ke mahasiswa adalah halaman galat Vercel —
+// bukan pesan portal.
+export const maxDuration = 60;
 
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const PDF_MIME = "application/pdf";
@@ -186,20 +196,27 @@ export async function POST(request: Request) {
     }
 
     // Penyerahan skripsi ke perpustakaan mengunggah empat bagian sekaligus.
-    // Aturan ukurannya sama persis dengan yang dipakai peramban, karena
-    // keduanya memanggil pemeriksa yang sama.
+    //
+    // Berkasnya sudah berada di penyimpanan sebelum formulir ini dikirim —
+    // peramban menaikkannya langsung, karena empat PDF penyerahan tidak
+    // pernah muat di badan permintaan fungsi serverless (lihat
+    // src/lib/unggah-langsung.ts). Yang datang ke sini hanya jalurnya,
+    // beserta tanda tangan yang membuktikan jalur itu memang pernah
+    // diizinkan server. Kiriman lama yang masih membawa berkasnya sendiri
+    // tetap dilayani lewat jalur cadangan.
     const penyerahan = isPenyerahanPerpus(serviceType, serviceNeed);
-    const bagianBerkas: Array<{ id: string; label: string; urut: number; berkas: File }> = [];
+    let bagianBerkas: BagianDiklaim[] = [];
+    // Jalur transit yang sah tetapi batal dipakai; disapu supaya tidak ada
+    // berkas yatim yang memakan kuota penyimpanan.
+    const sapuTransit: string[] = [];
     if (penyerahan) {
-      for (const [urut, bagian] of BAGIAN_PENYERAHAN.entries()) {
-        const isi = form.get(`bagian_${bagian.id}`);
-        const berkas = isi instanceof File && isi.name ? isi : null;
-        const cek = periksaBerkasBagian(bagian.id, berkas);
-        if (!cek.ok) {
-          return Response.json({ success: false, message: cek.pesan }, { status: 400 });
-        }
-        bagianBerkas.push({ id: bagian.id, label: bagian.label, urut, berkas: berkas as File });
+      const dibaca = bacaBagianDariForm(form, "requests", BAGIAN_PENYERAHAN);
+      sapuTransit.push(...dibaca.sapu);
+      if (!dibaca.ok) {
+        await Promise.all(sapuTransit.map((path) => removeDocument(path).catch(() => undefined)));
+        return Response.json({ success: false, message: dibaca.pesan }, { status: 400 });
       }
+      bagianBerkas = dibaca.daftar;
     }
 
     // Absensi tidak memakai lampiran apa pun; penyerahan memakai jalurnya sendiri.
@@ -242,7 +259,7 @@ export async function POST(request: Request) {
     // berikutnya gagal, semuanya dihapus kembali supaya tidak ada berkas
     // yatim yang memakan kuota penyimpanan.
     const uploadedPaths: string[] = [];
-    const jalurBagian: Array<{ id: string; label: string; urut: number; berkas: File; jalur: string }> = [];
+    let jalurBagian: BagianTersimpan[] = [];
     let fileName: string | null = null;
     let fileMime: string | null = null;
     let fileSize: number | null = null;
@@ -256,18 +273,26 @@ export async function POST(request: Request) {
         fileStoragePath = await uploadDocument({ folder: "requests", ticket, file, contentType: fileMime });
         uploadedPaths.push(fileStoragePath);
       }
-      for (const b of bagianBerkas) {
-        const jalur = await uploadDocument({
+      if (bagianBerkas.length > 0) {
+        const diamankan = await amankanBagian({
+          daftar: bagianBerkas,
           folder: "requests",
           ticket,
-          file: b.berkas,
-          contentType: b.berkas.type || PDF_MIME,
+          naik: uploadedPaths,
+          sapu: sapuTransit,
         });
-        uploadedPaths.push(jalur);
-        jalurBagian.push({ ...b, jalur });
+        if (!diamankan.ok) {
+          await Promise.all(
+            [...uploadedPaths, ...sapuTransit].map((path) => removeDocument(path).catch(() => undefined)),
+          );
+          return Response.json({ success: false, message: diamankan.pesan }, { status: 400 });
+        }
+        jalurBagian = diamankan.hasil;
       }
     } catch (error) {
-      await Promise.all(uploadedPaths.map((path) => removeDocument(path).catch(() => undefined)));
+      await Promise.all(
+        [...uploadedPaths, ...sapuTransit].map((path) => removeDocument(path).catch(() => undefined)),
+      );
       throw error;
     }
 
@@ -318,7 +343,9 @@ export async function POST(request: Request) {
         }
       }
     } catch (error) {
-      await Promise.all(uploadedPaths.map((path) => removeDocument(path).catch(() => undefined)));
+      await Promise.all(
+        [...uploadedPaths, ...sapuTransit].map((path) => removeDocument(path).catch(() => undefined)),
+      );
       throw error;
     }
 
@@ -333,9 +360,9 @@ export async function POST(request: Request) {
             part: b.id,
             label: b.label,
             sortOrder: b.urut,
-            fileName: b.berkas.name,
-            fileMime: b.berkas.type || PDF_MIME,
-            fileSize: b.berkas.size,
+            fileName: b.nama,
+            fileMime: PDF_MIME,
+            fileSize: b.ukuran,
             fileStoragePath: b.jalur,
           })),
         );
