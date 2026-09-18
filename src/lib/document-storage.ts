@@ -4,15 +4,54 @@ import { getSupabaseSecretKey, getSupabaseUrl } from "@/lib/supabase-config";
 export const DOCUMENT_BUCKET = process.env.SUPABASE_DOCUMENT_BUCKET || "service-documents";
 export const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
 
+/**
+ * Batas waktu SATU panggilan ke Supabase Storage.
+ *
+ * Tanpa batas ini, satu panggilan yang menggantung akan menahan seluruh fungsi
+ * sampai platform-nya sendiri yang memutus — dan yang diterima mahasiswa
+ * bukan pesan portal melainkan halaman galat 504 milik Vercel, tanpa satu pun
+ * keterangan tentang apa yang sebenarnya lambat.
+ *
+ * 20 detik: cukup longgar untuk unggahan jalur cadangan (≤4 MB lewat fungsi),
+ * dan cukup ketat untuk menyisakan waktu bagi pesan portal di dalam anggaran
+ * 60 detik milik fungsinya.
+ */
+const BATAS_PANGGILAN_MS = 20_000;
+
+/** Batas waktu pembacaan kepala berkas; hanya 16 bita, jadi jauh lebih ketat. */
+const BATAS_BACA_KEPALA_MS = 10_000;
+
+/**
+ * Satu klien untuk seluruh proses.
+ *
+ * Sebelumnya klien dibuat ULANG pada setiap panggilan. Untuk penyerahan
+ * skripsi itu berarti belasan klien dalam satu permintaan — masing-masing
+ * dengan pemasangan TLS-nya sendiri ke Supabase, dan seluruhnya menumpuk di
+ * jalur kritis yang anggarannya 60 detik.
+ */
+let klienTersimpan: ReturnType<typeof createClient> | null = null;
+
+/** fetch dengan batas waktu, dipakai seluruh panggilan Storage. */
+function fetchBerbatas(masukan: RequestInfo | URL, awalan?: RequestInit) {
+  // Pemanggil yang sudah membawa signal-nya sendiri dibiarkan: ia punya batas
+  // waktu yang lebih tepat untuk kerjanya (lihat bacaKepalaObjek).
+  if (awalan?.signal) return fetch(masukan, awalan);
+  return fetch(masukan, { ...awalan, signal: AbortSignal.timeout(BATAS_PANGGILAN_MS) });
+}
+
 function getStorageClient() {
   const url = getSupabaseUrl();
   const secretKey = getSupabaseSecretKey();
   if (!url || !secretKey) {
     throw new Error("Supabase Storage belum dikonfigurasi di environment variables.");
   }
-  return createClient(url, secretKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  if (!klienTersimpan) {
+    klienTersimpan = createClient(url, secretKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+      global: { fetch: fetchBerbatas as typeof fetch },
+    });
+  }
+  return klienTersimpan;
 }
 
 function safeSegment(value: string) {
@@ -98,6 +137,11 @@ export async function buatIzinUnggah(path: string) {
   return { url: data.signedUrl, token: data.token, path };
 }
 
+type KepalaObjek =
+  | { ok: true; ukuran: number; kepala: Uint8Array }
+  /** "hilang": bendanya tidak ada. "lambat": penyimpanan tidak menjawab tepat waktu. */
+  | { ok: false; sebab: "hilang" | "lambat" };
+
 /**
  * Baca ukuran dan beberapa bita pertama sebuah benda di penyimpanan.
  *
@@ -107,13 +151,26 @@ export async function buatIzinUnggah(path: string) {
  * memakai header Range, dan bacaannya tetap dihentikan sendiri seandainya
  * Range tidak dilayani.
  */
-async function bacaKepalaObjek(path: string) {
+async function bacaKepalaObjek(path: string): Promise<KepalaObjek> {
   const supabase = getStorageClient();
   const { data, error } = await supabase.storage.from(DOCUMENT_BUCKET).createSignedUrl(path, 60);
-  if (error || !data?.signedUrl) return null;
+  if (error || !data?.signedUrl) {
+    // Batas waktu dari fetchBerbatas muncul di sini sebagai error biasa, dan
+    // dibedakan dari "tidak ada": yang satu kesalahan mahasiswa, yang lain
+    // bukan sama sekali.
+    return { ok: false, sebab: lambat(error) ? "lambat" : "hilang" };
+  }
 
-  const jawaban = await fetch(data.signedUrl, { headers: { Range: "bytes=0-15" } });
-  if (!jawaban.ok) return null;
+  let jawaban: Response;
+  try {
+    jawaban = await fetch(data.signedUrl, {
+      headers: { Range: "bytes=0-15" },
+      signal: AbortSignal.timeout(BATAS_BACA_KEPALA_MS),
+    });
+  } catch (galat: unknown) {
+    return { ok: false, sebab: lambat(galat) ? "lambat" : "hilang" };
+  }
+  if (!jawaban.ok) return { ok: false, sebab: "hilang" };
 
   // "bytes 0-15/1048576" — angka sesudah garis miring adalah ukuran utuhnya.
   const rentang = jawaban.headers.get("content-range") || "";
@@ -121,7 +178,7 @@ async function bacaKepalaObjek(path: string) {
   const ukuran = cocok ? Number(cocok[1]) : Number(jawaban.headers.get("content-length") || 0);
 
   const pembaca = jawaban.body?.getReader();
-  if (!pembaca) return { ukuran, kepala: new Uint8Array() };
+  if (!pembaca) return { ok: true, ukuran, kepala: new Uint8Array() };
 
   // Dibaca sampai cukup untuk mengenali formatnya, lalu DIHENTIKAN. Potongan
   // pertama hampir selalu sudah memuat keenambelas bita yang diminta, tetapi
@@ -129,15 +186,20 @@ async function bacaKepalaObjek(path: string) {
   // satu-satunya yang menentukan.
   const potongan: Uint8Array[] = [];
   let terkumpul = 0;
-  while (terkumpul < 8) {
-    const { value, done } = await pembaca.read();
-    if (done) break;
-    if (value) {
-      potongan.push(value);
-      terkumpul += value.length;
+  try {
+    while (terkumpul < 8) {
+      const { value, done } = await pembaca.read();
+      if (done) break;
+      if (value) {
+        potongan.push(value);
+        terkumpul += value.length;
+      }
     }
+  } catch (galat: unknown) {
+    return { ok: false, sebab: lambat(galat) ? "lambat" : "hilang" };
+  } finally {
+    await pembaca.cancel().catch(() => undefined);
   }
-  await pembaca.cancel().catch(() => undefined);
 
   const kepala = new Uint8Array(terkumpul);
   let posisi = 0;
@@ -145,7 +207,20 @@ async function bacaKepalaObjek(path: string) {
     kepala.set(p, posisi);
     posisi += p.length;
   }
-  return { ukuran, kepala };
+  return { ok: true, ukuran, kepala };
+}
+
+/** Kegagalan ini karena waktunya habis, bukan karena bendanya tidak ada? */
+function lambat(galat: unknown) {
+  const nama = (galat as { name?: string } | null)?.name || "";
+  const pesan = String((galat as { message?: string } | null)?.message || "").toLowerCase();
+  return (
+    nama === "TimeoutError" ||
+    nama === "AbortError" ||
+    pesan.includes("timeout") ||
+    pesan.includes("aborted") ||
+    pesan.includes("fetch failed")
+  );
 }
 
 /**
@@ -162,7 +237,15 @@ export async function periksaObjekPdf(
   namaBagian: string,
 ): Promise<{ ok: true; ukuran: number } | { ok: false; pesan: string }> {
   const kepala = await bacaKepalaObjek(path);
-  if (!kepala) {
+  if (!kepala.ok) {
+    if (kepala.sebab === "lambat") {
+      return {
+        ok: false,
+        pesan:
+          `Penyimpanan tidak menjawab saat memeriksa berkas "${namaBagian}". ` +
+          "Ini gangguan sementara di sisi penyimpanan, bukan berkas Anda. Kirim lagi beberapa saat lagi.",
+      };
+    }
     return {
       ok: false,
       pesan: `Berkas "${namaBagian}" tidak ditemukan di penyimpanan. Pilih ulang berkasnya lalu kirim lagi.`,
@@ -189,21 +272,20 @@ export async function periksaObjekPdf(
   return { ok: true, ukuran: kepala.ukuran };
 }
 
-/**
- * Pindahkan benda di dalam bucket, tanpa menariknya ke dalam fungsi.
- *
- * Dipakai untuk memindahkan berkas dari folder transit ke folder tiket
- * sesudah formulirnya benar-benar terkirim. Dengan begitu apa pun yang masih
- * tertinggal di transit dapat dipastikan yatim, dan boleh disapu.
- */
-export async function moveDocument(dari: string, ke: string) {
-  const supabase = getStorageClient();
-  const { error } = await supabase.storage.from(DOCUMENT_BUCKET).move(dari, ke);
-  if (error) {
-    throw new Error(`Pemindahan berkas di penyimpanan gagal: ${error.message}`);
-  }
-  return ke;
-}
+// CATATAN: moveDocument DIHAPUS pada v45.
+//
+// Dulu berkas penyerahan dipindahkan dari folder transit ke folder tiketnya
+// pada detik formulirnya masuk. Pemindahan di Supabase Storage adalah SALINAN
+// seluruh isi berkas, dan untuk satu penyerahan itu berarti menyalin sampai
+// 55 MB — empat kali, berurutan, di dalam satu fungsi serverless yang
+// anggarannya 60 detik. Itulah yang membuat penyerahan berkas besar berakhir
+// sebagai galat 504, dan yang lebih buruk: percobaan berikutnya tidak lagi
+// menemukan berkasnya di transit, sehingga TIDAK ADA percobaan yang bisa
+// berhasil.
+//
+// Sekarang jalur transitnya dicatat apa adanya. Penyapu di /api/cleanup sudah
+// sejak awal menolak menghapus jalur yang masih ditunjuk basis data, jadi
+// berkas yang sudah diklaim tiket aman di tempatnya.
 
 export async function createDocumentDownloadUrl(path: string, fileName: string) {
   const supabase = getStorageClient();

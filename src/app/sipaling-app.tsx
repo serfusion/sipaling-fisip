@@ -25,6 +25,9 @@ import {
 import { muatLewatServerless } from "@/lib/unggah-langsung";
 import { tempelkanBagian, unggahBagianLangsung } from "@/lib/unggah-klien";
 import { pesanStatusHttp } from "@/lib/pesan-http";
+import { kirimFormulir } from "@/lib/kirim-ulang";
+import { kemajuanAwal, type Kemajuan } from "@/lib/kemajuan";
+import KemajuanUnggah, { type BerkasAntre } from "./kemajuan-unggah";
 import { LecturerPicker, type LecturerOption } from "./lecturer-picker";
 import TitleProposalForm from "./title-proposal-form";
 import Animasi from "./animasi";
@@ -627,10 +630,13 @@ export default function SipalingApp() {
   const [proposalData, setProposalData] = useState<ProposalRecord | null>(null);
   const [proposalCode, setProposalCode] = useState("");
   const [fileInfo, setFileInfo] = useState("");
-  // Kabar unggahan empat bagian. Berkasnya naik satu per satu langsung ke
-  // penyimpanan, jadi mahasiswa harus tahu sedang di berkas keberapa —
-  // tanpa ini yang terlihat hanya tombol yang diam selama beberapa menit.
-  const [kabarUnggah, setKabarUnggah] = useState("");
+  // Kemajuan unggahan empat bagian, per bita. Berkasnya naik satu per satu
+  // langsung ke penyimpanan, dan satu berkas skripsi 25 MB pada jaringan
+  // ponsel dapat memakan waktu bermenit-menit — tanpa angka yang bergerak,
+  // yang terlihat hanya tombol yang diam dan mahasiswa yang menyerah.
+  const [kemajuan, setKemajuan] = useState<Kemajuan | null>(null);
+  // Daftar berkas yang sedang dikirim, untuk baris-baris pada panel kemajuan.
+  const [antreanUnggah, setAntreanUnggah] = useState<BerkasAntre[]>([]);
   // Tautan folder Google Drive milik mahasiswa untuk penyerahan skripsi.
   // Empat bagian berkas penyerahan skripsi ke perpustakaan.
   const [bagianBerkas, setBagianBerkas] = useState<Record<string, File | null>>({});
@@ -889,20 +895,25 @@ export default function SipalingApp() {
     }
 
     setIsSubmitting(true);
-    setKabarUnggah("");
+    const bitaPenyerahan = siapPenyerahan.reduce((jumlah, b) => jumlah + b.berkas.size, 0);
+    setAntreanUnggah(
+      siapPenyerahan.map((b) => ({
+        label: BAGIAN_PENYERAHAN.find((bagian) => bagian.id === b.id)?.label ?? b.id,
+        nama: b.berkas.name,
+        ukuran: b.berkas.size,
+      })),
+    );
+    // Panel kemajuan langsung tampil, bahkan sebelum bita pertama bergerak:
+    // jeda antara tombol ditekan dan unggahan mulai adalah jeda yang paling
+    // sering diartikan "tombolnya tidak berfungsi".
+    setKemajuan(kemajuanAwal(siapPenyerahan.length, bitaPenyerahan));
     try {
       // Empat PDF penyerahan naik LANGSUNG ke penyimpanan, bukan menumpang
       // badan permintaan API: fungsi serverless memotong badan permintaan
       // pada 4,5 MB, dan satu penyerahan yang wajar jauh melewatinya.
       // Lihat src/lib/unggah-langsung.ts.
       if (siapPenyerahan.length > 0) {
-        const naik = await unggahBagianLangsung("requests", siapPenyerahan, (selesai, total, nama) =>
-          setKabarUnggah(
-            selesai >= total
-              ? "Semua berkas terunggah. Menyimpan pengajuan…"
-              : `Mengunggah berkas ${selesai + 1} dari ${total} — ${nama}`,
-          ),
-        );
+        const naik = await unggahBagianLangsung("requests", siapPenyerahan, setKemajuan);
         if (naik.mode === "langsung") {
           tempelkanBagian(formData, naik.hasil);
         } else {
@@ -912,22 +923,36 @@ export default function SipalingApp() {
           const muat = muatLewatServerless(siapPenyerahan.map((b) => b.berkas));
           if (!muat.ok) throw new Error(muat.pesan);
           for (const b of siapPenyerahan) formData.set(`bagian_${b.id}`, b.berkas);
-          setKabarUnggah("Mengirim berkas lewat jalur cadangan…");
         }
       }
 
-      const result = await readApi<{ ticket: string }>(
-        await fetch("/api/requests", { method: "POST", body: formData }),
-      );
+      // Langkah terakhir DICOBA LAGI bila yang gagal bukan keputusan portal
+      // (504, 502, sambungan putus). Berkasnya sudah berada di penyimpanan,
+      // jadi percobaan ulang hanya mengirim beberapa ratus bita — dan server
+      // mengenali kiriman ulang dari jalur berkasnya, sehingga yang dipulangkan
+      // tiket yang sama, bukan pengajuan kedua. Lihat src/lib/kirim-ulang.ts.
+      const result = await kirimFormulir<{ ticket: string; message?: string; ulangan?: boolean }>("/api/requests", formData, {
+        lapor: (percobaan, maks) =>
+          setKemajuan((kini) => ({
+            ...(kini ?? kemajuanAwal(siapPenyerahan.length, bitaPenyerahan)),
+            tahap: "simpan",
+            percobaan,
+            maksPercobaan: maks,
+          })),
+      });
       setSubmitMessage(
         <>
-          <strong>Pengajuan berhasil dikirim.</strong>
+          {/* Kiriman ulang yang mendarat pada pengajuan yang sudah tersimpan
+              diberi kalimatnya sendiri: menyebutnya "berhasil dikirim" akan
+              membuat mahasiswa menduga ia baru saja mengirim yang kedua. */}
+          <strong>{result.ulangan ? "Pengajuan Anda sudah tersimpan." : "Pengajuan berhasil dikirim."}</strong>
           <br />
           Nomor tiket Anda:
           <strong className="ticket-number">
             {result.ticket}
             <button type="button" className="copy-btn" onClick={() => doCopy(result.ticket)}>⧉ Salin</button>
           </strong>
+          {result.ulangan && result.message && <span>{result.message}</span>}
           <span>Simpan nomor ini untuk memantau status layanan.</span>
         </>,
       );
@@ -941,7 +966,8 @@ export default function SipalingApp() {
       setSubmitError(error instanceof Error ? error.message : "Pengajuan gagal dikirim.");
     } finally {
       setIsSubmitting(false);
-      setKabarUnggah("");
+      setKemajuan(null);
+      setAntreanUnggah([]);
     }
   }
 
@@ -1074,31 +1100,42 @@ export default function SipalingApp() {
     }
 
     setIsUploadingRevision(true);
-    setKabarUnggah("");
+    const bitaRevisi = siapRevisi.reduce((jumlah, b) => jumlah + b.berkas.size, 0);
+    setAntreanUnggah(
+      siapRevisi.map((b) => ({
+        label:
+          (bentuk.jenis === "bagian" ? bentuk.bagian.find((bagian) => bagian.id === b.id)?.label : "") || b.id,
+        nama: b.berkas.name,
+        ukuran: b.berkas.size,
+      })),
+    );
+    setKemajuan(kemajuanAwal(siapRevisi.length, bitaRevisi));
     try {
       // Revisi penyerahan juga empat PDF, jadi jalurnya sama: naik langsung ke
       // penyimpanan, formulir hanya membawa jalurnya.
       if (siapRevisi.length > 0) {
-        const naik = await unggahBagianLangsung("revisions", siapRevisi, (selesai, total, nama) =>
-          setKabarUnggah(
-            selesai >= total
-              ? "Semua berkas terunggah. Menyimpan revisi…"
-              : `Mengunggah berkas ${selesai + 1} dari ${total} — ${nama}`,
-          ),
-        );
+        const naik = await unggahBagianLangsung("revisions", siapRevisi, setKemajuan);
         if (naik.mode === "langsung") {
           tempelkanBagian(formData, naik.hasil);
         } else {
           const muat = muatLewatServerless(siapRevisi.map((b) => b.berkas));
           if (!muat.ok) throw new Error(muat.pesan);
           for (const b of siapRevisi) formData.set(`bagian_${b.id}`, b.berkas);
-          setKabarUnggah("Mengirim berkas lewat jalur cadangan…");
         }
       }
 
-      const result = await readApi<{ ticket: string; message: string }>(
-        await fetch("/api/revisions", { method: "POST", body: formData }),
-      );
+      // Sama seperti pengajuan: kiriman terakhirnya boleh dicoba lagi, dan
+      // server mengenali kiriman ulang dari jalur berkasnya sehingga revisi
+      // yang sudah tersimpan tidak pernah tercatat dua kali.
+      const result = await kirimFormulir<{ ticket: string; message: string }>("/api/revisions", formData, {
+        lapor: (percobaan, maks) =>
+          setKemajuan((kini) => ({
+            ...(kini ?? kemajuanAwal(siapRevisi.length, bitaRevisi)),
+            tahap: "simpan",
+            percobaan,
+            maksPercobaan: maks,
+          })),
+      });
       setRevisionMessage(
         <>
           <strong>{result.message}</strong>
@@ -1113,7 +1150,8 @@ export default function SipalingApp() {
       setRevisionError(error instanceof Error ? error.message : "Revisi gagal dikirim.");
     } finally {
       setIsUploadingRevision(false);
-      setKabarUnggah("");
+      setKemajuan(null);
+      setAntreanUnggah([]);
     }
   }
 
@@ -1502,7 +1540,7 @@ export default function SipalingApp() {
                 </>
                 )}
               </form>
-              {kabarUnggah && isSubmitting && <p className="kabar-unggah" role="status">{kabarUnggah}</p>}
+              {isSubmitting && <KemajuanUnggah kemajuan={kemajuan} antrean={antreanUnggah} kerja="pengajuan" />}
               {submitError && <ErrorNotice message={submitError} />}
               {submitMessage && <SuccessNotice>{submitMessage}</SuccessNotice>}
             </article>
@@ -1799,7 +1837,7 @@ export default function SipalingApp() {
                   </>
                 )}
               </form>
-              {kabarUnggah && isUploadingRevision && <p className="kabar-unggah" role="status">{kabarUnggah}</p>}
+              {isUploadingRevision && <KemajuanUnggah kemajuan={kemajuan} antrean={antreanUnggah} kerja="revisi" />}
               {revisionError && <ErrorNotice message={revisionError} />}
               {revisionMessage && <SuccessNotice>{revisionMessage}</SuccessNotice>}
             </article>
