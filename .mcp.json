@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "headroom": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "headroom-ai[mcp]",
+        "headroom",
+        "mcp",
+        "serve"
+      ],
+      "env": {
+        "HEADROOM_BEACON": "off",
+        "DO_NOT_TRACK": "1"
+      }
+    }
+  }
+}
