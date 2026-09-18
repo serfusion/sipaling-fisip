@@ -17,9 +17,11 @@ import {
 import {
   amankanBagian,
   bacaBagianDariForm,
+  jalurDiklaim,
   type BagianDiklaim,
   type BagianTersimpan,
 } from "@/lib/unggah-klaim";
+import { tiketPemilikJalur } from "@/lib/kiriman-ulang-server";
 import { kolomDriveSiap } from "@/lib/kolom-drive";
 import { getCurrentProfile, serviceTypeForProfile } from "@/lib/supabase-server";
 import { explainServerError } from "@/lib/api-errors";
@@ -127,7 +129,13 @@ function makeTicket(serviceType: string, nim: string) {
 }
 
 export async function POST(request: Request) {
-  const limit = rateLimit({ request, name: "request-submit", limit: 8, windowMs: 10 * 60_000 });
+  // 15, bukan 8 seperti sebelumnya: peramban kini MENGULANG kirimannya sendiri
+  // sampai tiga kali bila yang gagal bukan keputusan portal (lihat
+  // src/lib/kirim-ulang.ts). Dengan batas 8, satu pengiriman yang tersendat
+  // dapat menghabiskan kuota sebelum mahasiswa mendapat satu pun tiket — dan
+  // yang terbaca di layar lalu berganti menjadi "terlalu banyak permintaan",
+  // pesan yang sama sekali tidak menjelaskan keadaannya.
+  const limit = rateLimit({ request, name: "request-submit", limit: 15, windowMs: 10 * 60_000 });
   if (!limit.ok) return tooManyRequests(limit.retryAfter);
 
   // Selama mode maintenance menyala, kiriman dari pengunjung umum ditolak
@@ -217,6 +225,39 @@ export async function POST(request: Request) {
         return Response.json({ success: false, message: dibaca.pesan }, { status: 400 });
       }
       bagianBerkas = dibaca.daftar;
+
+      // KIRIMAN ULANG. Bila salah satu jalur ini sudah tercatat sebagai
+      // lampiran, pengajuannya SUDAH tersimpan dan yang hilang hanya
+      // jawabannya. Yang dipulangkan tiket yang sudah ada — bukan tiket kedua,
+      // dan bukan pesan galat yang menyuruh mahasiswa mengunggah dari nol.
+      //
+      // Dijawab di sini, sebelum satu pun berkas diperiksa: pemeriksaan itulah
+      // yang memakan waktu, dan pada kiriman ulang ia tidak ada gunanya.
+      const pemilik = await tiketPemilikJalur(jalurDiklaim(bagianBerkas));
+      if (pemilik) {
+        if (pemilik.nim === nim) {
+          return Response.json(
+            {
+              success: true,
+              ticket: pemilik.ticket,
+              ulangan: true,
+              message:
+                "Pengajuan ini sudah tersimpan sebelumnya — jawaban yang pertama tidak sampai ke perangkat Anda. " +
+                "Nomor tiketnya tetap yang ini, dan berkasnya tidak perlu diunggah lagi.",
+            },
+            { status: 200 },
+          );
+        }
+        // NIM-nya berbeda: jalur ini bukan milik pengirim. Tiket orang lain
+        // tidak pernah disebutkan dalam jawaban.
+        return Response.json(
+          {
+            success: false,
+            message: "Berkas yang Anda kirim sudah dipakai pengajuan lain. Pilih ulang berkasnya lalu kirim lagi.",
+          },
+          { status: 409 },
+        );
+      }
     }
 
     // Absensi tidak memakai lampiran apa pun; penyerahan memakai jalurnya sendiri.
@@ -367,6 +408,15 @@ export async function POST(request: Request) {
           })),
         );
       } catch (error) {
+        // Tiketnya sudah tersimpan tetapi berkasnya gagal dicatat. Barisnya
+        // ikut dibuang: tiket tanpa satu pun lampiran hanya menjadi pekerjaan
+        // yang tidak dapat dikerjakan di antrean admin perpustakaan, dan
+        // menghalangi kiriman ulang mahasiswa yang sebenarnya belum berhasil.
+        try {
+          await db.delete(serviceRequests).where(eq(serviceRequests.id, requestId));
+        } catch (galatHapus) {
+          console.error("hapus tiket tanpa lampiran", galatHapus);
+        }
         await Promise.all(uploadedPaths.map((path) => removeDocument(path).catch(() => undefined)));
         throw error;
       }

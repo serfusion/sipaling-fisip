@@ -23,7 +23,8 @@ import { explainServerError } from "@/lib/api-errors";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { blockedByMaintenance } from "@/lib/maintenance-gate";
 import { bentukUnggah, periksaBerkasTunggal } from "@/lib/bentuk-unggah";
-import { amankanBagian, bacaBagianDariForm } from "@/lib/unggah-klaim";
+import { amankanBagian, bacaBagianDariForm, jalurDiklaim } from "@/lib/unggah-klaim";
+import { revisiPemilikJalur } from "@/lib/kiriman-ulang-server";
 import { audienceUntukLayanan, pushNotification } from "@/lib/notify";
 import { gantiBerkasTunggal, gantiLampiranRevisi } from "@/lib/revisi-store";
 
@@ -73,7 +74,13 @@ async function kabarkanRevisi(
 }
 
 export async function POST(request: Request) {
-  const limit = rateLimit({ request, name: "revision-upload", limit: 8, windowMs: 10 * 60_000 });
+  // 15, bukan 8 seperti sebelumnya: peramban kini MENGULANG kirimannya sendiri
+  // sampai tiga kali bila yang gagal bukan keputusan portal (lihat
+  // src/lib/kirim-ulang.ts). Dengan batas 8, satu pengiriman yang tersendat
+  // dapat menghabiskan kuota sebelum mahasiswa mendapat satu pun tiket — dan
+  // yang terbaca di layar lalu berganti menjadi "terlalu banyak permintaan",
+  // pesan yang sama sekali tidak menjelaskan keadaannya.
+  const limit = rateLimit({ request, name: "revision-upload", limit: 15, windowMs: 10 * 60_000 });
   if (!limit.ok) return tooManyRequests(limit.retryAfter);
 
   // Selama mode maintenance menyala, kiriman dari pengunjung umum ditolak
@@ -122,6 +129,37 @@ export async function POST(request: Request) {
     if (!service) {
       return Response.json({ success: false, message: "Tiket dan NIM tidak ditemukan." }, { status: 404 });
     }
+    const bentuk = bentukUnggah(service.serviceType, service.serviceNeed, true);
+
+    // KIRIMAN ULANG, diperiksa SEBELUM status.
+    //
+    // Revisi yang tersimpan mengubah status tiketnya menjadi "Masuk". Kiriman
+    // ulang sesudah jawaban yang hilang karena itu akan ditolak penjaga status
+    // di bawah dengan alasan yang tepat menurut aturan dan salah menurut
+    // keadaan: berkasnya justru sudah masuk. Bila jalur pada kiriman ini sudah
+    // tercatat sebagai revisi tiket ini, yang dipulangkan kabar berhasil —
+    // bukan penolakan, dan bukan pula revisi kedua yang menimpa berkas yang
+    // baru saja tersimpan.
+    //
+    // Formulirnya dibaca SEKALI di sini lalu dipakai lagi oleh cabang "bagian"
+    // di bawah: pembacaannya murni (tidak menyentuh penyimpanan), dan
+    // membacanya dua kali hanya membuat aturan yang sama dievaluasi dua kali.
+    const dibaca = bentuk.jenis === "bagian" ? bacaBagianDariForm(form, "revisions", bentuk.bagian) : null;
+    if (bentuk.jenis === "bagian" && dibaca?.ok) {
+      const sudah = await revisiPemilikJalur(service.id, jalurDiklaim(dibaca.daftar));
+      if (sudah) {
+        return Response.json({
+          success: true,
+          message:
+            `Revisi ke-${sudah.nomor} sudah tersimpan sebelumnya — jawaban yang pertama tidak sampai ` +
+            "ke perangkat Anda. Berkasnya tidak perlu diunggah lagi.",
+          ticket,
+          jumlah: bentuk.bagian.length,
+          ulangan: true,
+        });
+      }
+    }
+
     if (service.status !== "Revisi") {
       return Response.json(
         {
@@ -132,7 +170,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const bentuk = bentukUnggah(service.serviceType, service.serviceNeed, true);
     if (bentuk.jenis === "tanpa") {
       return Response.json(
         { success: false, message: `Layanan ini tidak memuat berkas. ${bentuk.alasan}` },
@@ -144,15 +181,22 @@ export async function POST(request: Request) {
 
     // ---------- BEBERAPA BAGIAN SEKALIGUS ----------
     if (bentuk.jenis === "bagian") {
-      // SELURUH berkas diperiksa lebih dulu, sebelum satu pun disentuh. Kalau
-      // pemeriksaannya diselang-seling dengan pemindahan, berkas keempat yang
+      // SELURUH berkas diperiksa lebih dulu, sebelum satu pun diklaim. Kalau
+      // pemeriksaannya diselang-seling dengan pencatatan, berkas keempat yang
       // ditolak meninggalkan tiga berkas yatim di penyimpanan.
       //
       // Berkasnya sendiri sudah dinaikkan peramban langsung ke penyimpanan —
       // revisi penyerahan juga empat PDF, dan empat PDF tidak pernah muat di
       // badan permintaan fungsi serverless. Kiriman lama yang masih membawa
       // berkasnya sendiri tetap dilayani lewat jalur cadangan.
-      const dibaca = bacaBagianDariForm(form, "revisions", bentuk.bagian);
+      //
+      // `dibaca` sudah disiapkan di atas, saat memeriksa kiriman ulang.
+      if (!dibaca) {
+        return Response.json(
+          { success: false, message: "Bentuk berkas revisi tidak dapat dibaca. Muat ulang halaman lalu coba lagi." },
+          { status: 400 },
+        );
+      }
       sapuTransit.push(...dibaca.sapu);
       if (!dibaca.ok) {
         await Promise.all(sapuTransit.map((p) => removeDocument(p).catch(() => undefined)));
