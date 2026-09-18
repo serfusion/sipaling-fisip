@@ -74,15 +74,22 @@ const IZIN_PERANGKAT =
   "magnetometer=(), gyroscope=(), browsing-topics=()";
 
 /**
- * Sama seperti di atas, kecuali kamera diizinkan untuk asal ini sendiri.
+ * Sama seperti di atas, kecuali kamera DAN mikrofon diizinkan untuk asal ini
+ * sendiri.
  *
  * Ini BUKAN pemberian akses: peramban tetap meminta izin peserta lewat
  * dialognya sendiri, dan peserta tetap dapat menolak. Yang dibuka hanyalah
  * kemungkinan untuk bertanya — tanpa baris ini, getUserMedia ditolak peramban
- * sebelum dialognya sempat muncul, dan yang terlihat di layar peserta hanya
- * "kamera tidak aktif" tanpa keterangan apa pun.
+ * sebelum dialognya sempat muncul.
+ *
+ * Mikrofonnya dahulu tertinggal di sini, dan akibatnya persis itu: perekaman
+ * yang dinyalakan dosen selalu berakhir "ditolak" pada tiap peserta, tanpa
+ * satu pun kotak izin pernah muncul. Yang menolak bukan pesertanya melainkan
+ * header ini.
  */
-const IZIN_PERANGKAT_UJIAN = IZIN_PERANGKAT.replace("camera=()", "camera=(self)");
+const IZIN_PERANGKAT_UJIAN = IZIN_PERANGKAT
+  .replace("camera=()", "camera=(self)")
+  .replace("microphone=()", "microphone=(self)");
 
 const securityHeaders = [
   { key: "Content-Security-Policy", value: csp },

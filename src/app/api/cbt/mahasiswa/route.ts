@@ -4,8 +4,14 @@
 // GET  ?kode=XXXXXX&q=a   cari peserta dari layar ujian (TANPA LOGIN)
 // GET  ?q=a               cari dari dashboard (dosen/admin, keterangan lengkap)
 // GET  ?daftar=1          seluruh daftar untuk panel pengelolaan
+// GET  ?peserta=1         peserta ujian yang mengisi sendiri dan BELUM terdaftar
 // POST                    impor/perbarui daftar (admin)
+// PATCH                   ubah satu baris, termasuk nomor induknya (admin)
 // DELETE ?id=             hapus satu baris (admin)
+//
+// Daftarnya PERMANEN. Tidak ada satu pun jalur di sini maupun di
+// /api/cleanup yang membuangnya karena umur; satu-satunya yang menghapus
+// adalah DELETE di bawah, atas perbuatan seorang admin.
 //
 // ------------------------------------------------------------
 // SATU JALUR TERBUKA, DAN APA YANG MENJAGANYA
@@ -29,8 +35,8 @@
 // Hasilnya paling banyak delapan nama sekali minta, dan lajunya dibatasi.
 // ============================================================
 import { db } from "@/db";
-import { students } from "@/db/schema";
-import { and, asc, eq, ilike, or, sql } from "drizzle-orm";
+import { cbtAttempts, cbtExams, students } from "@/db/schema";
+import { and, asc, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
 import { explainServerError } from "@/lib/api-errors";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { getCurrentProfile } from "@/lib/supabase-server";
@@ -161,6 +167,46 @@ export async function GET(request: Request) {
       });
     }
 
+    // ---------- PESERTA YANG MENGISI SENDIRI ----------
+    //
+    // Nama dan nomor yang diketik peserta di layar ujian berhenti di baris
+    // percobaannya dan tidak pernah sampai ke daftar tetap. Yang
+    // dikembalikan di sini: yang nomornya BELUM ada di daftar, satu baris per
+    // nomor, supaya admin dapat memasukkannya dengan satu ketukan.
+    if (params.get("peserta")) {
+      const baris = await db
+        .select({
+          nim: cbtAttempts.nim,
+          nama: cbtAttempts.name,
+          kelas: cbtExams.className,
+          terakhir: sql<string>`max(${cbtAttempts.startedAt})`,
+          ujian: sql<number>`count(distinct ${cbtAttempts.examId})::int`,
+        })
+        .from(cbtAttempts)
+        .leftJoin(cbtExams, eq(cbtExams.id, cbtAttempts.examId))
+        .leftJoin(students, eq(students.nim, cbtAttempts.nim))
+        .where(isNull(students.id))
+        .groupBy(cbtAttempts.nim, cbtAttempts.name, cbtExams.className)
+        .orderBy(desc(sql`max(${cbtAttempts.startedAt})`))
+        .limit(200);
+
+      // Satu orang yang ikut tiga ujian muncul tiga kali bila kelas ujiannya
+      // berbeda-beda. Yang dipakai baris pertamanya — yang paling baru.
+      const sekali = new Map<string, (typeof baris)[number]>();
+      for (const b of baris) if (!sekali.has(b.nim)) sekali.set(b.nim, b);
+
+      return Response.json({
+        success: true,
+        peserta: [...sekali.values()].map((b) => ({
+          nim: b.nim,
+          nama: b.nama,
+          kelas: b.kelas || "",
+          ujian: b.ujian,
+        })),
+        bolehKelola: PENGELOLA.includes(profile.role),
+      });
+    }
+
     if (q.length < MIN_KETIK) return Response.json({ success: true, mahasiswa: [] });
     const calon = await db.select().from(students).where(syaratCari(q)).limit(AMBIL_CALON);
     return Response.json({
@@ -273,6 +319,81 @@ export async function POST(request: Request) {
     console.error("impor mahasiswa", error);
     return Response.json(
       { success: false, message: explainServerError(error, "Daftar mahasiswa belum tersimpan.") },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * Ubah SATU baris yang sudah ada, dikenali dari id-nya.
+ *
+ * Terpisah dari POST dan memang harus terpisah. POST menggabungkan berdasarkan
+ * nomor induk dan sengaja TIDAK pernah mengosongkan medan keterangan — itu
+ * yang benar untuk berkas impor yang hanya memuat nomor dan nama. Di sini
+ * kebalikannya yang benar: yang mengosongkan kolom email memang bermaksud
+ * menghapus emailnya, dan nomor induk yang salah ketik harus dapat dibetulkan
+ * tanpa menghapus barisnya lebih dulu.
+ */
+export async function PATCH(request: Request) {
+  try {
+    const profile = await getCurrentProfile();
+    if (!profile || !PENGELOLA.includes(profile.role)) {
+      return Response.json(
+        { success: false, message: "Hanya Admin dan Super Admin yang boleh mengubah data peserta." },
+        { status: 403 },
+      );
+    }
+
+    const body = (await request.json()) as BarisMasuk & { id?: unknown };
+    const id = Number(body.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return Response.json({ success: false, message: "Baris tidak dikenali." }, { status: 400 });
+    }
+
+    const nim = rapikanNimMhs(body.nim);
+    const nama = rapikanNamaMhs(body.nama);
+    if (nim.length < 4) {
+      return Response.json({ success: false, message: "Nomor induknya kosong atau terlalu pendek." }, { status: 400 });
+    }
+    if (nama.length < 3) {
+      return Response.json({ success: false, message: "Namanya kosong atau terlalu pendek." }, { status: 400 });
+    }
+
+    // Nomor induk yang dipindahkan ke nomor milik orang lain ditolak di sini,
+    // bukan dibiarkan menjadi galat batas unik basis data — yang pesannya
+    // tidak berarti apa pun bagi yang membacanya di layar.
+    const bentrok = await db.select({ id: students.id }).from(students).where(eq(students.nim, nim)).limit(1);
+    if (bentrok[0] && bentrok[0].id !== id) {
+      return Response.json(
+        { success: false, message: `Nomor ${nim} sudah dipakai baris lain.` },
+        { status: 409 },
+      );
+    }
+
+    const terubah = await db
+      .update(students)
+      .set({
+        nim,
+        name: nama,
+        nameKey: kunciCari(nama),
+        email: rapikanEmail(body.email) || null,
+        prodi: String(body.prodi ?? "").trim().slice(0, 120) || null,
+        className: String(body.kelas ?? "").trim().slice(0, 80) || null,
+        angkatan: String(body.angkatan ?? "").replace(/\D/g, "").slice(0, 10) || null,
+        status: rapikanStatus(body.status),
+        updatedAt: new Date(),
+      })
+      .where(eq(students.id, id))
+      .returning({ id: students.id });
+
+    if (terubah.length === 0) {
+      return Response.json({ success: false, message: "Barisnya sudah tidak ada." }, { status: 404 });
+    }
+    return Response.json({ success: true });
+  } catch (error: unknown) {
+    console.error("ubah data peserta", error);
+    return Response.json(
+      { success: false, message: explainServerError(error, "Baris belum dapat diubah.") },
       { status: 500 },
     );
   }
