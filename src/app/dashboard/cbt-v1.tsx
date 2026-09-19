@@ -39,6 +39,76 @@ import {
 // DAFTAR MAHASISWA
 // ============================================================
 
+/** Peserta yang mengetik identitasnya sendiri di layar ujian. */
+type PesertaLepas = { nim: string; nama: string; kelas: string; ujian: number };
+
+const BARIS_KOSONG: BarisImpor = {
+  nim: "", nama: "", email: "", prodi: "", kelas: "", angkatan: "", status: "aktif",
+};
+
+/** Medan teks pada formulir tambah/ubah. Status punya pemilihnya sendiri. */
+const MEDAN: Array<{ kunci: "nim" | "nama" | "email" | "prodi" | "kelas" | "angkatan"; label: string; contoh: string }> = [
+  { kunci: "nim", label: "NIM *", contoh: "2023123456" },
+  { kunci: "nama", label: "Nama *", contoh: "Andi Pratama" },
+  { kunci: "email", label: "Email", contoh: "andi@kampus.ac.id" },
+  { kunci: "prodi", label: "Prodi", contoh: "Ilmu Komunikasi" },
+  { kunci: "kelas", label: "Kelas", contoh: "3A" },
+  { kunci: "angkatan", label: "Angkatan", contoh: "2023" },
+];
+
+function keBarisImpor(m: Partial<Mahasiswa> & { nim: string; nama: string }): BarisImpor {
+  return {
+    nim: m.nim,
+    nama: m.nama,
+    email: m.email ?? "",
+    prodi: m.prodi ?? "",
+    kelas: m.kelas ?? "",
+    angkatan: m.angkatan ?? "",
+    status: (STATUS_MAHASISWA as readonly string[]).includes(m.status ?? "")
+      ? (m.status as BarisImpor["status"])
+      : "aktif",
+  };
+}
+
+/** Excel atau CSV. Pustakanya dimuat saat dipakai, bukan saat panel dibuka. */
+async function bacaLembar(berkas: File) {
+  const XLSX = await import("xlsx");
+  const kerja = XLSX.read(await berkas.arrayBuffer(), { type: "array" });
+  const lembar = kerja.Sheets[kerja.SheetNames[0]];
+  const aoa = XLSX.utils.sheet_to_json(lembar, { header: 1, raw: true, defval: "" }) as Aoa;
+  return bacaImporMahasiswa(aoa);
+}
+
+/**
+ * Word (.docx).
+ *
+ * Daftar mahasiswa di Word hampir selalu berupa TABEL, jadi tabelnya yang
+ * dicari lebih dulu — tabel terpanjang, karena kop surat dan kolom tanda
+ * tangan juga tabel. Baru kalau tidak ada satu pun tabel, isinya dibaca
+ * sebagai teks baris demi baris lewat pembaca tempelan yang sudah ada.
+ *
+ * .doc lama (bukan .docx) tidak dapat dibaca pustaka mana pun di peramban;
+ * yang terjadi adalah galat, dan pesannya menyebut hal itu.
+ */
+async function bacaWord(berkas: File) {
+  const mammoth = await import("mammoth");
+  const arrayBuffer = await berkas.arrayBuffer();
+  const { value: html } = await mammoth.convertToHtml({ arrayBuffer });
+  const dok = new DOMParser().parseFromString(html, "text/html");
+
+  let terpanjang: Aoa = [];
+  for (const tabel of Array.from(dok.querySelectorAll("table"))) {
+    const aoa: Aoa = Array.from(tabel.querySelectorAll("tr")).map((tr) =>
+      Array.from(tr.querySelectorAll("th, td")).map((sel) => (sel.textContent || "").trim()),
+    );
+    if (aoa.length > terpanjang.length) terpanjang = aoa;
+  }
+  if (terpanjang.length > 0) return bacaImporMahasiswa(terpanjang);
+
+  const { value: teks } = await mammoth.extractRawText({ arrayBuffer });
+  return bacaTempelMahasiswa(teks);
+}
+
 export function PanelMahasiswa({ bolehKelola }: { bolehKelola: boolean }) {
   const [daftar, setDaftar] = useState<Mahasiswa[]>([]);
   const [jumlah, setJumlah] = useState(0);
@@ -52,6 +122,20 @@ export function PanelMahasiswa({ bolehKelola }: { bolehKelola: boolean }) {
   const [tolak, setTolak] = useState<Array<{ baris: string; alasan: string }>>([]);
   const [tempel, setTempel] = useState("");
   const [bukaTempel, setBukaTempel] = useState(false);
+
+  /**
+   * Satu formulir untuk dua pekerjaan: menambah baris baru dan mengubah baris
+   * yang sudah ada. `id` null berarti baru.
+   *
+   * Digabung karena medannya persis sama, dan dua formulir dengan medan yang
+   * sama adalah dua tempat yang harus diubah setiap kali satu kolom bertambah.
+   */
+  const [isian, setIsian] = useState<{ id: number | null; baris: BarisImpor } | null>(null);
+
+  /** Peserta yang mengisi identitasnya sendiri di layar ujian. */
+  const [pesertaLepas, setPesertaLepas] = useState<PesertaLepas[]>([]);
+  const [pilihLepas, setPilihLepas] = useState<string[]>([]);
+  const [bukaLepas, setBukaLepas] = useState(false);
 
   const muatDaftar = useCallback(async (q: string) => {
     setMuat(true);
@@ -69,6 +153,17 @@ export function PanelMahasiswa({ bolehKelola }: { bolehKelola: boolean }) {
     }
   }, []);
 
+  /** Peserta ujian yang nomornya belum ada di daftar. */
+  const muatLepas = useCallback(async () => {
+    try {
+      const jawab = await fetch("/api/cbt/mahasiswa?peserta=1", { cache: "no-store" });
+      const data = await jawab.json();
+      if (jawab.ok && data.success) setPesertaLepas(data.peserta || []);
+    } catch {
+      // Didiamkan: bagian ini tambahan, dan panelnya tetap berguna tanpanya.
+    }
+  }, []);
+
   // Ketikan ditahan sebentar. Daftar lima ribu baris tidak perlu dicari ulang
   // pada tiap huruf, dan yang mengetiknya sedang mencari satu nama.
   useEffect(() => {
@@ -76,22 +171,28 @@ export function PanelMahasiswa({ bolehKelola }: { bolehKelola: boolean }) {
     return () => clearTimeout(jam);
   }, [cari, muatDaftar]);
 
+  // Ditunda satu tick, sama seperti pemuat lain di panel ini: memanggilnya
+  // langsung di badan effect memicu gambar bertingkat.
+  useEffect(() => {
+    if (!bolehKelola) return;
+    const jam = setTimeout(() => void muatLepas(), 0);
+    return () => clearTimeout(jam);
+  }, [bolehKelola, muatLepas]);
+
   async function bacaBerkas(berkas: File) {
     setGalat(""); setKabar("");
+    const word = /\.docx?$/i.test(berkas.name);
     try {
-      // xlsx dimuat saat dipakai, bukan saat panel dibuka. Pustakanya besar,
-      // dan sebagian besar dosen tidak pernah menyentuh tombol impor.
-      const XLSX = await import("xlsx");
-      const buf = await berkas.arrayBuffer();
-      const kerja = XLSX.read(buf, { type: "array" });
-      const lembar = kerja.Sheets[kerja.SheetNames[0]];
-      const aoa = XLSX.utils.sheet_to_json(lembar, { header: 1, raw: true, defval: "" }) as Aoa;
-      const hasil = bacaImporMahasiswa(aoa);
+      const hasil = word ? await bacaWord(berkas) : await bacaLembar(berkas);
       setPratinjau(hasil.baris);
       setTolak(hasil.tolak);
       if (hasil.baris.length === 0) setGalat("Tidak ada baris yang dapat dipakai dari berkas itu.");
     } catch {
-      setGalat("Berkasnya tidak dapat dibaca. Pastikan berupa Excel (.xlsx) atau CSV.");
+      setGalat(
+        word
+          ? "Berkas Word itu tidak dapat dibaca. Pastikan berupa .docx, bukan .doc lama."
+          : "Berkasnya tidak dapat dibaca. Pastikan berupa Excel (.xlsx) atau CSV.",
+      );
     }
   }
 
@@ -103,24 +204,67 @@ export function PanelMahasiswa({ bolehKelola }: { bolehKelola: boolean }) {
     else setGalat("");
   }
 
-  async function simpanImpor() {
-    if (pratinjau.length === 0) return;
+  /** Kirim sekumpulan baris lewat jalur impor. Dipakai tiga tombol. */
+  async function simpanBaris(baris: BarisImpor[], sesudah: string) {
+    if (baris.length === 0) return false;
     setSibuk(true); setGalat(""); setKabar("");
     try {
       const jawab = await fetch("/api/cbt/mahasiswa", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ baris: pratinjau }),
+        body: JSON.stringify({ baris }),
       });
       const data = await jawab.json();
       if (!jawab.ok || !data.success) throw new Error(data.message || "Gagal menyimpan.");
-      setKabar(`${data.tersimpan} mahasiswa tersimpan.`);
-      setPratinjau([]); setTolak([]); setTempel(""); setBukaTempel(false);
+      setKabar(sesudah.replace("{n}", String(data.tersimpan)));
       await muatDaftar(cari.trim());
+      await muatLepas();
+      return true;
     } catch (alasan: unknown) {
       setGalat(alasan instanceof Error ? alasan.message : "Daftar gagal disimpan.");
+      return false;
     } finally {
       setSibuk(false);
+    }
+  }
+
+  async function simpanImpor() {
+    if (await simpanBaris(pratinjau, "{n} mahasiswa tersimpan.")) {
+      setPratinjau([]); setTolak([]); setTempel(""); setBukaTempel(false);
+    }
+  }
+
+  async function simpanIsian() {
+    if (!isian) return;
+    // Baris baru lewat jalur impor — ia menggabungkan berdasarkan nomor induk,
+    // jadi nomor yang ternyata sudah ada diperbarui, bukan ditolak.
+    if (isian.id === null) {
+      if (await simpanBaris([isian.baris], "{n} baris tersimpan.")) setIsian(null);
+      return;
+    }
+    setSibuk(true); setGalat(""); setKabar("");
+    try {
+      const jawab = await fetch("/api/cbt/mahasiswa", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: isian.id, ...isian.baris }),
+      });
+      const data = await jawab.json();
+      if (!jawab.ok || !data.success) throw new Error(data.message || "Gagal menyimpan.");
+      setKabar("Perubahan tersimpan.");
+      setIsian(null);
+      await muatDaftar(cari.trim());
+    } catch (alasan: unknown) {
+      setGalat(alasan instanceof Error ? alasan.message : "Perubahan gagal disimpan.");
+    } finally {
+      setSibuk(false);
+    }
+  }
+
+  async function tambahLepas() {
+    const dipilih = pesertaLepas.filter((p) => pilihLepas.includes(p.nim));
+    if (await simpanBaris(dipilih.map(keBarisImpor), "{n} peserta masuk ke daftar.")) {
+      setPilihLepas([]);
     }
   }
 
@@ -131,6 +275,7 @@ export function PanelMahasiswa({ bolehKelola }: { bolehKelola: boolean }) {
       const data = await jawab.json();
       if (!jawab.ok || !data.success) throw new Error(data.message || "Gagal menghapus.");
       await muatDaftar(cari.trim());
+      await muatLepas();
     } catch (alasan: unknown) {
       setGalat(alasan instanceof Error ? alasan.message : "Baris gagal dihapus.");
     }
@@ -141,11 +286,7 @@ export function PanelMahasiswa({ bolehKelola }: { bolehKelola: boolean }) {
       <div className="panel cbt-kepala">
         <div>
           <b>Daftar mahasiswa</b>
-          <span>
-            Dipakai agar peserta cukup mengetik satu huruf namanya pada layar ujian, dan agar
-            laporan nilai punya alamat tujuan. <b>Boleh dibiarkan kosong</b> — ujian tetap
-            berjalan seperti biasa, peserta mengetik nama dan nomornya sendiri.
-          </span>
+          <span>Tersimpan sampai dihapus. Boleh dibiarkan kosong.</span>
         </div>
         <span className="cbtv-jumlah">{jumlah} orang</span>
       </div>
@@ -157,19 +298,33 @@ export function PanelMahasiswa({ bolehKelola }: { bolehKelola: boolean }) {
         <div className="panel cbt-form">
           <div className="cbtv-impor">
             <label className="btn btn-light btn-mini cbtv-berkas">
-              📄 Ambil dari Excel/CSV
+              📄 Excel/CSV
               <input
                 type="file"
                 accept=".xlsx,.xls,.csv"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) void bacaBerkas(f); e.target.value = ""; }}
               />
             </label>
+            <label className="btn btn-light btn-mini cbtv-berkas">
+              📝 Word
+              <input
+                type="file"
+                accept=".docx"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) void bacaBerkas(f); e.target.value = ""; }}
+              />
+            </label>
             <button type="button" className="btn btn-light btn-mini" onClick={() => setBukaTempel((b) => !b)}>
-              📋 Tempel dari SIAKAD
+              📋 Tempel
+            </button>
+            <button
+              type="button"
+              className="btn btn-light btn-mini"
+              onClick={() => setIsian({ id: null, baris: { ...BARIS_KOSONG } })}
+            >
+              ✎ Tambah manual
             </button>
             <span className="cbt-catatan cbtv-impor-bantu">
-              Kolom yang dikenali: NIM/NPM, Nama, Email, Prodi, Kelas, Angkatan, Status.
-              Nomor yang sudah ada akan diperbarui, bukan digandakan.
+              Kolom: NIM, Nama, Email, Prodi, Kelas, Angkatan, Status. Nomor yang sudah ada diperbarui.
             </span>
           </div>
 
@@ -184,6 +339,41 @@ export function PanelMahasiswa({ bolehKelola }: { bolehKelola: boolean }) {
               <button type="button" className="btn btn-light btn-mini" onClick={bacaTempelan}>
                 Baca tempelan
               </button>
+            </div>
+          )}
+
+          {isian && (
+            <div className="cbtv-isian">
+              <b>{isian.id === null ? "Tambah mahasiswa" : "Ubah data"}</b>
+              <div className="cbtv-isian-baris">
+                {MEDAN.map((m) => (
+                  <label key={m.kunci}>
+                    <span>{m.label}</span>
+                    <input
+                      value={isian.baris[m.kunci]}
+                      onChange={(e) => setIsian({ ...isian, baris: { ...isian.baris, [m.kunci]: e.target.value } })}
+                      placeholder={m.contoh}
+                    />
+                  </label>
+                ))}
+                <label>
+                  <span>Status</span>
+                  <select
+                    value={isian.baris.status}
+                    onChange={(e) => setIsian({ ...isian, baris: { ...isian.baris, status: e.target.value as BarisImpor["status"] } })}
+                  >
+                    {STATUS_MAHASISWA.map((st) => (
+                      <option key={st} value={st}>{STATUS_MAHASISWA_LABEL[st]}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="cbtv-pratinjau-tombol">
+                <button type="button" className="btn btn-primary btn-mini" disabled={sibuk} onClick={() => void simpanIsian()}>
+                  {sibuk ? "Menyimpan…" : "Simpan"}
+                </button>
+                <button type="button" className="btn btn-light btn-mini" onClick={() => setIsian(null)}>Batal</button>
+              </div>
             </div>
           )}
 
@@ -216,6 +406,67 @@ export function PanelMahasiswa({ bolehKelola }: { bolehKelola: boolean }) {
         </div>
       )}
 
+      {/* ---------- PESERTA YANG MENGISI SENDIRI ----------
+          Portal yang belum pernah mengimpor satu baris pun tetap mengumpulkan
+          nama dan nomor: peserta mengetiknya sendiri di layar ujian. Di sinilah
+          keduanya bertemu — satu ketukan memindahkan yang sudah terbukti ikut
+          ujian ke daftar tetap. */}
+      {bolehKelola && pesertaLepas.length > 0 && (
+        <div className="panel cbtv-lepas">
+          <button
+            type="button"
+            className="cbt-lipat"
+            aria-expanded={bukaLepas}
+            onClick={() => setBukaLepas((b) => !b)}
+          >
+            <b>Dari peserta ujian ({pesertaLepas.length})</b>
+            <span>{bukaLepas ? "▲ Sembunyikan" : "▼ Lihat"}</span>
+          </button>
+          {bukaLepas && (
+            <div className="cbt-lipat-isi">
+              <ul className="cbtv-lepas-daftar">
+                {pesertaLepas.map((p) => (
+                  <li key={p.nim}>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={pilihLepas.includes(p.nim)}
+                        onChange={(e) =>
+                          setPilihLepas((kini) =>
+                            e.target.checked ? [...kini, p.nim] : kini.filter((n) => n !== p.nim),
+                          )
+                        }
+                      />
+                      <code>{p.nim}</code>
+                      <b>{p.nama}</b>
+                      {p.kelas && <i>{p.kelas}</i>}
+                      <small>{p.ujian} ujian</small>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+              <div className="cbtv-pratinjau-tombol">
+                <button
+                  type="button"
+                  className="btn btn-primary btn-mini"
+                  disabled={sibuk || pilihLepas.length === 0}
+                  onClick={() => void tambahLepas()}
+                >
+                  {sibuk ? "Menyimpan…" : `Tambahkan ${pilihLepas.length || ""}`.trim()}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-light btn-mini"
+                  onClick={() => setPilihLepas(pesertaLepas.map((p) => p.nim))}
+                >
+                  Pilih semua
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="panel">
         <input
           className="cbtv-cari"
@@ -226,9 +477,7 @@ export function PanelMahasiswa({ bolehKelola }: { bolehKelola: boolean }) {
         {muat ? (
           <div className="dempty">Memuat…</div>
         ) : daftar.length === 0 ? (
-          <div className="dempty">
-            {cari ? "Tidak ada yang cocok." : "Belum ada mahasiswa di daftar. Impor dari Excel di atas, atau biarkan kosong."}
-          </div>
+          <div className="dempty">{cari ? "Tidak ada yang cocok." : "Belum ada mahasiswa di daftar."}</div>
         ) : (
           <table className="dsh-table cbtv-tabel">
             <thead>
@@ -243,7 +492,14 @@ export function PanelMahasiswa({ bolehKelola }: { bolehKelola: boolean }) {
                   <td>{m.kelas || "—"}</td>
                   <td>{STATUS_MAHASISWA_LABEL[m.status as (typeof STATUS_MAHASISWA)[number]] ?? m.status}</td>
                   {bolehKelola && (
-                    <td>
+                    <td className="cbtv-aksi-baris">
+                      <button
+                        type="button"
+                        className="btn btn-light btn-mini"
+                        onClick={() => setIsian({ id: m.id, baris: keBarisImpor(m) })}
+                      >
+                        Ubah
+                      </button>
                       <button type="button" className="btn btn-light btn-mini" onClick={() => void hapus(m)}>Hapus</button>
                     </td>
                   )}
@@ -253,7 +509,7 @@ export function PanelMahasiswa({ bolehKelola }: { bolehKelola: boolean }) {
           </table>
         )}
         {daftar.length >= 200 && (
-          <p className="cbt-catatan">Ditampilkan 200 pertama. Pakai kotak cari untuk menemukan yang lain.</p>
+          <p className="cbt-catatan">Ditampilkan 200 pertama. Pakai kotak cari.</p>
         )}
       </div>
     </div>
@@ -371,8 +627,7 @@ export function PanelRubrik() {
         <div>
           <b>Rubrik penilaian esai</b>
           <span>
-            Rubrik membuat nilai esai dapat diterangkan: tiap kriteria punya level beserta
-            alasannya. Pilih salah satu yang siap pakai di bawah, atau susun sendiri.
+            Tiap kriteria punya level beserta alasannya. Pilih yang siap pakai, atau susun sendiri.
           </span>
         </div>
         <button type="button" className="btn btn-primary btn-mini" onClick={() => setSusun({ id: null, isi: rubrikKosong() })}>
@@ -830,8 +1085,7 @@ export function LembarRubrik({
           </div>
 
           <p className="cbt-catatan cbtv-prinsip">
-            Yang dikerjakan AI berhenti pada <b>mengusulkan level beserta alasannya</b>. Nilai
-            baru berlaku setelah Anda menekan SAHKAN — dan nama Anda yang tercatat di laporan.
+            AI hanya <b>mengusulkan level</b>. Nilai berlaku setelah Anda menekan SAHKAN.
           </p>
 
           {data.esai.length === 0 && <div className="dempty">Tidak ada soal esai pada lembar peserta ini.</div>}
@@ -971,9 +1225,8 @@ export function LembarRubrik({
       </div>
       {!p.disetujui && (
         <p className="cbt-catatan">
-          Angka di atas boleh Anda ubah. Keduanya tersimpan — hitungan sistem dan nilai yang Anda
-          sahkan — dan laporan menampilkan keduanya.
-          {!p.email && " Peserta ini belum punya alamat email, jadi laporannya belum dapat dikirim."}
+          Angka di atas boleh diubah. Hitungan sistem dan nilai yang Anda sahkan sama-sama tersimpan.
+          {!p.email && " Peserta ini belum punya email, jadi laporannya belum dapat dikirim."}
         </p>
       )}
     </section>
@@ -1011,8 +1264,7 @@ export function DaftarMirip({ pasangan, skor, status }: { pasangan: PasanganMiri
       </div>
 
       <p className="cbt-catatan">
-        Angka ini <b>indikasi, bukan bukti</b>. Dua jawaban dapat mirip karena keduanya belajar
-        dari bahan yang sama. Yang menentukan tetap pembacaan Anda atas kedua jawabannya.
+        <b>Indikasi, bukan bukti.</b> Dua jawaban dapat mirip karena bahan belajarnya sama.
       </p>
 
       {pasangan.length === 0 ? (
@@ -1254,16 +1506,13 @@ export function PemutarRekaman({ ujianId, attemptId }: { ujianId: number; attemp
           {penggal.length === 0 ? (
             <p className="cbt-catatan">
               {bolehTranskrip
-                ? "Rekamannya belum ditranskripsikan. Tekan tombol di atas bila Anda ingin sistem menandai penggal yang perlu didengarkan."
-                : "Transkrip otomatis tidak tersedia di portal ini. Rekamannya tetap dapat Anda dengarkan sendiri."}
+                ? "Belum ditranskripsikan. Tekan tombol di atas."
+                : "Transkrip otomatis tidak tersedia. Rekamannya tetap dapat didengarkan."}
             </p>
           ) : (
             <>
               <p className="cbt-catatan">
-                Penandaan di bawah berasal dari pembacaan otomatis dan <b>dapat keliru</b> —
-                pengubah suara ke teks salah dengar, dan satu kata yang sama belum tentu berarti
-                sama. Tekan jamnya untuk mendengarkan sendiri; hanya pendengaran Anda yang
-                menentukan.
+                Penandaan otomatis <b>dapat keliru</b>. Tekan jamnya untuk mendengar sendiri.
               </p>
               {tampil.length === 0 ? (
                 <div className="dempty">Tidak ada penggal yang ditandai.</div>

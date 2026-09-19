@@ -239,37 +239,37 @@ const SETELAN: Array<{ kunci: KunciSetelan; label: string; jelas: string; bentuk
   {
     kunci: "randomQuestions",
     label: "Acak urutan soal",
-    jelas: "Tiap peserta menerima urutan soal yang berbeda.",
+    jelas: "Urutan soal berbeda tiap peserta.",
     bentuk: true,
   },
   {
     kunci: "randomOptions",
     label: "Acak urutan pilihan jawaban",
-    jelas: "Huruf A sampai D tidak sama antarpeserta, jadi menyalin jawaban sebelah tidak berguna.",
+    jelas: "Huruf A–D tidak sama antarpeserta.",
     bentuk: true,
   },
   {
     kunci: "allowBack",
     label: "Boleh kembali ke soal sebelumnya",
-    jelas: "Bila centangnya dilepas, soal yang sudah dilewati tidak dapat dibuka lagi.",
+    jelas: "Bila dilepas, soal yang dilewati tidak dapat dibuka lagi.",
     bentuk: false,
   },
   {
     kunci: "showScore",
     label: "Tampilkan nilai setelah selesai",
-    jelas: "Nilai langsung terlihat peserta begitu jawabannya dikumpulkan.",
+    jelas: "Nilai langsung terlihat begitu dikumpulkan.",
     bentuk: false,
   },
   {
     kunci: "singleDevice",
     label: "Satu perangkat untuk satu peserta",
-    jelas: "Mencegah satu ponsel dipakai bergantian. Lepas centangnya bila ada peserta yang terlanjur terblokir.",
+    jelas: "Mencegah satu ponsel dipakai bergantian.",
     bentuk: false,
   },
   {
     kunci: "requireLockdown",
     label: "Wajib lewat aplikasi Exam Browser",
-    jelas: "Satu-satunya cara benar-benar menolak tangkapan layar. Beri tahu kelas sehari sebelumnya.",
+    jelas: "Satu-satunya cara benar-benar menolak tangkapan layar.",
     bentuk: false,
   },
 ];
@@ -308,6 +308,104 @@ function Tbl({
     >
       <span aria-live="polite">{kabar ? kabar.teks : diam}</span>
     </button>
+  );
+}
+
+/**
+ * PENILAIAN & INTEGRITAS.
+ *
+ * Satu blok, dipakai dua kali — persis seperti DaftarSetelan di atas: pada
+ * formulir "Buat ujian" dan pada "⚙ Pengaturan ujian". Dulu ia hanya ada di
+ * panel pengaturan, jadi rubrik baru dapat dipasang sesudah ujiannya
+ * terlanjur jadi.
+ */
+type NilaiPenilaian = {
+  rubricId: number;
+  recordAudio: boolean;
+  checkSimilarity: boolean;
+  similarityReview: number;
+  similarityHigh: number;
+  autoEmail: boolean;
+};
+
+function SetelPenilaian({
+  nilai, rubrik, kunciRekam = false, ubah,
+}: {
+  nilai: NilaiPenilaian;
+  rubrik: Array<{ id: number; nama: string; kriteria: unknown[] }>;
+  /** Rekaman tidak boleh dinyalakan di tengah ujian yang sudah berjalan. */
+  kunciRekam?: boolean;
+  ubah: (tambalan: Partial<NilaiPenilaian>) => void;
+}) {
+  return (
+    <div className="cbt-mode cbtv-setel">
+      <div className="cbt-mode-kepala">Penilaian &amp; integritas</div>
+
+      <label className="cbtv-setel-baris">
+        <span>Rubrik penilaian esai</span>
+        <select value={nilai.rubricId} onChange={(e) => ubah({ rubricId: Number(e.target.value) })}>
+          <option value={0}>Tanpa rubrik</option>
+          {rubrik.map((r) => (
+            <option key={r.id} value={r.id}>{r.nama} ({r.kriteria.length} kriteria)</option>
+          ))}
+        </select>
+      </label>
+      {rubrik.length === 0 && (
+        <p className="cbt-catatan cbtv-setel-bantu">Belum ada rubrik. Buat di menu <b>Rubrik</b>.</p>
+      )}
+
+      <label className="cbtv-setel-saklar">
+        <input
+          type="checkbox"
+          checked={nilai.recordAudio}
+          disabled={kunciRekam}
+          onChange={(e) => ubah({ recordAudio: e.target.checked })}
+        />
+        <span>
+          <b>Rekam suara peserta</b>
+          {kunciRekam && <small>Terkunci: ujian sedang berjalan.</small>}
+        </span>
+      </label>
+
+      <label className="cbtv-setel-saklar">
+        <input
+          type="checkbox"
+          checked={nilai.checkSimilarity}
+          onChange={(e) => ubah({ checkSimilarity: e.target.checked })}
+        />
+        <span><b>Periksa kemiripan jawaban antarpeserta</b></span>
+      </label>
+
+      {nilai.checkSimilarity && (
+        <div className="cbtv-ambang">
+          <label>
+            <span>Perlu ditinjau</span>
+            <input
+              type="number" min={1} max={99} value={nilai.similarityReview}
+              onChange={(e) => ubah({ similarityReview: Number(e.target.value) })}
+            />
+            <i>%</i>
+          </label>
+          <label>
+            <span>Mirip tinggi</span>
+            <input
+              type="number" min={1} max={100} value={nilai.similarityHigh}
+              onChange={(e) => ubah({ similarityHigh: Number(e.target.value) })}
+            />
+            <i>%</i>
+          </label>
+        </div>
+      )}
+
+      <label className="cbtv-setel-saklar">
+        <input
+          type="checkbox"
+          checked={nilai.autoEmail}
+          onChange={(e) => ubah({ autoEmail: e.target.checked })}
+        />
+        <span><b>Kirim laporan nilai begitu disahkan</b></span>
+      </label>
+    </div>
   );
 }
 
@@ -423,10 +521,10 @@ function SaklarKamera({
         <b>Kamera pengawas</b>
         <small>
           {!berlaku
-            ? `Tidak berlaku pada mode ${MODE_LABEL[mode]}. Kamera hanya menyala pada mode ${MODE_LABEL.sertifikasi}.`
+            ? `Hanya pada mode ${MODE_LABEL.sertifikasi}.`
             : nyala
-              ? "Kamera peserta menyala selama ujian. Hanya cuplikan bermasalah yang disimpan."
-              : "Kamera dimatikan. Penjagaan lain pada mode ini tetap berjalan seperti biasa."}
+              ? "Menyala selama ujian. Hanya cuplikan bermasalah yang disimpan."
+              : "Mati. Penjagaan lain tetap berjalan."}
         </small>
       </div>
       {boleh ? (
@@ -772,6 +870,14 @@ export default function CbtPanel({ role }: { role: string }) {
     singleDevice: true, requireLockdown: false,
     lockdownDevice: "semua" as PerangkatKunci,
     proctorMode: "biasa" as ModePengawasan,
+    // Penilaian & integritas, kini ikut ditentukan sejak ujiannya dibuat.
+    // Bawaannya sama dengan yang dipakai server bila medannya tidak dikirim.
+    rubricId: 0,
+    recordAudio: false,
+    checkSimilarity: true,
+    similarityReview: 30,
+    similarityHigh: 60,
+    autoEmail: false,
   });
 
   const [soal, setSoal] = useState<Soal[]>([]);
@@ -966,14 +1072,15 @@ export default function CbtPanel({ role }: { role: string }) {
     return () => window.clearTimeout(tunda);
   }, [muatUjian]);
 
-  // Daftar rubrik, untuk pemilih pada Pengaturan Ujian.
+  // Daftar rubrik, untuk pemilih pada formulir Buat ujian dan Pengaturan ujian.
   //
-  // Ditanyakan sekali di awal, bukan saat panel setelan dibuka: yang membuka
-  // panel setelan sedang menyiapkan ujian yang akan dimulai sebentar lagi, dan
-  // satu perjalanan lagi ke server pada saat itu terasa seperti daftar yang
-  // tidak pernah terisi. Gagal memuat didiamkan — pemilihnya hanya akan
-  // menampilkan "tanpa rubrik", dan itu memang pilihan yang sah.
+  // Dimuat di awal DAN tiap kali menunya kembali ke daftar ujian. Yang kedua
+  // itu yang penting: pengajar membuka menu Rubrik, menyusun rubriknya, lalu
+  // kembali untuk memasangnya — dan daftar yang hanya dimuat sekali di awal
+  // tidak memuat rubrik yang baru saja ia buat. Gagal memuat didiamkan;
+  // pemilihnya menampilkan "Tanpa rubrik", dan itu pilihan yang sah.
   useEffect(() => {
+    if (menu !== "ujian") return;
     let hidup = true;
     void (async () => {
       try {
@@ -985,7 +1092,7 @@ export default function CbtPanel({ role }: { role: string }) {
       }
     })();
     return () => { hidup = false; };
-  }, []);
+  }, [menu]);
 
   // Ditanyakan sekali di awal: menu AI yang tampil lengkap lalu menjawab
   // "belum ada kunci" sesudah pengajar mengunggah dokumen dan menunggu satu menit
@@ -2095,7 +2202,7 @@ export default function CbtPanel({ role }: { role: string }) {
             <b>Peserta tidak perlu akun</b>
             <span>
               Cukup kode ujian, nama, dan nomor peserta.
-              {pemantau ? " Anda memantau dan boleh menghapus, tetapi aktivasi ada pada pemiliknya." : ""}
+              {pemantau ? " Aktivasi ada pada pemiliknya." : ""}
             </span>
           </div>
           <button type="button" className="btn btn-primary" onClick={() => setBuatBaru((b) => !b)}>
@@ -2145,10 +2252,12 @@ export default function CbtPanel({ role }: { role: string }) {
               ubah={(p) => setDraf({ ...draf, lockdownDevice: p })}
             />
             <PilihMode nilai={draf.proctorMode} ubah={(m) => setDraf({ ...draf, proctorMode: m })} />
-            <p className="cbt-catatan">
-              Seluruh setelan ini masih dapat diubah sesudah ujiannya jadi, lewat
-              <b> ⚙ Pengaturan ujian</b> di dalam ujiannya.
-            </p>
+            <SetelPenilaian
+              nilai={draf}
+              rubrik={daftarRubrik}
+              ubah={(tambalan) => setDraf({ ...draf, ...tambalan })}
+            />
+            <p className="cbt-catatan">Semua setelan ini masih bisa diubah lewat <b>⚙ Pengaturan ujian</b>.</p>
 
             <Tbl kabar={aksi.buat} diam="Simpan ujian" onClick={() => void buatUjian()} />
           </div>
@@ -2417,9 +2526,8 @@ export default function CbtPanel({ role }: { role: string }) {
           </>
         ) : (
           <p className="cbt-catatan">
-            Jadwal dan aktivasi dipegang pengajar pemiliknya. Anda memantau peserta dan nilainya di tab sebelah{terbuka.bolehHapus ? ", dan menghapus ujian ini bila memang perlu" : ""}.
-            Untuk ujian seleksi, buatlah ujian sendiri: ujian yang Anda buat menjadi milik Anda,
-            beserta tombol aktivasinya.
+            Jadwal dan aktivasi dipegang pengajar pemiliknya. Ujian yang Anda buat sendiri
+            menjadi milik Anda, beserta tombol aktivasinya.
           </p>
         )}
 
@@ -2431,7 +2539,7 @@ export default function CbtPanel({ role }: { role: string }) {
               diam="Hapus ujian ini"
               onClick={() => void hapusUjian()}
             />
-            <span>Soal dan seluruh hasilnya ikut terhapus. Tidak dapat dibatalkan.</span>
+            <span>Soal dan hasilnya ikut terhapus. Tidak dapat dibatalkan.</span>
           </div>
         )}
       </div>
@@ -2465,10 +2573,9 @@ export default function CbtPanel({ role }: { role: string }) {
           {bukaSetel && (
             <div className="cbt-lipat-isi">
               <p className="cbt-catatan">
-                Boleh diubah sewaktu-waktu.
                 {sedangBerlangsung
-                  ? " Sedang berlangsung: jumlah soal, durasi, dan pengacakan dikunci. Sisanya tetap bisa diubah."
-                  : " Perubahan berlaku untuk peserta yang masuk sesudah disimpan."}
+                  ? "Sedang berlangsung: jumlah soal, durasi, dan pengacakan dikunci."
+                  : "Berlaku untuk peserta yang masuk sesudah disimpan."}
               </p>
 
               <div className="cbt-baris">
@@ -2544,103 +2651,12 @@ export default function CbtPanel({ role }: { role: string }) {
                 ubah={(nyala) => setSetel({ ...setel, cameraOn: nyala })}
               />
 
-              {/* ---------- SETELAN CBT V1 ----------
-                  Empat baris, dan tiga di antaranya sudah benar sejak awal.
-                  Dosen yang tidak menyentuh satu pun tetap mendapat pemeriksaan
-                  kemiripan dan penilaian manual seperti biasa; yang harus ia
-                  putuskan sendiri hanya dua — rubrik dan perekaman. */}
-              <div className="cbt-mode cbtv-setel">
-                <div className="cbt-mode-kepala">Penilaian &amp; integritas</div>
-
-                <label className="cbtv-setel-baris">
-                  <span>Rubrik penilaian esai</span>
-                  <select
-                    value={setel.rubricId}
-                    onChange={(e) => setSetel({ ...setel, rubricId: Number(e.target.value) })}
-                  >
-                    <option value={0}>Tanpa rubrik — nilai esai diketik sendiri</option>
-                    {daftarRubrik.map((r) => (
-                      <option key={r.id} value={r.id}>{r.nama} ({r.kriteria.length} kriteria)</option>
-                    ))}
-                  </select>
-                </label>
-                <p className="cbt-catatan cbtv-setel-bantu">
-                  Dengan rubrik, tiap esai dinilai per kriteria beserta alasannya — dan AI dapat
-                  mengusulkan levelnya untuk Anda periksa. Belum punya rubrik? Buka menu
-                  <b> Rubrik</b> di daftar ujian; ada beberapa yang tinggal disalin.
-                </p>
-
-                <label className="cbtv-setel-saklar">
-                  <input
-                    type="checkbox"
-                    checked={setel.recordAudio}
-                    onChange={(e) => setSetel({ ...setel, recordAudio: e.target.checked })}
-                  />
-                  <span>
-                    <b>Rekam suara peserta</b>
-                    <small>
-                      Mikrofon menyala sepanjang ujian dan peserta diberi tahu sebelum memulai.
-                      Rekamannya hanya dapat dibuka Anda.
-                      {sedangBerlangsung && !setelanUjian(terbuka).recordAudio && (
-                        <i> Tidak dapat dinyalakan di tengah ujian yang sedang berjalan —
-                        yang sudah duduk mengerjakan tidak diberi tahu sebelumnya.</i>
-                      )}
-                    </small>
-                  </span>
-                </label>
-
-                <label className="cbtv-setel-saklar">
-                  <input
-                    type="checkbox"
-                    checked={setel.checkSimilarity}
-                    onChange={(e) => setSetel({ ...setel, checkSimilarity: e.target.checked })}
-                  />
-                  <span>
-                    <b>Periksa kemiripan jawaban antarpeserta</b>
-                    <small>
-                      Berjalan sendiri saat peserta mengumpulkan, tanpa biaya dan tanpa menunda.
-                      Hanya menandai — tidak pernah mengubah nilai.
-                    </small>
-                  </span>
-                </label>
-
-                {setel.checkSimilarity && (
-                  <div className="cbtv-ambang">
-                    <label>
-                      <span>Perlu ditinjau mulai</span>
-                      <input
-                        type="number" min={1} max={99} value={setel.similarityReview}
-                        onChange={(e) => setSetel({ ...setel, similarityReview: Number(e.target.value) })}
-                      />
-                      <i>%</i>
-                    </label>
-                    <label>
-                      <span>Kemiripan tinggi mulai</span>
-                      <input
-                        type="number" min={1} max={100} value={setel.similarityHigh}
-                        onChange={(e) => setSetel({ ...setel, similarityHigh: Number(e.target.value) })}
-                      />
-                      <i>%</i>
-                    </label>
-                  </div>
-                )}
-
-                <label className="cbtv-setel-saklar">
-                  <input
-                    type="checkbox"
-                    checked={setel.autoEmail}
-                    onChange={(e) => setSetel({ ...setel, autoEmail: e.target.checked })}
-                  />
-                  <span>
-                    <b>Kirim laporan nilai begitu disahkan</b>
-                    <small>
-                      Mati secara bawaan. Surat yang sudah terkirim tidak dapat ditarik kembali,
-                      jadi biarkan mati bila Anda hendak mengesahkan satu-dua orang lebih dulu
-                      untuk melihat bentuk laporannya.
-                    </small>
-                  </span>
-                </label>
-              </div>
+              <SetelPenilaian
+                nilai={setel}
+                rubrik={daftarRubrik}
+                kunciRekam={sedangBerlangsung && !setelanUjian(terbuka).recordAudio}
+                ubah={(tambalan) => setSetel({ ...setel, ...tambalan })}
+              />
 
               <div className="cbt-form-aksi">
                 <Tbl
@@ -3464,10 +3480,7 @@ export default function CbtPanel({ role }: { role: string }) {
             <div className="panel cbt-acara">
               <div className="cbt-impor-kepala">
                 <b>Berita acara pelaksanaan</b>
-                <span>
-                  Kehadiran, pelanggaran, nilai, dan jam pengumpulan tiap peserta diambil
-                  dari sistem. Isi tiga kolom di bawah.
-                </span>
+                <span>Kehadiran, pelanggaran, nilai, dan jam pengumpulan diambil dari sistem.</span>
               </div>
               <div className="cbt-baris">
                 <label><span>Nama pengawas</span>
@@ -3524,20 +3537,23 @@ export default function CbtPanel({ role }: { role: string }) {
                   {bukaPeserta.dihentikan && (
                     <p className="cbt-jaga-putus">{bukaPeserta.dihentikan}</p>
                   )}
-                  <p className="cbt-catatan">
-                    Skor ini <b>bukan nilai</b> dan tidak pernah mengubah nilai ujian. Ia hanya
-                    menandai lembar mana yang perlu dibaca lebih dulu. Yang memutuskan tetap Anda,
-                    dengan garis waktu di bawah ini.
-                  </p>
+                  <p className="cbt-catatan">Skor ini <b>bukan nilai</b> dan tidak mengubah nilai ujian.</p>
+                  {/* Rekamannya di sini, bersama skor integritasnya — bukan di
+                      kaki lembar. Keduanya menjawab pertanyaan yang sama, dan
+                      yang membaca skor integritas seseorang justru sedang
+                      mencari apa yang terdengar pada menit-menit itu. */}
+                  {terbuka.recordAudio && (
+                    <PemutarRekaman ujianId={terbuka.id} attemptId={bukaPeserta.id} />
+                  )}
                   <GarisWaktu jejak={jejak} mulai={bukaPeserta.mulai} />
                 </section>
               )}
 
               {/* ---------- BAGIAN CBT V1 ----------
-                  Urutannya mengikuti urutan pekerjaan dosen, bukan urutan
-                  fitur: menilai esainya dulu (itu yang menghasilkan angka),
-                  lalu memeriksa indikasi kemiripan, lalu mendengarkan
-                  rekamannya bila memang ada sesuatu yang perlu didengarkan.
+                  Rekamannya sudah dibaca di lembar pengawasan di atas, bersama
+                  skor integritasnya. Yang tersisa di sini urutan kerja
+                  penilaian: menilai esainya dulu (itu yang menghasilkan
+                  angka), lalu memeriksa indikasi kemiripan.
 
                   Pengesahan nilai berada di dalam LembarRubrik, di paling
                   bawah bagian penilaian — supaya tidak ada yang menekan
@@ -3556,10 +3572,6 @@ export default function CbtPanel({ role }: { role: string }) {
                   skor={bukaPeserta.kemiripan ?? 0}
                   status={bukaPeserta.statusKemiripan || "bersih"}
                 />
-              )}
-
-              {!muatRincian && terbuka.recordAudio && (
-                <PemutarRekaman ujianId={terbuka.id} attemptId={bukaPeserta.id} />
               )}
 
               {muatRincian ? (

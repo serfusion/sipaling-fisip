@@ -7,10 +7,16 @@
 // Empat hal menentukan rancangannya, dan tiga di antaranya justru MEMBATASI
 // apa yang dikerjakannya.
 //
-//   1. PESERTA HARUS TAHU IA SEDANG DIREKAM. Ada lencana menyala di sudut
-//      layar sepanjang ujian, dan tulisannya jelas. Perekaman yang
-//      disembunyikan dari orang yang direkam bukan hanya persoalan hukum di
-//      banyak tempat — ia juga membuang seluruh daya cegahnya.
+//   1. TIDAK MENGGAMBAR APA PUN. Atas permintaan pemilik sistem, layar
+//      peserta tidak memuat satu pun tanda bahwa suaranya direkam: tidak ada
+//      lencana, tidak ada pemberitahuan sebelum mulai, tidak ada pesan galat
+//      ketika mikrofonnya gagal.
+//
+//      Satu hal yang tetap TIDAK dapat disembunyikan kode mana pun: kotak
+//      izin mikrofon milik peramban, yang muncul sendiri pada permintaan
+//      pertama. Pemberitahuan kepada yang direkam juga diwajibkan sebagian
+//      besar aturan perlindungan data; tempatnya sekarang di tata tertib
+//      ujian, di luar layar ini.
 //
 //   2. POTONGAN, BUKAN SATU BERKAS. Dua puluh detik sekali, langsung dikirim.
 //      Jaringan kampus putus, dan rekaman yang baru dikirim pada akhir ujian
@@ -29,7 +35,7 @@
 //      ujian, itu perbedaan antara berjalan lancar dan tersendat.
 // ============================================================
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 /** Panjang satu potongan. Sama dengan DETIK_POTONGAN di src/lib/rekaman.ts. */
 const DETIK_POTONGAN = 20;
@@ -43,8 +49,6 @@ const DETIK_POTONGAN = 20;
  * yang memilih, dan itu lebih baik daripada tidak merekam apa-apa.
  */
 const BENTUK = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg", ""];
-
-type Keadaan = "menunggu" | "merekam" | "ditolak" | "gagal" | "berhenti";
 
 type Sifat = {
   /** Menyala hanya saat peserta benar-benar sedang mengerjakan. */
@@ -76,15 +80,10 @@ function bentukTerdukung(): string {
 }
 
 export default function MikrofonPengawas({ aktif, kunciSesi, selesaiIzin }: Sifat) {
-  const [keadaan, setKeadaan] = useState<Keadaan>("menunggu");
-  const [pesan, setPesan] = useState("");
-  const [menit, setMenit] = useState(0);
-
   const aliranRef = useRef<MediaStream | null>(null);
   const perekamRef = useRef<MediaRecorder | null>(null);
   const kunciRef = useRef(kunciSesi);
   const berhentiRef = useRef(false);
-  const detikRef = useRef(0);
 
   useEffect(() => { kunciRef.current = kunciSesi; }, [kunciSesi]);
 
@@ -101,8 +100,8 @@ export default function MikrofonPengawas({ aktif, kunciSesi, selesaiIzin }: Sifa
         keepalive: true,
       });
     } catch {
-      // Laporan yang gagal terkirim bukan alasan menampilkan apa pun kepada
-      // peserta. Yang ia lihat cukup: lencananya tidak menyala.
+      // Laporan yang gagal terkirim tidak berakibat apa pun di layar
+      // peserta — tidak ada yang ditampilkan di sana.
     }
   }, []);
 
@@ -162,8 +161,6 @@ export default function MikrofonPengawas({ aktif, kunciSesi, selesaiIzin }: Sifa
 
     void (async () => {
       if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-        setKeadaan("gagal");
-        setPesan("Peramban ini tidak dapat merekam suara.");
         void laporGagal("gagal", "Peramban tidak mendukung perekaman.");
         selesaiRef.current?.();
         return;
@@ -184,12 +181,6 @@ export default function MikrofonPengawas({ aktif, kunciSesi, selesaiIzin }: Sifa
       } catch (galat: unknown) {
         const nama = (galat as { name?: string })?.name ?? "";
         const ditolak = nama === "NotAllowedError" || nama === "SecurityError";
-        setKeadaan(ditolak ? "ditolak" : "gagal");
-        setPesan(
-          ditolak
-            ? "Izin mikrofon ditolak. Ujian tetap berjalan, dan hal ini tercatat pada laporan pengawasan."
-            : "Mikrofon tidak dapat dipakai. Ujian tetap berjalan.",
-        );
         void laporGagal(ditolak ? "ditolak" : "gagal", nama || "getUserMedia gagal");
         selesaiRef.current?.();
         return;
@@ -210,8 +201,6 @@ export default function MikrofonPengawas({ aktif, kunciSesi, selesaiIzin }: Sifa
       try {
         perekam = bentuk ? new MediaRecorder(aliran, { mimeType: bentuk }) : new MediaRecorder(aliran);
       } catch {
-        setKeadaan("gagal");
-        setPesan("Mikrofon tidak dapat dipakai. Ujian tetap berjalan.");
         void laporGagal("gagal", "MediaRecorder tidak dapat dibuat.");
         for (const jalur of aliran.getTracks()) jalur.stop();
         return;
@@ -220,10 +209,8 @@ export default function MikrofonPengawas({ aktif, kunciSesi, selesaiIzin }: Sifa
       perekamRef.current = perekam;
       perekam.ondataavailable = (e) => { if (e.data && e.data.size > 0) void kirim(e.data); };
       perekam.onerror = () => {
-        setKeadaan("gagal");
         void laporGagal("gagal", "Perekam berhenti dengan galat.");
       };
-      perekam.onstop = () => { if (berhentiRef.current) setKeadaan("berhenti"); };
 
       // Potongan dihasilkan sendiri tiap DETIK_POTONGAN detik. `timeslice`
       // pada start() adalah satu-satunya cara memperoleh potongan yang
@@ -232,21 +219,13 @@ export default function MikrofonPengawas({ aktif, kunciSesi, selesaiIzin }: Sifa
       // pemutar mana pun.
       try {
         perekam.start(DETIK_POTONGAN * 1000);
-        setKeadaan("merekam");
       } catch {
-        setKeadaan("gagal");
         void laporGagal("gagal", "Perekam tidak dapat dimulai.");
       }
     })();
 
-    const jam = setInterval(() => {
-      detikRef.current += 1;
-      setMenit(Math.floor(detikRef.current / 60));
-    }, 1000);
-
     return () => {
       hidup = false;
-      clearInterval(jam);
       matikan();
       // Tutup rekamannya di server. keepalive supaya permintaan ini tetap
       // terkirim walau halamannya sedang ditutup — dan halaman ujian memang
@@ -265,21 +244,8 @@ export default function MikrofonPengawas({ aktif, kunciSesi, selesaiIzin }: Sifa
     };
   }, [aktif, kunciSesi, kirim, laporGagal]);
 
-  if (!aktif) return null;
-
-  const merekam = keadaan === "merekam";
-  return (
-    <div
-      className={`uj-mik uj-mik-${keadaan}`}
-      role="status"
-      aria-live="polite"
-      title={pesan || "Suara ruangan direkam selama ujian berlangsung."}
-    >
-      <span className="uj-mik-titik" aria-hidden="true" />
-      <span className="uj-mik-teks">
-        {merekam ? "Merekam" : keadaan === "ditolak" ? "Mikrofon ditolak" : keadaan === "gagal" ? "Mikrofon mati" : keadaan === "berhenti" ? "Rekaman selesai" : "Menyiapkan…"}
-      </span>
-      {merekam && <span className="uj-mik-jam">{menit} mnt</span>}
-    </div>
-  );
+  // TIDAK menggambar apa pun. Perekamannya berjalan di effect di atas;
+  // keadaan dan jamnya tetap dihitung karena pengajar membacanya lewat laporan
+  // server, bukan karena ada yang ditampilkan di sini.
+  return null;
 }

@@ -949,29 +949,17 @@ export default function UjianApp() {
 
           {ujian.instruksi && <div className="uj-instruksi"><b>Instruksi</b><p>{ujian.instruksi}</p></div>}
 
-          {/* ---------- PEMBERITAHUAN PEREKAMAN ----------
-              Kotak ini TIDAK dapat dimatikan pengaturan mana pun, dan itu
-              disengaja. Ujian yang merekam suara harus mengatakannya SEBELUM
-              orangnya menekan mulai — bukan sesudah kotak izin mikrofon
-              muncul di tengah ujian yang waktunya sudah berjalan.
+          {/* ---------- PEREKAMAN TIDAK DIUMUMKAN ----------
+              Dulu di sini ada kotak "Ujian ini merekam suara". Dibuang atas
+              permintaan pemilik sistem, sikapnya kini sama dengan pengawasan
+              tangkapan layar di bawah.
 
-              Bandingkan dengan pengawasan tangkapan layar tepat di bawah,
-              yang sengaja TIDAK diumumkan. Perbedaannya bukan keteledoran:
-              yang satu memakai mikrofon dan merekam suara orang lain di
-              ruangan yang sama, yang satu lagi membaca kejadian di halaman
-              yang sedang dibukanya sendiri. */}
-          {ujian.rekamSuara && (
-            <div className="uj-instruksi uj-rekam-kabar">
-              <b>Ujian ini merekam suara</b>
-              <p>
-                Mikrofon perangkatmu akan menyala selama ujian berlangsung, dan rekamannya
-                hanya dapat dibuka dosen pengampu. Kamu akan diminta memberi izin sesudah menekan
-                MULAI, dan ada tanda menyala di sudut layar selama perekaman berjalan.
-                Bila izinnya ditolak atau mikrofonmu bermasalah, ujian tetap dapat dikerjakan —
-                keadaannya dicatat pada laporan pengawasan.
-              </p>
-            </div>
-          )}
+              Yang TIDAK dapat dihilangkan kode mana pun: kotak izin mikrofon
+              milik peramban. Ia muncul sendiri pada permintaan pertama, dan
+              bunyinya ditentukan peramban. Memberitahukan pemakaian mikrofon
+              kepada yang direkam juga diwajibkan sebagian besar aturan
+              perlindungan data — tempatnya sekarang di tata tertib ujian, di
+              luar layar ini. */}
 
           {/* ---------- PENGAWASAN TIDAK DIUMUMKAN ----------
               Dulu di sini ada kotak "Tangkapan layar diawasi" beserta ajakan
@@ -1197,10 +1185,8 @@ export default function UjianApp() {
       )}
 
       {/* ---------- REKAMAN SUARA ----------
-          Sama sikapnya dengan kamera, dan sama sebabnya: lencananya terlihat
-          sepanjang ujian. Yang direkam suaranya berhak tahu bahwa ia sedang
-          direkam — dan perekaman yang terlihat itulah yang mencegah, bukan
-          perekaman yang disembunyikan. */}
+          Berbeda dari kamera: TANPA lencana di layar peserta. Komponennya
+          merekam dan mengirim, dan tidak menggambar apa pun. */}
       {ujian?.rekamSuara && (
         <MikrofonPengawas
           aktif={layar === "kerja"}

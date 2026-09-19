@@ -1,6 +1,12 @@
 @import "tailwindcss";
 
 :root {
+  /* Portal ini TERANG, dan hanya terang.
+     Tanpa baris ini peramban di perangkat bersetelan gelap menggambar
+     sendiri kotak isian, daftar pilihan, dan bilah gulirnya dengan warna
+     gelap — di atas halaman yang seluruh latarnya putih. Yang terlihat
+     pengguna adalah kolom hitam berisi tulisan hitam. */
+  color-scheme: light;
   --font-jakarta: "Plus Jakarta Sans";
   --navy: #0a2a5e;
   --primary: #1565d8;
@@ -4566,11 +4572,6 @@ a.al-mini:hover { color: var(--al-ink); }
 .uj-cari-kelas { display: block; margin-top: 2px; color: var(--uj-samar); font-size: 11.5px; }
 .uj-cari-bantu { margin: 7px 0 0; color: var(--uj-samar); font-size: 11.5px; line-height: 1.5; }
 
-@media (prefers-color-scheme: dark) {
-  .uj-cari-daftar { border-color: #3a4350; background: #1d232b; box-shadow: 0 12px 28px rgba(0, 0, 0, .5); }
-  .uj-cari-daftar button:hover, .uj-cari-daftar button.on { background: #27313d; }
-  .uj-cari-nama { color: #e6ebf2; }
-}
 
 .uj-fakta { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 9px; margin: 16px 0; }
 .uj-fakta div { padding: 12px 8px; border-radius: 10px; border: 1px solid var(--uj-garis);
@@ -5364,7 +5365,9 @@ a.al-mini:hover { color: var(--al-ink); }
    Satu-satunya jendela yang menghalangi di panel ini, dan memang hanya untuk
    penolakan: kabar keberhasilan diberikan oleh tombolnya sendiri. */
 .cbt-tirai {
-  position: fixed; inset: 0; z-index: 60; display: grid; place-items: center;
+  position: fixed; inset: 0; z-index: 60; display: grid;
+  align-content: safe center; justify-items: center;
+  overflow-y: auto; overscroll-behavior: contain;
   padding: 18px; background: rgba(15, 23, 42, .55);
 }
 .cbt-pop {
@@ -5916,9 +5919,6 @@ table.qt td small { font-size: 11.5px; }
 }
 /* Layar ujian berlatar gelap membalik arahnya: yang samar di atas putih
    menjadi tidak terlihat sama sekali di atas hitam. */
-@media (prefers-color-scheme: dark) {
-  .uj-air-baris span { color: rgba(255, 255, 255, 0.13); }
-}
 
 /* Isi ujian harus berada DI ATAS tanda airnya, bukan tertimbun. */
 .uj-kerja > .ck-bar,
@@ -5977,7 +5977,12 @@ table.qt td small { font-size: 11.5px; }
   inset: 0;
   z-index: 60;
   display: grid;
-  place-items: center;
+  /* `safe` + gulir: isi yang lebih tinggi dari layar dapat dicapai sampai
+     ke atas. Pemusatan biasa memotong ujung atasnya tanpa jalan ke sana. */
+  align-content: safe center;
+  justify-items: center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 24px;
   background: #0b1220;
   /* Kebalikan dari tanda air: tirai HARUS menelan ketukan. Tombol jawaban di
@@ -6012,7 +6017,12 @@ table.qt td small { font-size: 11.5px; }
   inset: 0;
   z-index: 70;
   display: grid;
-  place-items: center;
+  /* `safe` + gulir: isi yang lebih tinggi dari layar dapat dicapai sampai
+     ke atas. Pemusatan biasa memotong ujung atasnya tanpa jalan ke sana. */
+  align-content: safe center;
+  justify-items: center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 24px;
   background: rgba(8, 12, 22, .97);
   /* Menelan ketukan, sama seperti tirai: tombol jawaban di baliknya tidak
@@ -6079,7 +6089,12 @@ table.qt td small { font-size: 11.5px; }
   inset: 0;
   z-index: 55;
   display: grid;
-  place-items: center;
+  /* `safe` + gulir: isi yang lebih tinggi dari layar dapat dicapai sampai
+     ke atas. Pemusatan biasa memotong ujung atasnya tanpa jalan ke sana. */
+  align-content: safe center;
+  justify-items: center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 24px;
   background: rgba(8, 12, 22, .92);
   /* Menelan ketukan: tombol jawaban di baliknya tidak boleh dapat ditekan
@@ -6283,51 +6298,9 @@ table.qt td small { font-size: 11.5px; }
   color: #fbbf24;
 }
 
-/* ---------- Lencana rekaman suara ----------
-   Duduk di atas kotak kamera bila keduanya menyala, dan menempati sudut yang
-   sama bila hanya ia sendiri. Sama sikapnya dengan kamera: terlihat, kecil,
-   dan tidak dapat ditutup peserta — perekaman yang disembunyikan dari yang
-   direkam membuang seluruh daya cegahnya. */
-.uj-mik {
-  position: fixed;
-  right: 14px;
-  bottom: 14px;
-  z-index: 23;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 12px;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.92);
-  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.35);
-  color: #e2e8f0;
-  font-size: 11.5px;
-  font-weight: 700;
-}
-/* Kamera memakai sudut yang sama, jadi lencananya naik ke atasnya. Tinggi
-   kotak kamera + jarak: cukup dihitung sekali di sini. */
-.uj-kam ~ .uj-mik, body:has(.uj-kam) .uj-mik { bottom: 190px; }
-.uj-mik-titik {
-  width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: #64748b;
-}
-.uj-mik-merekam .uj-mik-titik { background: #ef4444; animation: uj-mik-denyut 1.6s ease-in-out infinite; }
-.uj-mik-ditolak .uj-mik-titik, .uj-mik-gagal .uj-mik-titik { background: #f59e0b; }
-.uj-mik-berhenti .uj-mik-titik { background: #22c55e; }
-@keyframes uj-mik-denyut { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
-.uj-mik-jam { color: #94a3b8; font-weight: 600; font-variant-numeric: tabular-nums; }
-
-/* Kotak pemberitahuan perekaman pada layar sebelum ujian dimulai. */
-.uj-rekam-kabar { border-color: #f59e0b; background: #fffbeb; }
-.uj-rekam-kabar b { color: #b45309; }
-@media (prefers-color-scheme: dark) {
-  .uj-rekam-kabar { border-color: #b45309; background: #2a2010; }
-  .uj-rekam-kabar b { color: #fbbf24; }
-}
-
-@media (max-width: 640px) {
-  .uj-mik { right: 10px; bottom: 10px; padding: 6px 10px; font-size: 10.5px; }
-  .uj-kam ~ .uj-mik, body:has(.uj-kam) .uj-mik { bottom: 132px; }
-}
+/* Rekaman suara tidak menggambar apa pun di layar peserta — tidak ada
+   lencana, tidak ada pemberitahuan. Aturan .uj-mik* dan .uj-rekam-kabar
+   karena itu dibuang seluruhnya. */
 /* Di ponsel ia mengecil, tidak menghilang. Yang menutupi soal membuat peserta
    mencari cara menyingkirkannya; yang terlalu kecil untuk dikenali membatalkan
    gunanya. */
@@ -6876,6 +6849,29 @@ table.qt td small { font-size: 11.5px; }
 .cbtv-tabel code { font-size: 12.5px; }
 .cbtv-email { font-size: 12.5px; color: #475569; word-break: break-all; }
 
+/* Formulir tambah/ubah satu mahasiswa, dan daftar peserta yang mengisi
+   sendiri. Keduanya baru; sebelumnya daftar mahasiswa hanya dapat diisi
+   lewat berkas impor dan hanya dapat dihapus. */
+.cbtv-isian { margin-top: 12px; padding: 13px 14px; border: 1px solid #cbd5e1; border-radius: 10px; background: #f8fafc; }
+.cbtv-isian > b { display: block; margin-bottom: 9px; font-size: 13.5px; }
+.cbtv-isian-baris { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 9px; }
+.cbtv-isian-baris label { display: block; }
+.cbtv-isian-baris span { display: block; margin-bottom: 3px; font-size: 11.5px; font-weight: 700; color: #475569; }
+.cbtv-isian-baris input, .cbtv-isian-baris select {
+  width: 100%; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 13px;
+}
+.cbtv-aksi-baris { display: flex; flex-wrap: wrap; gap: 6px; }
+.cbtv-lepas-daftar { list-style: none; margin: 0 0 11px; padding: 0; display: grid; gap: 5px; max-height: 320px; overflow-y: auto; }
+.cbtv-lepas-daftar label {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 9px;
+  padding: 7px 11px; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-size: 13px;
+}
+.cbtv-lepas-daftar label:hover { background: #f8fafc; }
+.cbtv-lepas-daftar code { font-size: 12.5px; color: #475569; }
+.cbtv-lepas-daftar i { font-style: normal; font-size: 11.5px; color: #1d4ed8; }
+.cbtv-lepas-daftar small { margin-left: auto; font-size: 11.5px; color: #64748b; }
+
+
 /* ---------- RUBRIK ---------- */
 .cbtv-sub { display: block; margin-bottom: 11px; font-size: 13px; color: #334155; }
 .cbtv-bawaan { display: grid; grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); gap: 12px; }
@@ -7039,21 +7035,3 @@ table.qt td small { font-size: 11.5px; }
 .cbtv-penggal-kata { display: inline-block; margin-top: 3px; font-size: 12px; font-weight: 700; color: #b91c1c; }
 .cbtv-penggal-alasan { display: block; margin-top: 3px; font-size: 11.5px; line-height: 1.55; color: #64748b; }
 
-@media (prefers-color-scheme: dark) {
-  .cbtv-jumlah { background: #1f2937; color: #cbd5e1; }
-  .cbtv-bawaan-kartu, .cbtv-kriteria { border-color: #334155; background: #161d27; }
-  .cbtv-bobot-kabar, .cbtv-pratinjau, .cbtv-jawaban, .cbtv-sahkan { background: #161d27; }
-  .cbtv-sahkan { border-color: #334155; }
-  .cbtv-esai, .cbtv-daftar-rubrik li, .cbtv-mirip-daftar > li { border-color: #334155; }
-  .cbtv-mirip-rinci { background: #161d27; border-top-color: #334155; }
-  .cbtv-catatan-ai { background: #14243a; border-color: #1e3a5f; }
-  .cbtv-penggal li { background: #161d27; }
-  .cbtv-penggal li.cbtv-risiko-tinggi { background: #2a1416; }
-  .cbtv-penggal li.cbtv-risiko-rendah { background: #2a2010; }
-  .cbtv-jam-tombol { background: #1f2937; border-color: #334155; color: #e2e8f0; }
-  .cbtv-salinan { background: #2a1416; color: #fca5a5; }
-  .cbtv-tempel textarea, .cbtv-cari, .cbtv-level textarea,
-  .cbtv-setel-baris select, .cbtv-ambang input, .cbtv-nilai-ketik input {
-    background: #111827; border-color: #334155; color: #e2e8f0;
-  }
-}
