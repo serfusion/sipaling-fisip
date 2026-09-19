@@ -9,6 +9,7 @@
 //
 //   PanelMahasiswa    daftar mahasiswa + impor
 //   PanelRubrik       rubrik: pilih dari yang siap pakai, atau susun sendiri
+//   PanelAcuan        kunci jawaban acuan dosen: unduh template, isi, unggah
 //   LembarRubrik      penilaian esai satu peserta + pengesahan nilai
 //   PemutarRekaman    rekaman suara + penanda yang dapat ditekan
 //   DaftarMirip       pasangan jawaban yang mirip
@@ -34,6 +35,12 @@ import {
   STATUS_MAHASISWA, STATUS_MAHASISWA_LABEL, bacaImporMahasiswa, bacaTempelMahasiswa,
   type Aoa, type BarisImpor, type Mahasiswa,
 } from "@/lib/mahasiswa";
+import {
+  AMBANG_NOL_BAWAAN, AMBANG_PENUH_BAWAAN, MAKS_BUTIR, MIN_KATA_ACUAN,
+  acuanKosong, kurvaNilai, periksaAcuan, ratakanBobotButir,
+  type Acuan, type ButirAcuan,
+} from "@/lib/nilai-acuan";
+import { acuanDariExcel, acuanDariWord, buatDocxAcuan, buatXlsxAcuan } from "@/lib/template-acuan";
 
 // ============================================================
 // DAFTAR MAHASISWA
@@ -412,7 +419,7 @@ export function PanelMahasiswa({ bolehKelola: awal }: { bolehKelola: boolean }) 
           {tolak.length > 0 && (
             <div className="dsh-note cbtv-tolak">
               <b>{tolak.length} baris dilewati</b>
-              <ul>{tolak.slice(0, 6).map((t, i) => <li key={i}>{t.baris} — {t.alasan}</li>)}</ul>
+              <ul>{tolak.slice(0, 6).map((t, i) => <li key={i}>{t.baris}: {t.alasan}</li>)}</ul>
             </div>
           )}
         </div>
@@ -493,7 +500,7 @@ export function PanelMahasiswa({ bolehKelola: awal }: { bolehKelola: boolean }) 
             {cari
               ? "Tidak ada yang cocok."
               : pesertaLepas.length > 0
-                ? `Daftar tetap masih kosong. ${pesertaLepas.length} peserta sudah ikut ujian — tambahkan dari kotak di atas.`
+                ? `Daftar tetap masih kosong. ${pesertaLepas.length} peserta sudah ikut ujian, tambahkan dari kotak di atas.`
                 : "Belum ada peserta. Impor dari Excel, Word, tempelan, atau tambah manual di atas."}
           </div>
         ) : (
@@ -506,8 +513,8 @@ export function PanelMahasiswa({ bolehKelola: awal }: { bolehKelola: boolean }) 
                 <tr key={m.id}>
                   <td><code>{m.nim}</code></td>
                   <td>{m.nama}</td>
-                  <td className="cbtv-email">{m.email || <i>—</i>}</td>
-                  <td>{m.kelas || "—"}</td>
+                  <td className="cbtv-email">{m.email || <i>-</i>}</td>
+                  <td>{m.kelas || "-"}</td>
                   <td>{STATUS_MAHASISWA_LABEL[m.status as (typeof STATUS_MAHASISWA)[number]] ?? m.status}</td>
                   {bolehKelola && (
                     <td className="cbtv-aksi-baris">
@@ -663,7 +670,7 @@ export function PanelRubrik() {
           kosong dengan tombol "susun sendiri" yang memakan dua puluh menit. */}
       {!susun && (
         <div className="panel">
-          <b className="cbtv-sub">Siap pakai — tinggal salin</b>
+          <b className="cbtv-sub">Siap pakai, tinggal salin</b>
           <div className="cbtv-bawaan">
             {RUBRIK_BAWAAN.map((r) => (
               <div key={r.nama} className="cbtv-bawaan-kartu">
@@ -731,7 +738,7 @@ export function PanelRubrik() {
 
           <div className="cbtv-bobot-kabar">
             Jumlah bobot: <b className={jumlahBobot === 100 ? "ok" : "salah"}>{jumlahBobot}%</b>
-            {jumlahBobot !== 100 && <> — harus tepat 100%.</>}
+            {jumlahBobot !== 100 && <>, harus tepat 100%.</>}
             <button
               type="button"
               className="btn btn-light btn-mini"
@@ -868,6 +875,563 @@ export function PanelRubrik() {
                     </button>
                     {r.bolehSunting && (
                       <button type="button" className="btn btn-light btn-mini" onClick={() => void hapus(r)}>Hapus</button>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// PENILAIAN ESAI: DUA CARA, SATU MENU
+//
+// Jawaban acuan dan rubrik mengukur hal yang BERBEDA, dan itulah sebabnya
+// keduanya ada berdampingan alih-alih yang satu menggantikan yang lain:
+//
+//   jawaban acuan   mengukur ISI    apakah yang dibicarakan peserta sama
+//                                   dengan yang dibicarakan dosen
+//   rubrik          mengukur BENTUK panjangnya, susunannya, berapa istilah
+//                                   soal yang muncul
+//
+// Jawaban acuan didahulukan dan menjadi bawaannya. Ia menjawab pertanyaan
+// yang sebenarnya ditanyakan dosen ketika menilai esai, dan rubrik tidak
+// pernah dapat menjawabnya betapa pun rapi deskriptornya disusun.
+//
+// Rubrik tidak dihapus, dan itu bukan keraguan. Ujian yang sudah dinilai
+// dengan rubrik masih menyimpan skor per kriterianya, dan lembar penilaian
+// ujian-ujian itu harus tetap dapat dibuka bertahun-tahun kemudian ketika ada
+// yang menggugat nilainya. Menghapus rubrik berarti menghapus jawaban atas
+// gugatan itu.
+// ============================================================
+
+export function PanelPenilaianEsai() {
+  /** Jawaban acuan lebih dulu, karena itulah yang dianjurkan sekarang. */
+  const [cara, setCara] = useState<"acuan" | "rubrik">("acuan");
+
+  return (
+    <div className="cbtv-penilaian">
+      <div className="cbt-tab cbtv-cara">
+        <button type="button" className={cara === "acuan" ? "on" : ""} onClick={() => setCara("acuan")}>
+          Jawaban acuan
+        </button>
+        <button type="button" className={cara === "rubrik" ? "on" : ""} onClick={() => setCara("rubrik")}>
+          Rubrik
+        </button>
+      </div>
+
+      <p className="cbtv-cara-baca">
+        {cara === "acuan"
+          ? "Mengukur ISI jawaban: seberapa dekat yang ditulis peserta dengan jawaban acuan Anda. Dianjurkan."
+          : "Mengukur BENTUK jawaban: panjang, susunan, dan istilah soal yang muncul. Tidak tahu apakah isinya benar."}
+      </p>
+
+      {cara === "acuan" ? <PanelAcuan /> : <PanelRubrik />}
+    </div>
+  );
+}
+
+// ============================================================
+// KUNCI JAWABAN ACUAN DOSEN
+//
+// Susunan layarnya sengaja meniru impor soal, sampai ke letak tombolnya:
+// unduh template, isi di komputer, unggah sekali. Dosen yang pernah mengimpor
+// soal sudah tahu cara memakai panel ini sebelum membacanya.
+//
+// Ada juga jalan menyusun langsung di layar, dan ia ditaruh SESUDAH jalur
+// berkas, bukan sebelumnya. Yang butirnya tiga memang lebih cepat mengetik di
+// sini; yang butirnya dua puluh akan menyesal di butir ketujuh belas.
+// ============================================================
+
+export type AcuanRingkas = {
+  id: number;
+  nama: string;
+  keterangan: string;
+  ambangNol: number;
+  ambangPenuh: number;
+  butir: ButirAcuan[];
+  pemilik: string;
+  milikSaya: boolean;
+  bolehSunting: boolean;
+  dipakai: number;
+};
+
+/** Berapa kata sebuah jawaban acuan, dihitung kasar untuk ditampilkan. */
+function jumlahKata(teks: string) {
+  return teks.trim() ? teks.trim().split(/\s+/).length : 0;
+}
+
+export function PanelAcuan() {
+  const [daftar, setDaftar] = useState<AcuanRingkas[]>([]);
+  const [muat, setMuat] = useState(true);
+  const [kabar, setKabar] = useState("");
+  const [galat, setGalat] = useState("");
+  const [sibuk, setSibuk] = useState(false);
+
+  /** Acuan yang sedang disunting. null berarti tidak ada formulir terbuka. */
+  const [susun, setSusun] = useState<{ id: number | null; isi: Acuan } | null>(null);
+
+  /** Baris yang ditolak pembaca berkas, ditahan untuk diperlihatkan. */
+  const [tolak, setTolak] = useState<Array<{ baris: string; alasan: string }>>([]);
+  const [namaBerkas, setNamaBerkas] = useState("");
+  const [membaca, setMembaca] = useState(false);
+
+  const muatDaftar = useCallback(async () => {
+    setMuat(true);
+    try {
+      const jawab = await fetch("/api/cbt/acuan", { cache: "no-store" });
+      const data = await jawab.json();
+      if (!jawab.ok || !data.success) throw new Error(data.message || "Gagal memuat.");
+      setDaftar(data.acuan || []);
+      setGalat("");
+    } catch (alasan: unknown) {
+      setGalat(alasan instanceof Error ? alasan.message : "Daftar jawaban acuan gagal dimuat.");
+    } finally {
+      setMuat(false);
+    }
+  }, []);
+
+  // Ditunda satu putaran, sama seperti PanelRubrik di atas: pemuat ini
+  // menyetel state pada baris pertamanya, dan menyetel state serentak di dalam
+  // efek memicu gambar ulang berantai.
+  useEffect(() => {
+    const tunda = window.setTimeout(() => void muatDaftar(), 0);
+    return () => window.clearTimeout(tunda);
+  }, [muatDaftar]);
+
+  function unduh(berkas: Blob, nama: string) {
+    const url = URL.createObjectURL(berkas);
+    const tautan = document.createElement("a");
+    tautan.href = url;
+    tautan.download = nama;
+    tautan.click();
+    URL.revokeObjectURL(url);
+  }
+
+  /**
+   * Baca berkas acuan yang diunggah.
+   *
+   * Seluruhnya diurai DI PERAMBAN, sama seperti pengimpor soal. Berkas Word
+   * dan Excel dosen tidak perlu singgah di server hanya untuk dibaca, dan yang
+   * tidak singgah tidak dapat tertinggal di sana.
+   */
+  async function bacaBerkas(berkas: File) {
+    setMembaca(true);
+    setGalat("");
+    setKabar("");
+    setNamaBerkas(berkas.name);
+    try {
+      let hasil: { butir: ButirAcuan[]; tolak: Array<{ baris: string; alasan: string }> };
+      if (/\.docx?$/i.test(berkas.name)) {
+        const mammoth = await import("mammoth");
+        const dibaca = await mammoth.convertToHtml({ arrayBuffer: await berkas.arrayBuffer() });
+        hasil = acuanDariWord(dibaca.value || "");
+      } else {
+        const XLSX = await import("xlsx");
+        const buku = XLSX.read(await berkas.arrayBuffer(), { type: "array" });
+        const lembar = buku.Sheets[buku.SheetNames[0]];
+        const aoa = XLSX.utils.sheet_to_json(lembar, { header: 1, raw: false, defval: "" }) as Aoa;
+        hasil = acuanDariExcel(aoa);
+      }
+
+      setTolak(hasil.tolak);
+      if (hasil.butir.length === 0) {
+        setGalat(hasil.tolak[0]?.alasan || "Tidak ada butir yang terbaca dari berkas ini.");
+        return;
+      }
+
+      // Berkas yang terbaca langsung membuka formulir, bukan sekadar menjadi
+      // pratinjau yang masih harus ditekan sekali lagi. Yang baru saja
+      // mengunggah berkas bermaksud menyimpannya; nama acuannya yang masih
+      // perlu ia ketik, dan itulah satu-satunya yang diminta di sini.
+      setSusun({
+        id: null,
+        isi: {
+          nama: berkas.name.replace(/\.(xlsx|xls|csv|docx?)$/i, "").slice(0, 160),
+          keterangan: "",
+          ambangNol: AMBANG_NOL_BAWAAN,
+          ambangPenuh: AMBANG_PENUH_BAWAAN,
+          butir: hasil.butir,
+        },
+      });
+      setKabar(`${hasil.butir.length} jawaban acuan terbaca dari ${berkas.name}. Periksa lalu simpan.`);
+    } catch (alasan: unknown) {
+      setGalat(alasan instanceof Error ? alasan.message : "Berkas belum dapat dibaca.");
+    } finally {
+      setMembaca(false);
+    }
+  }
+
+  async function simpan() {
+    if (!susun) return;
+    const periksa = periksaAcuan(susun.isi);
+    if (!periksa.ok) { setGalat(periksa.pesan); return; }
+
+    setSibuk(true); setGalat(""); setKabar("");
+    try {
+      const jawab = await fetch("/api/cbt/acuan", {
+        method: susun.id ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: susun.id ?? undefined, ...susun.isi }),
+      });
+      const data = await jawab.json();
+      if (!jawab.ok || !data.success) throw new Error(data.message || "Gagal menyimpan.");
+      setKabar(
+        susun.id
+          ? data.dipakai > 0
+            ? `Acuan tersimpan. Ia dipakai ${data.dipakai} ujian; nilai yang sudah keluar dihitung dengan acuan versi lama sampai penilaiannya dijalankan lagi.`
+            : "Acuan tersimpan."
+          : "Acuan baru tersimpan.",
+      );
+      setSusun(null);
+      setTolak([]);
+      setNamaBerkas("");
+      await muatDaftar();
+    } catch (alasan: unknown) {
+      setGalat(alasan instanceof Error ? alasan.message : "Acuan gagal disimpan.");
+    } finally {
+      setSibuk(false);
+    }
+  }
+
+  async function hapus(a: AcuanRingkas) {
+    if (!window.confirm(`Hapus jawaban acuan "${a.nama}"?`)) return;
+    try {
+      const jawab = await fetch(`/api/cbt/acuan?id=${a.id}`, { method: "DELETE" });
+      const data = await jawab.json();
+      if (!jawab.ok || !data.success) throw new Error(data.message || "Gagal menghapus.");
+      await muatDaftar();
+    } catch (alasan: unknown) {
+      setGalat(alasan instanceof Error ? alasan.message : "Acuan gagal dihapus.");
+    }
+  }
+
+  function ubahButir(urut: number, ubah: Partial<ButirAcuan>) {
+    if (!susun) return;
+    const butir = susun.isi.butir.map((b, i) => (i === urut ? { ...b, ...ubah } : b));
+    setSusun({ ...susun, isi: { ...susun.isi, butir } });
+  }
+
+  const jumlahBobot = susun ? susun.isi.butir.reduce((n, b) => n + b.bobot, 0) : 0;
+
+  return (
+    <div className="cbtv-acuan">
+      <div className="panel cbt-kepala">
+        <div>
+          <b>Kunci jawaban acuan Dosen / Pengajar</b>
+          <span>
+            Jawaban peserta dinilai dari kedekatannya dengan jawaban acuan Anda, memakai cosine
+            similarity atas bobot kata TF-IDF. Parafrase yang benar tetap bernilai tinggi;
+            jawaban panjang di luar topik tidak terbantu oleh panjangnya.
+          </span>
+        </div>
+        <button
+          type="button"
+          className="btn btn-light btn-mini"
+          onClick={() => { setSusun({ id: null, isi: acuanKosong() }); setTolak([]); setNamaBerkas(""); }}
+        >
+          + Susun di layar
+        </button>
+      </div>
+
+      {kabar && <div className="dsh-ok">{kabar}</div>}
+      {galat && <div className="dsh-error">{galat}</div>}
+
+      {/* ---------- UNDUH, ISI, UNGGAH ----------
+          Tombolnya memakai kelas yang sama persis dengan impor soal, sehingga
+          keduanya tidak dapat berselisih rupa ketika salah satunya diubah. */}
+      {!susun && (
+        <div className="panel cbt-impor">
+          <div className="cbt-impor-kepala">
+            <b>Isi lewat Excel atau Word</b>
+            <span>
+              Unduh template, tulis jawaban acuan di komputer, unggah sekali untuk seluruh butir.
+              Excel untuk butir yang banyak; Word untuk jawaban berupa paragraf.
+            </span>
+          </div>
+
+          <div className="cbt-impor-tombol">
+            <button
+              type="button"
+              className="btn btn-light"
+              onClick={() => unduh(buatXlsxAcuan(), "template-jawaban-acuan.xlsx")}
+            >
+              &#8681; Template Excel (.xlsx)
+            </button>
+            <button
+              type="button"
+              className="btn btn-light"
+              onClick={() => unduh(buatDocxAcuan(), "template-jawaban-acuan.docx")}
+            >
+              &#8681; Template Word (.docx)
+            </button>
+            <label className={`btn btn-primary cbt-unggah ${membaca ? "mati" : ""}`}>
+              {membaca ? "Membaca…" : "⇧ Unggah acuan"}
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv,.docx"
+                disabled={membaca}
+                onChange={(e) => {
+                  const berkas = e.target.files?.[0];
+                  e.target.value = "";
+                  if (berkas) void bacaBerkas(berkas);
+                }}
+              />
+            </label>
+          </div>
+
+          {tolak.length > 0 && (
+            <div className="cbt-impor-hasil">
+              <div className="cbt-impor-angka">
+                <span className="cbt-impor-gagal"><b>{tolak.length}</b> baris perlu diperbaiki</span>
+                {namaBerkas && <span className="cbt-impor-nama">{namaBerkas}</span>}
+              </div>
+              <ul className="cbt-impor-tolak">
+                {tolak.slice(0, 8).map((t, i) => <li key={i}><b>{t.baris}</b>: {t.alasan}</li>)}
+                {tolak.length > 8 && <li>…dan {tolak.length - 8} lagi.</li>}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ---------- FORMULIR ---------- */}
+      {susun && (
+        <div className="panel cbt-form cbtv-susun">
+          <div className="cbt-baris">
+            <label><span>Nama acuan *</span>
+              <input
+                value={susun.isi.nama}
+                onChange={(e) => setSusun({ ...susun, isi: { ...susun.isi, nama: e.target.value } })}
+                placeholder="mis. Acuan UAS Komunikasi Massa"
+              />
+            </label>
+          </div>
+
+          <label className="cbt-lebar"><span>Keterangan singkat</span>
+            <input
+              value={susun.isi.keterangan}
+              onChange={(e) => setSusun({ ...susun, isi: { ...susun.isi, keterangan: e.target.value } })}
+              placeholder="Untuk mata kuliah dan semester apa acuan ini dipakai"
+            />
+          </label>
+
+          {/* ---------- DUA AMBANG ----------
+              Ditaruh di atas daftar butir, bukan disembunyikan di bawahnya:
+              keduanya berlaku untuk SELURUH butir, dan yang mengubahnya perlu
+              melihat akibatnya sebelum mengetik dua puluh jawaban acuan. */}
+          <div className="cbtv-ambang-acuan">
+            <div className="cbtv-ambang-baris">
+              <label>
+                <span>Nilai nol di bawah</span>
+                <input
+                  type="number" min={0} max={98} value={susun.isi.ambangNol}
+                  onChange={(e) => setSusun({
+                    ...susun,
+                    isi: { ...susun.isi, ambangNol: Math.max(0, Math.min(98, Number(e.target.value) || 0)) },
+                  })}
+                />
+                <i>% mirip</i>
+              </label>
+              <label>
+                <span>Nilai penuh mulai</span>
+                <input
+                  type="number" min={1} max={100} value={susun.isi.ambangPenuh}
+                  onChange={(e) => setSusun({
+                    ...susun,
+                    isi: { ...susun.isi, ambangPenuh: Math.max(1, Math.min(100, Number(e.target.value) || 0)) },
+                  })}
+                />
+                <i>% mirip</i>
+              </label>
+            </div>
+            <p className="cbt-catatan">
+              Nilai penuh sengaja tidak menunggu kemiripan 100%. Kemiripan 100% hanya dicapai
+              jawaban yang menyalin acuan kata demi kata, dan menuntutnya berarti memberi nilai
+              tertinggi kepada yang menghafal. Bawaannya {AMBANG_NOL_BAWAAN}% dan {AMBANG_PENUH_BAWAAN}%.
+            </p>
+            <div className="cbtv-kurva">
+              {[10, 25, 40, 55, 70, 85, 100].map((k) => (
+                <span key={k}>
+                  <b>{k}%</b> mirip <i>→</i> nilai {kurvaNilai(k, susun.isi.ambangNol, susun.isi.ambangPenuh)}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="cbtv-bobot-kabar">
+            Jumlah bobot: <b className={jumlahBobot === 100 ? "ok" : "salah"}>{jumlahBobot}%</b>
+            {jumlahBobot !== 100 && <> harus tepat 100%.</>}
+            <button
+              type="button"
+              className="btn btn-light btn-mini"
+              onClick={() => {
+                const rata = ratakanBobotButir(susun.isi.butir.length);
+                setSusun({
+                  ...susun,
+                  isi: { ...susun.isi, butir: susun.isi.butir.map((b, i) => ({ ...b, bobot: rata[i] })) },
+                });
+              }}
+            >
+              Ratakan
+            </button>
+          </div>
+
+          {susun.isi.butir.map((b, urut) => {
+            const kata = jumlahKata(b.jawaban);
+            return (
+              <div key={urut} className="cbtv-butir">
+                <div className="cbt-baris">
+                  <label className="cbtv-nomor"><span>Soal nomor</span>
+                    <input
+                      type="number" min={1} max={999} value={b.nomor}
+                      onChange={(e) => ubahButir(urut, { nomor: Math.max(1, Number(e.target.value) || 1) })}
+                    />
+                  </label>
+                  <label><span>Pertanyaan (tidak dinilai)</span>
+                    <input
+                      value={b.pertanyaan}
+                      onChange={(e) => ubahButir(urut, { pertanyaan: e.target.value })}
+                      placeholder="Disalin sekadar agar Anda tahu sedang menjawab soal yang mana"
+                    />
+                  </label>
+                  <label className="cbtv-bobot"><span>Bobot %</span>
+                    <input
+                      type="number" min={0} max={100} value={b.bobot}
+                      onChange={(e) => ubahButir(urut, { bobot: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="btn btn-light btn-mini cbtv-buang"
+                    onClick={() => setSusun({
+                      ...susun,
+                      isi: { ...susun.isi, butir: susun.isi.butir.filter((_, i) => i !== urut) },
+                    })}
+                  >
+                    Buang
+                  </button>
+                </div>
+
+                <div className="cbt-lebar cbtv-jawab">
+                  <div className="cbtv-jawab-kepala">
+                    <span>Jawaban acuan</span>
+                    {/* Jumlah kata ditulis terus terang, dan warnanya berubah di
+                        bawah ambang. Acuan yang terlalu pendek baru ketahuan saat
+                        disimpan akan membuat dosen mengulang dari awal. */}
+                    <em className={kata < MIN_KATA_ACUAN ? "kurang" : ""}>
+                      {kata} kata{kata < MIN_KATA_ACUAN ? `, paling sedikit ${MIN_KATA_ACUAN}` : ""}
+                    </em>
+                  </div>
+                  <textarea
+                    rows={4}
+                    value={b.jawaban}
+                    onChange={(e) => ubahButir(urut, { jawaban: e.target.value })}
+                    placeholder="Tulis jawaban terbaik yang Anda harapkan, dengan kalimat penuh"
+                  />
+                </div>
+
+                <label className="cbt-lebar cbtv-wajib"><span>Istilah wajib, dipisah koma (opsional)</span>
+                  <input
+                    value={b.wajib.join(", ")}
+                    onChange={(e) => ubahButir(urut, {
+                      wajib: e.target.value.split(",").map((w) => w.trim().toLowerCase()).filter((w) => w !== ""),
+                    })}
+                    placeholder="mis. agenda setting, khalayak"
+                  />
+                </label>
+              </div>
+            );
+          })}
+
+          <div className="cbtv-susun-tombol">
+            <button
+              type="button"
+              className="btn btn-light btn-mini"
+              disabled={susun.isi.butir.length >= MAKS_BUTIR}
+              onClick={() => setSusun({
+                ...susun,
+                isi: {
+                  ...susun.isi,
+                  butir: [
+                    ...susun.isi.butir,
+                    { nomor: susun.isi.butir.length + 1, pertanyaan: "", jawaban: "", bobot: 0, wajib: [] },
+                  ],
+                },
+              })}
+            >
+              + Tambah butir
+            </button>
+            <button type="button" className="btn btn-primary btn-mini" disabled={sibuk} onClick={() => void simpan()}>
+              {sibuk ? "Menyimpan…" : "Simpan acuan"}
+            </button>
+            <button
+              type="button"
+              className="btn btn-light btn-mini"
+              onClick={() => { setSusun(null); setTolak([]); setNamaBerkas(""); }}
+            >
+              Batal
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ---------- ACUAN YANG SUDAH ADA ---------- */}
+      {!susun && (
+        <div className="panel">
+          <b className="cbtv-sub">Acuan di portal ini</b>
+          {muat ? (
+            <div className="dempty">Memuat…</div>
+          ) : daftar.length === 0 ? (
+            <div className="dempty">
+              Belum ada jawaban acuan. Unduh template di atas, isi di komputer, lalu unggah kembali.
+            </div>
+          ) : (
+            <ul className="cbtv-daftar-rubrik">
+              {daftar.map((a) => (
+                <li key={a.id}>
+                  <div>
+                    <b>{a.nama}</b>
+                    <small>
+                      {a.butir.length} butir · nilai penuh mulai {a.ambangPenuh}% mirip · oleh {a.pemilik}
+                      {a.dipakai > 0 && ` · dipakai ${a.dipakai} ujian`}
+                    </small>
+                  </div>
+                  <span className="cbtv-aksi-rubrik">
+                    {a.bolehSunting && (
+                      <button
+                        type="button" className="btn btn-light btn-mini"
+                        onClick={() => setSusun({
+                          id: a.id,
+                          isi: {
+                            nama: a.nama, keterangan: a.keterangan,
+                            ambangNol: a.ambangNol, ambangPenuh: a.ambangPenuh,
+                            butir: JSON.parse(JSON.stringify(a.butir)) as ButirAcuan[],
+                          },
+                        })}
+                      >
+                        Sunting
+                      </button>
+                    )}
+                    <button
+                      type="button" className="btn btn-light btn-mini"
+                      onClick={() => setSusun({
+                        id: null,
+                        isi: {
+                          nama: `${a.nama} (salinan)`, keterangan: a.keterangan,
+                          ambangNol: a.ambangNol, ambangPenuh: a.ambangPenuh,
+                          butir: JSON.parse(JSON.stringify(a.butir)) as ButirAcuan[],
+                        },
+                      })}
+                    >
+                      Salin
+                    </button>
+                    {a.bolehSunting && (
+                      <button type="button" className="btn btn-light btn-mini" onClick={() => void hapus(a)}>Hapus</button>
                     )}
                   </span>
                 </li>
@@ -1085,7 +1649,7 @@ export function LembarRubrik({
 
       {!data.rubrik ? (
         <div className="dsh-note">
-          Ujian ini belum memakai rubrik, jadi esai dinilai seperti biasa — Anda mengetik
+          Ujian ini belum memakai rubrik, jadi esai dinilai seperti biasa, Anda mengetik
           angkanya sendiri pada lembar jawaban. Untuk memakai rubrik, pilih satu pada
           <b> Pengaturan ujian → Rubrik penilaian esai</b>.
         </div>
@@ -1093,7 +1657,7 @@ export function LembarRubrik({
         <>
           <div className="cbtv-lembar-kepala">
             <div>
-              <b>Penilaian rubrik — {data.rubrik.nama}</b>
+              <b>Penilaian rubrik: {data.rubrik.nama}</b>
               <small>
                 {data.esai.length} soal esai · skala {data.rubrik.skalaMin}–{data.rubrik.skalaMax}
                 {belumDinilai > 0 && ` · ${belumDinilai} belum dinilai`}
@@ -1124,7 +1688,7 @@ export function LembarRubrik({
 
           <p className="cbt-catatan cbtv-prinsip">
             Esai dinilai otomatis dari ambang panjang rubrik saat peserta mengumpulkan.
-            Ubah level bila ada yang meleset — nilainya ikut berubah.
+            Ubah level bila ada yang meleset, nilainya ikut berubah.
           </p>
 
           {data.esai.length === 0 && <div className="dempty">Tidak ada soal esai pada lembar peserta ini.</div>}
@@ -1165,7 +1729,7 @@ export function LembarRubrik({
                               <small className="cbtv-alasan">
                                 {k.aiAlasan}
                                 {k.aiKeyakinan !== null && k.aiKeyakinan < 70 && (
-                                  <b> (keyakinan {k.aiKeyakinan}% — mohon diperiksa)</b>
+                                  <b> (keyakinan {k.aiKeyakinan}%, mohon diperiksa)</b>
                                 )}
                               </small>
                             )}
@@ -1178,7 +1742,7 @@ export function LembarRubrik({
                               onChange={(ev) => void ubahLevel(e.soalId, k.urut, ev.target.value === "" ? null : Number(ev.target.value))}
                               title={k.levels.find((l) => l.level === k.level)?.deskriptor ?? ""}
                             >
-                              <option value="">—</option>
+                              <option value="">-</option>
                               {k.levels.map((l) => (
                                 <option key={l.level} value={l.level} title={l.deskriptor}>
                                   {l.level}{l.deskriptor ? ` · ${l.deskriptor.slice(0, 60)}${l.deskriptor.length > 60 ? "…" : ""}` : ""}
@@ -1226,14 +1790,14 @@ export function LembarRubrik({
           dikirimkan ke mahasiswa harus melewatinya. */}
       <div className="cbtv-sahkan">
         <div className="cbtv-sahkan-kiri">
-          <span className="cbtv-nilai-mesin">Hitungan sistem: <b>{p.nilaiMesin ?? "—"}</b></span>
+          <span className="cbtv-nilai-mesin">Hitungan sistem: <b>{p.nilaiMesin ?? "-"}</b></span>
           {p.tertunda > 0 && <span className="cbtv-tunggu">{p.tertunda} jawaban belum dinilai</span>}
         </div>
 
         {p.disetujui ? (
           <div className="cbtv-sahkan-kanan">
             <span className="cbtv-sudah">
-              ✓ Nilai <b>{p.nilaiAkhir}</b> ({p.predikat.huruf} — {p.predikat.sebutan}) disahkan oleh {p.disetujuiOleh}
+              ✓ Nilai <b>{p.nilaiAkhir}</b> ({p.predikat.huruf}, {p.predikat.sebutan}) disahkan oleh {p.disetujuiOleh}
             </span>
             <span className="cbtv-aksi-rubrik">
               <button

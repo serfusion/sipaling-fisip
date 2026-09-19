@@ -32,6 +32,7 @@ import { cbtAnswers, cbtAttempts, cbtRubricScores } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { bacaLembar, skorRubrikAttempt, soalUjian } from "@/lib/cbt-store";
 import { hitungRubrik, poinDariRubrik, type Rubrik } from "@/lib/rubrik";
+import { nilaiSoal, type Acuan } from "@/lib/nilai-acuan";
 import { GalatModel } from "@/lib/ai-penyedia";
 import { nilaiEsai } from "@/lib/nilai-esai";
 import { kataDariTeks, nilaiLokal } from "@/lib/nilai-lokal";
@@ -249,6 +250,114 @@ async function simpanUsulan(
       });
   }
   await simpanPoinRubrik(kerja.attemptId, kerja.soalId, kerja.bobot, rubrik, penilai, catatan);
+}
+
+/**
+ * Nilai antrean dengan KUNCI JAWABAN ACUAN dosen.
+ *
+ * Jalur ketiga penilaian esai, dan yang pertama di antara ketiganya yang
+ * benar-benar mengukur ISI. Rubrik mengukur bentuk; penilaian lokal mengukur
+ * bentuk; yang ini mengukur seberapa dekat yang ditulis peserta dengan yang
+ * ditulis dosen sebagai jawaban acuan. Rumusnya ada di src/lib/nilai-acuan.ts.
+ *
+ * ------------------------------------------------------------
+ * KENAPA SELURUH KELAS DINILAI SEKALIGUS, BUKAN SATU PER SATU
+ * ------------------------------------------------------------
+ * Bobot kata TF-IDF bergantung pada df, yaitu berapa lembar di kelas yang
+ * memuat tiap kata. Menilai satu peserta sendirian berarti menghitung df dari
+ * satu dokumen, dan idf dari satu dokumen bernilai sama untuk setiap kata.
+ * Yang tersisa hanyalah TF, dan bersamanya hilang seluruh alasan memakai
+ * TF-IDF sejak awal: kata-kata yang datang dari pertanyaannya kembali
+ * berbobot penuh, dan penyalin pertanyaan kembali bernilai setinggi yang
+ * benar-benar menguraikan.
+ *
+ * Karena itu antrean dikelompokkan per SOAL lebih dulu, dan tiap kelompok
+ * dinilai dalam satu panggilan.
+ *
+ * ------------------------------------------------------------
+ * KORPUSNYA LEBIH LUAS DARIPADA ANTREANNYA
+ * ------------------------------------------------------------
+ * Yang masuk korpus bukan hanya jawaban yang sedang diantre, melainkan SELURUH
+ * jawaban atas soal itu yang sudah terkumpul, termasuk yang sudah dinilai
+ * kemarin. Kalau tidak, peserta yang dinilai pada penyegaran berikutnya akan
+ * dibandingkan memakai df yang berbeda dari yang dipakai temannya, dan dua
+ * jawaban yang sama persis akan bernilai lain hanya karena dinilai pada
+ * putaran yang berbeda. Nilai yang bergantung pada urutan penilaian adalah
+ * nilai yang tidak dapat dipertahankan di hadapan yang menggugatnya.
+ */
+export async function kerjakanPenilaianAcuan(
+  examId: number,
+  acuan: Acuan,
+  antre: Pekerjaan[],
+): Promise<number> {
+  if (antre.length === 0 || acuan.butir.length === 0) return 0;
+
+  // Nomor butir mengikuti urutan bank soal, jadi peta soalId ke nomornya
+  // disusun dari urutan yang sama persis dengan yang dilihat dosen ketika ia
+  // mengisi template.
+  const bank = await soalUjian(examId);
+  const nomorSoal = new Map(bank.map((soal, i) => [soal.id, i + 1]));
+  const butirNomor = new Map(acuan.butir.map((b) => [b.nomor, b]));
+
+  // Antrean dikelompokkan per soal. Lihat keterangan panjang di atas.
+  const perSoal = new Map<number, Pekerjaan[]>();
+  for (const kerja of antre) {
+    const daftar = perSoal.get(kerja.soalId);
+    if (daftar) daftar.push(kerja);
+    else perSoal.set(kerja.soalId, [kerja]);
+  }
+
+  const sekarang = new Date();
+  let dinilai = 0;
+
+  for (const [soalId, kelompok] of perSoal) {
+    const nomor = nomorSoal.get(soalId);
+    const butir = nomor === undefined ? undefined : butirNomor.get(nomor);
+    // Soal yang tidak ada butir acuannya dilewati, bukan dinolkan. Yang
+    // terjadi bukan peserta gagal menjawabnya, melainkan dosen belum menulis
+    // acuannya, dan menolkan seluruh kelas karena itu adalah kesalahan yang
+    // paling mahal yang dapat dilakukan berkas ini.
+    if (!butir) continue;
+
+    // Korpus: seluruh jawaban atas soal ini yang sudah terkumpul.
+    const semua = await db
+      .select({ attemptId: cbtAnswers.attemptId, teks: cbtAnswers.answer })
+      .from(cbtAnswers)
+      .where(eq(cbtAnswers.questionId, soalId));
+
+    const korpus = semua
+      .map((j) => ({ attemptId: j.attemptId, teks: String(j.teks ?? "").trim() }))
+      .filter((j) => j.teks !== "");
+    if (korpus.length === 0) continue;
+
+    const hasil = nilaiSoal(korpus, butir, acuan.ambangNol, acuan.ambangPenuh);
+
+    // Yang DISIMPAN hanya yang diantre, meskipun yang DIHITUNG seluruh kelas.
+    // Peserta yang sudah dinilai kemarin tetap menjadi pembanding tanpa
+    // nilainya ditimpa diam-diam.
+    for (const kerja of kelompok) {
+      const h = hasil.get(kerja.attemptId);
+      if (!h) continue;
+
+      const poin = poinDariRubrik(h.nilai, kerja.bobot);
+      await db
+        .update(cbtAnswers)
+        .set({
+          points: poin,
+          // Jawaban yang terlalu pendek untuk dibandingkan TIDAK ditandai
+          // sudah dinilai: isCorrect null membuatnya tetap muncul sebagai
+          // pekerjaan yang menunggu dosen, dan itu memang yang dikehendaki.
+          isCorrect: h.perluDibaca ? null : poin > 0,
+          gradedBy: `Acuan: ${acuan.nama}`.slice(0, 120),
+          feedback: `${h.alasan}`.slice(0, 4000),
+          updatedAt: sekarang,
+        })
+        .where(and(eq(cbtAnswers.attemptId, kerja.attemptId), eq(cbtAnswers.questionId, soalId)));
+      dinilai += 1;
+    }
+  }
+
+  return dinilai;
 }
 
 /**

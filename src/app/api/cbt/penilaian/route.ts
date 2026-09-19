@@ -27,18 +27,20 @@
 // ============================================================
 import { db } from "@/db";
 import { cbtAnswers, cbtAttempts, cbtExams, cbtRubricScores } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getCurrentProfile } from "@/lib/supabase-server";
 import { explainServerError } from "@/lib/api-errors";
 import { angkaParam, bolehCbt, bolehPantau, bolehUbah } from "@/lib/cbt";
-import { bacaLembar, rekamanAttempt, rubrikUjian, skorRubrikAttempt, soalUjian } from "@/lib/cbt-store";
+import {
+  acuanUjian, bacaLembar, rekamanAttempt, rubrikUjian, skorRubrikAttempt, soalUjian,
+} from "@/lib/cbt-store";
 import { hitungRubrik, levelBerlaku, poinDariRubrik, predikat, type Rubrik } from "@/lib/rubrik";
 import { aiSiap, nilaiEsai } from "@/lib/nilai-esai";
 import { GalatModel } from "@/lib/ai-penyedia";
 import { hitungUlangUjian, pasanganPeserta } from "@/lib/mirip-simpan";
 import { hitungUlangAttempt } from "@/lib/nilai-attempt";
 import {
-  MAKS_SEKALI_NILAI, antreEsai, kerjakanPenilaian, kerjakanPenilaianLokal,
+  MAKS_SEKALI_NILAI, antreEsai, kerjakanPenilaian, kerjakanPenilaianAcuan, kerjakanPenilaianLokal,
   pembandingPanjang, simpanPoinRubrik,
 } from "@/lib/nilai-otomatis";
 import { kirimLaporanNilai } from "@/lib/kirim-nilai";
@@ -252,13 +254,86 @@ export async function POST(request: Request) {
       });
     }
 
-    // ---------- DUA PENILAI ----------
+    // ---------- PENILAIAN DARI JAWABAN ACUAN PENGAJAR ----------
     //
-    // "lokal" — bawaan. Menghitung dari bentuk jawaban: panjang dibanding
+    // Jalur ketiga, dan satu-satunya yang mengukur ISI jawaban. Tanpa
+    // jaringan, tanpa kunci API, tanpa biaya per jawaban. Rumusnya cosine
+    // similarity atas bobot kata TF-IDF; lihat src/lib/nilai-acuan.ts.
+    //
+    // Batas MAKS_SEKALI_NILAI tidak berlaku, sama seperti penilaian lokal:
+    // yang membatasi penilaian model adalah umur satu permintaan HTTP yang
+    // diisi panggilan jaringan berulang, dan di sini tidak ada satu pun
+    // panggilan jaringan.
+    if (aksi === "acuan") {
+      const acuan = await acuanUjian(ujian.answerKeyId);
+      if (!acuan || acuan.butir.length === 0) {
+        return Response.json(
+          {
+            success: false,
+            message:
+              "Ujian ini belum memakai jawaban acuan. Pilih satu acuan pada Pengaturan Ujian, " +
+              "atau buat yang baru di menu Penilaian esai.",
+          },
+          { status: 400 },
+        );
+      }
+
+      const attemptSatu = angkaParam(String(body.attempt ?? ""));
+      const pesertaAcuan = attemptSatu
+        ? await db
+            .select()
+            .from(cbtAttempts)
+            .where(and(eq(cbtAttempts.id, attemptSatu), eq(cbtAttempts.examId, examId)))
+            .limit(1)
+        : await db.select().from(cbtAttempts).where(eq(cbtAttempts.examId, examId)).limit(400);
+
+      if (pesertaAcuan.length === 0) {
+        return Response.json({ success: false, message: "Belum ada peserta yang dapat dinilai." }, { status: 400 });
+      }
+
+      const antreAcuan = await antreEsai(examId, pesertaAcuan, body.ulangi === true);
+      if (antreAcuan.length === 0) {
+        return Response.json({
+          success: true,
+          dinilai: 0,
+          sisa: 0,
+          pesan: "Semua jawaban sudah pernah dinilai. Pakai 'nilai ulang' bila ingin mengulanginya.",
+        });
+      }
+
+      const dinilaiAcuan = await kerjakanPenilaianAcuan(examId, acuan, antreAcuan);
+
+      // Bobot kata TF-IDF bergantung pada seluruh lembar yang dibandingkan,
+      // jadi menilai di tengah ujian memakai korpus yang belum lengkap. Itu
+      // tidak salah, tetapi harus dikatakan: dua jawaban yang sama persis
+      // dapat bernilai sedikit berbeda bila dinilai pada putaran yang berbeda.
+      // "Nilai ulang" sesudah kelasnya selesai menyamakan semuanya dengan satu
+      // korpus yang sama.
+      const masihBerjalan = await db
+        .select({ jumlah: sql<number>`count(*)::int` })
+        .from(cbtAttempts)
+        .where(and(eq(cbtAttempts.examId, examId), eq(cbtAttempts.status, "berjalan")));
+      const belumKumpul = masihBerjalan[0]?.jumlah ?? 0;
+
+      return Response.json({
+        success: true,
+        dinilai: dinilaiAcuan,
+        sisa: 0,
+        pesan:
+          belumKumpul > 0
+            ? `${dinilaiAcuan} jawaban dinilai dengan acuan "${acuan.nama}". ${belumKumpul} peserta masih mengerjakan; ` +
+              "jalankan nilai ulang sesudah semuanya mengumpulkan supaya seluruh kelas dinilai dengan pembanding yang sama."
+            : `${dinilaiAcuan} jawaban dinilai dengan acuan "${acuan.nama}".`,
+      });
+    }
+
+    // ---------- DUA PENILAI LAIN ----------
+    //
+    // "lokal" adalah bawaan. Menghitung dari bentuk jawaban: panjang dibanding
     //   sekelas, cakupan istilah soal, susunan kalimat. Tanpa jaringan, tanpa
     //   kunci, tanpa biaya. Inilah yang dijalankan papan pantau sendiri.
-    // "ai"    — atas permintaan, lewat tombolnya. Membaca isinya, dan itu satu
-    //   panggilan model berbayar per jawaban.
+    // "ai" berjalan atas permintaan, lewat tombolnya. Membaca isinya, dan itu
+    //   satu panggilan model berbayar per jawaban.
     //
     // Keduanya menulis ke kolom yang sama dan sama-sama hanya MENGUSULKAN;
     // level yang diubah pengajar selalu menang atas keduanya.
@@ -285,7 +360,7 @@ export async function POST(request: Request) {
         {
           success: false,
           message:
-            "Ujian ini belum memakai rubrik. Pilih satu rubrik pada Pengaturan Ujian — " +
+            "Ujian ini belum memakai rubrik. Pilih satu rubrik pada Pengaturan Ujian, " +
             "ada beberapa rubrik siap pakai yang tinggal disalin.",
         },
         { status: 400 },
@@ -334,7 +409,7 @@ export async function POST(request: Request) {
       gagal,
       pesan:
         antre.length > kerjakan.length
-          ? `${dinilai} jawaban dinilai. Masih ada ${antre.length - kerjakan.length} lagi — tekan sekali lagi untuk melanjutkan.`
+          ? `${dinilai} jawaban dinilai. Masih ada ${antre.length - kerjakan.length} lagi, tekan sekali lagi untuk melanjutkan.`
           : `${dinilai} jawaban dinilai.`,
     });
   } catch (error: unknown) {

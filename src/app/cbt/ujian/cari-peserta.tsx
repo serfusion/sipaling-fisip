@@ -173,7 +173,7 @@ export default function CariPeserta({ kode, nama, setNama, nim, setNim, onPilih 
           onChange={(e) => { dipilihRef.current = ""; setNama(e.target.value); }}
           onKeyDown={tombol}
           onFocus={() => { if (saran.length > 0) setBuka(true); }}
-          placeholder="Ketik namamu — daftar muncul sendiri"
+          placeholder="Ketik namamu, daftar muncul sendiri"
           autoComplete="off"
           role="combobox"
           aria-expanded={buka}
@@ -218,7 +218,7 @@ export default function CariPeserta({ kode, nama, setNama, nim, setNim, onPilih 
         autoComplete="off"
       />
       <p className="uj-cari-bantu">
-        Namamu tidak muncul? Ketik saja nama dan nomormu sendiri — sama sahnya.
+        Namamu tidak muncul? Ketik saja nama dan nomormu sendiri, sama sahnya.
       </p>
     </div>
   );

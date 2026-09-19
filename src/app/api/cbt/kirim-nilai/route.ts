@@ -206,7 +206,7 @@ export async function POST(request: Request) {
       sisa,
       pesan:
         sisa > 0
-          ? `${terkirim} laporan terkirim. Masih ada ${sisa} lagi — tekan sekali lagi untuk melanjutkan.`
+          ? `${terkirim} laporan terkirim. Masih ada ${sisa} lagi, tekan sekali lagi untuk melanjutkan.`
           : `${terkirim} laporan terkirim.`,
     });
   } catch (error: unknown) {

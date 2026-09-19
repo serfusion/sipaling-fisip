@@ -151,7 +151,7 @@ export async function POST(request: Request) {
         return Response.json({
           success: true,
           message:
-            `Revisi ke-${sudah.nomor} sudah tersimpan sebelumnya — jawaban yang pertama tidak sampai ` +
+            `Revisi ke-${sudah.nomor} sudah tersimpan sebelumnya, jawaban yang pertama tidak sampai ` +
             "ke perangkat Anda. Berkasnya tidak perlu diunggah lagi.",
           ticket,
           jumlah: bentuk.bagian.length,

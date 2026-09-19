@@ -37,12 +37,17 @@ const teks = (nilai: unknown, batas: number) =>
   typeof nilai === "string" ? nilai.replace(/\s+/g, " ").trim().slice(0, batas) : "";
 
 /**
- * Id rubrik dari kiriman layar, atau null.
+ * Id rubrik atau id acuan dari kiriman layar, atau null.
  *
  * Kosong, nol, dan "tanpa rubrik" semuanya berarti hal yang sama: esai dinilai
  * seperti sebelum V1, dosen mengetik angkanya sendiri. Ketiganya dijadikan
  * null di satu tempat supaya tidak ada rubrik bernomor nol yang dicari-cari
  * kemudian di tabel dan tidak pernah ketemu.
+ *
+ * Dipakai juga oleh answerKeyId, yang jepitannya sama persis. Menyalin fungsi
+ * ini menjadi idAcuan hanya akan membuat dua jepitan yang dapat berbeda
+ * diam-diam, dan bedanya baru ketahuan sebagai acuan bernomor nol yang tidak
+ * pernah ketemu.
  */
 const idRubrik = (nilai: unknown): number | null => {
   const angkanya = Number(nilai);
@@ -129,6 +134,7 @@ export async function GET() {
         createdAt: cbtExams.createdAt,
         // ---------- CBT V1 ----------
         rubricId: cbtExams.rubricId,
+        answerKeyId: cbtExams.answerKeyId,
         recordAudio: cbtExams.recordAudio,
         checkSimilarity: cbtExams.checkSimilarity,
         similarityReview: cbtExams.similarityReview,
@@ -244,6 +250,7 @@ export async function POST(request: Request) {
             // jadi layar pembuatan ujian yang tidak menyebutkannya sama sekali
             // tetap menghasilkan ujian yang sah.
             rubricId: idRubrik(body.rubricId),
+            answerKeyId: idRubrik(body.answerKeyId),
             recordAudio: body.recordAudio === true,
             checkSimilarity: body.checkSimilarity !== false,
             similarityReview: angka(body.similarityReview, 30, 1, 99),
@@ -334,6 +341,7 @@ export async function PATCH(request: Request) {
     // lagi cocok dengan rubrik yang sekarang. Menghapusnya diam-diam akan
     // membuang pekerjaan dosen yang barangkali hanya salah pilih satu kali.
     if (body.rubricId !== undefined) ubah.rubricId = idRubrik(body.rubricId);
+    if (body.answerKeyId !== undefined) ubah.answerKeyId = idRubrik(body.answerKeyId);
     // Rekaman suara TIDAK boleh menyala di tengah ujian yang sedang berjalan.
     // Ini satu-satunya setelan V1 yang ditahan, dan sebabnya bukan teknis:
     // peserta yang sudah duduk mengerjakan tidak diberi tahu bahwa mikrofonnya

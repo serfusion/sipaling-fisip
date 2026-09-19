@@ -44,7 +44,7 @@ export function PanelDrama() {
         </p>
         <p>
           Yang membukanya kode Cakrawala yang <b>sama</b>. Tidak ada kode kedua, tidak ada biaya
-          tambahan, dan memasukkannya di sana <b>tidak memotong masa langgananmu</b> — hari yang
+          tambahan, dan memasukkannya di sana <b>tidak memotong masa langgananmu</b>, hari yang
           sudah dibeli tetap utuh. Kodenya perlu diketik sekali lagi di sana hanya karena peramban
           tidak pernah membawa kunci satu domain ke domain lain.
         </p>

@@ -43,7 +43,7 @@ const SISTEM = `Anda pemeriksa esai yang bekerja dengan rubrik, membantu dosen d
 
 TUGAS ANDA
 Untuk SETIAP kriteria rubrik, pilih satu level yang paling sesuai dengan jawaban mahasiswa,
-lalu terangkan alasannya. Anda TIDAK memberi nilai akhir — nilai dihitung sistem dari level
+lalu terangkan alasannya. Anda TIDAK memberi nilai akhir, nilai dihitung sistem dari level
 yang Anda pilih.
 
 CARA MEMILIH LEVEL
@@ -64,7 +64,7 @@ CARA MENULIS ALASAN
 KEYAKINAN
 Isi "keyakinan" 0–100 dengan kejujuran. Turunkan bila jawabannya sangat pendek, bila bidangnya
 di luar yang dapat Anda nilai, atau bila rubriknya menuntut pengetahuan tentang materi kuliah
-yang tidak ada di hadapan Anda. Keyakinan rendah bukan kegagalan — ia tanda bagi dosen untuk
+yang tidak ada di hadapan Anda. Keyakinan rendah bukan kegagalan, ia tanda bagi dosen untuk
 membaca sendiri, dan itu memang tugasnya.
 
 YANG TIDAK BOLEH ANDA LAKUKAN
@@ -180,7 +180,7 @@ export function susunPerintah(input: {
   baris.push(`Skala level: ${rubrik.skalaMin} sampai ${rubrik.skalaMax}.`);
   baris.push("");
   rubrik.kriteria.forEach((k, urut) => {
-    baris.push(`Kriteria ${urut} — ${k.nama} (bobot ${k.bobot}%)`);
+    baris.push(`Kriteria ${urut}: ${k.nama} (bobot ${k.bobot}%)`);
     for (const l of k.levels) {
       baris.push(`  Level ${l.level}: ${l.deskriptor.trim() || "(deskriptor belum diisi dosen)"}`);
     }
@@ -188,7 +188,7 @@ export function susunPerintah(input: {
   });
 
   baris.push("JAWABAN MAHASISWA:");
-  baris.push(jawaban ? jawaban.slice(0, MAKS_JAWABAN) : "(kosong — mahasiswa tidak menulis apa pun)");
+  baris.push(jawaban ? jawaban.slice(0, MAKS_JAWABAN) : "(kosong, mahasiswa tidak menulis apa pun)");
   if (dipotong) {
     baris.push("");
     baris.push("(Jawaban dipotong karena sangat panjang. Nilailah bagian yang terlihat, dan turunkan keyakinan Anda.)");

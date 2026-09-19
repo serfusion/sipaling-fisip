@@ -3,12 +3,13 @@
 // ============================================================
 import { db } from "@/db";
 import {
-  cbtAnswers, cbtAttempts, cbtExams, cbtQuestions, cbtRecordings, cbtRubrics,
-  cbtRubricScores, students,
+  cbtAnswerKeys, cbtAnswers, cbtAttempts, cbtExams, cbtQuestions, cbtRecordings,
+  cbtRubrics, cbtRubricScores, students,
 } from "@/db/schema";
 import { and, asc, eq } from "drizzle-orm";
 import type { JenisMedia, JenisSoal, Pasangan, Soal } from "@/lib/cbt";
 import { bacaKriteria, type Rubrik } from "@/lib/rubrik";
+import { bacaButir, type Acuan } from "@/lib/nilai-acuan";
 
 export type Ujian = typeof cbtExams.$inferSelect;
 export type Attempt = typeof cbtAttempts.$inferSelect;
@@ -163,6 +164,35 @@ export async function rubrikUjian(rubricId: number | null): Promise<Rubrik | nul
     skalaMax: r.scaleMax,
     kriteria: bacaKriteria(r.criteria),
   };
+}
+
+/**
+ * Kunci jawaban acuan satu ujian, siap dipakai mesin penilai.
+ *
+ * Bentuknya sejajar dengan rubrikUjian di atas dan alasannya sama: pemanggil
+ * tidak perlu tahu bahwa butirnya tersimpan sebagai JSON, dan tidak ada satu
+ * pun jalur penilaian yang perlu mengurai kolomnya sendiri.
+ *
+ * Tabelnya bisa saja belum ada karena migrasi v47 belum dijalankan. Yang
+ * terjadi kemudian adalah ujian tetap berjalan dan esainya dinilai seperti
+ * sebelumnya, bukan seluruh penilaian gagal.
+ */
+export async function acuanUjian(answerKeyId: number | null): Promise<Acuan | null> {
+  if (!answerKeyId) return null;
+  try {
+    const baris = await db.select().from(cbtAnswerKeys).where(eq(cbtAnswerKeys.id, answerKeyId)).limit(1);
+    const a = baris[0];
+    if (!a) return null;
+    return {
+      nama: a.name,
+      keterangan: a.description || "",
+      ambangNol: a.zeroThreshold,
+      ambangPenuh: a.fullThreshold,
+      butir: bacaButir(a.items),
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** Skor rubrik satu attempt, dikelompokkan per soal lalu per urutan kriteria. */

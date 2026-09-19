@@ -119,7 +119,7 @@ function lewatXhr(izin: IzinUnggah, berkas: File, lapor?: LaporBita) {
       window.clearTimeout(pengawas);
       pengawas = window.setTimeout(() => {
         xhr.abort();
-        tutup("Unggahan berhenti bergerak selama 45 detik — jaringan Anda kemungkinan terputus.");
+        tutup("Unggahan berhenti bergerak selama 45 detik, jaringan Anda kemungkinan terputus.");
       }, BATAS_MACET_MS);
     };
 

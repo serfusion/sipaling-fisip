@@ -48,7 +48,14 @@ import { cosine, jaccard, ngram } from "@/lib/mirip-jawaban";
  * "dan", "dengan" menjadi istilah kunci, dan setiap jawaban memuat semuanya —
  * cakupannya selalu 100% dan sinyalnya mati.
  */
-const KATA_UMUM = new Set([
+/**
+ * Kata yang ada di hampir setiap jawaban, apa pun soalnya.
+ *
+ * Diekspor supaya penilaian jawaban acuan dapat memakai daftar yang SAMA
+ * ketika menyusun alasannya. Dua daftar kata umum yang terpisah berarti dua
+ * daftar yang akan berbeda diam-diam.
+ */
+export const KATA_UMUM = new Set([
   "yang", "dan", "atau", "dengan", "untuk", "pada", "dari", "dalam", "adalah",
   "akan", "tidak", "bukan", "juga", "agar", "supaya", "karena", "sebab", "maka",
   "oleh", "jika", "bila", "saat", "ketika", "serta", "telah", "sudah", "masih",
@@ -538,7 +545,7 @@ export function nilaiLokal({
       (peringatan.length > 0 ? ` ⚠ ${peringatan.join("; ")}.` : "") +
       (sinyal.adaAcuan
         ? " Yang menentukan kedekatan dengan jawaban acuan; panjang hanya membatasi."
-        : " Soal ini belum punya jawaban acuan pada kolom Pembahasan — isilah untuk penilaian yang jauh lebih tepat.") +
+        : " Soal ini belum punya jawaban acuan pada kolom Pembahasan, isilah untuk penilaian yang jauh lebih tepat.") +
       " Ubah levelnya bila ada yang meleset.",
     sinyal,
   };

@@ -107,7 +107,7 @@ export async function mintaJson(input: {
   if ((input.suara ?? []).length > 0) {
     if (!tersedia.includes("gemini")) {
       throw new GalatModel(
-        "Transkrip rekaman memerlukan GEMINI_API_KEY pada environment — model yang " +
+        "Transkrip rekaman memerlukan GEMINI_API_KEY pada environment, model yang " +
           "terpasang sekarang tidak dapat mendengar rekaman. Rekamannya tetap tersimpan " +
           "dan tetap dapat diputar dosen.",
         503,

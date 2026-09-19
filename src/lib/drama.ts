@@ -402,7 +402,7 @@ export const PLATFORM: Platform[] = [
     // error". Tabelnya ditinggalkan utuh supaya menyalakannya kembali kelak
     // cukup mengubah satu kata.
     aktif: false,
-    catatan: "Dimatikan di hulu sejak 12 September 2026 — API sumbernya bermasalah.",
+    catatan: "Dimatikan di hulu sejak 12 September 2026, API sumbernya bermasalah.",
     caraEpisode: "id-episode",
     kunciIdEpisode: "fileId",
     titik: {

@@ -32,7 +32,8 @@ import {
 } from "@/lib/cetak-cbt";
 import { gambarQr, namaBerkasQr } from "@/lib/qr-ujian";
 import {
-  HURUF_ZONA, jamIndonesia, pecahWaktuUjian, PILIHAN_JAM, PILIHAN_MENIT, susunWaktuUjian,
+  HURUF_ZONA, jamIndonesia, pecahWaktuUjian, PILIHAN_JAM, PILIHAN_MENIT, sekarangUjian,
+  susunWaktuUjian,
 } from "@/lib/waktu-indonesia";
 import { buatDocxTemplate, buatXlsxTemplate } from "@/lib/template-soal";
 import { asalCbt } from "@/lib/situs-cbt";
@@ -46,7 +47,7 @@ import {
 } from "@/lib/pengawasan";
 import { KREDIT_CBT } from "../cbt/kredit";
 import {
-  DaftarMirip, LembarRubrik, PanelMahasiswa, PanelRubrik, PemutarRekaman,
+  DaftarMirip, LembarRubrik, PanelMahasiswa, PanelPenilaianEsai, PemutarRekaman,
   type PasanganMirip,
 } from "./cbt-v1";
 import { STATUS_MIRIP_LABEL, STATUS_MIRIP_WARNA, type StatusMirip } from "@/lib/mirip-jawaban";
@@ -80,6 +81,8 @@ type Ujian = {
   // ---------- CBT V1 ----------
   /** Rubrik yang dipakai menilai esai. null berarti dinilai manual seperti dulu. */
   rubricId?: number | null;
+  /** Kunci jawaban acuan yang dipakai menilai esai. null berarti tidak ada. */
+  answerKeyId?: number | null;
   /** Merekam suara peserta selama ujian. */
   recordAudio?: boolean;
   /** Memeriksa kemiripan jawaban antarpeserta saat dikumpulkan. */
@@ -320,6 +323,7 @@ function Tbl({
  * terlanjur jadi.
  */
 type NilaiPenilaian = {
+  answerKeyId: number;
   rubricId: number;
   recordAudio: boolean;
   checkSimilarity: boolean;
@@ -329,30 +333,69 @@ type NilaiPenilaian = {
 };
 
 function SetelPenilaian({
-  nilai, rubrik, kunciRekam = false, ubah,
+  nilai, rubrik, acuan, kunciRekam = false, ubah,
 }: {
   nilai: NilaiPenilaian;
   rubrik: Array<{ id: number; nama: string; kriteria: unknown[] }>;
+  acuan: Array<{ id: number; nama: string; butir: unknown[]; ambangPenuh: number }>;
   /** Rekaman tidak boleh dinyalakan di tengah ujian yang sudah berjalan. */
   kunciRekam?: boolean;
   ubah: (tambalan: Partial<NilaiPenilaian>) => void;
 }) {
+  const adaPenilai = nilai.answerKeyId > 0 || nilai.rubricId > 0;
   return (
-    <div className="cbt-mode cbtv-setel">
+    <div className="cbt-grup cbt-mode cbtv-setel">
       <div className="cbt-mode-kepala">Penilaian &amp; integritas</div>
 
-      <label className="cbtv-setel-baris">
-        <span>Rubrik penilaian esai</span>
-        <select value={nilai.rubricId} onChange={(e) => ubah({ rubricId: Number(e.target.value) })}>
-          <option value={0}>Tanpa rubrik</option>
-          {rubrik.map((r) => (
-            <option key={r.id} value={r.id}>{r.nama} ({r.kriteria.length} kriteria)</option>
-          ))}
-        </select>
-      </label>
-      {rubrik.length === 0 && (
-        <p className="cbt-catatan cbtv-setel-bantu">Belum ada rubrik. Buat di menu <b>Rubrik</b>.</p>
-      )}
+      {/* ---------- DUA PEMILIH, SEJAJAR ----------
+          Dahulu hanya ada pemilih rubrik, berdiri sendiri selebar blok. Kini
+          ada dua, dan keduanya menjawab pertanyaan yang sama ("esai dinilai
+          dengan apa"), jadi keduanya berdampingan di satu baris. Menumpuknya
+          ke bawah membuat yang kedua terbaca seperti setelan yang lain sama
+          sekali, dan yang membacanya tidak akan tahu bahwa keduanya boleh
+          menyala bersama. */}
+      <div className="cbtv-penilai">
+        <label>
+          <span>Jawaban acuan Dosen / Pengajar</span>
+          <select value={nilai.answerKeyId} onChange={(e) => ubah({ answerKeyId: Number(e.target.value) })}>
+            <option value={0}>Tanpa acuan</option>
+            {acuan.map((a) => (
+              <option key={a.id} value={a.id}>{a.nama} ({a.butir.length} butir)</option>
+            ))}
+          </select>
+          <i>Menilai ISI jawaban lewat kemiripan TF-IDF.</i>
+        </label>
+
+        <label>
+          <span>Rubrik penilaian esai</span>
+          <select value={nilai.rubricId} onChange={(e) => ubah({ rubricId: Number(e.target.value) })}>
+            <option value={0}>Tanpa rubrik</option>
+            {rubrik.map((r) => (
+              <option key={r.id} value={r.id}>{r.nama} ({r.kriteria.length} kriteria)</option>
+            ))}
+          </select>
+          <i>Menilai BENTUK jawaban: panjang dan susunannya.</i>
+        </label>
+      </div>
+
+      {/* Satu kalimat, bukan dua peringatan terpisah di bawah masing-masing
+          pemilih. Yang perlu diketahui pengajar adalah keadaan penilaian esai
+          ujian ini secara utuh, dan dua kalimat terpisah tentang dua pustaka
+          kosong hanya memenuhi layar tanpa menambah satu keterangan pun. */}
+      {acuan.length === 0 && rubrik.length === 0 ? (
+        <p className="cbt-catatan cbtv-setel-bantu">
+          Belum ada acuan maupun rubrik. Buat di menu <b>Penilaian esai</b>.
+        </p>
+      ) : !adaPenilai ? (
+        <p className="cbt-catatan cbtv-setel-bantu">
+          Esai dinilai manual: Anda mengetik angkanya sendiri. Itu tetap jalan yang sah.
+        </p>
+      ) : nilai.answerKeyId > 0 && nilai.rubricId > 0 ? (
+        <p className="cbt-catatan cbtv-setel-bantu">
+          Keduanya menyala. Anda mendapat dua pembacaan atas lembar yang sama, dan lembar yang
+          kedua pembacaannya berselisih adalah yang paling perlu Anda baca sendiri.
+        </p>
+      ) : null}
 
       <label className="cbtv-setel-saklar">
         <input
@@ -516,7 +559,7 @@ function SaklarKamera({
   const berlaku = aturanMode(mode).kamera;
 
   return (
-    <div className={`cbt-kamera${berlaku && nyala ? " on" : ""}`}>
+    <div className={`cbt-grup cbt-kamera${berlaku && nyala ? " on" : ""}`}>
       <div className="cbt-kamera-teks">
         <b>Kamera pengawas</b>
         <small>
@@ -572,7 +615,7 @@ function PilihMode({
   ubah: (mode: ModePengawasan) => void;
 }) {
   return (
-    <div className="cbt-mode">
+    <div className="cbt-grup cbt-mode">
       <div className="cbt-mode-kepala">Pengawasan ujian</div>
       <div className="cbt-mode-pilih">
         {SEMUA_MODE.map((m) => (
@@ -602,7 +645,7 @@ function DaftarSetelan({
   ubah: (kunci: KunciSetelan, nyala: boolean) => void;
 }) {
   return (
-    <div className="cbt-sakelar">
+    <div className="cbt-grup cbt-sakelar">
       {SETELAN.map((s) => {
         const mati = kunciBentuk && s.bentuk;
         return (
@@ -634,7 +677,7 @@ function PilihPerangkat({
 }: { nilai: PerangkatKunci; nyala: boolean; ubah: (p: PerangkatKunci) => void }) {
   if (!nyala) return null;
   return (
-    <div className="cbt-perangkat">
+    <div className="cbt-grup cbt-perangkat">
       <span className="cbt-perangkat-kepala">Exam Browser untuk</span>
       <div className="cbt-perangkat-pilih">
         {SEMUA_PERANGKAT.map((p) => (
@@ -675,6 +718,7 @@ function setelanUjian(u: Ujian) {
     proctorMode: rapikanMode(u.proctorMode),
     cameraOn: u.cameraOn !== false,
     // ---------- CBT V1 ----------
+    answerKeyId: u.answerKeyId ?? 0,
     rubricId: u.rubricId ?? 0,
     recordAudio: u.recordAudio === true,
     checkSimilarity: u.checkSimilarity !== false,
@@ -742,7 +786,7 @@ function halanganJadwal(opsi: {
   soalDipakai: number;
 }): string | null {
   const { mulai, selesai, durasi, jumlahBank, soalDipakai } = opsi;
-  if (!mulai || !selesai) return "Tanggal, jam, dan menit — mulai maupun selesai — harus terisi lengkap.";
+  if (!mulai || !selesai) return "Tanggal, jam, dan menit (mulai maupun selesai) harus terisi lengkap.";
   if (selesai.getTime() <= mulai.getTime()) return "Jam selesai harus sesudah jam mulai.";
 
   const menitJendela = Math.round((selesai.getTime() - mulai.getTime()) / 60_000);
@@ -782,6 +826,41 @@ function PilihJam({
   nilai: IsianJam;
   ubah: (isian: IsianJam) => void;
 }) {
+  // Jam berjalan terus selama panel terbuka, dan pemilih yang menghitung
+  // "sudah lewat" sekali saat digambar akan salah sesudah pengajar mengetik
+  // lima belas menit. Denyut tiap tiga puluh detik menggambar ulang
+  // pemilihnya, cukup rapat untuk menit yang baru lewat dan cukup jarang
+  // untuk tidak terasa.
+  const [denyut, setDenyut] = useState(() => Date.now());
+  useEffect(() => {
+    const jentera = window.setInterval(() => setDenyut(Date.now()), 30_000);
+    return () => window.clearInterval(jentera);
+  }, []);
+
+  // Jam yang sudah terlewat diabukan, bukan dibuang dari daftar.
+  //
+  // Dibuang berarti pemilih yang sedang menampilkan "08" pada ujian yang
+  // dijadwalkan kemarin mendadak kosong, dan jadwal yang tadinya terbaca
+  // berubah menjadi tidak terisi tanpa ada yang menyentuhnya. Diabukan
+  // membuat pilihannya tetap terbaca sekaligus tidak dapat dipilih lagi.
+  const kini = sekarangUjian(new Date(denyut));
+  const hariIni = nilai.tanggal === kini.tanggal;
+  const jamTerpilih = nilai.jam === "" ? -1 : Number(nilai.jam);
+
+  /** Jam ini sudah terlewat? Hanya berlaku bila tanggalnya hari ini. */
+  function jamLewat(j: string) {
+    return hariIni && Number(j) < kini.jam;
+  }
+
+  /**
+   * Menit ini sudah terlewat?
+   *
+   * Hanya pada jam yang sedang berjalan. Pada jam-jam sesudahnya seluruh
+   * menit masih di depan, dan mengabukannya akan mengunci jadwal yang sah.
+   */
+  function menitLewat(m: string) {
+    return hariIni && jamTerpilih === kini.jam && Number(m) < kini.menit;
+  }
   // Dibacakan kembali dengan kata, bukan dengan angka.
   //
   // Kotak tanggal bawaan peramban menuliskan urutannya menurut bahasa sistem
@@ -791,39 +870,56 @@ function PilihJam({
   // nama bulan yang dieja, sehingga tanggal yang keliru terbaca sebelum
   // ujiannya dijadwalkan, bukan sesudah pesertanya menunggu di hari yang salah.
   const terbaca = dariIsian(nilai);
+  const sudahLewat = terbaca !== null && terbaca.getTime() < denyut;
   return (
     <div className="cbt-jam">
       <span className="cbt-jam-label">{label}</span>
       <div className="cbt-jam-baris">
+        {/* min menutup hari-hari yang sudah lewat di dalam kalender bawaan
+            peramban, sehingga tanggal kemarin tidak dapat dipilih sama sekali.
+            Tanggal yang TERLANJUR tersimpan tetap ditampilkan: min hanya
+            menjaga pilihan baru, tidak menghapus nilai yang sudah ada. */}
         <input
           type="date"
           aria-label={`Tanggal ${label.toLowerCase()}`}
+          min={kini.tanggal}
           value={nilai.tanggal}
           onChange={(e) => ubah({ ...nilai, tanggal: e.target.value })}
         />
         <select
           aria-label={`Jam ${label.toLowerCase()}`}
+          className="cbt-jam-pilih"
           value={nilai.jam}
           onChange={(e) => ubah({ ...nilai, jam: e.target.value })}
         >
           <option value="">--</option>
-          {PILIHAN_JAM.map((j) => <option key={j} value={j}>{j}</option>)}
+          {PILIHAN_JAM.map((j) => (
+            <option key={j} value={j} disabled={jamLewat(j)}>{j}</option>
+          ))}
         </select>
         <b className="cbt-jam-titik">.</b>
         <select
           aria-label={`Menit ${label.toLowerCase()}`}
+          className="cbt-jam-pilih"
           value={nilai.menit}
           onChange={(e) => ubah({ ...nilai, menit: e.target.value })}
         >
           <option value="">--</option>
-          {PILIHAN_MENIT.map((m) => <option key={m} value={m}>{m}</option>)}
+          {PILIHAN_MENIT.map((m) => (
+            <option key={m} value={m} disabled={menitLewat(m)}>{m}</option>
+          ))}
         </select>
         <span className="cbt-jam-zona">{HURUF_ZONA}</span>
       </div>
-      <small className="cbt-jam-baca">
+      <small className={`cbt-jam-baca${sudahLewat ? " cbt-jam-basi" : ""}`}>
         {terbaca
           ? jamIndonesia(terbaca, { hari: true, tahun: true, panjang: true })
           : "Tanggal, jam, dan menit belum lengkap."}
+        {/* Mengabukan pilihan saja tidak cukup untuk jadwal yang SUDAH
+            tersimpan lewat: pilihannya tetap terbaca seperti jadwal yang sah,
+            hanya tidak dapat dipilih ulang. Kalimat inilah yang mengatakan
+            bahwa yang terbaca itu sudah berlalu. */}
+        {sudahLewat && <b> (sudah terlewat)</b>}
       </small>
     </div>
   );
@@ -855,6 +951,9 @@ export default function CbtPanel({ role }: { role: string }) {
   /** Rubrik yang dapat dipilih pada pengaturan ujian. Dimuat sekali. */
   const [daftarRubrik, setDaftarRubrik] = useState<Array<{ id: number; nama: string; kriteria: unknown[] }>>([]);
 
+  /** Kunci jawaban acuan yang dapat dipilih pada pengaturan ujian. */
+  const [daftarAcuan, setDaftarAcuan] = useState<Array<{ id: number; nama: string; butir: unknown[]; ambangPenuh: number }>>([]);
+
   /** Bahan CBT V1 untuk peserta yang sedang dibuka. */
   const [pasanganMirip, setPasanganMirip] = useState<PasanganMirip[]>([]);
   const [rubrikCetak, setRubrikCetak] = useState<unknown[]>([]);
@@ -872,6 +971,7 @@ export default function CbtPanel({ role }: { role: string }) {
     proctorMode: "biasa" as ModePengawasan,
     // Penilaian & integritas, kini ikut ditentukan sejak ujiannya dibuat.
     // Bawaannya sama dengan yang dipakai server bila medannya tidak dikirim.
+    answerKeyId: 0,
     rubricId: 0,
     recordAudio: false,
     checkSimilarity: true,
@@ -926,6 +1026,7 @@ export default function CbtPanel({ role }: { role: string }) {
     // Bawaannya berarti "seperti sebelum V1": tanpa rubrik, tanpa rekaman,
     // tanpa surat otomatis. Yang menyala hanya pemeriksaan kemiripan, yang
     // tidak berbiaya, tidak menunda apa pun, dan tidak pernah mengubah nilai.
+    answerKeyId: 0,
     rubricId: 0,
     recordAudio: false,
     checkSimilarity: true,
@@ -1075,24 +1176,35 @@ export default function CbtPanel({ role }: { role: string }) {
     return () => window.clearTimeout(tunda);
   }, [muatUjian]);
 
-  // Daftar rubrik, untuk pemilih pada formulir Buat ujian dan Pengaturan ujian.
+  // Daftar acuan dan rubrik, untuk pemilih pada formulir Buat ujian dan
+  // Pengaturan ujian.
   //
   // Dimuat di awal DAN tiap kali menunya kembali ke daftar ujian. Yang kedua
-  // itu yang penting: pengajar membuka menu Rubrik, menyusun rubriknya, lalu
-  // kembali untuk memasangnya — dan daftar yang hanya dimuat sekali di awal
-  // tidak memuat rubrik yang baru saja ia buat. Gagal memuat didiamkan;
-  // pemilihnya menampilkan "Tanpa rubrik", dan itu pilihan yang sah.
+  // itu yang penting: pengajar membuka menu Penilaian esai, menyusun acuannya,
+  // lalu kembali untuk memasangnya, dan daftar yang hanya dimuat sekali di
+  // awal tidak memuat acuan yang baru saja ia buat. Gagal memuat didiamkan;
+  // pemilihnya menampilkan "Tanpa acuan", dan itu pilihan yang sah.
+  //
+  // Keduanya diminta BERSAMAAN lewat Promise.all, bukan bergantian. Dua
+  // permintaan berurutan membuat pemilih kedua terlambat selama perjalanan
+  // pertama, dan yang terjadi di layar adalah pemilih acuan yang sekejap
+  // kosong tepat ketika pengajar hendak menyentuhnya.
   useEffect(() => {
     if (menu !== "ujian") return;
     let hidup = true;
     void (async () => {
-      try {
-        const jawab = await fetch("/api/cbt/rubrik", { cache: "no-store" });
+      const ambil = async (jalur: string) => {
+        const jawab = await fetch(jalur, { cache: "no-store" });
         const data = await jawab.json();
-        if (hidup && jawab.ok && data.success) setDaftarRubrik(data.rubrik || []);
-      } catch {
-        // Didiamkan; lihat catatan di atas.
-      }
+        return jawab.ok && data.success ? data : null;
+      };
+      const [rubrik, acuan] = await Promise.all([
+        ambil("/api/cbt/rubrik").catch(() => null),
+        ambil("/api/cbt/acuan").catch(() => null),
+      ]);
+      if (!hidup) return;
+      if (rubrik) setDaftarRubrik(rubrik.rubrik || []);
+      if (acuan) setDaftarAcuan(acuan.acuan || []);
     })();
     return () => { hidup = false; };
   }, [menu]);
@@ -1179,11 +1291,14 @@ export default function CbtPanel({ role }: { role: string }) {
   // berikutnya. Dari kursi pengajar, nilainya sudah ada tanpa ia mengoreksi
   // apa pun.
   //
-  // Yang dipakai jalur LOKAL: menghitung dari panjang jawaban dibanding
-  // sekelas, cakupan istilah soal, dan susunan kalimatnya. Tanpa kunci API,
-  // tanpa biaya, dan hasilnya sama tiap kali. Pembacaan isi oleh model tetap
-  // ada, tetapi sebagai tombol yang ditekan sendiri — bukan sesuatu yang
-  // berjalan diam-diam dan menagih per jawaban.
+  // Yang dipakai jalur ACUAN bila ujiannya punya kunci jawaban acuan, dan
+  // jalur LOKAL bila tidak. Acuan didahulukan karena ia mengukur ISI jawaban,
+  // sedangkan lokal hanya mengukur bentuknya, dan keduanya sama-sama gratis
+  // serta sama-sama berjalan di dalam server. Tidak ada alasan memakai yang
+  // lebih lemah ketika yang lebih kuat sudah dipasang pengajarnya.
+  //
+  // Pembacaan isi oleh model tetap ada, tetapi sebagai tombol yang ditekan
+  // sendiri, bukan sesuatu yang berjalan diam-diam dan menagih per jawaban.
   //
   // Tiga pagar:
   //
@@ -1198,8 +1313,8 @@ export default function CbtPanel({ role }: { role: string }) {
   //   3. HANYA KALAU MEMANG ADA YANG MENUNGGU. `tertunda` datang dari server
   //      dan sudah menghitung jawaban yang belum dinilai.
   // ============================================================
-  const nilaiSendiri = useCallback(async (id: number, daftar: Peserta[], pakaiRubrik: boolean) => {
-    if (!pakaiRubrik) return;
+  const nilaiSendiri = useCallback(async (id: number, daftar: Peserta[], aksi: "acuan" | "lokal" | null) => {
+    if (!aksi) return;
     if (nilaiJalanRef.current || nilaiMenyerahRef.current.has(id)) return;
     if (!daftar.some((p) => p.status !== "berjalan" && p.tertunda > 0)) return;
 
@@ -1208,7 +1323,7 @@ export default function CbtPanel({ role }: { role: string }) {
       const jawab = await fetch("/api/cbt/penilaian", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ aksi: "lokal", ujian: id }),
+        body: JSON.stringify({ aksi, ujian: id }),
       });
       const data = await jawab.json();
       if (!jawab.ok || !data.success) {
@@ -1235,8 +1350,11 @@ export default function CbtPanel({ role }: { role: string }) {
   // Ditunda satu putaran, pola yang sama dengan pemuat lain di panel ini.
   useEffect(() => {
     if (buka === null || tab !== "pantau" || peserta.length === 0) return;
-    const pakaiRubrik = Boolean(ujian.find((u) => u.id === buka)?.rubricId);
-    const jam = setTimeout(() => void nilaiSendiri(buka, peserta, pakaiRubrik), 0);
+    // Acuan lebih dulu, rubrik sesudahnya, dan null berarti ujian ini memang
+    // tidak minta dinilai sendiri.
+    const dibuka = ujian.find((u) => u.id === buka);
+    const aksiNilai = dibuka?.answerKeyId ? "acuan" : dibuka?.rubricId ? "lokal" : null;
+    const jam = setTimeout(() => void nilaiSendiri(buka, peserta, aksiNilai), 0);
     return () => clearTimeout(jam);
   }, [buka, tab, peserta, ujian, nilaiSendiri]);
 
@@ -2053,7 +2171,7 @@ export default function CbtPanel({ role }: { role: string }) {
       // hanya yang kedua yang berarti sesuatu.
       jejak: jejak.slice(0, 100).map((j) => ({
         jam: jamIndonesia(j.jam),
-        keterangan: `${INSIDEN_LABEL[j.jenis as JenisInsiden] ?? j.jenis}${j.detail ? ` — ${j.detail}` : ""}`,
+        keterangan: `${INSIDEN_LABEL[j.jenis as JenisInsiden] ?? j.jenis}${j.detail ? `: ${j.detail}` : ""}`,
       })),
     };
     bukaCetak(
@@ -2170,6 +2288,39 @@ export default function CbtPanel({ role }: { role: string }) {
   // menyampaikan sisanya kepada yang menekan.
   // ============================================================
 
+  /**
+   * Nilai ULANG seluruh kelas dengan jawaban acuan.
+   *
+   * Tombol ini ada karena bobot kata TF-IDF bergantung pada seluruh lembar
+   * yang dibandingkan. Penilaian yang berjalan sendiri di tengah ujian memakai
+   * korpus yang belum lengkap, jadi dua jawaban yang sama persis dapat
+   * bernilai sedikit berbeda bila dinilai pada putaran yang berbeda.
+   *
+   * Sekali ditekan sesudah kelasnya selesai, seluruh peserta dinilai dengan
+   * satu korpus yang sama, dan selisih yang datang dari urutan pengumpulan
+   * hilang. Nilai yang bergantung pada siapa mengumpulkan lebih dulu adalah
+   * nilai yang tidak dapat dipertahankan di hadapan yang menggugatnya.
+   */
+  async function nilaiUlangAcuan() {
+    if (!terbuka) return;
+    kabari("acuan-ulang", "jalan", "Menilai ulang…");
+    try {
+      const jawab = await fetch("/api/cbt/penilaian", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aksi: "acuan", ujian: terbuka.id, ulangi: true }),
+      });
+      const data = await jawab.json();
+      if (!jawab.ok || !data.success) throw new Error(data.message || "Gagal menilai.");
+      setPesan(data.pesan || "Penilaian acuan selesai.");
+      await muatHasil(terbuka.id);
+      kabari("acuan-ulang", "oke", "✓ Selesai", 6000);
+    } catch (alasan: unknown) {
+      setGalat(alasan instanceof Error ? alasan.message : "Penilaian acuan gagal dijalankan.");
+      kabari("acuan-ulang", "gagal", "✕ Gagal", 6000);
+    }
+  }
+
   async function nilaiSemuaEsai() {
     if (!terbuka) return;
     kabari("ai-semua", "jalan", "Menilai…");
@@ -2247,22 +2398,23 @@ export default function CbtPanel({ role }: { role: string }) {
         <h2 className="dsh-title">Ujian Online (CBT)</h2>
 
         {/* ---------- TIGA MENU, SATU TEMPAT ----------
-            Rubrik dan daftar mahasiswa hanya berarti bagi CBT, jadi keduanya
-            duduk di sini — bukan sebagai dua menu baru di sidebar dashboard
-            yang juga dilihat admin bagian yang tidak pernah menyentuh ujian. */}
+            Penilaian esai dan daftar peserta hanya berarti bagi CBT, jadi
+            keduanya duduk di sini, bukan sebagai dua menu baru di sidebar
+            dashboard yang juga dilihat admin bagian yang tidak pernah
+            menyentuh ujian. */}
         <div className="cbt-tab cbtv-menu">
           <button type="button" className={menu === "ujian" ? "on" : ""} onClick={() => setMenu("ujian")}>
             Ujian ({ujian.length})
           </button>
           <button type="button" className={menu === "rubrik" ? "on" : ""} onClick={() => setMenu("rubrik")}>
-            Rubrik penilaian
+            Penilaian esai
           </button>
           <button type="button" className={menu === "mahasiswa" ? "on" : ""} onClick={() => setMenu("mahasiswa")}>
             Data mahasiswa
           </button>
         </div>
 
-        {menu === "rubrik" && <PanelRubrik />}
+        {menu === "rubrik" && <PanelPenilaianEsai />}
         {menu === "mahasiswa" && <PanelMahasiswa bolehKelola={pemantau} />}
 
         {menu === "ujian" && (<>
@@ -2328,6 +2480,7 @@ export default function CbtPanel({ role }: { role: string }) {
             <SetelPenilaian
               nilai={draf}
               rubrik={daftarRubrik}
+              acuan={daftarAcuan}
               ubah={(tambalan) => setDraf({ ...draf, ...tambalan })}
             />
             <p className="cbt-catatan">Semua setelan ini masih bisa diubah lewat <b>⚙ Pengaturan ujian</b>.</p>
@@ -2727,6 +2880,7 @@ export default function CbtPanel({ role }: { role: string }) {
               <SetelPenilaian
                 nilai={setel}
                 rubrik={daftarRubrik}
+                acuan={daftarAcuan}
                 kunciRekam={sedangBerlangsung && !setelanUjian(terbuka).recordAudio}
                 ubah={(tambalan) => setSetel({ ...setel, ...tambalan })}
               />
@@ -3002,7 +3156,7 @@ export default function CbtPanel({ role }: { role: string }) {
               <p className={`cbt-hitung-kabar ${cukupSoal ? "cukup" : "kurang"}`}>
                 {cukupSoal
                   ? soal.length > terbuka.questionCount
-                    ? `✓ Cukup, malah berlebih ${soal.length - terbuka.questionCount} soal — yang dipakai diacak dari seluruh bank.`
+                    ? `✓ Cukup, malah berlebih ${soal.length - terbuka.questionCount} soal, yang dipakai diacak dari seluruh bank.`
                     : "✓ Cukup. Bank soalnya pas dengan jumlah yang dipakai ujian."
                   : `Kurang ${terbuka.questionCount - soal.length} soal lagi. Ujian belum dapat diaktifkan sebelum banknya cukup.`}
               </p>
@@ -3265,7 +3419,7 @@ export default function CbtPanel({ role }: { role: string }) {
                 dengan kalimatnya sendiri tetap mendapat angka tinggi. */}
             {(soalBaru.jenis === "essay" || soalBaru.jenis === "isian") && (
               <label className="cbt-lebar"><span>
-                Jawaban acuan {soalBaru.jenis === "essay" ? "— menentukan nilai otomatisnya" : "(opsional)"}
+                Jawaban acuan {soalBaru.jenis === "essay" ? "(menentukan nilai otomatisnya)" : "(opsional)"}
               </span>
                 <textarea
                   rows={4}
@@ -3435,6 +3589,14 @@ export default function CbtPanel({ role }: { role: string }) {
                     yang tidak mengatakan berapa banyak yang akan terkena
                     membuat orang ragu menekannya — lalu mengerjakannya satu
                     per satu, empat puluh kali. */}
+                {terbuka.answerKeyId && sudahKumpul > 0 && (
+                  <Tbl
+                    kabar={aksi["acuan-ulang"]}
+                    dasar="btn btn-light btn-mini"
+                    diam={`↻ Nilai ulang ${sudahKumpul} lembar dengan acuan`}
+                    onClick={() => void nilaiUlangAcuan()}
+                  />
+                )}
                 {terbuka.rubricId && sudahKumpul > 0 && (
                   <Tbl
                     kabar={aksi["ai-semua"]}
@@ -3690,7 +3852,7 @@ export default function CbtPanel({ role }: { role: string }) {
                       salah satunya keliru. */}
                   {terbuka.randomOptions && (
                     <p className="cbt-catatan">
-                      Huruf pilihan di bawah mengikuti urutan <b>bank soal</b> —
+                      Huruf pilihan di bawah mengikuti urutan <b>bank soal</b>,
                       sama dengan naskah cetak. Urutan pilihan di layar peserta
                       diacak, dan jawabannya sudah dikembalikan ke urutan bank
                       oleh sistem, dengan cara yang sama seperti ketika nilainya

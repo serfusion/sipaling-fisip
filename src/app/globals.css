@@ -5040,9 +5040,24 @@ a.al-mini:hover { color: var(--al-ink); }
 .cbt-jam-titik { flex: 0 0 auto; margin: 0 -2px; color: var(--ink); font-size: 15px; font-weight: 800; }
 .cbt-jam-zona { flex: 0 0 auto; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .04em; }
 
+/* Jam dan menit yang sudah terlewat.
+
+   Peramban memang mengabukan <option disabled> sendiri, tetapi warnanya
+   ditentukan mesin gambar masing-masing dan pada sebagian di antaranya nyaris
+   tidak terbedakan dari pilihan yang masih hidup. Ditulis terus terang di sini
+   supaya "tidak bisa diklik" terlihat sebelum diklik, bukan sesudahnya. */
+.cbt-jam-baris select option:disabled {
+  color: #94a3b8; background: var(--canvas); font-style: italic;
+}
+
 /* Tanggal yang dieja kembali di bawah pemilihnya. Kecil, tetapi ia satu-satunya
    tempat di layar ini yang tidak dapat dibaca terbalik. */
 .cbt-jam-baca { color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+/* Jadwal yang tersimpan dengan jam yang sudah berlalu. Pemilihnya tidak dapat
+   mengabukan dirinya sendiri untuk nilai yang TERLANJUR terpilih, jadi
+   keterangannya yang berbicara. */
+.cbt-jam-basi { color: var(--red); }
+.cbt-jam-basi b { font-weight: 800; }
 .cbt-jadwal-ringkas {
   margin: 0 0 10px; padding: 9px 12px; border-radius: 9px;
   background: var(--blue-soft); color: var(--navy); font-size: 12px; line-height: 1.65;
@@ -6166,6 +6181,26 @@ table.qt td small { font-size: 11.5px; }
   white-space: nowrap;
 }
 
+/* ---------- KELOMPOK SETELAN UJIAN ----------
+
+   Pengaturan ujian memuat lima kelompok berurutan, masing-masing dengan kelas
+   sendiri: setelan umum (.cbt-sakelar), perangkat yang dikunci
+   (.cbt-perangkat), mode pengawasan (.cbt-mode), saklar kamera (.cbt-kamera),
+   dan penilaian (.cbt-mode.cbtv-setel). Tanpa pemisah, kelimanya mengalir
+   sebagai satu daftar panjang, dan judul tiap kelompok terbaca seperti
+   keterangan setelan di atasnya alih-alih kepala kelompok baru.
+
+   Yang dipakai penanda bersama .cbt-grup, bukan daftar pasangan kelas yang
+   saling bertetangga: pasangan semacam itu harus ditambah tiap kali ada
+   kelompok baru, dan yang lupa menambahkannya tidak akan melihat apa pun
+   rusak, hanya satu garis yang diam-diam hilang.
+
+   Selektor tetangga, bukan aturan pada tiap kelompok. Kelompok PERTAMA tidak
+   punya apa pun di atasnya untuk dipisahkan, dan .cbt-perangkat menghilang
+   sama sekali ketika Exam Browser mati, sehingga "yang pertama" bukan selalu
+   elemen yang sama. */
+.cbt-grup + .cbt-grup { margin-top: 20px; padding-top: 18px; border-top: 1px solid #eef2f7; }
+
 /* ---------- Pemilih mode pengawasan ---------- */
 .cbt-mode { margin-top: 16px; }
 .cbt-mode-kepala {
@@ -6917,23 +6952,127 @@ table.qt td small { font-size: 11.5px; }
 
 /* ---------- SETELAN V1 PADA PENGATURAN UJIAN ---------- */
 .cbtv-setel { margin-top: 16px; padding: 0; }
-.cbtv-setel-baris { display: block; margin-bottom: 12px; }
-.cbtv-setel-baris > span {
-  display: block; margin-bottom: 8px; font-size: 13px; font-weight: 600; color: #334155;
-}
-.cbtv-setel-baris select {
-  width: 100%; max-width: 500px; padding: 10px 12px;
-  border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; font-size: 14px;
-}
 .cbtv-setel-bantu { margin: 0 0 16px; padding: 8px 12px; background: #f8fafc; border-radius: 6px; font-size: 12px; }
-.cbtv-setel-saklar { display: flex; align-items: flex-start; gap: 12px; margin: 14px 0; cursor: pointer; }
+
+/* Satu baris saklar: kotak centang, judulnya, dan keterangannya.
+
+   Jarak atas dan bawah dibuat SAMA dan tetap. Dahulu tiap saklar membawa
+   margin sendiri yang bertemu margin tetangganya, dan yang terjadi adalah
+   jarak antarsaklar berubah-ubah menurut ada tidaknya keterangan kecil di
+   bawah masing-masing. Deretan yang jaraknya tidak tetap terbaca seperti
+   daftar yang sebagian isinya berkelompok, padahal tidak. */
+.cbtv-setel-saklar {
+  display: flex; align-items: flex-start; gap: 12px; margin: 0; padding: 11px 0;
+  cursor: pointer;
+}
+.cbtv-setel-saklar + .cbtv-setel-saklar { border-top: 1px solid #eef2f7; }
 .cbtv-setel-saklar input { margin-top: 4px; flex: 0 0 auto; cursor: pointer; }
 .cbtv-setel-saklar b { display: block; font-size: 14px; font-weight: 600; color: #334155; }
 .cbtv-setel-saklar small { display: block; margin-top: 3px; font-size: 12px; line-height: 1.5; color: #64748b; }
 .cbtv-setel-saklar i { color: #b45309; font-style: normal; }
-.cbtv-ambang { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin: 12px 0 14px 0; padding: 12px 0 0 0; }
-.cbtv-ambang label { display: flex; flex-direction: column; align-items: stretch; gap: 6px; font-size: 12px; font-weight: 600; color: #475569; }
-.cbtv-ambang input { width: 100%; max-width: 140px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 13px; }
+/* Dua ambang kemiripan, berdampingan.
+
+   Dahulu label, kotak isian, dan tanda persennya ditumpuk ke bawah dalam satu
+   kolom, sehingga tanda "%" jatuh sendirian di baris di bawah kotaknya dan
+   terbaca seperti isian ketiga yang kosong. Sekarang kotak dan tandanya duduk
+   di satu baris, dan hanya labelnya yang berada di atas. */
+/* Bertakuk ke dalam dan bergaris di tepi kiri, karena kedua ambang ini hanya
+   berlaku bila saklar di atasnya menyala. Tanpa takukan, keduanya terbaca
+   sebagai setelan yang berdiri sendiri, dan yang mematikan saklarnya akan
+   bingung ke mana perginya dua isian yang barusan ia atur. */
+.cbtv-ambang {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px 18px; margin: 2px 0 12px; padding: 12px 0 2px 16px;
+  border-left: 2px solid #e2e8f0;
+}
+.cbtv-ambang label {
+  display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto;
+  align-items: center; justify-content: start; gap: 6px 8px;
+  font-size: 12px; font-weight: 600; color: #475569;
+}
+.cbtv-ambang label > span { grid-column: 1 / -1; }
+.cbtv-ambang input {
+  width: 96px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 7px;
+  font-size: 13px; font-variant-numeric: tabular-nums; text-align: center;
+}
+.cbtv-ambang label > i { font-style: normal; font-weight: 700; color: #64748b; }
+
+/* ---------- PENILAIAN ESAI: DUA CARA DALAM SATU MENU ---------- */
+.cbtv-cara { margin-bottom: 8px; }
+.cbtv-cara-baca {
+  margin: 0 0 14px; padding: 9px 13px; border-radius: 8px;
+  background: var(--blue-soft); color: var(--navy); font-size: 12.5px; line-height: 1.6;
+}
+
+/* ---------- DUA PEMILIH PENILAI ESAI, SEJAJAR ----------
+   Keduanya menjawab pertanyaan yang sama, jadi keduanya berdampingan. Di layar
+   sempit mereka menumpuk sendiri, dan urutan menumpuknya tetap acuan lebih
+   dulu karena itulah yang dianjurkan. */
+.cbtv-penilai {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 12px 16px; margin-bottom: 12px;
+}
+.cbtv-penilai label { display: grid; gap: 6px; min-width: 0; }
+.cbtv-penilai > label > span { font-size: 13px; font-weight: 600; color: #334155; }
+.cbtv-penilai select {
+  width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px;
+  background: var(--white); font: inherit; font-size: 14px;
+}
+.cbtv-penilai > label > i {
+  font-style: normal; font-size: 11.5px; line-height: 1.5; color: #64748b;
+}
+
+/* ---------- KUNCI JAWABAN ACUAN ---------- */
+.cbtv-acuan { display: grid; gap: 14px; }
+.cbtv-butir {
+  margin: 12px 0; padding: 13px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fbfcfd;
+}
+.cbtv-nomor { max-width: 118px; }
+.cbtv-jawab-kepala {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
+  gap: 6px 12px; margin-bottom: 5px;
+}
+.cbtv-jawab-kepala > span { font-size: 12px; font-weight: 800; color: #334155; }
+/* Jumlah kata, dan warnanya ketika masih di bawah ambang. Acuan yang terlalu
+   pendek harus ketahuan saat diketik, bukan saat tombol simpan ditekan. */
+.cbtv-jawab-kepala em { font-style: normal; font-size: 11.5px; color: #64748b; }
+.cbtv-jawab-kepala em.kurang { color: #b91c1c; font-weight: 700; }
+.cbtv-jawab textarea {
+  width: 100%; padding: 9px 11px; border: 1px solid #cbd5e1; border-radius: 7px;
+  font: inherit; font-size: 13px; line-height: 1.6;
+}
+.cbtv-wajib { margin-top: 10px; }
+
+.cbtv-ambang-acuan {
+  margin: 12px 0; padding: 13px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fbfcfd;
+}
+.cbtv-ambang-acuan .cbt-catatan { margin: 10px 0 0; font-size: 12px; line-height: 1.6; }
+.cbtv-ambang-baris {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px 18px;
+}
+.cbtv-ambang-baris label {
+  display: grid; grid-template-columns: auto auto; align-items: center;
+  justify-content: start; gap: 6px 8px; font-size: 12px; font-weight: 600; color: #475569;
+}
+.cbtv-ambang-baris label > span { grid-column: 1 / -1; }
+.cbtv-ambang-baris input {
+  width: 96px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 7px;
+  font-size: 13px; font-variant-numeric: tabular-nums; text-align: center;
+}
+.cbtv-ambang-baris label > i { font-style: normal; font-weight: 700; color: #64748b; }
+
+/* Tangga kurva nilai, terbaca sebelum satu butir pun diketik. Angka ambang
+   sendirian tidak mengatakan apa-apa; yang menjawab "kemiripan 55% itu
+   nilainya berapa" adalah deretan ini. */
+.cbtv-kurva {
+  display: flex; flex-wrap: wrap; gap: 6px 8px; margin-top: 11px;
+}
+.cbtv-kurva span {
+  padding: 4px 9px; border-radius: 999px; background: #eef2f7;
+  font-size: 11.5px; color: #475569; font-variant-numeric: tabular-nums;
+}
+.cbtv-kurva b { font-weight: 800; color: #334155; }
+.cbtv-kurva i { font-style: normal; color: #94a3b8; }
 
 /* ---------- LEMBAR PENILAIAN RUBRIK ---------- */
 .cbtv-lembar { margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0; }

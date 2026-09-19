@@ -111,7 +111,7 @@ export function kalimatKemajuan(k: Kemajuan, kerja: "pengajuan" | "revisi" = "pe
   }
   if (k.tahap === "unggah") {
     const persen = persenBita(k.bita, k.bitaTotal);
-    return `Mengunggah berkas ${nomor} dari ${k.total} — ${k.nama} (${persen}%)`;
+    return `Mengunggah berkas ${nomor} dari ${k.total}: ${k.nama} (${persen}%)`;
   }
   const dasar = `Semua berkas terunggah. Menyimpan ${kerja}…`;
   if (k.percobaan > 1) {
