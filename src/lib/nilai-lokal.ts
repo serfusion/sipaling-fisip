@@ -35,6 +35,7 @@
 // ============================================================
 
 import type { LevelRubrik, Rubrik } from "@/lib/rubrik";
+import { cosine, jaccard, ngram } from "@/lib/mirip-jawaban";
 
 // ------------------------------------------------------------
 // PEMBACAAN TEKS
@@ -144,9 +145,23 @@ export type Sinyal = {
   keragaman: number;
   /** 0–1: kepadatan penghubung antar-gagasan. */
   susunan: number;
+  /** 0–1: kedekatan dengan jawaban acuan dosen. 0 bila acuannya tidak ada. */
+  kesesuaian: number;
+  adaAcuan: boolean;
+  /** 0–1: bagian kalimat yang merupakan ulangan kalimat lain. */
+  redundansi: number;
+  /** 0–1: bagian kata yang tidak berbentuk kata. */
+  ngawur: number;
+  /** 0–1: seberapa besar jawaban hanyalah pertanyaannya diketik ulang. */
+  menyalinSoal: number;
 };
 
-export function bacaSinyal(jawaban: string, istilah: string[]): Sinyal {
+export function bacaSinyal(
+  jawaban: string,
+  istilah: string[],
+  pertanyaan = "",
+  acuan = "",
+): Sinyal {
   const kata = kataDariTeks(jawaban);
   const unik = new Set(kata);
   const rendah = String(jawaban ?? "").toLowerCase();
@@ -164,7 +179,121 @@ export function bacaSinyal(jawaban: string, istilah: string[]): Sinyal {
     // membedakan keduanya tanpa membaca isinya.
     keragaman: kata.length === 0 ? 0 : unik.size / kata.length,
     susunan: Math.min(1, penghubung / 4),
+    kesesuaian: acuan.trim() ? kesesuaianAcuan(jawaban, acuan) : 0,
+    adaAcuan: acuan.trim().length > 0,
+    redundansi: redundansi(jawaban),
+    ngawur: ngawur(jawaban),
+    menyalinSoal: pertanyaan.trim() ? menyalinSoal(jawaban, pertanyaan) : 0,
   };
+}
+
+
+// ------------------------------------------------------------
+// KESESUAIAN DENGAN JAWABAN ACUAN
+// ------------------------------------------------------------
+//
+// Inilah yang membuat penilaian berhenti dapat dicurangi dengan mengetik
+// panjang-panjang. Dasarnya cara baku penilaian jawaban singkat otomatis:
+// jawaban peserta dan jawaban acuan dosen sama-sama diubah menjadi vektor
+// bobot kata, lalu diukur sudut di antara keduanya (cosine similarity).
+// Jawaban yang membicarakan hal yang sama akan berdekatan betapa pun berbeda
+// kalimatnya; jawaban yang panjang tetapi membicarakan hal lain tidak.
+//
+// Ditambah satu ukuran kedua: kesamaan URUTAN kata (Jaccard atas 3-gram).
+// Cosine tidak peduli susunan — "media memilih isu" dan "isu memilih media"
+// bernilai sama baginya. Untuk jawaban pendek, perbedaan itu berarti.
+//
+// Keduanya memakai mesin yang sama persis dengan pemeriksaan kemiripan
+// antarpeserta di src/lib/mirip-jawaban.ts. Satu mesin, dua kegunaan: di sana
+// membandingkan peserta dengan peserta, di sini peserta dengan acuan dosen.
+
+/** Vektor jumlah kata isi, tanpa kata umum. */
+function vektorKata(teks: string): Map<string, number> {
+  const peta = new Map<string, number>();
+  for (const k of kataDariTeks(teks)) {
+    if (k.length < 3 || KATA_UMUM.has(k)) continue;
+    peta.set(k, (peta.get(k) ?? 0) + 1);
+  }
+  return peta;
+}
+
+/**
+ * Seberapa dekat jawaban dengan acuan dosen, 0–1.
+ *
+ * Nol berarti tidak ada acuan untuk dibandingkan — BUKAN berarti jawabannya
+ * salah. Pemanggilnya harus membedakan keduanya, dan `adaAcuan` di bawah
+ * itulah yang membedakannya.
+ */
+export function kesesuaianAcuan(jawaban: string, acuan: string): number {
+  const a = vektorKata(jawaban);
+  const b = vektorKata(acuan);
+  if (a.size === 0 || b.size === 0) return 0;
+
+  const arah = cosine(a, b);
+  const urutan = jaccard(
+    new Set(ngram(kataDariTeks(jawaban), 3)),
+    new Set(ngram(kataDariTeks(acuan), 3)),
+  );
+  // Cosine memimpin: parafrase yang benar harus lolos, dan itu justru tanda
+  // peserta memahami — bukan menyalin. Urutan kata hanya menambah keyakinan.
+  return Math.min(1, arah * 0.8 + urutan * 0.2);
+}
+
+// ------------------------------------------------------------
+// PENANGKAL AKAL-AKALAN
+// ------------------------------------------------------------
+//
+// Tiga cara paling murah membohongi penilai otomatis, dan ketiganya sudah
+// terdokumentasi dalam penelitian penilaian esai otomatis: mengulang kalimat
+// yang sama (padding), mengetik huruf asal (gibberish), dan menyalin kembali
+// pertanyaannya. Ketiganya menaikkan jumlah kata tanpa menambah satu gagasan
+// pun, dan ketiganya dihitung di sini.
+
+/** Bagian kalimat yang merupakan ulangan kalimat lain, 0–1. */
+export function redundansi(teks: string): number {
+  const kalimat = String(teks ?? "")
+    .split(/[.!?\n]+/)
+    .map((k) => kataDariTeks(k))
+    .filter((k) => k.length >= 2);
+  if (kalimat.length < 2) return 0;
+
+  let ulangan = 0;
+  for (let i = 1; i < kalimat.length; i += 1) {
+    const kini = new Set(kalimat[i]);
+    for (let j = 0; j < i; j += 1) {
+      // Dua kalimat dianggap ulangan bila delapan dari sepuluh katanya sama.
+      // Ambang di bawah itu akan menghukum penulis yang memang mengulang satu
+      // istilah kunci di tiap kalimat, dan itu justru tanda jawaban yang fokus.
+      if (jaccard(kini, new Set(kalimat[j])) >= 0.8) { ulangan += 1; break; }
+    }
+  }
+  return ulangan / kalimat.length;
+}
+
+/** Bagian kata yang tidak berbentuk kata, 0–1. */
+export function ngawur(teks: string): number {
+  const kata = kataDariTeks(teks);
+  if (kata.length === 0) return 0;
+  let aneh = 0;
+  for (const k of kata) {
+    // Tanpa huruf hidup sama sekali, atau panjang tidak wajar. "asdfgh",
+    // "qwertyuiop", dan "kkkkkkkk" tertangkap; "DPR" dan "PDIP" tidak,
+    // karena singkatan pendek dilewati.
+    if (k.length <= 3) continue;
+    const adaVokal = /[aeiou]/.test(k);
+    const berulang = /(.)\1{3,}/.test(k);
+    const deretKonsonan = /[bcdfghjklmnpqrstvwxyz]{5,}/.test(k);
+    if (!adaVokal || berulang || deretKonsonan || k.length > 24) aneh += 1;
+  }
+  return aneh / kata.length;
+}
+
+/** Seberapa besar jawaban hanyalah pertanyaannya yang diketik ulang, 0–1. */
+export function menyalinSoal(jawaban: string, pertanyaan: string): number {
+  const a = kataDariTeks(jawaban);
+  const b = kataDariTeks(pertanyaan);
+  if (a.length < 3 || b.length < 3) return 0;
+  return jaccard(new Set(ngram(a, 3)), new Set(ngram(b, 3)));
 }
 
 // ------------------------------------------------------------
@@ -299,19 +428,44 @@ export function nilaiLokal({
   pembandingKata?: number[];
 }): HasilLokal {
   const istilah = istilahKunci(pertanyaan, acuan);
-  const sinyal = bacaSinyal(jawaban, istilah);
+  const sinyal = bacaSinyal(jawaban, istilah, pertanyaan, acuan);
 
   const relatif = pembandingKata.length >= MIN_PEMBANDING;
   const panjang = relatif ? kedudukan(sinyal.kata, pembandingKata) : kedudukanAmbang(sinyal.kata);
 
-  // Panjang yang dicapai dengan mengulang kalimat yang sama tidak dihitung
-  // penuh. Keragaman di bawah 0,4 berarti hampir seluruhnya pengulangan.
-  const panjangJujur = panjang * Math.min(1, sinyal.keragaman / 0.55 + 0.25);
+  // ---------- KEJUJURAN BENTUK ----------
+  //
+  // Satu pengali, 0–1, yang menyusut setiap kali jawaban menaikkan jumlah
+  // katanya tanpa menambah gagasan. Ketiganya berlipat, bukan dijumlah:
+  // jawaban yang sekaligus mengulang DAN ngawur harus jatuh lebih dalam
+  // daripada yang hanya melakukan salah satunya.
+  const kejujuran =
+    (1 - sinyal.redundansi) *
+    (1 - Math.min(1, sinyal.ngawur * 2)) *
+    Math.min(1, sinyal.keragaman / 0.45 + 0.15);
 
-  const gabungan = Math.min(
-    1,
-    panjangJujur * 0.55 + sinyal.cakupan * 0.30 + sinyal.susunan * 0.15,
-  );
+  // Bagian jawaban yang hanyalah pertanyaannya diketik ulang tidak dihitung
+  // sebagai isi. Menyalin soal adalah cara paling murah memenuhi ambang kata.
+  const isiBersih = Math.max(0, 1 - sinyal.menyalinSoal);
+
+  // ---------- NILAI ISI ----------
+  //
+  // Ketika dosen mengisi jawaban acuan, kedekatan dengan acuan itulah yang
+  // memimpin — 60% — dan panjang tidak ikut sama sekali. Tanpa acuan, yang
+  // tersisa hanya cakupan istilah soal dan susunan kalimat; panjang diberi
+  // porsi kecil karena harus ada sesuatu yang membedakan jawaban dua kata
+  // dari jawaban satu paragraf, tetapi porsinya sengaja tidak cukup untuk
+  // memenangkan apa pun sendirian.
+  const isi = sinyal.adaAcuan
+    ? Math.min(1, (sinyal.kesesuaian * 0.60 + sinyal.cakupan * 0.25 + sinyal.susunan * 0.15) * isiBersih * kejujuran)
+    : Math.min(1, (sinyal.cakupan * 0.50 + sinyal.susunan * 0.25 + panjang * 0.25) * isiBersih * kejujuran);
+
+  // ---------- MELENCENG ----------
+  //
+  // Jawaban yang tidak menyentuh acuan MAUPUN istilah soalnya tidak dinilai
+  // dari panjangnya, berapa pun panjangnya. Inilah yang menutup celah
+  // "ketik apa saja asal banyak".
+  const melenceng = sinyal.adaAcuan && sinyal.kesesuaian < 0.12 && sinyal.cakupan < 0.10;
 
   const dasar = relatif
     ? `${sinyal.kata} kata (lebih panjang dari ${Math.round(panjang * 100)}% jawaban lain)`
@@ -320,55 +474,72 @@ export function nilaiLokal({
     sinyal.istilahTotal > 0
       ? `${sinyal.istilahKena} dari ${sinyal.istilahTotal} istilah soal`
       : "istilah soal tidak dapat diambil";
+  const dasarAcuan = sinyal.adaAcuan
+    ? `kesesuaian dengan jawaban acuan ${Math.round(sinyal.kesesuaian * 100)}%`
+    : "tanpa jawaban acuan";
+
+  const peringatan: string[] = [];
+  if (sinyal.redundansi > 0.3) peringatan.push(`${Math.round(sinyal.redundansi * 100)}% kalimatnya mengulang`);
+  if (sinyal.ngawur > 0.15) peringatan.push(`${Math.round(sinyal.ngawur * 100)}% katanya tidak berbentuk kata`);
+  if (sinyal.menyalinSoal > 0.4) peringatan.push("sebagian besar menyalin pertanyaannya");
+  if (melenceng) peringatan.push("tidak menyentuh acuan maupun istilah soal");
 
   const kriteria: UsulanKriteria[] = rubrik.kriteria.map((k, urut) => {
-    // AMBANG RUBRIK MENANG ATAS SEGALANYA.
+    // ---------- PANJANG HANYA MEMBATASI, TIDAK PERNAH MEMBERI ----------
     //
-    // Yang menyusun rubrik tahu soalnya; penilai otomatis tidak. Ketika
-    // pengajar sudah menuliskan "level 4 mulai 140 kata", tidak ada gunanya
-    // menimbangnya lagi dengan tebakan.
-    const dariAmbang = levelDariAmbang(sinyal.kata, k.levels);
-    if (dariAmbang !== null) {
-      const batas = [...k.levels]
-        .sort((a, b) => a.level - b.level)
-        .find((l) => l.level === dariAmbang)?.minKata ?? 0;
-      return {
-        urut,
-        level: Math.max(rubrik.skalaMin, Math.min(rubrik.skalaMax, dariAmbang)),
-        alasan: `${sinyal.kata} kata — ambang level ${dariAmbang} pada rubrik ini ${batas} kata.`,
-      };
-    }
-
+    // Inilah pembalikan yang menutup celah "asal panjang". Ambang pada rubrik
+    // tidak lagi MENENTUKAN level; ia menjadi LANGIT-LANGIT. Jawaban 300 kata
+    // yang isinya tidak menyentuh acuan tetap mendapat level satu, sedangkan
+    // jawaban 150 kata yang tepat tidak akan terhalang.
+    //
+    // Arahnya masuk akal bagi yang menyusun rubrik: "level 4 mulai 140 kata"
+    // berarti jawaban di bawah 140 kata tidak akan dianggap level 4 betapa pun
+    // tepatnya — dan itu memang yang dimaksud ketika ambangnya ditulis.
     const keluarga = keluargaKriteria(k.nama);
     const nilai =
-      keluarga === "cakupan" ? sinyal.cakupan
-        : keluarga === "susunan" ? sinyal.susunan
-          : keluarga === "panjang" ? panjangJujur
-            : gabungan;
+      melenceng ? 0
+        : keluarga === "cakupan" ? sinyal.cakupan * kejujuran
+          : keluarga === "susunan" ? sinyal.susunan * kejujuran
+            : isi;
 
     const alasan =
-      keluarga === "cakupan" ? `${dasarIstilah}.`
-        : keluarga === "susunan" ? `${sinyal.kalimat} kalimat, ${sinyal.paragraf} paragraf.`
-          : keluarga === "panjang" ? `${dasar}.`
-            : `${dasar}, ${dasarIstilah}, ${sinyal.kalimat} kalimat.`;
+      melenceng ? `Tidak menyentuh acuan maupun istilah soal (${sinyal.kata} kata).`
+        : keluarga === "cakupan" ? `${dasarIstilah}.`
+          : keluarga === "susunan" ? `${sinyal.kalimat} kalimat, ${sinyal.paragraf} paragraf.`
+            : sinyal.adaAcuan ? `${dasarAcuan}, ${dasarIstilah}, ${dasar}.`
+              : `${dasarIstilah}, ${dasar}, ${sinyal.kalimat} kalimat.`;
+
+    const langit = levelDariAmbang(sinyal.kata, k.levels);
+    const dariIsi = keLevel(nilai, rubrik.skalaMin, rubrik.skalaMax);
+    const dipakai = langit === null ? dariIsi : Math.min(dariIsi, langit);
 
     return {
       urut,
-      level: keLevel(nilai, rubrik.skalaMin, rubrik.skalaMax),
-      alasan: `Dihitung dari bentuk jawaban, bukan dari isinya: ${alasan}`,
+      level: Math.max(rubrik.skalaMin, Math.min(rubrik.skalaMax, dipakai)),
+      alasan:
+        (langit !== null && dariIsi > langit ? `Dibatasi ambang panjang level ${langit}. ` : "") +
+        alasan +
+        (peringatan.length > 0 ? ` ⚠ ${peringatan.join("; ")}.` : ""),
     };
   });
 
   return {
     kriteria,
-    // Sengaja tidak pernah tinggi. Angka ini muncul di lembar penilaian, dan
-    // di bawah 70 lembarnya menandai "mohon diperiksa" — yang memang benar
-    // untuk setiap jawaban yang dinilai tanpa dibaca.
-    keyakinan: 35,
+    // Naik ketika ada jawaban acuan untuk dibandingkan, dan turun ketika ada
+    // tanda akal-akalan. Angka ini muncul di lembar penilaian; di bawah 70 ia
+    // menandai "mohon diperiksa", dan tanpa acuan penilaian ini memang selalu
+    // pantas ditandai begitu.
+    keyakinan: Math.round(
+      Math.max(20, Math.min(85, (sinyal.adaAcuan ? 70 : 35) * kejujuran - peringatan.length * 8)),
+    ),
     ringkasan:
-      `Penilaian otomatis tanpa model. ${dasar}, ${dasarIstilah}, ` +
-      `${sinyal.kalimat} kalimat, ${sinyal.paragraf} paragraf. ` +
-      `Angka ini mengukur BENTUK jawaban, bukan kebenarannya — ubah levelnya bila tidak sesuai.`,
+      `Penilaian otomatis tanpa model. ${dasarAcuan}, ${dasarIstilah}, ${dasar}, ` +
+      `${sinyal.kalimat} kalimat.` +
+      (peringatan.length > 0 ? ` ⚠ ${peringatan.join("; ")}.` : "") +
+      (sinyal.adaAcuan
+        ? " Yang menentukan kedekatan dengan jawaban acuan; panjang hanya membatasi."
+        : " Soal ini belum punya jawaban acuan pada kolom Pembahasan — isilah untuk penilaian yang jauh lebih tepat.") +
+      " Ubah levelnya bila ada yang meleset.",
     sinyal,
   };
 }

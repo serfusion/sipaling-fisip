@@ -11,7 +11,7 @@
 import {
   MIN_PEMBANDING, bacaSinyal, cakupanIstilah, istilahKunci, jumlahKalimat,
   jumlahParagraf, kataDariTeks, kedudukan, kedudukanAmbang, keLevel,
-  levelDariAmbang, nilaiLokal,
+  kesesuaianAcuan, levelDariAmbang, menyalinSoal, ngawur, nilaiLokal, redundansi,
 } from "./src/lib/nilai-lokal";
 import { RUBRIK_BAWAAN, hitungRubrik, predikat, rubrikBawaan, type Rubrik } from "./src/lib/rubrik";
 
@@ -125,12 +125,13 @@ benar("jawaban panjang berisi mengungguli jawaban dua kata",
   bagus.kriteria[0].level > pendek.kriteria[0].level,
   `bagus ${bagus.kriteria[0].level}, pendek ${pendek.kriteria[0].level}`);
 benar("tiap usulan membawa alasannya",
-  bagus.kriteria.every((k) => k.alasan.length > 10 && k.alasan.includes("bukan dari isinya")));
+  bagus.kriteria.every((k) => k.alasan.length > 10 && /kata|istilah|kalimat/.test(k.alasan)));
 benar("keyakinannya rendah, dan memang harus", bagus.keyakinan < 70,
   "di atas 70 lembar penilaian berhenti menandai 'mohon diperiksa'");
 benar("ringkasannya menyebut angka yang dipakai",
   bagus.ringkasan.includes("kata") && bagus.ringkasan.includes("kalimat"));
-benar("ringkasannya mengakui batasnya", bagus.ringkasan.includes("BENTUK"));
+benar("tanpa acuan, ringkasannya mengakui batasnya dan menunjuk jalan keluarnya",
+  bagus.ringkasan.includes("Pembahasan"));
 
 // Kriteria "Referensi & Contoh" dinilai dari cakupan istilah, bukan panjang —
 // tanpa pemisahan ini seluruh kriteria menerima level yang sama dan bobot
@@ -220,21 +221,24 @@ const RUBRIK_AMBANG: Rubrik = {
   nama: "Berambang", keterangan: "", skalaMin: 1, skalaMax: 4,
   kriteria: [{ nama: "Isi", bobot: 100, levels: BERAMBANG }],
 };
+// Ambang adalah LANGIT-LANGIT, bukan penentu. Mengetik satu kata yang sama
+// 150 kali melewati seluruh ambang panjang, dan justru itulah yang tidak
+// boleh menghasilkan level tertinggi.
 const pakaiAmbang = nilaiLokal({
   jawaban: "kata ".repeat(150), pertanyaan: "apa saja", acuan: "", rubrik: RUBRIK_AMBANG,
 });
-sama("ambang rubrik menentukan levelnya", pakaiAmbang.kriteria[0].level, 4);
-benar("alasannya menyebut ambang yang dipakai",
-  pakaiAmbang.kriteria[0].alasan.includes("140 kata"),
-  pakaiAmbang.kriteria[0].alasan);
+benar("melewati ambang panjang saja TIDAK menghasilkan level tertinggi",
+  pakaiAmbang.kriteria[0].level < 4,
+  `level ${pakaiAmbang.kriteria[0].level} untuk 150 kata yang sama diulang`);
 
-// Ambang rubrik harus MENANG atas pembanding sekelas. Tanpa aturan ini, nilai
-// yang sudah final berubah-ubah mengikuti siapa yang mengumpulkan sesudahnya.
+// Yang tidak boleh berubah: nilai final tidak bergantung pada siapa yang
+// mengumpulkan lebih dulu.
 const denganPembandingPanjang = nilaiLokal({
   jawaban: "kata ".repeat(150), pertanyaan: "apa saja", acuan: "",
   rubrik: RUBRIK_AMBANG, pembandingKata: [900, 950, 1000, 1100],
 });
-sama("ambang menang atas kedudukan sekelas", denganPembandingPanjang.kriteria[0].level, 4);
+sama("level tidak berubah karena sekelasnya lebih panjang",
+  denganPembandingPanjang.kriteria[0].level, pakaiAmbang.kriteria[0].level);
 
 console.log("\n=== RUBRIK BAWAAN SIAP MENILAI SENDIRI ===\n");
 
@@ -265,6 +269,124 @@ if (kampanye) {
   sama("nilai akhir", hasil.nilai, 91.25);
   sama("predikat", predikat(hasil.nilai).huruf, "A");
 }
+
+console.log("\n=== PENANGKAL AKAL-AKALAN ===\n");
+
+benar("kalimat yang diulang tertangkap", redundansi("Saya setuju. ".repeat(10)) > 0.8,
+  `redundansi ${redundansi("Saya setuju. ".repeat(10))}`);
+benar("tulisan yang benar-benar berbeda tidak dianggap mengulang",
+  redundansi("Media memilih isu penting. Khalayak lalu memikirkannya. Teori ini lahir di Chapel Hill.") === 0);
+benar("huruf asal tertangkap", ngawur("asdfgh qwertyuiop zxcvbnm hjklmn") > 0.5);
+benar("kalimat Indonesia wajar tidak dianggap ngawur",
+  ngawur("media massa memilih isu yang dianggap penting oleh khalayak") === 0);
+benar("singkatan pendek tidak dianggap ngawur", ngawur("DPR dan KPU serta MPR") === 0);
+benar("menyalin pertanyaan tertangkap",
+  menyalinSoal("Jelaskan teori agenda setting dalam komunikasi politik",
+    "Jelaskan teori agenda setting dalam komunikasi politik") > 0.9);
+benar("jawaban sungguhan tidak dianggap menyalin soal",
+  menyalinSoal("Media menentukan isu apa yang dipikirkan khalayak melalui pemberitaan berulang.",
+    "Jelaskan teori agenda setting dalam komunikasi politik") < 0.2);
+
+console.log("\n=== KESESUAIAN DENGAN ACUAN ===\n");
+
+const ACUAN =
+  "Agenda setting adalah teori yang menyatakan media massa menentukan isu mana yang " +
+  "dianggap penting oleh khalayak. Media tidak memberitahu apa yang harus dipikirkan, " +
+  "melainkan tentang apa khalayak berpikir. Teori ini berasal dari penelitian McCombs " +
+  "dan Shaw di Chapel Hill.";
+
+const tepatBeda =
+  "Teori ini menjelaskan bahwa pemberitaan media menentukan isu mana yang dianggap " +
+  "penting khalayak. McCombs dan Shaw membuktikannya lewat penelitian di Chapel Hill. " +
+  "Media membentuk tentang apa orang berpikir, bukan apa yang dipikirkan.";
+const melencengPanjang =
+  "Kemarin saya pergi ke pasar membeli sayur dan ikan segar. Harga cabai sedang naik " +
+  "sekali sehingga ibu-ibu mengeluh. Setelah itu saya mampir ke warung kopi bertemu " +
+  "teman lama yang baru pulang dari Surabaya membawa oleh-oleh.";
+
+benar("parafrase yang benar tetap dekat dengan acuan",
+  kesesuaianAcuan(tepatBeda, ACUAN) > 0.3,
+  `kesesuaian ${kesesuaianAcuan(tepatBeda, ACUAN).toFixed(3)}`);
+benar("jawaban yang membicarakan hal lain jauh dari acuan",
+  kesesuaianAcuan(melencengPanjang, ACUAN) < 0.12,
+  `kesesuaian ${kesesuaianAcuan(melencengPanjang, ACUAN).toFixed(3)}`);
+benar("parafrase mengungguli jawaban melenceng",
+  kesesuaianAcuan(tepatBeda, ACUAN) > kesesuaianAcuan(melencengPanjang, ACUAN));
+
+console.log("\n=== CELAH 'ASAL PANJANG' TERTUTUP ===\n");
+
+const SOAL = "Jelaskan teori agenda setting dalam komunikasi politik";
+const RUBRIK_ISI: Rubrik = {
+  nama: "Isi", keterangan: "", skalaMin: 1, skalaMax: 4,
+  kriteria: [{ nama: "Ketepatan Konsep", bobot: 100, levels: BERAMBANG }],
+};
+
+// Inilah uji yang paling menentukan: jawaban PANJANG tetapi melenceng harus
+// kalah dari jawaban PENDEK yang tepat. Kalau ini gagal, seluruh fiturnya
+// hanya menghadiahi siapa yang paling rajin mengetik.
+const panjangMelenceng = nilaiLokal({
+  jawaban: melencengPanjang + " " + melencengPanjang,
+  pertanyaan: SOAL, acuan: ACUAN, rubrik: RUBRIK_ISI,
+});
+const pendekTepat = nilaiLokal({
+  jawaban: tepatBeda, pertanyaan: SOAL, acuan: ACUAN, rubrik: RUBRIK_ISI,
+});
+benar("jawaban panjang yang melenceng kalah dari jawaban lebih pendek yang tepat",
+  panjangMelenceng.kriteria[0].level < pendekTepat.kriteria[0].level,
+  `melenceng(${panjangMelenceng.sinyal.kata} kata) level ${panjangMelenceng.kriteria[0].level}, ` +
+  `tepat(${pendekTepat.sinyal.kata} kata) level ${pendekTepat.kriteria[0].level}`);
+sama("jawaban panjang yang sama sekali tidak menyentuh acuan jatuh ke level terendah",
+  panjangMelenceng.kriteria[0].level, 1);
+benar("alasannya menyebut kenapa", panjangMelenceng.kriteria[0].alasan.includes("Tidak menyentuh"));
+
+const ulangPanjang = nilaiLokal({
+  jawaban: (tepatBeda + " ").repeat(6),
+  pertanyaan: SOAL, acuan: ACUAN, rubrik: RUBRIK_ISI,
+});
+benar("menggandakan kalimat yang benar tidak menaikkan level",
+  ulangPanjang.kriteria[0].level <= pendekTepat.kriteria[0].level,
+  `ulang ${ulangPanjang.kriteria[0].level}, asli ${pendekTepat.kriteria[0].level}`);
+benar("pengulangan ditandai pada alasannya",
+  ulangPanjang.kriteria[0].alasan.includes("mengulang"));
+
+const hurufAsal = nilaiLokal({
+  jawaban: "asdfgh qwertyuiop zxcvbnm ".repeat(30),
+  pertanyaan: SOAL, acuan: ACUAN, rubrik: RUBRIK_ISI,
+});
+sama("mengetik huruf asal sepanjang apa pun tetap level terendah",
+  hurufAsal.kriteria[0].level, 1);
+
+const salinSoal = nilaiLokal({
+  jawaban: (SOAL + " ").repeat(20),
+  pertanyaan: SOAL, acuan: ACUAN, rubrik: RUBRIK_ISI,
+});
+sama("menyalin pertanyaan berulang kali tetap level terendah",
+  salinSoal.kriteria[0].level, 1);
+
+console.log("\n=== PANJANG HANYA MEMBATASI ===\n");
+
+// Jawaban tepat tetapi pendek tidak boleh menembus ambang level yang lebih
+// tinggi — itu memang arti ambang yang ditulis dosen.
+const tepatTapiPendek = nilaiLokal({
+  jawaban: "Media menentukan isu penting bagi khalayak.",
+  pertanyaan: SOAL, acuan: ACUAN, rubrik: RUBRIK_ISI,
+});
+benar("jawaban tepat tetapi di bawah ambang tidak menembus level tertinggi",
+  tepatTapiPendek.kriteria[0].level < 4,
+  `level ${tepatTapiPendek.kriteria[0].level} pada ${tepatTapiPendek.sinyal.kata} kata`);
+benar("alasannya mengatakan ia dibatasi ambang bila memang begitu",
+  tepatTapiPendek.kriteria[0].alasan.includes("ambang") ||
+  tepatTapiPendek.kriteria[0].level === 1);
+
+console.log("\n=== KEYAKINAN ===\n");
+
+benar("ada acuan menaikkan keyakinan", pendekTepat.keyakinan > hurufAsal.keyakinan,
+  `tepat ${pendekTepat.keyakinan}, ngawur ${hurufAsal.keyakinan}`);
+benar("tanpa acuan keyakinannya selalu di bawah ambang 'mohon diperiksa'",
+  nilaiLokal({ jawaban: tepatBeda, pertanyaan: SOAL, acuan: "", rubrik: RUBRIK_ISI }).keyakinan < 70);
+benar("tanpa acuan, ringkasannya menyuruh mengisi Pembahasan",
+  nilaiLokal({ jawaban: tepatBeda, pertanyaan: SOAL, acuan: "", rubrik: RUBRIK_ISI })
+    .ringkasan.includes("Pembahasan"));
 
 console.log("");
 if (gagal.length === 0) {
