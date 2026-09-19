@@ -584,6 +584,18 @@ export const cbtExams = pgTable("cbt_exams", {
    */
   rubricId: integer("rubric_id").references(() => cbtRubrics.id, { onDelete: "set null" }),
   /**
+   * Kunci jawaban acuan dosen yang dipakai menilai esai ujian ini.
+   *
+   * Berdampingan dengan rubricId, bukan menggantikannya, dan keduanya boleh
+   * menyala bersama-sama. Yang diukur keduanya memang berbeda: rubrik
+   * mengukur BENTUK jawaban, acuan mengukur ISINYA. Dosen yang memakai
+   * keduanya mendapat dua pembacaan atas lembar yang sama, dan dua pembacaan
+   * yang berselisih adalah justru lembar yang paling perlu ia baca sendiri.
+   *
+   * Null berarti tidak ada acuan, dan itu bawaannya.
+   */
+  answerKeyId: integer("answer_key_id").references(() => cbtAnswerKeys.id, { onDelete: "set null" }),
+  /**
    * Merekam suara peserta selama ujian.
    *
    * MATI secara bawaan, dan itu tidak dapat ditawar. Menyalakan mikrofon orang
@@ -962,6 +974,42 @@ export const cbtRubrics = pgTable("cbt_rubrics", {
   /** Kriteria beserta bobot dan deskriptor tiap level, sebagai JSON. */
   criteria: text("criteria").notNull().default("[]"),
   /** Profil yang membuatnya. Null untuk rubrik bawaan portal. */
+  ownerId: varchar("owner_id", { length: 64 }),
+  createdBy: varchar("created_by", { length: 120 }).notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * KUNCI JAWABAN ACUAN DOSEN.
+ *
+ * Sebuah pustaka yang dipakai bersama, sama seperti rubrik: dosen A menulis
+ * acuan untuk mata kuliah yang diampunya, dan dosen B memakainya pada kelas
+ * paralel. Yang MENYUNTING tetap pemiliknya saja ditambah pengelola, karena
+ * mengubah jawaban acuan berarti mengubah arti nilai yang sudah keluar.
+ *
+ * Butirnya disimpan sebagai JSON, bukan tabel anak tersendiri. Satu acuan
+ * selalu dibaca utuh dan tidak pernah dipertanyakan per butir lewat SQL;
+ * tabel anak hanya akan menambah satu penggabungan pada tiap pembacaan tanpa
+ * menjawab satu pertanyaan pun yang tidak terjawab sekarang.
+ *
+ * Lihat src/lib/nilai-acuan.ts untuk cara butir-butir ini menjadi angka.
+ */
+export const cbtAnswerKeys = pgTable("cbt_answer_keys", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 160 }).notNull(),
+  description: text("description"),
+  /**
+   * Dua ambang kurva nilai, dalam persen kemiripan.
+   *
+   * Disimpan per acuan, bukan tetap di dalam kode, karena soal yang jawabannya
+   * sempit dan soal yang jawabannya terbuka tidak dapat memakai ambang yang
+   * sama. Bawaannya 15 dan 65; alasan kedua angka itu ada di nilai-acuan.ts.
+   */
+  zeroThreshold: integer("zero_threshold").notNull().default(15),
+  fullThreshold: integer("full_threshold").notNull().default(65),
+  /** Butir acuan beserta bobot dan istilah wajibnya, sebagai JSON. */
+  items: text("items").notNull().default("[]"),
   ownerId: varchar("owner_id", { length: 64 }),
   createdBy: varchar("created_by", { length: 120 }).notNull().default(""),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
