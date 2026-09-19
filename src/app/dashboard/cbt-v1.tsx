@@ -953,13 +953,13 @@ export function LembarRubrik({
     return () => window.clearTimeout(tunda);
   }, [muatLembar]);
 
-  async function nilaiAi(ulangi: boolean) {
-    setSibuk("ai"); setGalat(""); setKabar("");
+  async function nilaiAi(ulangi: boolean, aksi: "ai" | "lokal" = "ai") {
+    setSibuk(aksi); setGalat(""); setKabar("");
     try {
       const jawab = await fetch("/api/cbt/penilaian", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ aksi: "ai", ujian: ujianId, attempt: attemptId, ulangi }),
+        body: JSON.stringify({ aksi, ujian: ujianId, attempt: attemptId, ulangi }),
       });
       const isi = await jawab.json();
       if (!jawab.ok || !isi.success) throw new Error(isi.message || "Gagal menilai.");
@@ -1096,15 +1096,21 @@ export function LembarRubrik({
                 </button>
               </span>
             ) : (
-              <small className="cbt-catatan">
-                Koreksi otomatis mati: belum ada <code>ANTHROPIC_API_KEY</code> atau{" "}
-                <code>GEMINI_API_KEY</code> di environment. Level di bawah tetap dapat diisi sendiri.
-              </small>
+              <span className="cbtv-lembar-aksi">
+                <button
+                  type="button" className="btn btn-light btn-mini"
+                  disabled={sibuk === "lokal"}
+                  onClick={() => void nilaiAi(true, "lokal")}
+                >
+                  {sibuk === "lokal" ? "Menghitung…" : "↻ Hitung ulang otomatis"}
+                </button>
+                <small className="cbt-catatan">Pembacaan isi oleh AI tidak tersedia.</small>
+              </span>
             )}
           </div>
 
           <p className="cbt-catatan cbtv-prinsip">
-            AI mengusulkan, Anda yang mengesahkan.
+            Otomatis mengusulkan, Anda yang mengesahkan.
           </p>
 
           {data.esai.length === 0 && <div className="dempty">Tidak ada soal esai pada lembar peserta ini.</div>}

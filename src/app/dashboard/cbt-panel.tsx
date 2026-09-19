@@ -1179,17 +1179,22 @@ export default function CbtPanel({ role }: { role: string }) {
   // berikutnya. Dari kursi pengajar, nilainya sudah ada tanpa ia mengoreksi
   // apa pun.
   //
-  // Tiga pagar, dan ketiganya ada karena hal yang sama — ini memanggil model
-  // yang dibayar per panggilan:
+  // Yang dipakai jalur LOKAL: menghitung dari panjang jawaban dibanding
+  // sekelas, cakupan istilah soal, dan susunan kalimatnya. Tanpa kunci API,
+  // tanpa biaya, dan hasilnya sama tiap kali. Pembacaan isi oleh model tetap
+  // ada, tetapi sebagai tombol yang ditekan sendiri — bukan sesuatu yang
+  // berjalan diam-diam dan menagih per jawaban.
+  //
+  // Tiga pagar:
   //
   //   1. SATU PADA SATU WAKTU. Papan menyegar tiap sepuluh detik, dan
-  //      penilaian satu kelas memakan lebih dari sepuluh detik. Tanpa ini,
+  //      penilaian satu kelas dapat memakan lebih dari itu. Tanpa ini,
   //      putaran kedua menilai ulang jawaban yang sedang dinilai putaran
-  //      pertama, dan keduanya membayar.
-  //   2. BERHENTI SESUDAH GAGAL. Tanpa kunci API, tanpa rubrik, kuota habis:
-  //      semuanya gagal berulang kali dengan cara yang sama. Ujian yang sudah
-  //      gagal sekali tidak dicoba lagi sampai halamannya dimuat ulang —
-  //      tombol manualnya tetap ada bagi yang sudah membetulkan sebabnya.
+  //      pertama.
+  //   2. BERHENTI SESUDAH GAGAL. Rubrik yang belum dipasang, tabel yang belum
+  //      dimigrasikan: keduanya gagal berulang kali dengan cara yang sama.
+  //      Ujian yang sudah gagal sekali tidak dicoba lagi sampai halamannya
+  //      dimuat ulang.
   //   3. HANYA KALAU MEMANG ADA YANG MENUNGGU. `tertunda` datang dari server
   //      dan sudah menghitung jawaban yang belum dinilai.
   // ============================================================
@@ -1203,7 +1208,7 @@ export default function CbtPanel({ role }: { role: string }) {
       const jawab = await fetch("/api/cbt/penilaian", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ aksi: "ai", ujian: id }),
+        body: JSON.stringify({ aksi: "lokal", ujian: id }),
       });
       const data = await jawab.json();
       if (!jawab.ok || !data.success) {

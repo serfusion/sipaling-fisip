@@ -37,7 +37,10 @@ import { aiSiap, nilaiEsai } from "@/lib/nilai-esai";
 import { GalatModel } from "@/lib/ai-penyedia";
 import { hitungUlangUjian, pasanganPeserta } from "@/lib/mirip-simpan";
 import { hitungUlangAttempt } from "@/lib/nilai-attempt";
-import { MAKS_SEKALI_NILAI, antreEsai, kerjakanPenilaian, simpanPoinRubrik } from "@/lib/nilai-otomatis";
+import {
+  MAKS_SEKALI_NILAI, antreEsai, kerjakanPenilaian, kerjakanPenilaianLokal,
+  pembandingPanjang, simpanPoinRubrik,
+} from "@/lib/nilai-otomatis";
 import { kirimLaporanNilai } from "@/lib/kirim-nilai";
 import { STATUS_TANDA_LABEL, type StatusTanda } from "@/lib/rekaman";
 
@@ -249,18 +252,28 @@ export async function POST(request: Request) {
       });
     }
 
-    if (aksi !== "ai") {
+    // ---------- DUA PENILAI ----------
+    //
+    // "lokal" — bawaan. Menghitung dari bentuk jawaban: panjang dibanding
+    //   sekelas, cakupan istilah soal, susunan kalimat. Tanpa jaringan, tanpa
+    //   kunci, tanpa biaya. Inilah yang dijalankan papan pantau sendiri.
+    // "ai"    — atas permintaan, lewat tombolnya. Membaca isinya, dan itu satu
+    //   panggilan model berbayar per jawaban.
+    //
+    // Keduanya menulis ke kolom yang sama dan sama-sama hanya MENGUSULKAN;
+    // level yang diubah pengajar selalu menang atas keduanya.
+    if (aksi !== "ai" && aksi !== "lokal") {
       return Response.json({ success: false, message: "Aksi tidak dikenali." }, { status: 400 });
     }
 
-    // ---------- PENILAIAN OLEH MODEL ----------
-    if (!aiSiap()) {
+    if (aksi === "ai" && !aiSiap()) {
       return Response.json(
         {
           success: false,
           message:
             "Penilaian AI belum tersambung ke model mana pun. Pasang ANTHROPIC_API_KEY atau " +
-            "GEMINI_API_KEY pada environment, lalu deploy ulang. Penilaian manual tetap jalan.",
+            "GEMINI_API_KEY pada environment, lalu deploy ulang. Penilaian otomatis tanpa " +
+            "model dan penilaian manual tetap jalan.",
         },
         { status: 503 },
       );
@@ -305,8 +318,14 @@ export async function POST(request: Request) {
       });
     }
 
-    const kerjakan = antre.slice(0, MAKS_SEKALI_NILAI);
-    const { dinilai, gagal } = await kerjakanPenilaian(rubrik, kerjakan, ujian.courseName);
+    // Penilaian lokal tidak memanggil apa pun ke luar, jadi batas per
+    // panggilan tidak berlaku untuknya: yang membatasi penilaian model adalah
+    // umur satu permintaan HTTP yang diisi panggilan jaringan berulang.
+    const kerjakan = aksi === "lokal" ? antre : antre.slice(0, MAKS_SEKALI_NILAI);
+    const { dinilai, gagal } =
+      aksi === "lokal"
+        ? await kerjakanPenilaianLokal(rubrik, kerjakan, await pembandingPanjang(peserta))
+        : await kerjakanPenilaian(rubrik, kerjakan, ujian.courseName);
 
     return Response.json({
       success: true,

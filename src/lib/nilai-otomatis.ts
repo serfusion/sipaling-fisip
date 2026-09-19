@@ -34,6 +34,7 @@ import { bacaLembar, skorRubrikAttempt, soalUjian } from "@/lib/cbt-store";
 import { hitungRubrik, poinDariRubrik, type Rubrik } from "@/lib/rubrik";
 import { GalatModel } from "@/lib/ai-penyedia";
 import { nilaiEsai } from "@/lib/nilai-esai";
+import { kataDariTeks, nilaiLokal } from "@/lib/nilai-lokal";
 import { hitungUlangAttempt } from "@/lib/nilai-attempt";
 
 /**
@@ -53,6 +54,15 @@ export type Pekerjaan = {
   acuan: string;
   jawaban: string;
 };
+
+/**
+ * Jumlah kata jawaban peserta lain, per soal.
+ *
+ * Dipakai penilaian tanpa model: panjang yang "cukup" tidak sama antara soal
+ * yang minta definisi dan soal yang minta analisis kasus, jadi yang dipakai
+ * kedudukan jawaban ini di antara jawaban sekelas pada soal yang SAMA.
+ */
+export type PembandingSoal = Map<number, number[]>;
 
 /**
  * Jenis soal yang dinilai rubrik.
@@ -125,6 +135,31 @@ export async function antreEsai(
 }
 
 /**
+ * Susun pembanding panjang per soal dari seluruh jawaban yang sudah masuk.
+ *
+ * Diambil dari SEMUA peserta yang mengumpulkan, bukan hanya yang sedang
+ * diantre: yang sudah dinilai kemarin tetap pembanding yang sah, dan tanpa
+ * mereka peserta pertama pada tiap penyegaran hanya punya dirinya sendiri.
+ */
+export async function pembandingPanjang(
+  peserta: Array<typeof cbtAttempts.$inferSelect>,
+): Promise<PembandingSoal> {
+  const peta: PembandingSoal = new Map();
+  for (const p of peserta) {
+    if (p.status === "berjalan") continue;
+    const jawaban = await db.select().from(cbtAnswers).where(eq(cbtAnswers.attemptId, p.id));
+    for (const j of jawaban) {
+      const isi = String(j.answer ?? "").trim();
+      if (!isi) continue;
+      const daftar = peta.get(j.questionId) ?? [];
+      daftar.push(kataDariTeks(isi).length);
+      peta.set(j.questionId, daftar);
+    }
+  }
+  return peta;
+}
+
+/**
  * Hitung ulang poin satu jawaban dari level rubriknya, lalu simpan.
  *
  * Keputusan dosen yang sudah ada tidak pernah ditimpa: hitungRubrik memakai
@@ -174,6 +209,104 @@ export async function simpanPoinRubrik(
 }
 
 /**
+ * Simpan usulan level satu jawaban, dari mana pun asalnya.
+ *
+ * Satu jalan tulis untuk dua penilai — model dan hitungan lokal — supaya
+ * keduanya mendarat di kolom yang sama, dibaca lembar penilaian yang sama,
+ * dan dapat ditimpa keputusan pengajar dengan cara yang sama.
+ */
+async function simpanUsulan(
+  kerja: Pekerjaan,
+  rubrik: Rubrik,
+  usulan: Array<{ urut: number; level: number; alasan: string }>,
+  keyakinan: number,
+  penilai: string,
+  catatan: string,
+  sekarang: Date,
+) {
+  for (const k of usulan) {
+    const nilaiKriteria = {
+      criterionName: rubrik.kriteria[k.urut]?.nama ?? "",
+      weight: rubrik.kriteria[k.urut]?.bobot ?? 0,
+      aiLevel: k.level,
+      aiReason: k.alasan,
+      aiConfidence: keyakinan,
+      updatedAt: sekarang,
+    };
+    await db
+      .insert(cbtRubricScores)
+      .values({
+        attemptId: kerja.attemptId,
+        questionId: kerja.soalId,
+        criterionIndex: k.urut,
+        ...nilaiKriteria,
+      })
+      // Keputusan pengajar yang sudah ada TIDAK dihapus oleh penilaian ulang.
+      .onConflictDoUpdate({
+        target: [cbtRubricScores.attemptId, cbtRubricScores.questionId, cbtRubricScores.criterionIndex],
+        set: nilaiKriteria,
+      });
+  }
+  await simpanPoinRubrik(kerja.attemptId, kerja.soalId, kerja.bobot, rubrik, penilai, catatan);
+}
+
+/**
+ * Nilai antrean TANPA model: dari panjang, cakupan istilah, dan susunan.
+ *
+ * Inilah jalur bawaan penilaian otomatis. Ia tidak memanggil apa pun ke luar,
+ * jadi ia berjalan pada portal yang tidak punya kunci API sama sekali, tidak
+ * pernah gagal karena kuota, dan tidak menambah biaya per jawaban. Batasnya
+ * ditulis terang di src/lib/nilai-lokal.ts: ia mengukur bentuk jawaban, bukan
+ * kebenarannya.
+ */
+export async function kerjakanPenilaianLokal(
+  rubrik: Rubrik,
+  kerjakan: Pekerjaan[],
+  pembanding: PembandingSoal,
+): Promise<{ dinilai: number; gagal: string[] }> {
+  const sekarang = new Date();
+  let dinilai = 0;
+  const gagal: string[] = [];
+
+  for (const kerja of kerjakan) {
+    try {
+      // Jawaban peserta ini sendiri dikeluarkan dari pembandingnya. Tanpa itu
+      // satu-satunya peserta yang sudah mengumpulkan selalu dibandingkan
+      // dengan dirinya sendiri, dan selalu berada tepat di tengah.
+      const semua = pembanding.get(kerja.soalId) ?? [];
+      const sendiri = kataDariTeks(kerja.jawaban).length;
+      const lain = [...semua];
+      const posisi = lain.indexOf(sendiri);
+      if (posisi >= 0) lain.splice(posisi, 1);
+
+      const hasil = nilaiLokal({
+        jawaban: kerja.jawaban,
+        pertanyaan: kerja.pertanyaan,
+        acuan: kerja.acuan,
+        rubrik,
+        pembandingKata: lain,
+      });
+
+      await simpanUsulan(
+        kerja, rubrik, hasil.kriteria, hasil.keyakinan,
+        "Otomatis (bentuk jawaban)", hasil.ringkasan, sekarang,
+      );
+      dinilai += 1;
+    } catch (galat: unknown) {
+      const sebab = galat instanceof Error ? galat.message : "gagal";
+      gagal.push(`${kerja.nama}: ${sebab.slice(0, 120)}`);
+      console.error("nilai lokal", kerja.attemptId, kerja.soalId, galat);
+    }
+  }
+
+  for (const id of new Set(kerjakan.map((k) => k.attemptId))) {
+    await hitungUlangAttempt(id);
+  }
+
+  return { dinilai, gagal };
+}
+
+/**
  * Kerjakan sebagian antrean: panggil model, simpan levelnya, hitung ulang.
  *
  * Satu jawaban yang gagal dinilai tidak menggagalkan sisanya. Kelas berisi
@@ -199,32 +332,6 @@ export async function kerjakanPenilaian(
         acuan: kerja.acuan,
       });
 
-      for (const k of hasil.kriteria) {
-        const nilaiKriteria = {
-          criterionName: rubrik.kriteria[k.urut]?.nama ?? "",
-          weight: rubrik.kriteria[k.urut]?.bobot ?? 0,
-          aiLevel: k.level,
-          aiReason: k.alasan,
-          aiConfidence: hasil.keyakinan,
-          updatedAt: sekarang,
-        };
-        await db
-          .insert(cbtRubricScores)
-          .values({
-            attemptId: kerja.attemptId,
-            questionId: kerja.soalId,
-            criterionIndex: k.urut,
-            ...nilaiKriteria,
-          })
-          // Keputusan dosen yang sudah ada TIDAK dihapus oleh penilaian ulang.
-          // Dosen yang sudah membaca dan memutuskan tidak boleh kehilangan
-          // keputusannya karena ada yang menekan "nilai ulang".
-          .onConflictDoUpdate({
-            target: [cbtRubricScores.attemptId, cbtRubricScores.questionId, cbtRubricScores.criterionIndex],
-            set: nilaiKriteria,
-          });
-      }
-
       // Umpan balik yang dibaca peserta dirakit di SATU tempat, bukan disimpan
       // terpisah lalu dirakit ulang di panel dan sekali lagi di laporan cetak.
       const catatan = [
@@ -233,13 +340,9 @@ export async function kerjakanPenilaian(
         hasil.perluDosen ? `\n\n(Keyakinan penilaian awal ${hasil.keyakinan}%. Mohon diperiksa.)` : "",
       ].join("");
 
-      await simpanPoinRubrik(
-        kerja.attemptId,
-        kerja.soalId,
-        kerja.bobot,
-        rubrik,
-        `AI (${hasil.model})`,
-        catatan,
+      await simpanUsulan(
+        kerja, rubrik, hasil.kriteria, hasil.keyakinan,
+        `AI (${hasil.model})`, catatan, sekarang,
       );
       dinilai += 1;
     } catch (galat: unknown) {

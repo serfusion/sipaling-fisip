@@ -6936,6 +6936,8 @@ table.qt td small { font-size: 11.5px; }
 }
 .cbtv-lembar-kepala small { display: block; margin-top: 2px; font-size: 12px; color: #64748b; }
 .cbtv-prinsip { margin-bottom: 13px; }
+.cbtv-lembar-aksi { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 11px; }
+.cbtv-lembar-aksi .cbt-catatan { margin: 0; }
 .cbtv-esai { margin: 14px 0; padding: 14px; border: 1px solid #e2e8f0; border-radius: 10px; }
 .cbtv-esai > header {
   display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 10px;
