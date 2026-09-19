@@ -465,6 +465,67 @@ export async function GET(request: Request) {
       return Response.json({ success: true, rekaman: null, potongan: [], penggal: [] });
     }
 
+    // ---------- REKAMAN UTUH, SATU ALIRAN ----------
+    //
+    // Potongan dua puluh detik adalah cara MENYIMPAN, bukan cara mendengarkan.
+    // Pemutar yang berganti berkas tiap dua puluh detik berhenti sejenak pada
+    // tiap pergantian, dan yang mendengarkan sembilan puluh menit rekaman
+    // ujian menghitung jeda itu ratusan kali.
+    //
+    // Yang dikirim di sini satu aliran berurutan: potongan diunduh satu per
+    // satu dan disambung apa adanya. Itu memang bentuk aslinya — MediaRecorder
+    // dengan `timeslice` menghasilkan pecahan dari SATU wadah, dan
+    // menyambungnya kembali mengembalikan berkas yang sama seperti seandainya
+    // ia tidak pernah dipecah.
+    //
+    // Dialirkan, bukan dikumpulkan di memori lebih dulu: ujian sembilan puluh
+    // menit berisi 270 potongan, dan menahan seluruhnya sekaligus adalah cara
+    // paling mudah membuat fungsi ini kehabisan memori pada peserta terpanjang.
+    if (params.get("utuh")) {
+      const simpanUtuh = storage();
+      if (!simpanUtuh || rekaman.chunkCount === 0) {
+        return Response.json({ success: false, message: "Rekamannya belum ada." }, { status: 404 });
+      }
+      const daftar = await simpanUtuh.list(rekaman.prefix, { limit: 1000, sortBy: { column: "name", order: "asc" } });
+      const nama = (daftar.data ?? []).map((o) => o.name).sort();
+      if (nama.length === 0) {
+        return Response.json({ success: false, message: "Rekamannya belum ada." }, { status: 404 });
+      }
+
+      const antre = [...nama];
+      const aliran = new ReadableStream<Uint8Array>({
+        async pull(kendali) {
+          const berikut = antre.shift();
+          if (!berikut) { kendali.close(); return; }
+          try {
+            const { data } = await simpanUtuh.download(`${rekaman.prefix}/${berikut}`);
+            if (data) kendali.enqueue(new Uint8Array(await data.arrayBuffer()));
+          } catch (galat) {
+            // Satu potongan yang gagal diunduh tidak mematikan sisanya. Yang
+            // terdengar adalah lompatan dua puluh detik — jauh lebih baik
+            // daripada pemutar yang berhenti di tengah dan tidak menjelaskan
+            // apa pun.
+            console.error("unduh potongan rekaman", rekaman.prefix, berikut, galat);
+          }
+        },
+      });
+
+      // Jenisnya dibaca dari akhiran nama potongan — di sanalah ia disimpan
+      // (lihat namaPotongan di src/lib/rekaman.ts), dan tabelnya tidak
+      // menyimpan mime apa pun.
+      const akhiran = (nama[0].split(".").pop() || "webm").toLowerCase();
+      const jenis =
+        akhiran === "m4a" ? "audio/mp4" : akhiran === "ogg" ? "audio/ogg" : akhiran === "mp3" ? "audio/mpeg" : "audio/webm";
+
+      return new Response(aliran, {
+        headers: {
+          "Content-Type": jenis,
+          "Cache-Control": "private, max-age=3600",
+          "Content-Disposition": `inline; filename="rekaman-${attemptId}.${akhiran}"`,
+        },
+      });
+    }
+
     const penggal = await db
       .select()
       .from(cbtTranscriptSegments)
@@ -473,11 +534,11 @@ export async function GET(request: Request) {
       .limit(2000);
 
     // ---------- ALAMAT PEMUTAR ----------
-    // Satu alamat bertanda tangan per potongan, berumur satu jam. Potongannya
-    // TIDAK digabung menjadi satu berkas di server: penggabungan WebM yang
-    // benar menuntut pembacaan ulang seluruh wadahnya, dan pemutar di panel
-    // dosen dapat memainkan daftar berurutan tanpa itu — dengan keuntungan
-    // tambahan bahwa satu potongan yang rusak tidak merusak seluruh rekaman.
+    // Potongannya tetap disimpan terpisah — itu yang membuat rekaman selamat
+    // dari jaringan kampus yang putus. Yang DIGABUNG adalah pemutarannya:
+    // lihat `utuh=1` di bawah, satu aliran berurutan untuk satu pemutar.
+    // Daftar potongan di bawah tetap dikirim karena penanda transkrip
+    // membutuhkan detik mulai tiap potongan.
     const simpan = storage();
     let potongan: Array<{ urut: number; url: string; mulai: number }> = [];
     if (simpan && rekaman.chunkCount > 0) {

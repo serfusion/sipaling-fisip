@@ -6936,6 +6936,8 @@ table.qt td small { font-size: 11.5px; }
 }
 .cbtv-lembar-kepala small { display: block; margin-top: 2px; font-size: 12px; color: #64748b; }
 .cbtv-prinsip { margin-bottom: 13px; }
+.cbtv-lembar-aksi { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 11px; }
+.cbtv-lembar-aksi .cbt-catatan { margin: 0; }
 .cbtv-esai { margin: 14px 0; padding: 14px; border: 1px solid #e2e8f0; border-radius: 10px; }
 .cbtv-esai > header {
   display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 10px;
@@ -6947,8 +6949,70 @@ table.qt td small { font-size: 11.5px; }
   border-radius: 8px; background: #f8fafc; font-size: 13.5px; line-height: 1.7;
   white-space: pre-line;
 }
+/* ---------- TABEL RUBRIK ----------
+   Empat kolom, dan yang ketiga memuat daftar pilihan berisi deskriptor level
+   yang panjang. Di ponsel jumlahnya melampaui lebar layar: tabelnya melebar
+   keluar panel, MENYERET SELURUH HALAMAN ke samping, dan kolom Terbobot
+   terpotong di tepi kanan. Dua lapis menahannya. */
+
+/* Lapis pertama: lebar berlebih digulir DI DALAM panel, tidak pernah sampai
+   ke halaman. Ini yang menyelamatkan tampilan di lebar berapa pun. */
+.cbtv-tabel-bungkus { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
 .cbtv-tabel-rubrik { font-size: 13px; }
-.cbtv-tabel-rubrik select { padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12.5px; max-width: 220px; }
+.cbtv-tabel-rubrik select {
+  width: 100%; min-width: 0; max-width: 260px;
+  padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12.5px;
+}
+
+/* Lapis kedua: di ponsel tabelnya berhenti menjadi tabel.
+   Menggulir ke samping untuk membaca satu angka adalah pekerjaan; tiap baris
+   karena itu menjadi kartu, dengan nama kolomnya ikut tercetak di depan tiap
+   nilai — tanpa itu "30%" dan "0.00" berdiri tanpa keterangan apa pun. */
+@media (max-width: 640px) {
+  .cbtv-tabel-rubrik,
+  .cbtv-tabel-rubrik thead,
+  .cbtv-tabel-rubrik tbody,
+  .cbtv-tabel-rubrik tfoot,
+  .cbtv-tabel-rubrik tr,
+  .cbtv-tabel-rubrik th,
+  .cbtv-tabel-rubrik td { display: block; width: auto; }
+
+  /* Judul kolomnya pindah ke depan tiap nilai, jadi barisnya tidak perlu. */
+  .cbtv-tabel-rubrik thead { display: none; }
+
+  .cbtv-tabel-rubrik tbody tr {
+    margin-bottom: 9px; padding: 10px 12px;
+    border: 1px solid #e2e8f0; border-radius: 9px; background: #fbfcfd;
+  }
+  .cbtv-tabel-rubrik tbody td {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
+    padding: 4px 0; border: 0; text-align: left;
+  }
+  .cbtv-tabel-rubrik tbody td[data-kolom]::before {
+    content: attr(data-kolom);
+    flex: 0 0 76px;
+    font-size: 11px; font-weight: 800; letter-spacing: .04em;
+    text-transform: uppercase; color: #64748b;
+  }
+  /* Nama kriteria menjadi judul kartunya, jadi ia tidak perlu label. */
+  .cbtv-tabel-rubrik tbody td[data-kolom="Kriteria"] {
+    font-size: 14px; font-weight: 700; padding-bottom: 7px;
+  }
+  .cbtv-tabel-rubrik tbody td[data-kolom="Kriteria"]::before { display: none; }
+  .cbtv-tabel-rubrik tbody td[data-kolom="Level"] select { max-width: none; flex: 1 1 160px; }
+  .cbtv-tabel-rubrik tbody .cbtv-ka { text-align: left; }
+  /* Alasan AI memakai lebar penuh kartunya, bukan sisa ruang di kanan label. */
+  .cbtv-tabel-rubrik tbody .cbtv-alasan,
+  .cbtv-tabel-rubrik tbody .cbtv-berubah,
+  .cbtv-tabel-rubrik tbody .cbtv-diubah { flex: 1 1 100%; }
+
+  .cbtv-tabel-rubrik tfoot tr {
+    display: flex; justify-content: space-between; gap: 12px;
+    padding: 6px 12px; border-top: 1px solid #e2e8f0;
+  }
+  .cbtv-tabel-rubrik tfoot th { font-size: 12.5px; text-align: left; }
+}
 .cbtv-ka { text-align: right; font-variant-numeric: tabular-nums; }
 .cbtv-alasan { display: block; margin-top: 4px; font-size: 12px; line-height: 1.6; color: #475569; font-style: italic; }
 .cbtv-alasan b { color: #b45309; font-style: normal; }
@@ -6964,12 +7028,24 @@ table.qt td small { font-size: 11.5px; }
 /* Pengesahan. Sengaja berlatar berbeda dari sekitarnya: ini satu-satunya
    tombol di seluruh lembar yang membuat sebuah nilai menjadi resmi. */
 .cbtv-sahkan {
-  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 13px;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 12px 16px;
   margin-top: 16px; padding: 14px 16px; border-radius: 10px;
   background: #f8fafc; border: 1px solid #cbd5e1;
 }
-.cbtv-sahkan-kiri { display: flex; flex-wrap: wrap; gap: 13px; align-items: center; font-size: 13px; }
-.cbtv-sahkan-kanan { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+/* Kedua sisi boleh tumbuh, dan keduanya punya lebar terkecil sendiri. Tanpa
+   min-width, sisi kanan terjepit sampai kotak nilai dan tombol SAHKAN
+   berdempet pada satu baris yang kepenuhan. */
+.cbtv-sahkan-kiri {
+  flex: 1 1 210px; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: 13px;
+}
+.cbtv-sahkan-kanan {
+  flex: 0 1 auto; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+}
+@media (max-width: 540px) {
+  .cbtv-sahkan-kanan { flex: 1 1 100%; }
+  .cbtv-sahkan-kanan .btn { flex: 1 1 auto; }
+}
 .cbtv-nilai-mesin b { font-size: 16px; }
 .cbtv-tunggu { color: #b45309; font-size: 12.5px; }
 .cbtv-nilai-ketik { display: flex; align-items: center; gap: 7px; font-size: 12.5px; }
@@ -6989,6 +7065,8 @@ table.qt td small { font-size: 11.5px; }
   font-size: 11.5px; font-weight: 800; white-space: nowrap;
 }
 .cbtv-mirip-sel { font-weight: 800; font-variant-numeric: tabular-nums; }
+/* Tinggi baris pemutar disamakan dengan isi panel di sekitarnya. */
+.cbtv-audio { display: block; }
 .cbtv-mirip-daftar { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 7px; }
 .cbtv-mirip-daftar > li { border: 1px solid #e2e8f0; border-radius: 9px; overflow: hidden; }
 .cbtv-mirip-daftar > li > button {

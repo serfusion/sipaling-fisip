@@ -40,7 +40,7 @@ import { and, asc, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
 import { explainServerError } from "@/lib/api-errors";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { getCurrentProfile } from "@/lib/supabase-server";
-import { bolehCbt } from "@/lib/cbt";
+import { CBT_ROLES, bolehCbt } from "@/lib/cbt";
 import { ujianDariKode } from "@/lib/cbt-store";
 import { bolehMasuk } from "@/lib/cbt";
 import {
@@ -51,8 +51,18 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Hanya Admin dan Super Admin yang boleh mengubah daftar mahasiswa. */
-const PENGELOLA = ["super_admin", "admin"];
+/**
+ * Siapa yang boleh mengubah daftar peserta.
+ *
+ * Dulu hanya Admin dan Super Admin — dan itu keliru untuk pekerjaan yang
+ * sebenarnya terjadi: yang mengimpor daftar kelas adalah PENGAJAR yang akan
+ * mengujinya, lima menit sebelum ujian dimulai. Pengajar yang membuka menu
+ * Data peserta mendapat panel tanpa satu pun tombol, tanpa keterangan kenapa,
+ * dan menyimpulkan fiturnya belum ada.
+ *
+ * Sama dengan yang boleh memakai CBT: super_admin, admin, dosen.
+ */
+const PENGELOLA = CBT_ROLES;
 
 /**
  * Berapa baris yang ditarik dari basis data sebelum diperingkat di memori.

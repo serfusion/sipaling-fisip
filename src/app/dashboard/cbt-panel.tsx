@@ -994,6 +994,9 @@ export default function CbtPanel({ role }: { role: string }) {
   const [aksi, setAksi] = useState<Record<string, Kabar>>({});
   const [tolakSoal, setTolakSoal] = useState<{ judul: string; rincian: string[] } | null>(null);
   const jamAksi = useRef<Record<string, number>>({});
+  /** Penjaga penilaian otomatis; keterangannya di nilaiSendiri() di bawah. */
+  const nilaiJalanRef = useRef(false);
+  const nilaiMenyerahRef = useRef<Set<number>>(new Set());
   useEffect(() => {
     const jam = jamAksi.current;
     return () => { Object.values(jam).forEach((t) => window.clearTimeout(t)); };
@@ -1168,7 +1171,77 @@ export default function CbtPanel({ role }: { role: string }) {
     }
   }
 
+  // ============================================================
+  // PENILAIAN YANG BERJALAN SENDIRI
+  //
+  // Ujian yang memakai rubrik tidak perlu ditekan tombolnya: begitu ada
+  // jawaban yang menunggu, papan ini menilainya sendiri pada penyegaran
+  // berikutnya. Dari kursi pengajar, nilainya sudah ada tanpa ia mengoreksi
+  // apa pun.
+  //
+  // Yang dipakai jalur LOKAL: menghitung dari panjang jawaban dibanding
+  // sekelas, cakupan istilah soal, dan susunan kalimatnya. Tanpa kunci API,
+  // tanpa biaya, dan hasilnya sama tiap kali. Pembacaan isi oleh model tetap
+  // ada, tetapi sebagai tombol yang ditekan sendiri — bukan sesuatu yang
+  // berjalan diam-diam dan menagih per jawaban.
+  //
+  // Tiga pagar:
+  //
+  //   1. SATU PADA SATU WAKTU. Papan menyegar tiap sepuluh detik, dan
+  //      penilaian satu kelas dapat memakan lebih dari itu. Tanpa ini,
+  //      putaran kedua menilai ulang jawaban yang sedang dinilai putaran
+  //      pertama.
+  //   2. BERHENTI SESUDAH GAGAL. Rubrik yang belum dipasang, tabel yang belum
+  //      dimigrasikan: keduanya gagal berulang kali dengan cara yang sama.
+  //      Ujian yang sudah gagal sekali tidak dicoba lagi sampai halamannya
+  //      dimuat ulang.
+  //   3. HANYA KALAU MEMANG ADA YANG MENUNGGU. `tertunda` datang dari server
+  //      dan sudah menghitung jawaban yang belum dinilai.
+  // ============================================================
+  const nilaiSendiri = useCallback(async (id: number, daftar: Peserta[], pakaiRubrik: boolean) => {
+    if (!pakaiRubrik) return;
+    if (nilaiJalanRef.current || nilaiMenyerahRef.current.has(id)) return;
+    if (!daftar.some((p) => p.status !== "berjalan" && p.tertunda > 0)) return;
+
+    nilaiJalanRef.current = true;
+    try {
+      const jawab = await fetch("/api/cbt/penilaian", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aksi: "lokal", ujian: id }),
+      });
+      const data = await jawab.json();
+      if (!jawab.ok || !data.success) {
+        nilaiMenyerahRef.current.add(id);
+        // Sebabnya ditulis sekali, tidak diulang tiap sepuluh detik.
+        setGalat(data.message || "Penilaian otomatis belum dapat berjalan.");
+        return;
+      }
+      if (data.dinilai > 0) {
+        const jawabUlang = await fetch(`/api/cbt/hasil?ujian=${id}`, { cache: "no-store" });
+        const segar = await jawabUlang.json();
+        if (segar.success) {
+          setPeserta(segar.peserta || []);
+          setStatistik(segar.statistik || null);
+        }
+      }
+    } catch {
+      nilaiMenyerahRef.current.add(id);
+    } finally {
+      nilaiJalanRef.current = false;
+    }
+  }, []);
+
+  // Ditunda satu putaran, pola yang sama dengan pemuat lain di panel ini.
+  useEffect(() => {
+    if (buka === null || tab !== "pantau" || peserta.length === 0) return;
+    const pakaiRubrik = Boolean(ujian.find((u) => u.id === buka)?.rubricId);
+    const jam = setTimeout(() => void nilaiSendiri(buka, peserta, pakaiRubrik), 0);
+    return () => clearTimeout(jam);
+  }, [buka, tab, peserta, ujian, nilaiSendiri]);
+
   function bukaUjian(u: Ujian) {
+    nilaiMenyerahRef.current.delete(u.id);
     setBuka(u.id);
     setTab("soal");
     setSunting(null);
