@@ -1291,11 +1291,14 @@ export default function CbtPanel({ role }: { role: string }) {
   // berikutnya. Dari kursi pengajar, nilainya sudah ada tanpa ia mengoreksi
   // apa pun.
   //
-  // Yang dipakai jalur LOKAL: menghitung dari panjang jawaban dibanding
-  // sekelas, cakupan istilah soal, dan susunan kalimatnya. Tanpa kunci API,
-  // tanpa biaya, dan hasilnya sama tiap kali. Pembacaan isi oleh model tetap
-  // ada, tetapi sebagai tombol yang ditekan sendiri — bukan sesuatu yang
-  // berjalan diam-diam dan menagih per jawaban.
+  // Yang dipakai jalur ACUAN bila ujiannya punya kunci jawaban acuan, dan
+  // jalur LOKAL bila tidak. Acuan didahulukan karena ia mengukur ISI jawaban,
+  // sedangkan lokal hanya mengukur bentuknya, dan keduanya sama-sama gratis
+  // serta sama-sama berjalan di dalam server. Tidak ada alasan memakai yang
+  // lebih lemah ketika yang lebih kuat sudah dipasang dosen.
+  //
+  // Pembacaan isi oleh model tetap ada, tetapi sebagai tombol yang ditekan
+  // sendiri, bukan sesuatu yang berjalan diam-diam dan menagih per jawaban.
   //
   // Tiga pagar:
   //
@@ -1310,8 +1313,8 @@ export default function CbtPanel({ role }: { role: string }) {
   //   3. HANYA KALAU MEMANG ADA YANG MENUNGGU. `tertunda` datang dari server
   //      dan sudah menghitung jawaban yang belum dinilai.
   // ============================================================
-  const nilaiSendiri = useCallback(async (id: number, daftar: Peserta[], pakaiRubrik: boolean) => {
-    if (!pakaiRubrik) return;
+  const nilaiSendiri = useCallback(async (id: number, daftar: Peserta[], aksi: "acuan" | "lokal" | null) => {
+    if (!aksi) return;
     if (nilaiJalanRef.current || nilaiMenyerahRef.current.has(id)) return;
     if (!daftar.some((p) => p.status !== "berjalan" && p.tertunda > 0)) return;
 
@@ -1320,7 +1323,7 @@ export default function CbtPanel({ role }: { role: string }) {
       const jawab = await fetch("/api/cbt/penilaian", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ aksi: "lokal", ujian: id }),
+        body: JSON.stringify({ aksi, ujian: id }),
       });
       const data = await jawab.json();
       if (!jawab.ok || !data.success) {
@@ -1347,8 +1350,11 @@ export default function CbtPanel({ role }: { role: string }) {
   // Ditunda satu putaran, pola yang sama dengan pemuat lain di panel ini.
   useEffect(() => {
     if (buka === null || tab !== "pantau" || peserta.length === 0) return;
-    const pakaiRubrik = Boolean(ujian.find((u) => u.id === buka)?.rubricId);
-    const jam = setTimeout(() => void nilaiSendiri(buka, peserta, pakaiRubrik), 0);
+    // Acuan lebih dulu, rubrik sesudahnya, dan null berarti ujian ini memang
+    // tidak minta dinilai sendiri.
+    const dibuka = ujian.find((u) => u.id === buka);
+    const aksiNilai = dibuka?.answerKeyId ? "acuan" : dibuka?.rubricId ? "lokal" : null;
+    const jam = setTimeout(() => void nilaiSendiri(buka, peserta, aksiNilai), 0);
     return () => clearTimeout(jam);
   }, [buka, tab, peserta, ujian, nilaiSendiri]);
 
@@ -2281,6 +2287,39 @@ export default function CbtPanel({ role }: { role: string }) {
   // di server (lihat MAKS_SEKALI_NILAI), dan yang dikerjakan di sini hanya
   // menyampaikan sisanya kepada yang menekan.
   // ============================================================
+
+  /**
+   * Nilai ULANG seluruh kelas dengan jawaban acuan.
+   *
+   * Tombol ini ada karena bobot kata TF-IDF bergantung pada seluruh lembar
+   * yang dibandingkan. Penilaian yang berjalan sendiri di tengah ujian memakai
+   * korpus yang belum lengkap, jadi dua jawaban yang sama persis dapat
+   * bernilai sedikit berbeda bila dinilai pada putaran yang berbeda.
+   *
+   * Sekali ditekan sesudah kelasnya selesai, seluruh peserta dinilai dengan
+   * satu korpus yang sama, dan selisih yang datang dari urutan pengumpulan
+   * hilang. Nilai yang bergantung pada siapa mengumpulkan lebih dulu adalah
+   * nilai yang tidak dapat dipertahankan di hadapan yang menggugatnya.
+   */
+  async function nilaiUlangAcuan() {
+    if (!terbuka) return;
+    kabari("acuan-ulang", "jalan", "Menilai ulang…");
+    try {
+      const jawab = await fetch("/api/cbt/penilaian", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aksi: "acuan", ujian: terbuka.id, ulangi: true }),
+      });
+      const data = await jawab.json();
+      if (!jawab.ok || !data.success) throw new Error(data.message || "Gagal menilai.");
+      setPesan(data.pesan || "Penilaian acuan selesai.");
+      await muatHasil(terbuka.id);
+      kabari("acuan-ulang", "oke", "✓ Selesai", 6000);
+    } catch (alasan: unknown) {
+      setGalat(alasan instanceof Error ? alasan.message : "Penilaian acuan gagal dijalankan.");
+      kabari("acuan-ulang", "gagal", "✕ Gagal", 6000);
+    }
+  }
 
   async function nilaiSemuaEsai() {
     if (!terbuka) return;
@@ -3550,6 +3589,14 @@ export default function CbtPanel({ role }: { role: string }) {
                     yang tidak mengatakan berapa banyak yang akan terkena
                     membuat orang ragu menekannya — lalu mengerjakannya satu
                     per satu, empat puluh kali. */}
+                {terbuka.answerKeyId && sudahKumpul > 0 && (
+                  <Tbl
+                    kabar={aksi["acuan-ulang"]}
+                    dasar="btn btn-light btn-mini"
+                    diam={`↻ Nilai ulang ${sudahKumpul} lembar dengan acuan`}
+                    onClick={() => void nilaiUlangAcuan()}
+                  />
+                )}
                 {terbuka.rubricId && sudahKumpul > 0 && (
                   <Tbl
                     kabar={aksi["ai-semua"]}
