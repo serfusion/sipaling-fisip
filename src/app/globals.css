@@ -5040,9 +5040,24 @@ a.al-mini:hover { color: var(--al-ink); }
 .cbt-jam-titik { flex: 0 0 auto; margin: 0 -2px; color: var(--ink); font-size: 15px; font-weight: 800; }
 .cbt-jam-zona { flex: 0 0 auto; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .04em; }
 
+/* Jam dan menit yang sudah terlewat.
+
+   Peramban memang mengabukan <option disabled> sendiri, tetapi warnanya
+   ditentukan mesin gambar masing-masing dan pada sebagian di antaranya nyaris
+   tidak terbedakan dari pilihan yang masih hidup. Ditulis terus terang di sini
+   supaya "tidak bisa diklik" terlihat sebelum diklik, bukan sesudahnya. */
+.cbt-jam-baris select option:disabled {
+  color: #94a3b8; background: var(--canvas); font-style: italic;
+}
+
 /* Tanggal yang dieja kembali di bawah pemilihnya. Kecil, tetapi ia satu-satunya
    tempat di layar ini yang tidak dapat dibaca terbalik. */
 .cbt-jam-baca { color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+/* Jadwal yang tersimpan dengan jam yang sudah berlalu. Pemilihnya tidak dapat
+   mengabukan dirinya sendiri untuk nilai yang TERLANJUR terpilih, jadi
+   keterangannya yang berbicara. */
+.cbt-jam-basi { color: var(--red); }
+.cbt-jam-basi b { font-weight: 800; }
 .cbt-jadwal-ringkas {
   margin: 0 0 10px; padding: 9px 12px; border-radius: 9px;
   background: var(--blue-soft); color: var(--navy); font-size: 12px; line-height: 1.65;

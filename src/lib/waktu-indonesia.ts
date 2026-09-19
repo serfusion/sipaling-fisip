@@ -198,3 +198,30 @@ export function ejaSelisih(detik: number): string {
   const sisaJam = jam % 24;
   return sisaJam === 0 ? `${hari} hari` : `${hari} hari ${sisaJam} jam`;
 }
+
+/**
+ * Tanggal, jam, dan menit SEKARANG menurut zona ujian.
+ *
+ * Dipakai pemilih jadwal untuk mengabukan jam yang sudah terlewat. Yang
+ * dibandingkan harus zona ujian, bukan zona perangkat: laptop yang jamnya
+ * disetel WITA akan mengabukan satu jam yang di Jakarta belum lewat, dan
+ * pengajar kehilangan satu jam yang sebenarnya masih boleh dijadwalkan.
+ *
+ * pecahWaktuUjian dipakai kembali apa adanya, sehingga hanya ada SATU tempat
+ * di seluruh berkas ini yang menerjemahkan satu saat menjadi jam Indonesia.
+ */
+export function sekarangUjian(saat: Date = new Date()): JamPecah {
+  return pecahWaktuUjian(saat);
+}
+
+/**
+ * Apakah satu tanggal "YYYY-MM-DD" jatuh sebelum hari ini menurut zona ujian.
+ *
+ * Perbandingan tali, bukan perbandingan Date. Bentuk YYYY-MM-DD berurutan
+ * secara leksikografis persis seperti ia berurutan secara kalender, dan
+ * membandingkan tali membuat tengah malam tidak pernah menjadi kasus khusus.
+ */
+export function tanggalSudahLewat(tanggal: string, saat: Date = new Date()): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(tanggal || ""))) return false;
+  return tanggal < sekarangUjian(saat).tanggal;
+}

@@ -32,7 +32,8 @@ import {
 } from "@/lib/cetak-cbt";
 import { gambarQr, namaBerkasQr } from "@/lib/qr-ujian";
 import {
-  HURUF_ZONA, jamIndonesia, pecahWaktuUjian, PILIHAN_JAM, PILIHAN_MENIT, susunWaktuUjian,
+  HURUF_ZONA, jamIndonesia, pecahWaktuUjian, PILIHAN_JAM, PILIHAN_MENIT, sekarangUjian,
+  susunWaktuUjian,
 } from "@/lib/waktu-indonesia";
 import { buatDocxTemplate, buatXlsxTemplate } from "@/lib/template-soal";
 import { asalCbt } from "@/lib/situs-cbt";
@@ -782,6 +783,41 @@ function PilihJam({
   nilai: IsianJam;
   ubah: (isian: IsianJam) => void;
 }) {
+  // Jam berjalan terus selama panel terbuka, dan pemilih yang menghitung
+  // "sudah lewat" sekali saat digambar akan salah sesudah pengajar mengetik
+  // lima belas menit. Denyut tiap tiga puluh detik menggambar ulang
+  // pemilihnya, cukup rapat untuk menit yang baru lewat dan cukup jarang
+  // untuk tidak terasa.
+  const [denyut, setDenyut] = useState(() => Date.now());
+  useEffect(() => {
+    const jentera = window.setInterval(() => setDenyut(Date.now()), 30_000);
+    return () => window.clearInterval(jentera);
+  }, []);
+
+  // Jam yang sudah terlewat diabukan, bukan dibuang dari daftar.
+  //
+  // Dibuang berarti pemilih yang sedang menampilkan "08" pada ujian yang
+  // dijadwalkan kemarin mendadak kosong, dan jadwal yang tadinya terbaca
+  // berubah menjadi tidak terisi tanpa ada yang menyentuhnya. Diabukan
+  // membuat pilihannya tetap terbaca sekaligus tidak dapat dipilih lagi.
+  const kini = sekarangUjian(new Date(denyut));
+  const hariIni = nilai.tanggal === kini.tanggal;
+  const jamTerpilih = nilai.jam === "" ? -1 : Number(nilai.jam);
+
+  /** Jam ini sudah terlewat? Hanya berlaku bila tanggalnya hari ini. */
+  function jamLewat(j: string) {
+    return hariIni && Number(j) < kini.jam;
+  }
+
+  /**
+   * Menit ini sudah terlewat?
+   *
+   * Hanya pada jam yang sedang berjalan. Pada jam-jam sesudahnya seluruh
+   * menit masih di depan, dan mengabukannya akan mengunci jadwal yang sah.
+   */
+  function menitLewat(m: string) {
+    return hariIni && jamTerpilih === kini.jam && Number(m) < kini.menit;
+  }
   // Dibacakan kembali dengan kata, bukan dengan angka.
   //
   // Kotak tanggal bawaan peramban menuliskan urutannya menurut bahasa sistem
@@ -791,39 +827,56 @@ function PilihJam({
   // nama bulan yang dieja, sehingga tanggal yang keliru terbaca sebelum
   // ujiannya dijadwalkan, bukan sesudah pesertanya menunggu di hari yang salah.
   const terbaca = dariIsian(nilai);
+  const sudahLewat = terbaca !== null && terbaca.getTime() < denyut;
   return (
     <div className="cbt-jam">
       <span className="cbt-jam-label">{label}</span>
       <div className="cbt-jam-baris">
+        {/* min menutup hari-hari yang sudah lewat di dalam kalender bawaan
+            peramban, sehingga tanggal kemarin tidak dapat dipilih sama sekali.
+            Tanggal yang TERLANJUR tersimpan tetap ditampilkan: min hanya
+            menjaga pilihan baru, tidak menghapus nilai yang sudah ada. */}
         <input
           type="date"
           aria-label={`Tanggal ${label.toLowerCase()}`}
+          min={kini.tanggal}
           value={nilai.tanggal}
           onChange={(e) => ubah({ ...nilai, tanggal: e.target.value })}
         />
         <select
           aria-label={`Jam ${label.toLowerCase()}`}
+          className="cbt-jam-pilih"
           value={nilai.jam}
           onChange={(e) => ubah({ ...nilai, jam: e.target.value })}
         >
           <option value="">--</option>
-          {PILIHAN_JAM.map((j) => <option key={j} value={j}>{j}</option>)}
+          {PILIHAN_JAM.map((j) => (
+            <option key={j} value={j} disabled={jamLewat(j)}>{j}</option>
+          ))}
         </select>
         <b className="cbt-jam-titik">.</b>
         <select
           aria-label={`Menit ${label.toLowerCase()}`}
+          className="cbt-jam-pilih"
           value={nilai.menit}
           onChange={(e) => ubah({ ...nilai, menit: e.target.value })}
         >
           <option value="">--</option>
-          {PILIHAN_MENIT.map((m) => <option key={m} value={m}>{m}</option>)}
+          {PILIHAN_MENIT.map((m) => (
+            <option key={m} value={m} disabled={menitLewat(m)}>{m}</option>
+          ))}
         </select>
         <span className="cbt-jam-zona">{HURUF_ZONA}</span>
       </div>
-      <small className="cbt-jam-baca">
+      <small className={`cbt-jam-baca${sudahLewat ? " cbt-jam-basi" : ""}`}>
         {terbaca
           ? jamIndonesia(terbaca, { hari: true, tahun: true, panjang: true })
           : "Tanggal, jam, dan menit belum lengkap."}
+        {/* Mengabukan pilihan saja tidak cukup untuk jadwal yang SUDAH
+            tersimpan lewat: pilihannya tetap terbaca seperti jadwal yang sah,
+            hanya tidak dapat dipilih ulang. Kalimat inilah yang mengatakan
+            bahwa yang terbaca itu sudah berlalu. */}
+        {sudahLewat && <b> (sudah terlewat)</b>}
       </small>
     </div>
   );
