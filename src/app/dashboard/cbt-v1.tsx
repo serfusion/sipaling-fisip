@@ -1097,13 +1097,14 @@ export function LembarRubrik({
               </span>
             ) : (
               <small className="cbt-catatan">
-                Penilaian AI belum tersambung ke model. Level di bawah tetap dapat Anda isi sendiri.
+                Koreksi otomatis mati: belum ada <code>ANTHROPIC_API_KEY</code> atau{" "}
+                <code>GEMINI_API_KEY</code> di environment. Level di bawah tetap dapat diisi sendiri.
               </small>
             )}
           </div>
 
           <p className="cbt-catatan cbtv-prinsip">
-            AI hanya <b>mengusulkan level</b>. Nilai berlaku setelah Anda menekan SAHKAN.
+            AI mengusulkan, Anda yang mengesahkan.
           </p>
 
           {data.esai.length === 0 && <div className="dempty">Tidak ada soal esai pada lembar peserta ini.</div>}
@@ -1122,6 +1123,7 @@ export function LembarRubrik({
               </div>
 
               {e.jawaban.trim() && (
+                <div className="cbtv-tabel-bungkus">
                 <table className="dsh-table cbtv-tabel-rubrik">
                   <thead>
                     <tr><th>Kriteria</th><th>Bobot</th><th>Level</th><th>Terbobot</th></tr>
@@ -1132,7 +1134,7 @@ export function LembarRubrik({
                       const berbeda = k.namaTersimpan && k.namaTersimpan !== k.nama;
                       return (
                         <tr key={k.urut}>
-                          <td>
+                          <td data-kolom="Kriteria">
                             {k.nama}
                             {/* Rubriknya disunting sesudah jawaban ini dinilai.
                                 Ditunjukkan apa adanya, bukan didiamkan: angka
@@ -1148,8 +1150,8 @@ export function LembarRubrik({
                               </small>
                             )}
                           </td>
-                          <td className="cbtv-ka">{k.bobot}%</td>
-                          <td>
+                          <td className="cbtv-ka" data-kolom="Bobot">{k.bobot}%</td>
+                          <td data-kolom="Level">
                             <select
                               value={k.level ?? ""}
                               disabled={sibuk === `level-${e.soalId}-${k.urut}`}
@@ -1165,7 +1167,7 @@ export function LembarRubrik({
                             </select>
                             {k.finalLevel !== null && <small className="cbtv-diubah">diubah Anda</small>}
                           </td>
-                          <td className="cbtv-ka">{terbobot.toFixed(2)}</td>
+                          <td className="cbtv-ka" data-kolom="Terbobot">{terbobot.toFixed(2)}</td>
                         </tr>
                       );
                     })}
@@ -1183,6 +1185,7 @@ export function LembarRubrik({
                     </tfoot>
                   )}
                 </table>
+                </div>
               )}
 
               {e.catatan && (
