@@ -419,7 +419,7 @@ export function PanelMahasiswa({ bolehKelola: awal }: { bolehKelola: boolean }) 
           {tolak.length > 0 && (
             <div className="dsh-note cbtv-tolak">
               <b>{tolak.length} baris dilewati</b>
-              <ul>{tolak.slice(0, 6).map((t, i) => <li key={i}>{t.baris} — {t.alasan}</li>)}</ul>
+              <ul>{tolak.slice(0, 6).map((t, i) => <li key={i}>{t.baris}: {t.alasan}</li>)}</ul>
             </div>
           )}
         </div>
@@ -500,7 +500,7 @@ export function PanelMahasiswa({ bolehKelola: awal }: { bolehKelola: boolean }) 
             {cari
               ? "Tidak ada yang cocok."
               : pesertaLepas.length > 0
-                ? `Daftar tetap masih kosong. ${pesertaLepas.length} peserta sudah ikut ujian — tambahkan dari kotak di atas.`
+                ? `Daftar tetap masih kosong. ${pesertaLepas.length} peserta sudah ikut ujian, tambahkan dari kotak di atas.`
                 : "Belum ada peserta. Impor dari Excel, Word, tempelan, atau tambah manual di atas."}
           </div>
         ) : (
@@ -513,8 +513,8 @@ export function PanelMahasiswa({ bolehKelola: awal }: { bolehKelola: boolean }) 
                 <tr key={m.id}>
                   <td><code>{m.nim}</code></td>
                   <td>{m.nama}</td>
-                  <td className="cbtv-email">{m.email || <i>—</i>}</td>
-                  <td>{m.kelas || "—"}</td>
+                  <td className="cbtv-email">{m.email || <i>-</i>}</td>
+                  <td>{m.kelas || "-"}</td>
                   <td>{STATUS_MAHASISWA_LABEL[m.status as (typeof STATUS_MAHASISWA)[number]] ?? m.status}</td>
                   {bolehKelola && (
                     <td className="cbtv-aksi-baris">
@@ -670,7 +670,7 @@ export function PanelRubrik() {
           kosong dengan tombol "susun sendiri" yang memakan dua puluh menit. */}
       {!susun && (
         <div className="panel">
-          <b className="cbtv-sub">Siap pakai — tinggal salin</b>
+          <b className="cbtv-sub">Siap pakai, tinggal salin</b>
           <div className="cbtv-bawaan">
             {RUBRIK_BAWAAN.map((r) => (
               <div key={r.nama} className="cbtv-bawaan-kartu">
@@ -738,7 +738,7 @@ export function PanelRubrik() {
 
           <div className="cbtv-bobot-kabar">
             Jumlah bobot: <b className={jumlahBobot === 100 ? "ok" : "salah"}>{jumlahBobot}%</b>
-            {jumlahBobot !== 100 && <> — harus tepat 100%.</>}
+            {jumlahBobot !== 100 && <>, harus tepat 100%.</>}
             <button
               type="button"
               className="btn btn-light btn-mini"
@@ -1122,7 +1122,7 @@ export function PanelAcuan() {
     <div className="cbtv-acuan">
       <div className="panel cbt-kepala">
         <div>
-          <b>Kunci jawaban acuan dosen</b>
+          <b>Kunci jawaban acuan Dosen / Pengajar</b>
           <span>
             Jawaban peserta dinilai dari kedekatannya dengan jawaban acuan Anda, memakai cosine
             similarity atas bobot kata TF-IDF. Parafrase yang benar tetap bernilai tinggi;
@@ -1649,7 +1649,7 @@ export function LembarRubrik({
 
       {!data.rubrik ? (
         <div className="dsh-note">
-          Ujian ini belum memakai rubrik, jadi esai dinilai seperti biasa — Anda mengetik
+          Ujian ini belum memakai rubrik, jadi esai dinilai seperti biasa, Anda mengetik
           angkanya sendiri pada lembar jawaban. Untuk memakai rubrik, pilih satu pada
           <b> Pengaturan ujian → Rubrik penilaian esai</b>.
         </div>
@@ -1657,7 +1657,7 @@ export function LembarRubrik({
         <>
           <div className="cbtv-lembar-kepala">
             <div>
-              <b>Penilaian rubrik — {data.rubrik.nama}</b>
+              <b>Penilaian rubrik: {data.rubrik.nama}</b>
               <small>
                 {data.esai.length} soal esai · skala {data.rubrik.skalaMin}–{data.rubrik.skalaMax}
                 {belumDinilai > 0 && ` · ${belumDinilai} belum dinilai`}
@@ -1688,7 +1688,7 @@ export function LembarRubrik({
 
           <p className="cbt-catatan cbtv-prinsip">
             Esai dinilai otomatis dari ambang panjang rubrik saat peserta mengumpulkan.
-            Ubah level bila ada yang meleset — nilainya ikut berubah.
+            Ubah level bila ada yang meleset, nilainya ikut berubah.
           </p>
 
           {data.esai.length === 0 && <div className="dempty">Tidak ada soal esai pada lembar peserta ini.</div>}
@@ -1729,7 +1729,7 @@ export function LembarRubrik({
                               <small className="cbtv-alasan">
                                 {k.aiAlasan}
                                 {k.aiKeyakinan !== null && k.aiKeyakinan < 70 && (
-                                  <b> (keyakinan {k.aiKeyakinan}% — mohon diperiksa)</b>
+                                  <b> (keyakinan {k.aiKeyakinan}%, mohon diperiksa)</b>
                                 )}
                               </small>
                             )}
@@ -1742,7 +1742,7 @@ export function LembarRubrik({
                               onChange={(ev) => void ubahLevel(e.soalId, k.urut, ev.target.value === "" ? null : Number(ev.target.value))}
                               title={k.levels.find((l) => l.level === k.level)?.deskriptor ?? ""}
                             >
-                              <option value="">—</option>
+                              <option value="">-</option>
                               {k.levels.map((l) => (
                                 <option key={l.level} value={l.level} title={l.deskriptor}>
                                   {l.level}{l.deskriptor ? ` · ${l.deskriptor.slice(0, 60)}${l.deskriptor.length > 60 ? "…" : ""}` : ""}
@@ -1790,14 +1790,14 @@ export function LembarRubrik({
           dikirimkan ke mahasiswa harus melewatinya. */}
       <div className="cbtv-sahkan">
         <div className="cbtv-sahkan-kiri">
-          <span className="cbtv-nilai-mesin">Hitungan sistem: <b>{p.nilaiMesin ?? "—"}</b></span>
+          <span className="cbtv-nilai-mesin">Hitungan sistem: <b>{p.nilaiMesin ?? "-"}</b></span>
           {p.tertunda > 0 && <span className="cbtv-tunggu">{p.tertunda} jawaban belum dinilai</span>}
         </div>
 
         {p.disetujui ? (
           <div className="cbtv-sahkan-kanan">
             <span className="cbtv-sudah">
-              ✓ Nilai <b>{p.nilaiAkhir}</b> ({p.predikat.huruf} — {p.predikat.sebutan}) disahkan oleh {p.disetujuiOleh}
+              ✓ Nilai <b>{p.nilaiAkhir}</b> ({p.predikat.huruf}, {p.predikat.sebutan}) disahkan oleh {p.disetujuiOleh}
             </span>
             <span className="cbtv-aksi-rubrik">
               <button

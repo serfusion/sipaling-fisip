@@ -242,7 +242,7 @@ export async function POST(request: Request) {
               ticket: pemilik.ticket,
               ulangan: true,
               message:
-                "Pengajuan ini sudah tersimpan sebelumnya — jawaban yang pertama tidak sampai ke perangkat Anda. " +
+                "Pengajuan ini sudah tersimpan sebelumnya, jawaban yang pertama tidak sampai ke perangkat Anda. " +
                 "Nomor tiketnya tetap yang ini, dan berkasnya tidak perlu diunggah lagi.",
             },
             { status: 200 },

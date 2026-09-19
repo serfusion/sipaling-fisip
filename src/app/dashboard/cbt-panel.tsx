@@ -356,7 +356,7 @@ function SetelPenilaian({
           menyala bersama. */}
       <div className="cbtv-penilai">
         <label>
-          <span>Jawaban acuan dosen</span>
+          <span>Jawaban acuan Dosen / Pengajar</span>
           <select value={nilai.answerKeyId} onChange={(e) => ubah({ answerKeyId: Number(e.target.value) })}>
             <option value={0}>Tanpa acuan</option>
             {acuan.map((a) => (
@@ -786,7 +786,7 @@ function halanganJadwal(opsi: {
   soalDipakai: number;
 }): string | null {
   const { mulai, selesai, durasi, jumlahBank, soalDipakai } = opsi;
-  if (!mulai || !selesai) return "Tanggal, jam, dan menit — mulai maupun selesai — harus terisi lengkap.";
+  if (!mulai || !selesai) return "Tanggal, jam, dan menit (mulai maupun selesai) harus terisi lengkap.";
   if (selesai.getTime() <= mulai.getTime()) return "Jam selesai harus sesudah jam mulai.";
 
   const menitJendela = Math.round((selesai.getTime() - mulai.getTime()) / 60_000);
@@ -1295,7 +1295,7 @@ export default function CbtPanel({ role }: { role: string }) {
   // jalur LOKAL bila tidak. Acuan didahulukan karena ia mengukur ISI jawaban,
   // sedangkan lokal hanya mengukur bentuknya, dan keduanya sama-sama gratis
   // serta sama-sama berjalan di dalam server. Tidak ada alasan memakai yang
-  // lebih lemah ketika yang lebih kuat sudah dipasang dosen.
+  // lebih lemah ketika yang lebih kuat sudah dipasang pengajarnya.
   //
   // Pembacaan isi oleh model tetap ada, tetapi sebagai tombol yang ditekan
   // sendiri, bukan sesuatu yang berjalan diam-diam dan menagih per jawaban.
@@ -2171,7 +2171,7 @@ export default function CbtPanel({ role }: { role: string }) {
       // hanya yang kedua yang berarti sesuatu.
       jejak: jejak.slice(0, 100).map((j) => ({
         jam: jamIndonesia(j.jam),
-        keterangan: `${INSIDEN_LABEL[j.jenis as JenisInsiden] ?? j.jenis}${j.detail ? ` — ${j.detail}` : ""}`,
+        keterangan: `${INSIDEN_LABEL[j.jenis as JenisInsiden] ?? j.jenis}${j.detail ? `: ${j.detail}` : ""}`,
       })),
     };
     bukaCetak(
@@ -2398,7 +2398,7 @@ export default function CbtPanel({ role }: { role: string }) {
         <h2 className="dsh-title">Ujian Online (CBT)</h2>
 
         {/* ---------- TIGA MENU, SATU TEMPAT ----------
-            Penilaian esai dan daftar mahasiswa hanya berarti bagi CBT, jadi
+            Penilaian esai dan daftar peserta hanya berarti bagi CBT, jadi
             keduanya duduk di sini, bukan sebagai dua menu baru di sidebar
             dashboard yang juga dilihat admin bagian yang tidak pernah
             menyentuh ujian. */}
@@ -3156,7 +3156,7 @@ export default function CbtPanel({ role }: { role: string }) {
               <p className={`cbt-hitung-kabar ${cukupSoal ? "cukup" : "kurang"}`}>
                 {cukupSoal
                   ? soal.length > terbuka.questionCount
-                    ? `✓ Cukup, malah berlebih ${soal.length - terbuka.questionCount} soal — yang dipakai diacak dari seluruh bank.`
+                    ? `✓ Cukup, malah berlebih ${soal.length - terbuka.questionCount} soal, yang dipakai diacak dari seluruh bank.`
                     : "✓ Cukup. Bank soalnya pas dengan jumlah yang dipakai ujian."
                   : `Kurang ${terbuka.questionCount - soal.length} soal lagi. Ujian belum dapat diaktifkan sebelum banknya cukup.`}
               </p>
@@ -3419,7 +3419,7 @@ export default function CbtPanel({ role }: { role: string }) {
                 dengan kalimatnya sendiri tetap mendapat angka tinggi. */}
             {(soalBaru.jenis === "essay" || soalBaru.jenis === "isian") && (
               <label className="cbt-lebar"><span>
-                Jawaban acuan {soalBaru.jenis === "essay" ? "— menentukan nilai otomatisnya" : "(opsional)"}
+                Jawaban acuan {soalBaru.jenis === "essay" ? "(menentukan nilai otomatisnya)" : "(opsional)"}
               </span>
                 <textarea
                   rows={4}
@@ -3852,7 +3852,7 @@ export default function CbtPanel({ role }: { role: string }) {
                       salah satunya keliru. */}
                   {terbuka.randomOptions && (
                     <p className="cbt-catatan">
-                      Huruf pilihan di bawah mengikuti urutan <b>bank soal</b> —
+                      Huruf pilihan di bawah mengikuti urutan <b>bank soal</b>,
                       sama dengan naskah cetak. Urutan pilihan di layar peserta
                       diacak, dan jawabannya sudah dikembalikan ke urutan bank
                       oleh sistem, dengan cara yang sama seperti ketika nilainya

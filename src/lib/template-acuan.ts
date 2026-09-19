@@ -97,7 +97,7 @@ const PETUNJUK_ACUAN: string[] = [
 ];
 
 const NASKAH_ACUAN_WORD = [
-  "TEMPLATE JAWABAN ACUAN DOSEN",
+  "TEMPLATE JAWABAN ACUAN DOSEN / PENGAJAR",
   "",
   "Hapus dua contoh di bawah, lalu tulis jawaban acuan Anda sendiri dengan bentuk yang sama.",
   "",
@@ -140,7 +140,7 @@ export function buatXlsxAcuan(): Blob {
     {
       tinggi: 30,
       sel: KOLOM_ACUAN.map((_, i) =>
-        i === 0 ? { nilai: "TEMPLATE JAWABAN ACUAN DOSEN", gaya: GAYA.judul } : { nilai: "", gaya: GAYA.judul },
+        i === 0 ? { nilai: "TEMPLATE JAWABAN ACUAN DOSEN / PENGAJAR", gaya: GAYA.judul } : { nilai: "", gaya: GAYA.judul },
       ),
     },
     {

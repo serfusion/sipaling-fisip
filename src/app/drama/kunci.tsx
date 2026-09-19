@@ -84,7 +84,7 @@ export default function KunciDrama({ portal, habis }: Props) {
         </span>
         <h1>Nonton Drama</h1>
         <p className="dk-lead">
-          Drama pendek dari sembilan sumber sekaligus — cari judulnya, pilih episodenya, langsung
+          Drama pendek dari sembilan sumber sekaligus, cari judulnya, pilih episodenya, langsung
           jalan. Gratis untuk yang langganan Cakrawala, tanpa tambahan biaya apa pun.
         </p>
       </header>
@@ -94,7 +94,7 @@ export default function KunciDrama({ portal, habis }: Props) {
           <h2>Buka dengan kode Cakrawala</h2>
           <p className="dk-sub">
             Pakai kode yang sama dengan yang kamu pakai di portal. Membukanya di sini{" "}
-            <b>tidak memotong masa langgananmu</b> — hari yang sudah kamu beli tetap utuh.
+            <b>tidak memotong masa langgananmu</b>, hari yang sudah kamu beli tetap utuh.
           </p>
 
           {habis && (
@@ -149,7 +149,7 @@ export default function KunciDrama({ portal, habis }: Props) {
         <section className="dk-kartu dk-kartu-lain">
           <h2>Belum punya kode?</h2>
           <p className="dk-sub">
-            Kode dibagikan bersama langganan Cakrawala di portal — sembilan alat bantu tugas akhir,
+            Kode dibagikan bersama langganan Cakrawala di portal, sembilan alat bantu tugas akhir,
             catatan uang bulanan, dan menu ini. Satu kode untuk semuanya.
           </p>
           <div className="dk-aksi">

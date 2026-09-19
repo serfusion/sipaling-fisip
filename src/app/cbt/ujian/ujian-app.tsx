@@ -991,7 +991,7 @@ export default function UjianApp() {
               ) : (
                 <>Jadwal ujian ini belum disetel pengajarnya.</>
               )}{" "}
-              Halaman ini boleh dibiarkan terbuka — tombol Mulai menyala sendiri begitu
+              Halaman ini boleh dibiarkan terbuka, tombol Mulai menyala sendiri begitu
               ujiannya dibuka.
             </div>
           )}

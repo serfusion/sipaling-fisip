@@ -144,7 +144,7 @@ export async function kirimFormulir<T>(
 
   throw new Error(
     `${terakhir} Sudah dicoba ${maks} kali dan server tetap tidak menyelesaikannya. ` +
-      "Berkas Anda masih tersimpan di server; coba kirim lagi beberapa menit lagi — " +
-      "bila pengajuannya ternyata sudah masuk, nomor tiketnya akan muncul tanpa membuat pengajuan kedua.",
+      "Berkas Anda masih tersimpan di server; coba kirim lagi beberapa menit lagi. " +
+      "Bila pengajuannya ternyata sudah masuk, nomor tiketnya akan muncul tanpa membuat pengajuan kedua.",
   );
 }

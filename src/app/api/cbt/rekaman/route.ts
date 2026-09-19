@@ -417,7 +417,7 @@ async function transkripkan(body: Record<string, unknown>) {
     jumlahTanda: keadaan.jumlah,
     pesan:
       sisa > 0
-        ? `${masuk} penggal tersimpan. Masih ada ${sisa} potongan — tekan sekali lagi untuk melanjutkan.`
+        ? `${masuk} penggal tersimpan. Masih ada ${sisa} potongan, tekan sekali lagi untuk melanjutkan.`
         : `Transkrip selesai. ${keadaan.jumlah} penggal ditandai untuk ditinjau.`,
   });
 }

@@ -539,7 +539,7 @@ export function beritaAcaraHtml(ujian: UjianCetak, acara: BeritaAcara): string {
       if (p.status === "waktu_habis") bagian.push("Waktu habis, dikumpulkan otomatis");
       if (p.status !== "berjalan") {
         if ((p.tertunda ?? 0) > 0) {
-          bagian.push(`${p.tertunda} essay menunggu koreksi — nilai belum tetap`);
+          bagian.push(`${p.tertunda} essay menunggu koreksi, nilai belum tetap`);
         } else if (typeof p.nilai === "number") {
           bagian.push(p.nilai >= acara.passing ? "Lulus" : "Belum lulus");
         } else {
@@ -739,7 +739,7 @@ ${barisKeterangan([
 <h3>A. Ringkasan nilai</h3>
 <table class="nilai">
   <tr><th>Nilai akhir</th><td><b style="font-size:15pt">${nilaiPakai ?? "-"}</b>
-    ${peserta.predikat ? `&nbsp; <b>${lolos(peserta.predikat.huruf)}</b> — ${lolos(peserta.predikat.sebutan)}` : ""}
+    ${peserta.predikat ? `&nbsp; <b>${lolos(peserta.predikat.huruf)}</b>, ${lolos(peserta.predikat.sebutan)}` : ""}
     &nbsp; (batas lulus ${passing}) · <b>${nilaiPakai === null || nilaiPakai === undefined ? "belum dinilai" : lulus ? "LULUS" : "BELUM LULUS"}</b></td></tr>
   ${diubah ? `<tr><th>Nilai hitungan sistem</th><td>${peserta.nilai ?? "-"} &nbsp;<i>(diubah dosen menjadi ${peserta.nilaiAkhir})</i></td></tr>` : ""}
   <tr><th>Benar</th><td>${peserta.benar} butir</td></tr>
@@ -817,7 +817,7 @@ function bagianRubrik(rubrik: RubrikCetak[], namaRubrik: string): string {
           (k) => `<tr>
         <td>${lolos(k.nama)}</td>
         <td class="ka">${k.bobot}%</td>
-        <td class="te">${k.level > 0 ? `${k.level} / ${r.skalaMax}` : "—"}${k.diubahDosen ? " *" : ""}</td>
+        <td class="te">${k.level > 0 ? `${k.level} / ${r.skalaMax}` : "-"}${k.diubahDosen ? " *" : ""}</td>
         <td class="ka">${k.terbobot.toFixed(2)}</td>
       </tr>${k.alasan ? `<tr><td colspan="4" class="alasan">${lolos(k.alasan)}</td></tr>` : ""}`,
         )
@@ -835,7 +835,7 @@ ${r.catatan ? `<p class="catatan-rubrik"><b>Catatan:</b> ${lolos(r.catatan)}</p>
     .join("");
 
   return `
-<h3>C. Penilaian rubrik${namaRubrik ? ` — ${lolos(namaRubrik)}` : ""}</h3>
+<h3>C. Penilaian rubrik${namaRubrik ? `: ${lolos(namaRubrik)}` : ""}</h3>
 <p class="rumus">Nilai = (total skor terbobot ÷ level tertinggi) × 100. Tanda * berarti level ditentukan dosen.</p>
 ${isi}`;
 }
@@ -848,7 +848,7 @@ function bagianIntegritas(peserta: PesertaCetak): string {
   if (peserta.kemiripan) {
     bagian.push(`
 <table class="nilai">
-  <tr><th>Kemiripan tertinggi dengan peserta lain</th><td><b>${peserta.kemiripan.skor}%</b> — ${lolos(peserta.kemiripan.status)}${peserta.kemiripan.lawan ? ` (dengan ${lolos(peserta.kemiripan.lawan)})` : ""}</td></tr>
+  <tr><th>Kemiripan tertinggi dengan peserta lain</th><td><b>${peserta.kemiripan.skor}%</b>, ${lolos(peserta.kemiripan.status)}${peserta.kemiripan.lawan ? ` (dengan ${lolos(peserta.kemiripan.lawan)})` : ""}</td></tr>
 </table>
 <p class="peringatan">Angka kemiripan adalah INDIKASI yang perlu diperiksa pengajar, bukan bukti
 penjiplakan. Dua jawaban dapat mirip karena keduanya belajar dari bahan yang sama.</p>`);
@@ -861,7 +861,7 @@ penjiplakan. Dua jawaban dapat mirip karena keduanya belajar dari bahan yang sam
       .join("");
     bagian.push(`
 <table class="nilai">
-  <tr><th>Rekaman suara</th><td>${r.ada ? `tersedia · ${Math.round(r.durasi / 60)} menit` : `tidak ada${r.catatan ? ` — ${lolos(r.catatan)}` : ""}`}</td></tr>
+  <tr><th>Rekaman suara</th><td>${r.ada ? `tersedia · ${Math.round(r.durasi / 60)} menit` : `tidak ada${r.catatan ? `, ${lolos(r.catatan)}` : ""}`}</td></tr>
   <tr><th>Transkrip</th><td>${lolos(r.transkrip)}</td></tr>
   <tr><th>Hasil pembacaan</th><td><b>${lolos(r.tanda)}</b>${r.jumlahTanda > 0 ? ` · ${r.jumlahTanda} penggal ditandai` : ""}</td></tr>
 </table>

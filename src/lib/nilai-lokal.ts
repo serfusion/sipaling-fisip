@@ -545,7 +545,7 @@ export function nilaiLokal({
       (peringatan.length > 0 ? ` ⚠ ${peringatan.join("; ")}.` : "") +
       (sinyal.adaAcuan
         ? " Yang menentukan kedekatan dengan jawaban acuan; panjang hanya membatasi."
-        : " Soal ini belum punya jawaban acuan pada kolom Pembahasan — isilah untuk penilaian yang jauh lebih tepat.") +
+        : " Soal ini belum punya jawaban acuan pada kolom Pembahasan, isilah untuk penilaian yang jauh lebih tepat.") +
       " Ubah levelnya bila ada yang meleset.",
     sinyal,
   };

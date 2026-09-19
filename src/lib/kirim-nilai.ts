@@ -64,7 +64,7 @@ function rangka(isi: string, judul: string): string {
 </table>
 <p style="max-width:600px;margin:16px auto 0;color:#8a95a1;font-size:11.5px;line-height:1.6;text-align:center;">
 Surat ini dikirim otomatis oleh sistem ujian. Bila ada yang perlu ditanyakan mengenai nilai,
-hubungi dosen pengampu mata kuliah — bukan membalas surat ini.
+hubungi dosen pengampu mata kuliah, bukan membalas surat ini.
 </p></body></html>`;
 }
 
@@ -109,7 +109,7 @@ export async function kirimLaporanNilai(input: {
   if (!attempt.approvedAt) {
     return {
       terkirim: false,
-      pesan: "Nilainya belum disetujui. Tekan SETUJUI dulu — surat hanya dikirim untuk nilai yang sudah final.",
+      pesan: "Nilainya belum disetujui. Tekan SETUJUI dulu, surat hanya dikirim untuk nilai yang sudah final.",
       email: attempt.email || "",
     };
   }
@@ -175,7 +175,7 @@ export async function kirimLaporanNilai(input: {
     `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 20px;border-collapse:separate;">` +
       `<tr><td style="padding:18px;border-radius:10px;background:${lulus ? "#f0fdf4" : "#fef2f2"};border:1px solid ${lulus ? "#bbf7d0" : "#fecaca"};text-align:center;">` +
       `<div style="font-size:38px;font-weight:800;line-height:1;color:${lulus ? "#15803d" : "#b91c1c"};">${nilai}</div>` +
-      `<div style="margin-top:6px;font-size:13px;font-weight:700;color:#374151;">${lolos(pred.huruf)} — ${lolos(pred.sebutan)}</div>` +
+      `<div style="margin-top:6px;font-size:13px;font-weight:700;color:#374151;">${lolos(pred.huruf)}, ${lolos(pred.sebutan)}</div>` +
       `<div style="margin-top:4px;font-size:12px;color:#6b7280;">Batas kelulusan ${ujian.passingGrade} · ${lulus ? "Memenuhi" : "Belum memenuhi"}</div>` +
       `</td></tr></table>`,
   );
@@ -233,7 +233,7 @@ export async function kirimLaporanNilai(input: {
       `${lolos(jamIndonesia(attempt.approvedAt))}</p>`,
   );
 
-  const judul = `Hasil ${ujian.title} — ${ujian.courseName}`;
+  const judul = `Hasil ${ujian.title}: ${ujian.courseName}`;
   const html = rangka(bagian.join(""), judul);
 
   // ---------- KIRIM ----------

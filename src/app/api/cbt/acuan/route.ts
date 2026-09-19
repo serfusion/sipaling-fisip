@@ -1,5 +1,5 @@
 // ============================================================
-// CBT - KUNCI JAWABAN ACUAN DOSEN
+// CBT - KUNCI JAWABAN ACUAN PENGAJAR
 //
 // GET             daftar acuan milik portal
 // POST            buat acuan baru
@@ -13,16 +13,16 @@
 // disengaja: dua pustaka yang berdampingan di satu menu tetapi hak suntingnya
 // berbeda adalah dua pustaka yang salah satunya akan dipakai keliru.
 //
-// Acuan dipakai bersama-sama. Dosen A menulis acuan untuk mata kuliah yang
-// diampunya, dosen B memakainya pada kelas paralel. Itu memang yang
+// Acuan dipakai bersama-sama. Pengajar A menulis acuan untuk mata uji yang
+// diampunya, pengajar B memakainya pada kelas paralel. Itu memang yang
 // dikehendaki, karena menulis jawaban acuan yang baik memakan waktu berjam-jam
-// dan menyuruh tiap dosen menulisnya sendiri berarti hampir tidak ada yang
+// dan menyuruh tiap pengajar menulisnya sendiri berarti hampir tidak ada yang
 // memakainya.
 //
 // Yang MENYUNTING tetap pemiliknya saja, ditambah Admin dan Super Admin.
 // Alasannya lebih keras di sini daripada di rubrik: mengubah satu jawaban
 // acuan mengubah nilai yang sudah keluar bagi SELURUH kelas sekaligus, bukan
-// mengubah satu deskriptor yang masih harus dibaca dosen.
+// mengubah satu deskriptor yang masih harus dibaca pengajarnya.
 // ============================================================
 import { db } from "@/db";
 import { cbtAnswerKeys, cbtExams } from "@/db/schema";
@@ -49,7 +49,7 @@ function bolehSunting(profile: { id: string; role: string }, acuan: { ownerId: s
  * Bersihkan butir yang datang dari layar.
  *
  * Yang masuk dari peramban tidak pernah dipercaya bentuknya, termasuk ketika
- * peramban itu milik dosen sendiri. bersihkanButir dipakai kembali apa adanya
+ * peramban itu milik pengajarnya sendiri. bersihkanButir dipakai kembali apa adanya
  * dari src/lib/nilai-acuan.ts, sehingga yang datang dari basis data dan yang
  * datang dari layar melewati jepitan yang SAMA. Dua jepitan terpisah berarti
  * dua tempat yang dapat berbeda diam-diam, dan yang berbeda diam-diam di sini
@@ -179,7 +179,7 @@ export async function PATCH(request: Request) {
     // diketahui penyuntingnya adalah bahwa nilai yang sudah keluar dihitung
     // dengan acuan versi lama, dan penghitungan ulang hanya terjadi bila
     // penilaian dijalankan lagi. Jalur penilaian selalu menyimpan kemiripan
-    // yang dipakainya, sehingga dosen dapat melihat bahwa keduanya berbeda.
+    // yang dipakainya, sehingga pengajar dapat melihat bahwa keduanya berbeda.
     const dipakai = await db
       .select({ jumlah: sql<number>`count(*)::int` })
       .from(cbtExams)

@@ -255,8 +255,8 @@ export function periksaUcapan(teks: string, kata: string[] = KATA_BAWAAN): Temua
       keyword: ketemu,
       risk: "rendah",
       reason:
-        `Kata "${ketemu}" terdengar, tetapi kalimat sebelumnya berisi kata pengingkar ` +
-        "— kemungkinan peserta sedang membicarakan larangannya, bukan melakukannya.",
+        `Kata "${ketemu}" terdengar, tetapi kalimat sebelumnya berisi kata pengingkar, ` +
+        "kemungkinan peserta sedang membicarakan larangannya, bukan melakukannya.",
     };
   }
 
@@ -376,7 +376,7 @@ jangan menerjemahkan.
 Pecah menjadi penggal pendek, kira-kira satu kalimat atau satu ucapan per penggal, masing-masing
 dengan detik mulai dan selesainya terhitung dari awal potongan ini.
 
-Bila sebuah bagian tidak terdengar jelas, tulis bagian itu sebagai [tidak jelas] — JANGAN menebak.
+Bila sebuah bagian tidak terdengar jelas, tulis bagian itu sebagai [tidak jelas], JANGAN menebak.
 Tebakan pada rekaman ujian dapat menjadi dasar tuduhan terhadap orang yang tidak mengatakannya.
 
 Bila tidak ada suara manusia sama sekali, kembalikan penggal kosong dan adaSuara bernilai false.

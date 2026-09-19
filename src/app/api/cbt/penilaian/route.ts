@@ -254,7 +254,7 @@ export async function POST(request: Request) {
       });
     }
 
-    // ---------- PENILAIAN DARI JAWABAN ACUAN DOSEN ----------
+    // ---------- PENILAIAN DARI JAWABAN ACUAN PENGAJAR ----------
     //
     // Jalur ketiga, dan satu-satunya yang mengukur ISI jawaban. Tanpa
     // jaringan, tanpa kunci API, tanpa biaya per jawaban. Rumusnya cosine
@@ -360,7 +360,7 @@ export async function POST(request: Request) {
         {
           success: false,
           message:
-            "Ujian ini belum memakai rubrik. Pilih satu rubrik pada Pengaturan Ujian — " +
+            "Ujian ini belum memakai rubrik. Pilih satu rubrik pada Pengaturan Ujian, " +
             "ada beberapa rubrik siap pakai yang tinggal disalin.",
         },
         { status: 400 },
@@ -409,7 +409,7 @@ export async function POST(request: Request) {
       gagal,
       pesan:
         antre.length > kerjakan.length
-          ? `${dinilai} jawaban dinilai. Masih ada ${antre.length - kerjakan.length} lagi — tekan sekali lagi untuk melanjutkan.`
+          ? `${dinilai} jawaban dinilai. Masih ada ${antre.length - kerjakan.length} lagi, tekan sekali lagi untuk melanjutkan.`
           : `${dinilai} jawaban dinilai.`,
     });
   } catch (error: unknown) {

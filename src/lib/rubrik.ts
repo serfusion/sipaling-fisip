@@ -407,7 +407,7 @@ export const RUBRIK_BAWAAN: Rubrik[] = [
         nama: "Argumentasi",
         bobot: 25,
         levels: [
-          { level: 1, minKata: 0, deskriptor: "Tidak ada argumen — jawaban hanya menyebut ulang pertanyaan atau mendaftar istilah." },
+          { level: 1, minKata: 0, deskriptor: "Tidak ada argumen, jawaban hanya menyebut ulang pertanyaan atau mendaftar istilah." },
           { level: 2, minKata: 25, deskriptor: "Ada argumen tetapi lemah, tanpa dasar yang jelas." },
           { level: 3, minKata: 70, deskriptor: "Argumen jelas dan didukung alasan yang masuk akal." },
           { level: 4, minKata: 140, deskriptor: "Argumen kuat, runtut, dan menimbang kemungkinan bantahannya." },

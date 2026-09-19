@@ -258,7 +258,7 @@ export async function DELETE(request: Request) {
           success: false,
           message:
             `Rubrik ini masih dipakai ${jumlah} ujian. Lepaskan dulu dari ujiannya, ` +
-            "atau biarkan saja — rubrik yang tidak dipakai tidak mengganggu apa pun.",
+            "atau biarkan saja, rubrik yang tidak dipakai tidak mengganggu apa pun.",
         },
         { status: 409 },
       );
