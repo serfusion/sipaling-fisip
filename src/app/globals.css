@@ -6181,6 +6181,26 @@ table.qt td small { font-size: 11.5px; }
   white-space: nowrap;
 }
 
+/* ---------- KELOMPOK SETELAN UJIAN ----------
+
+   Pengaturan ujian memuat lima kelompok berurutan, masing-masing dengan kelas
+   sendiri: setelan umum (.cbt-sakelar), perangkat yang dikunci
+   (.cbt-perangkat), mode pengawasan (.cbt-mode), saklar kamera (.cbt-kamera),
+   dan penilaian (.cbt-mode.cbtv-setel). Tanpa pemisah, kelimanya mengalir
+   sebagai satu daftar panjang, dan judul tiap kelompok terbaca seperti
+   keterangan setelan di atasnya alih-alih kepala kelompok baru.
+
+   Yang dipakai penanda bersama .cbt-grup, bukan daftar pasangan kelas yang
+   saling bertetangga: pasangan semacam itu harus ditambah tiap kali ada
+   kelompok baru, dan yang lupa menambahkannya tidak akan melihat apa pun
+   rusak, hanya satu garis yang diam-diam hilang.
+
+   Selektor tetangga, bukan aturan pada tiap kelompok. Kelompok PERTAMA tidak
+   punya apa pun di atasnya untuk dipisahkan, dan .cbt-perangkat menghilang
+   sama sekali ketika Exam Browser mati, sehingga "yang pertama" bukan selalu
+   elemen yang sama. */
+.cbt-grup + .cbt-grup { margin-top: 20px; padding-top: 18px; border-top: 1px solid #eef2f7; }
+
 /* ---------- Pemilih mode pengawasan ---------- */
 .cbt-mode { margin-top: 16px; }
 .cbt-mode-kepala {
@@ -6932,16 +6952,20 @@ table.qt td small { font-size: 11.5px; }
 
 /* ---------- SETELAN V1 PADA PENGATURAN UJIAN ---------- */
 .cbtv-setel { margin-top: 16px; padding: 0; }
-.cbtv-setel-baris { display: block; margin-bottom: 12px; }
-.cbtv-setel-baris > span {
-  display: block; margin-bottom: 8px; font-size: 13px; font-weight: 600; color: #334155;
-}
-.cbtv-setel-baris select {
-  width: 100%; max-width: 500px; padding: 10px 12px;
-  border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; font-size: 14px;
-}
 .cbtv-setel-bantu { margin: 0 0 16px; padding: 8px 12px; background: #f8fafc; border-radius: 6px; font-size: 12px; }
-.cbtv-setel-saklar { display: flex; align-items: flex-start; gap: 12px; margin: 14px 0; cursor: pointer; }
+
+/* Satu baris saklar: kotak centang, judulnya, dan keterangannya.
+
+   Jarak atas dan bawah dibuat SAMA dan tetap. Dahulu tiap saklar membawa
+   margin sendiri yang bertemu margin tetangganya, dan yang terjadi adalah
+   jarak antarsaklar berubah-ubah menurut ada tidaknya keterangan kecil di
+   bawah masing-masing. Deretan yang jaraknya tidak tetap terbaca seperti
+   daftar yang sebagian isinya berkelompok, padahal tidak. */
+.cbtv-setel-saklar {
+  display: flex; align-items: flex-start; gap: 12px; margin: 0; padding: 11px 0;
+  cursor: pointer;
+}
+.cbtv-setel-saklar + .cbtv-setel-saklar { border-top: 1px solid #eef2f7; }
 .cbtv-setel-saklar input { margin-top: 4px; flex: 0 0 auto; cursor: pointer; }
 .cbtv-setel-saklar b { display: block; font-size: 14px; font-weight: 600; color: #334155; }
 .cbtv-setel-saklar small { display: block; margin-top: 3px; font-size: 12px; line-height: 1.5; color: #64748b; }
@@ -6952,9 +6976,14 @@ table.qt td small { font-size: 11.5px; }
    kolom, sehingga tanda "%" jatuh sendirian di baris di bawah kotaknya dan
    terbaca seperti isian ketiga yang kosong. Sekarang kotak dan tandanya duduk
    di satu baris, dan hanya labelnya yang berada di atas. */
+/* Bertakuk ke dalam dan bergaris di tepi kiri, karena kedua ambang ini hanya
+   berlaku bila saklar di atasnya menyala. Tanpa takukan, keduanya terbaca
+   sebagai setelan yang berdiri sendiri, dan yang mematikan saklarnya akan
+   bingung ke mana perginya dua isian yang barusan ia atur. */
 .cbtv-ambang {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 14px 18px; margin: 12px 0 14px; padding: 12px 0 0;
+  gap: 14px 18px; margin: 2px 0 12px; padding: 12px 0 2px 16px;
+  border-left: 2px solid #e2e8f0;
 }
 .cbtv-ambang label {
   display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto;

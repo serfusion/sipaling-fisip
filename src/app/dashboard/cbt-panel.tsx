@@ -344,7 +344,7 @@ function SetelPenilaian({
 }) {
   const adaPenilai = nilai.answerKeyId > 0 || nilai.rubricId > 0;
   return (
-    <div className="cbt-mode cbtv-setel">
+    <div className="cbt-grup cbt-mode cbtv-setel">
       <div className="cbt-mode-kepala">Penilaian &amp; integritas</div>
 
       {/* ---------- DUA PEMILIH, SEJAJAR ----------
@@ -559,7 +559,7 @@ function SaklarKamera({
   const berlaku = aturanMode(mode).kamera;
 
   return (
-    <div className={`cbt-kamera${berlaku && nyala ? " on" : ""}`}>
+    <div className={`cbt-grup cbt-kamera${berlaku && nyala ? " on" : ""}`}>
       <div className="cbt-kamera-teks">
         <b>Kamera pengawas</b>
         <small>
@@ -615,7 +615,7 @@ function PilihMode({
   ubah: (mode: ModePengawasan) => void;
 }) {
   return (
-    <div className="cbt-mode">
+    <div className="cbt-grup cbt-mode">
       <div className="cbt-mode-kepala">Pengawasan ujian</div>
       <div className="cbt-mode-pilih">
         {SEMUA_MODE.map((m) => (
@@ -645,7 +645,7 @@ function DaftarSetelan({
   ubah: (kunci: KunciSetelan, nyala: boolean) => void;
 }) {
   return (
-    <div className="cbt-sakelar">
+    <div className="cbt-grup cbt-sakelar">
       {SETELAN.map((s) => {
         const mati = kunciBentuk && s.bentuk;
         return (
@@ -677,7 +677,7 @@ function PilihPerangkat({
 }: { nilai: PerangkatKunci; nyala: boolean; ubah: (p: PerangkatKunci) => void }) {
   if (!nyala) return null;
   return (
-    <div className="cbt-perangkat">
+    <div className="cbt-grup cbt-perangkat">
       <span className="cbt-perangkat-kepala">Exam Browser untuk</span>
       <div className="cbt-perangkat-pilih">
         {SEMUA_PERANGKAT.map((p) => (
