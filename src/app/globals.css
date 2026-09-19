@@ -6169,8 +6169,8 @@ table.qt td small { font-size: 11.5px; }
 /* ---------- Pemilih mode pengawasan ---------- */
 .cbt-mode { margin-top: 16px; }
 .cbt-mode-kepala {
-  font-size: 12px; font-weight: 700; letter-spacing: 0.06em;
-  text-transform: uppercase; color: #475569; margin-bottom: 8px;
+  font-size: 13px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: #334155; margin-bottom: 12px;
 }
 .cbt-mode-pilih { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 .cbt-mode-kartu {
@@ -6909,24 +6909,24 @@ table.qt td small { font-size: 11.5px; }
 .cbtv-aksi-rubrik { display: flex; flex-wrap: wrap; gap: 6px; }
 
 /* ---------- SETELAN V1 PADA PENGATURAN UJIAN ---------- */
-.cbtv-setel { margin-top: 12px; }
-.cbtv-setel-baris { display: block; margin-bottom: 4px; }
+.cbtv-setel { margin-top: 16px; padding: 0; }
+.cbtv-setel-baris { display: block; margin-bottom: 12px; }
 .cbtv-setel-baris > span {
-  display: block; margin-bottom: 5px; font-size: 12px; font-weight: 700; color: #475569;
+  display: block; margin-bottom: 8px; font-size: 13px; font-weight: 600; color: #334155;
 }
 .cbtv-setel-baris select {
-  width: 100%; max-width: 460px; padding: 8px 11px;
-  border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; font-size: 13.5px;
+  width: 100%; max-width: 500px; padding: 10px 12px;
+  border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; font-size: 14px;
 }
-.cbtv-setel-bantu { margin: 0 0 12px; }
-.cbtv-setel-saklar { display: flex; align-items: flex-start; gap: 10px; margin: 11px 0; cursor: pointer; }
-.cbtv-setel-saklar input { margin-top: 3px; flex: 0 0 auto; }
-.cbtv-setel-saklar b { display: block; font-size: 13.5px; }
-.cbtv-setel-saklar small { display: block; margin-top: 2px; font-size: 12px; line-height: 1.55; color: #64748b; }
+.cbtv-setel-bantu { margin: 0 0 16px; padding: 8px 12px; background: #f8fafc; border-radius: 6px; font-size: 12px; }
+.cbtv-setel-saklar { display: flex; align-items: flex-start; gap: 12px; margin: 14px 0; cursor: pointer; }
+.cbtv-setel-saklar input { margin-top: 4px; flex: 0 0 auto; cursor: pointer; }
+.cbtv-setel-saklar b { display: block; font-size: 14px; font-weight: 600; color: #334155; }
+.cbtv-setel-saklar small { display: block; margin-top: 3px; font-size: 12px; line-height: 1.5; color: #64748b; }
 .cbtv-setel-saklar i { color: #b45309; font-style: normal; }
-.cbtv-ambang { display: flex; flex-wrap: wrap; gap: 14px; margin: 4px 0 12px 28px; }
-.cbtv-ambang label { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: #475569; }
-.cbtv-ambang input { width: 74px; padding: 6px 9px; border: 1px solid #cbd5e1; border-radius: 7px; }
+.cbtv-ambang { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin: 12px 0 14px 0; padding: 12px 0 0 0; }
+.cbtv-ambang label { display: flex; flex-direction: column; align-items: stretch; gap: 6px; font-size: 12px; font-weight: 600; color: #475569; }
+.cbtv-ambang input { width: 100%; max-width: 140px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 13px; }
 
 /* ---------- LEMBAR PENILAIAN RUBRIK ---------- */
 .cbtv-lembar { margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0; }
