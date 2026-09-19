@@ -45,6 +45,7 @@ import {
   bacaKlien, bolehMasukKlien, periksaKunciKlien, rapikanKlien, rapikanPerangkatKunci,
 } from "@/lib/kunci-layar";
 import { periksaKemiripan } from "@/lib/mirip-simpan";
+import { nilaiEsaiSaatKumpul } from "@/lib/nilai-otomatis";
 import { jamIndonesia } from "@/lib/waktu-indonesia";
 
 export const runtime = "nodejs";
@@ -318,6 +319,42 @@ async function nilaiDanTutup(
     await periksaKemiripan(ujian, attempt.id);
   } catch (galat) {
     console.error("periksa kemiripan", galat);
+  }
+
+  // ---------- PENILAIAN ESAI, DI DALAM PERMINTAAN YANG SAMA ----------
+  //
+  // Ujian yang memakai rubrik berambang panjang menilai esainya di sini juga,
+  // dan nilainya FINAL — bukan usulan yang menunggu disetujui. Peserta yang
+  // ujiannya menampilkan nilai karena itu melihat angka yang lengkap, bukan
+  // "3 esai menunggu koreksi" yang tidak berarti apa pun baginya.
+  //
+  // Boleh berada di sini karena ia TIDAK memanggil apa pun ke luar: hitungan
+  // kata di dalam proses yang sama, persis seperti pemeriksaan kemiripan di
+  // atas. Penilaian oleh model tetap tidak boleh di sini — lihat catatan di
+  // kepala src/lib/nilai-otomatis.ts.
+  //
+  // Dibungkus penangkap galat dengan alasan yang sama seperti kemiripan: yang
+  // sudah tersimpan di atas adalah nilai objektif seseorang, dan penilaian
+  // esai yang gagal tidak boleh membuat pengumpulannya berakhir dengan galat.
+  // Yang hilang bila ia gagal hanya angka esainya, dan pengajar dapat
+  // menghitungnya ulang kapan saja dari panelnya.
+  try {
+    const segar = await nilaiEsaiSaatKumpul(ujian, attempt);
+    if (segar) {
+      // Angka yang dikirim balik ke peserta diambil dari hitungan TERBARU,
+      // bukan dari ringkasan sebelum esainya dinilai. Tanpa ini peserta
+      // melihat nilai tanpa esainya sementara basis data sudah memuat nilai
+      // lengkapnya — dua angka berbeda untuk satu ujian yang sama.
+      ringkas.nilai = segar.nilai;
+      ringkas.benar = segar.benar;
+      ringkas.salah = segar.salah;
+      ringkas.sebagian = segar.sebagian;
+      ringkas.kosong = segar.kosong;
+      ringkas.tertunda = segar.tertunda;
+      ringkas.lulus = segar.nilai >= ujian.passingGrade;
+    }
+  } catch (galat) {
+    console.error("nilai esai saat kumpul", attempt.id, galat);
   }
 
   return ringkas;

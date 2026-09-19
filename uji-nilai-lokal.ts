@@ -10,9 +10,10 @@
 
 import {
   MIN_PEMBANDING, bacaSinyal, cakupanIstilah, istilahKunci, jumlahKalimat,
-  jumlahParagraf, kataDariTeks, kedudukan, kedudukanAmbang, keLevel, nilaiLokal,
+  jumlahParagraf, kataDariTeks, kedudukan, kedudukanAmbang, keLevel,
+  levelDariAmbang, nilaiLokal,
 } from "./src/lib/nilai-lokal";
-import type { Rubrik } from "./src/lib/rubrik";
+import { RUBRIK_BAWAAN, hitungRubrik, predikat, rubrikBawaan, type Rubrik } from "./src/lib/rubrik";
 
 let lulus = 0;
 const gagal: string[] = [];
@@ -196,6 +197,74 @@ const tanpaKriteria = nilaiLokal({
   rubrik: { ...RUBRIK, kriteria: [] },
 });
 sama("rubrik tanpa kriteria menghasilkan daftar kosong", tanpaKriteria.kriteria.length, 0);
+
+console.log("\n=== AMBANG PANJANG DARI RUBRIK ===\n");
+
+const BERAMBANG = [
+  { level: 1, minKata: 0, deskriptor: "" },
+  { level: 2, minKata: 25, deskriptor: "" },
+  { level: 3, minKata: 70, deskriptor: "" },
+  { level: 4, minKata: 140, deskriptor: "" },
+];
+
+sama("kosong jatuh ke level terendah", levelDariAmbang(0, BERAMBANG), 1);
+sama("tepat di ambang sudah naik", levelDariAmbang(25, BERAMBANG), 2);
+sama("satu kata di bawah ambang belum naik", levelDariAmbang(24, BERAMBANG), 1);
+sama("di antara dua ambang memakai yang bawah", levelDariAmbang(100, BERAMBANG), 3);
+sama("melampaui ambang tertinggi tetap level tertinggi", levelDariAmbang(9999, BERAMBANG), 4);
+benar("level tanpa ambang sama sekali dilewati",
+  levelDariAmbang(500, [{ level: 1, deskriptor: "" }, { level: 2, deskriptor: "" }]) === null,
+  "kriteria tanpa ambang harus jatuh ke tangga bawaan, bukan dipaksa");
+
+const RUBRIK_AMBANG: Rubrik = {
+  nama: "Berambang", keterangan: "", skalaMin: 1, skalaMax: 4,
+  kriteria: [{ nama: "Isi", bobot: 100, levels: BERAMBANG }],
+};
+const pakaiAmbang = nilaiLokal({
+  jawaban: "kata ".repeat(150), pertanyaan: "apa saja", acuan: "", rubrik: RUBRIK_AMBANG,
+});
+sama("ambang rubrik menentukan levelnya", pakaiAmbang.kriteria[0].level, 4);
+benar("alasannya menyebut ambang yang dipakai",
+  pakaiAmbang.kriteria[0].alasan.includes("140 kata"),
+  pakaiAmbang.kriteria[0].alasan);
+
+// Ambang rubrik harus MENANG atas pembanding sekelas. Tanpa aturan ini, nilai
+// yang sudah final berubah-ubah mengikuti siapa yang mengumpulkan sesudahnya.
+const denganPembandingPanjang = nilaiLokal({
+  jawaban: "kata ".repeat(150), pertanyaan: "apa saja", acuan: "",
+  rubrik: RUBRIK_AMBANG, pembandingKata: [900, 950, 1000, 1100],
+});
+sama("ambang menang atas kedudukan sekelas", denganPembandingPanjang.kriteria[0].level, 4);
+
+console.log("\n=== RUBRIK BAWAAN SIAP MENILAI SENDIRI ===\n");
+
+benar("seluruh rubrik bawaan sudah berambang",
+  RUBRIK_BAWAAN.every((r) => r.kriteria.every((k) => k.levels.some((l) => (l.minKata ?? 0) > 0))),
+  "rubrik yang baru disalin harus langsung dapat menilai tanpa disetel");
+benar("ambangnya naik seiring levelnya",
+  RUBRIK_BAWAAN.every((r) => r.kriteria.every((k) => {
+    const urut = [...k.levels].sort((a, b) => a.level - b.level);
+    return urut.every((l, i) => i === 0 || (l.minKata ?? 0) >= (urut[i - 1].minKata ?? 0));
+  })));
+
+console.log("\n=== CONTOH DARI LAMPIRAN: 3,65 → 91,25 ===\n");
+
+// Angka dari laporan_penilaian_proposal_kampanye.md, dijadikan uji supaya
+// rumusnya tidak dapat bergeser diam-diam.
+const kampanye = rubrikBawaan("Rubrik Proposal Kampanye");
+benar("rubrik proposal kampanye ada", kampanye !== null);
+if (kampanye) {
+  const hasil = hitungRubrik(kampanye, [
+    { aiLevel: 3, finalLevel: null },
+    { aiLevel: 4, finalLevel: null },
+    { aiLevel: 4, finalLevel: null },
+    { aiLevel: 3, finalLevel: null },
+    { aiLevel: 4, finalLevel: null },
+  ]);
+  sama("total skor terbobot", hasil.totalTerbobot, 3.65);
+  sama("nilai akhir", hasil.nilai, 91.25);
+  sama("predikat", predikat(hasil.nilai).huruf, "A");
+}
 
 console.log("");
 if (gagal.length === 0) {

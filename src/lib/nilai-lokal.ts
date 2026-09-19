@@ -34,7 +34,7 @@
 // uji-nilai-lokal.ts.
 // ============================================================
 
-import type { Rubrik } from "@/lib/rubrik";
+import type { LevelRubrik, Rubrik } from "@/lib/rubrik";
 
 // ------------------------------------------------------------
 // PEMBACAAN TEKS
@@ -201,6 +201,34 @@ export function kedudukan(angka: number, pembanding: number[]): number {
  */
 const AMBANG_KATA = [15, 40, 90, 160, 260];
 
+/**
+ * Level dari ambang panjang yang DITETAPKAN RUBRIK.
+ *
+ * Inilah jalur yang membuat nilai dapat berdiri sendiri tanpa verifikasi
+ * siapa pun: tangga yang ditetapkan sebelum ujian, berlaku sama untuk semua
+ * orang, dan tidak bergantung pada siapa mengumpulkan lebih dulu.
+ *
+ * Kedudukan relatif terhadap sekelas tidak dapat dipakai untuk nilai final —
+ * peserta pertama yang mengumpulkan belum punya satu pun pembanding, dan
+ * jawaban yang sama persis akan bernilai lain bila dikumpulkan lebih awal.
+ * Untuk nilai yang langsung terlihat peserta, itu tidak dapat dipertanggung-
+ * jawabkan.
+ *
+ * Mengembalikan null bila kriteria ini memang tidak memakai ambang.
+ */
+export function levelDariAmbang(kata: number, levels: LevelRubrik[]): number | null {
+  const berambang = levels.filter((l) => (l.minKata ?? 0) > 0);
+  if (berambang.length === 0) return null;
+
+  // Naik dari level terendah: level tertinggi yang ambangnya sudah terlewati.
+  const urut = [...levels].sort((a, b) => a.level - b.level);
+  let dipakai = urut[0]?.level ?? 1;
+  for (const l of urut) {
+    if (kata >= (l.minKata ?? 0)) dipakai = l.level;
+  }
+  return dipakai;
+}
+
 /** Kedudukan panjang terhadap ambang tetap, 0–1. */
 export function kedudukanAmbang(kata: number): number {
   let lewat = 0;
@@ -294,6 +322,23 @@ export function nilaiLokal({
       : "istilah soal tidak dapat diambil";
 
   const kriteria: UsulanKriteria[] = rubrik.kriteria.map((k, urut) => {
+    // AMBANG RUBRIK MENANG ATAS SEGALANYA.
+    //
+    // Yang menyusun rubrik tahu soalnya; penilai otomatis tidak. Ketika
+    // pengajar sudah menuliskan "level 4 mulai 140 kata", tidak ada gunanya
+    // menimbangnya lagi dengan tebakan.
+    const dariAmbang = levelDariAmbang(sinyal.kata, k.levels);
+    if (dariAmbang !== null) {
+      const batas = [...k.levels]
+        .sort((a, b) => a.level - b.level)
+        .find((l) => l.level === dariAmbang)?.minKata ?? 0;
+      return {
+        urut,
+        level: Math.max(rubrik.skalaMin, Math.min(rubrik.skalaMax, dariAmbang)),
+        alasan: `${sinyal.kata} kata — ambang level ${dariAmbang} pada rubrik ini ${batas} kata.`,
+      };
+    }
+
     const keluarga = keluargaKriteria(k.nama);
     const nilai =
       keluarga === "cakupan" ? sinyal.cakupan
