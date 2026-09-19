@@ -228,7 +228,15 @@ function ratakanBila(butir: ButirAcuan[]): ButirAcuan[] {
   }));
 }
 
-export type AoaAcuan = Array<Array<string | number | null | undefined>>;
+/**
+ * Lembar Excel sebagaimana dibaca SheetJS: baris berisi sel apa adanya.
+ *
+ * Boolean ikut disebut karena sel Excel memang dapat berisi TRUE dan FALSE,
+ * dan pembaca yang tidak menyebutnya akan menolak berkas yang sah. Seluruh
+ * sel melewati teks() sebelum dipakai, jadi jenisnya tidak pernah sampai ke
+ * bagian yang menghitung.
+ */
+export type AoaAcuan = Array<Array<string | number | boolean | null | undefined>>;
 
 /**
  * Baca lembar jawaban acuan dari Excel.
