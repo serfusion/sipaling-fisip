@@ -35,7 +35,8 @@ import { hitungRubrik, poinDariRubrik, type Rubrik } from "@/lib/rubrik";
 import { GalatModel } from "@/lib/ai-penyedia";
 import { nilaiEsai } from "@/lib/nilai-esai";
 import { kataDariTeks, nilaiLokal } from "@/lib/nilai-lokal";
-import { hitungUlangAttempt } from "@/lib/nilai-attempt";
+import { hitungUlangAttempt, type NilaiUlang } from "@/lib/nilai-attempt";
+import { rubrikUjian } from "@/lib/cbt-store";
 
 /**
  * Berapa jawaban dinilai dalam satu panggilan.
@@ -360,4 +361,50 @@ export async function kerjakanPenilaian(
   }
 
   return { dinilai, gagal };
+}
+
+
+/**
+ * Nilai seluruh esai satu peserta SEKARANG, di dalam permintaan pengumpulan.
+ *
+ * ------------------------------------------------------------
+ * KENAPA INI BOLEH DI SINI, SEDANGKAN PENILAIAN MODEL TIDAK
+ * ------------------------------------------------------------
+ * Catatan di kepala berkas ini menolak menaruh penilaian di jalur pengumpulan,
+ * dan alasannya tetap berlaku — untuk penilaian MODEL. Yang dilarang di sana
+ * adalah panggilan jaringan berulang: lima soal esai berarti lima perjalanan
+ * ke penyedia model, masing-masing beberapa detik, pada jalur yang 504-nya
+ * baru diperbaiki v45.
+ *
+ * Penilaian dari ambang rubrik tidak memanggil apa pun. Ia menghitung kata di
+ * dalam proses yang sama, dalam hitungan milidetik, persis seperti pemeriksaan
+ * kemiripan yang sudah berjalan di sana sejak v44. Yang tersisa hanya tulisan
+ * ke basis data, dan jumlahnya diketahui sejak awal: satu baris per kriteria
+ * per esai.
+ *
+ * Inilah yang membuat nilainya FINAL saat peserta menekan kumpulkan — bukan
+ * usulan yang menunggu seseorang menyetujuinya. Pengajar tetap dapat mengubah
+ * level mana pun sesudahnya, dan nilainya ikut berubah; bedanya, ia tidak
+ * harus.
+ */
+export async function nilaiEsaiSaatKumpul(
+  ujian: { id: number; rubricId: number | null; courseName: string },
+  attempt: typeof cbtAttempts.$inferSelect,
+): Promise<NilaiUlang | null> {
+  if (!ujian.rubricId) return null;
+
+  const rubrik = await rubrikUjian(ujian.rubricId);
+  if (!rubrik || rubrik.kriteria.length === 0) return null;
+
+  const antre = await antreEsai(ujian.id, [attempt]);
+  if (antre.length === 0) return null;
+
+  // Pembandingnya SENGAJA kosong. Kedudukan relatif terhadap sekelas tidak
+  // dapat dipakai untuk nilai yang langsung terlihat peserta: yang
+  // mengumpulkan pertama belum punya satu pun pembanding, dan jawaban yang
+  // sama persis akan bernilai lain hanya karena dikumpulkan lebih awal.
+  // Yang dipakai ambang rubrik — sama untuk semua orang, apa pun urutannya.
+  await kerjakanPenilaianLokal(rubrik, antre, new Map());
+
+  return hitungUlangAttempt(attempt.id);
 }

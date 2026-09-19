@@ -3253,8 +3253,34 @@ export default function CbtPanel({ role }: { role: string }) {
               </label>
             )}
 
+            {/* ---------- JAWABAN ACUAN ----------
+                Kolomnya sudah lama ada di basis data dan di API, tetapi tidak
+                pernah punya isian di layar — jadi tidak pernah terisi. Itu
+                persoalan sejak penilaian esai berjalan sendiri: inilah satu-
+                satunya teks yang dapat dibandingkan dengan jawaban peserta,
+                dan tanpanya penilai hanya punya panjang tulisan untuk dinilai.
+
+                Bukan kunci yang harus sama persis. Yang dihitung kedekatan
+                makna lewat pembobotan kata, jadi peserta yang menjawab benar
+                dengan kalimatnya sendiri tetap mendapat angka tinggi. */}
+            {(soalBaru.jenis === "essay" || soalBaru.jenis === "isian") && (
+              <label className="cbt-lebar"><span>
+                Jawaban acuan {soalBaru.jenis === "essay" ? "— menentukan nilai otomatisnya" : "(opsional)"}
+              </span>
+                <textarea
+                  rows={4}
+                  value={soalBaru.pembahasan}
+                  onChange={(e) => setSoalBaru({ ...soalBaru, pembahasan: e.target.value })}
+                  placeholder="Tulis jawaban yang Anda harapkan, selengkap mungkin. Peserta tidak melihatnya."
+                />
+              </label>
+            )}
             {soalBaru.jenis === "essay" && (
-              <p className="cbt-catatan">Essay dikoreksi pengajar di tab Monitoring &amp; nilai setelah ujian selesai.</p>
+              <p className="cbt-catatan">
+                {soalBaru.pembahasan.trim()
+                  ? "Dinilai otomatis dari kedekatan dengan jawaban acuan ini."
+                  : "Tanpa jawaban acuan, penilaian otomatis hanya mengukur panjang dan istilah soal."}
+              </p>
             )}
 
             <div className="cbt-form-aksi">
@@ -3288,6 +3314,9 @@ export default function CbtPanel({ role }: { role: string }) {
                           pilihan: s.pilihan.length ? s.pilihan : ["", ""],
                           pasangan: s.pasangan ?? [],
                           media: s.media ?? { ...MEDIA_KOSONG },
+                          // Soal lama menyimpannya null; isian di layar tidak
+                          // boleh menerima null atau ia menjadi tak terkendali.
+                          pembahasan: s.pembahasan ?? "",
                         });
                         // Soal yang sudah bergambar dibuka lipatannya sendiri.
                         // Media yang tersembunyi di balik lipatan tertutup akan

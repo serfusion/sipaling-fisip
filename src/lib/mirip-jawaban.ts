@@ -200,7 +200,7 @@ export function hitungDf(sidik: Sidik[]): Map<string, number> {
   return df;
 }
 
-function bobotTfIdf(s: Sidik, df: Map<string, number>, jumlahDok: number): Map<string, number> {
+export function bobotTfIdf(s: Sidik, df: Map<string, number>, jumlahDok: number): Map<string, number> {
   const bobot = new Map<string, number>();
   for (const [kata, tf] of s.hitung) {
     const muncul = df.get(kata) ?? 1;

@@ -627,11 +627,11 @@ export function PanelRubrik() {
     setSusun({ ...susun, isi: { ...susun.isi, kriteria } });
   }
 
-  function ubahLevel(urutK: number, level: number, deskriptor: string) {
+  function ubahLevel(urutK: number, level: number, ubah: { deskriptor?: string; minKata?: number }) {
     if (!susun) return;
     const kriteria = susun.isi.kriteria.map((k, i) => {
       if (i !== urutK) return k;
-      const levels = k.levels.map((l) => (l.level === level ? { ...l, deskriptor } : l));
+      const levels = k.levels.map((l) => (l.level === level ? { ...l, ...ubah } : l));
       return { ...k, levels };
     });
     setSusun({ ...susun, isi: { ...susun.isi, kriteria } });
@@ -645,7 +645,7 @@ export function PanelRubrik() {
         <div>
           <b>Rubrik penilaian esai</b>
           <span>
-            Tiap kriteria punya level beserta alasannya. Pilih yang siap pakai, atau susun sendiri.
+            Tiap level punya ambang panjang. Itu yang dipakai menilai esai otomatis saat peserta mengumpulkan.
           </span>
         </div>
         <button type="button" className="btn btn-primary btn-mini" onClick={() => setSusun({ id: null, isi: rubrikKosong() })}>
@@ -768,15 +768,28 @@ export function PanelRubrik() {
                 </button>
               </div>
               {k.levels.map((l) => (
-                <label key={l.level} className="cbt-lebar cbtv-level">
-                  <span>Level {l.level}</span>
+                <div key={l.level} className="cbt-lebar cbtv-level">
+                  <div className="cbtv-level-kepala">
+                    <span>Level {l.level}</span>
+                    {/* Angka inilah yang membuat esai dapat ternilai sampai
+                        selesai tanpa satu ketukan pun: tangga yang ditetapkan
+                        sebelum ujian dan berlaku sama untuk semua peserta. */}
+                    <label className="cbtv-ambang-kata">
+                      <span>mulai</span>
+                      <input
+                        type="number" min={0} max={5000} value={l.minKata ?? 0}
+                        onChange={(e) => ubahLevel(urut, l.level, { minKata: Number(e.target.value) })}
+                      />
+                      <span>kata</span>
+                    </label>
+                  </div>
                   <textarea
                     rows={2}
                     value={l.deskriptor}
-                    onChange={(e) => ubahLevel(urut, l.level, e.target.value)}
+                    onChange={(e) => ubahLevel(urut, l.level, { deskriptor: e.target.value })}
                     placeholder={`Apa yang membuat sebuah jawaban berada di level ${l.level}`}
                   />
-                </label>
+                </div>
               ))}
             </div>
           ))}
@@ -1110,7 +1123,8 @@ export function LembarRubrik({
           </div>
 
           <p className="cbt-catatan cbtv-prinsip">
-            Otomatis mengusulkan, Anda yang mengesahkan.
+            Esai dinilai otomatis dari ambang panjang rubrik saat peserta mengumpulkan.
+            Ubah level bila ada yang meleset — nilainya ikut berubah.
           </p>
 
           {data.esai.length === 0 && <div className="dempty">Tidak ada soal esai pada lembar peserta ini.</div>}

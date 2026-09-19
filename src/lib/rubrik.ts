@@ -42,6 +42,19 @@ export type LevelRubrik = {
   level: number;
   /** Apa yang membuat sebuah jawaban berada di level ini. */
   deskriptor: string;
+  /**
+   * Panjang jawaban paling sedikit untuk mencapai level ini, dalam kata.
+   *
+   * Inilah yang membuat penilaian dapat berjalan SENDIRI sampai selesai,
+   * tanpa satu ketukan pun dari pengajar: sebuah tangga yang ditetapkan
+   * sebelum ujian dan berlaku sama untuk semua orang.
+   *
+   * Nol atau kosong berarti kriteria ini tidak memakai ambang panjang; ia
+   * jatuh ke tangga bawaan penilai otomatis. Ambang yang diisi SELALU menang
+   * atas tangga bawaan itu — yang menyusun rubrik tahu soalnya, penilai
+   * otomatis tidak.
+   */
+  minKata?: number;
 };
 
 export type KriteriaRubrik = {
@@ -89,6 +102,10 @@ export function bacaKriteria(json: string | null | undefined): KriteriaRubrik[] 
               .map((l) => ({
                 level: Number((l as LevelRubrik)?.level) || 0,
                 deskriptor: String((l as LevelRubrik)?.deskriptor ?? "").slice(0, 2000),
+                // Dijepit pada batas yang masih masuk akal untuk satu jawaban
+                // esai. Ambang 50.000 kata bukan rubrik, melainkan cara
+                // membuat seluruh kelas bernilai satu.
+                minKata: Math.max(0, Math.min(5000, Math.round(Number((l as LevelRubrik)?.minKata) || 0))),
               }))
               .filter((l) => Number.isFinite(l.level) && l.level > 0)
               .sort((a, b) => a.level - b.level)
@@ -320,50 +337,50 @@ export const RUBRIK_BAWAAN: Rubrik[] = [
         nama: "Analisis Situasi & Konteks Wilayah",
         bobot: 20,
         levels: [
-          { level: 1, deskriptor: "Analisis situasi tidak memadai. Audiens dan konteks wilayah tidak jelas. Tidak ada data atau dasar yang cukup untuk mendukung analisis." },
-          { level: 2, deskriptor: "Analisis situasi ada tetapi masih umum. Pemetaan audiens atau konteks wilayah belum lengkap. Data pendukung terbatas." },
-          { level: 3, deskriptor: "Pemetaan audiens dan konteks wilayah tepat. Identifikasi masalah cukup tepat, tetapi masih membutuhkan dukungan data statistik lokal yang lebih spesifik." },
-          { level: 4, deskriptor: "Pemetaan situasi, audiens sasaran, dan konteks wilayah sangat lengkap. Identifikasi masalah tepat, didukung data lokal yang spesifik, dan hubungan antara masalah, wilayah, serta target kampanye dijelaskan kuat." },
+          { level: 1, minKata: 0, deskriptor: "Analisis situasi tidak memadai. Audiens dan konteks wilayah tidak jelas. Tidak ada data atau dasar yang cukup untuk mendukung analisis." },
+          { level: 2, minKata: 25, deskriptor: "Analisis situasi ada tetapi masih umum. Pemetaan audiens atau konteks wilayah belum lengkap. Data pendukung terbatas." },
+          { level: 3, minKata: 70, deskriptor: "Pemetaan audiens dan konteks wilayah tepat. Identifikasi masalah cukup tepat, tetapi masih membutuhkan dukungan data statistik lokal yang lebih spesifik." },
+          { level: 4, minKata: 140, deskriptor: "Pemetaan situasi, audiens sasaran, dan konteks wilayah sangat lengkap. Identifikasi masalah tepat, didukung data lokal yang spesifik, dan hubungan antara masalah, wilayah, serta target kampanye dijelaskan kuat." },
         ],
       },
       {
         nama: "Strategi Pesan & Pendekatan Budaya",
         bobot: 20,
         levels: [
-          { level: 1, deskriptor: "Pesan tidak sesuai audiens. Tidak menunjukkan sensitivitas budaya. Pendekatan komunikasi terlalu umum atau tidak relevan." },
-          { level: 2, deskriptor: "Pesan cukup relevan tetapi pendekatan budaya masih terbatas. Kesesuaian bahasa dan figur lokal belum kuat." },
-          { level: 3, deskriptor: "Strategi pesan relevan dan pendekatan budaya cukup sesuai. Unsur lokal sudah digunakan tetapi belum maksimal." },
-          { level: 4, deskriptor: "Strategi pesan sangat relevan dengan audiens. Pendekatan budaya kuat dan sensitif terhadap konteks lokal, melibatkan figur atau aktor lokal yang tepat, dengan pemilihan bahasa dan media yang mendukung penerimaan pesan." },
+          { level: 1, minKata: 0, deskriptor: "Pesan tidak sesuai audiens. Tidak menunjukkan sensitivitas budaya. Pendekatan komunikasi terlalu umum atau tidak relevan." },
+          { level: 2, minKata: 25, deskriptor: "Pesan cukup relevan tetapi pendekatan budaya masih terbatas. Kesesuaian bahasa dan figur lokal belum kuat." },
+          { level: 3, minKata: 70, deskriptor: "Strategi pesan relevan dan pendekatan budaya cukup sesuai. Unsur lokal sudah digunakan tetapi belum maksimal." },
+          { level: 4, minKata: 140, deskriptor: "Strategi pesan sangat relevan dengan audiens. Pendekatan budaya kuat dan sensitif terhadap konteks lokal, melibatkan figur atau aktor lokal yang tepat, dengan pemilihan bahasa dan media yang mendukung penerimaan pesan." },
         ],
       },
       {
         nama: "Kelayakan Kanal & Taktik Eksekusi",
         bobot: 25,
         levels: [
-          { level: 1, deskriptor: "Kanal tidak realistis atau tidak sesuai target. Taktik eksekusi tidak jelas atau sulit dilaksanakan." },
-          { level: 2, deskriptor: "Kanal tersedia tetapi kesesuaiannya belum kuat. Taktik belum cukup rinci atau masih memiliki hambatan implementasi." },
-          { level: 3, deskriptor: "Kanal dan taktik realistis serta sebagian besar sesuai kondisi target. Masih terdapat aspek eksekusi yang perlu diperjelas." },
-          { level: 4, deskriptor: "Kanal sangat realistis dan sesuai kondisi target. Taktik eksekusi konkret dan dapat dilaksanakan, mempertimbangkan akses geografis, ekonomi, dan kebiasaan audiens, dengan pilihan media serta titik distribusi yang sangat sesuai." },
+          { level: 1, minKata: 0, deskriptor: "Kanal tidak realistis atau tidak sesuai target. Taktik eksekusi tidak jelas atau sulit dilaksanakan." },
+          { level: 2, minKata: 25, deskriptor: "Kanal tersedia tetapi kesesuaiannya belum kuat. Taktik belum cukup rinci atau masih memiliki hambatan implementasi." },
+          { level: 3, minKata: 70, deskriptor: "Kanal dan taktik realistis serta sebagian besar sesuai kondisi target. Masih terdapat aspek eksekusi yang perlu diperjelas." },
+          { level: 4, minKata: 140, deskriptor: "Kanal sangat realistis dan sesuai kondisi target. Taktik eksekusi konkret dan dapat dilaksanakan, mempertimbangkan akses geografis, ekonomi, dan kebiasaan audiens, dengan pilihan media serta titik distribusi yang sangat sesuai." },
         ],
       },
       {
         nama: "Rencana Operasional & Timeline",
         bobot: 15,
         levels: [
-          { level: 1, deskriptor: "Tidak ada timeline yang jelas. Operasional tidak terstruktur dan tidak ada indikator keberhasilan yang dapat digunakan." },
-          { level: 2, deskriptor: "Timeline tersedia tetapi kurang rinci. Tahapan operasional atau indikator keberhasilan masih terbatas." },
-          { level: 3, deskriptor: "Timeline terstruktur dan logis, tahapan pelaksanaan cukup jelas, tetapi indikator kinerja pada tahap evaluasi belum seluruhnya terukur." },
-          { level: 4, deskriptor: "Timeline jelas, realistis, dan terukur. Tahapan operasional lengkap, dengan indikator kinerja utama yang kuantitatif dan jelas." },
+          { level: 1, minKata: 0, deskriptor: "Tidak ada timeline yang jelas. Operasional tidak terstruktur dan tidak ada indikator keberhasilan yang dapat digunakan." },
+          { level: 2, minKata: 25, deskriptor: "Timeline tersedia tetapi kurang rinci. Tahapan operasional atau indikator keberhasilan masih terbatas." },
+          { level: 3, minKata: 70, deskriptor: "Timeline terstruktur dan logis, tahapan pelaksanaan cukup jelas, tetapi indikator kinerja pada tahap evaluasi belum seluruhnya terukur." },
+          { level: 4, minKata: 140, deskriptor: "Timeline jelas, realistis, dan terukur. Tahapan operasional lengkap, dengan indikator kinerja utama yang kuantitatif dan jelas." },
         ],
       },
       {
         nama: "Sistematika Penulisan & Bahasa",
         bobot: 20,
         levels: [
-          { level: 1, deskriptor: "Tulisan tidak terstruktur. Bahasa sulit dipahami dan banyak masalah dalam penyajian." },
-          { level: 2, deskriptor: "Struktur tulisan cukup tetapi belum konsisten. Bahasa masih memiliki beberapa masalah yang mengganggu pemahaman." },
-          { level: 3, deskriptor: "Penulisan cukup rapi dan mudah dipahami. Struktur dan bahasa umumnya konsisten, masih terdapat sedikit bagian yang dapat diperbaiki." },
-          { level: 4, deskriptor: "Penulisan ringkas dan sangat terstruktur. Bahasa Indonesia baku dan konsisten, mudah dipahami, dan penyajiannya mendukung pemahaman isi." },
+          { level: 1, minKata: 0, deskriptor: "Tulisan tidak terstruktur. Bahasa sulit dipahami dan banyak masalah dalam penyajian." },
+          { level: 2, minKata: 25, deskriptor: "Struktur tulisan cukup tetapi belum konsisten. Bahasa masih memiliki beberapa masalah yang mengganggu pemahaman." },
+          { level: 3, minKata: 70, deskriptor: "Penulisan cukup rapi dan mudah dipahami. Struktur dan bahasa umumnya konsisten, masih terdapat sedikit bagian yang dapat diperbaiki." },
+          { level: 4, minKata: 140, deskriptor: "Penulisan ringkas dan sangat terstruktur. Bahasa Indonesia baku dan konsisten, mudah dipahami, dan penyajiannya mendukung pemahaman isi." },
         ],
       },
     ],
@@ -380,40 +397,40 @@ export const RUBRIK_BAWAAN: Rubrik[] = [
         nama: "Ketepatan Konsep",
         bobot: 30,
         levels: [
-          { level: 1, deskriptor: "Konsep yang dipakai keliru atau tidak berhubungan dengan pertanyaan." },
-          { level: 2, deskriptor: "Sebagian konsep tepat, tetapi masih bercampur dengan kekeliruan yang mendasar." },
-          { level: 3, deskriptor: "Konsep yang dipakai tepat dan sesuai dengan pertanyaan." },
-          { level: 4, deskriptor: "Konsep tepat, menyeluruh, dan dihubungkan dengan konsep lain yang relevan." },
+          { level: 1, minKata: 0, deskriptor: "Konsep yang dipakai keliru atau tidak berhubungan dengan pertanyaan." },
+          { level: 2, minKata: 25, deskriptor: "Sebagian konsep tepat, tetapi masih bercampur dengan kekeliruan yang mendasar." },
+          { level: 3, minKata: 70, deskriptor: "Konsep yang dipakai tepat dan sesuai dengan pertanyaan." },
+          { level: 4, minKata: 140, deskriptor: "Konsep tepat, menyeluruh, dan dihubungkan dengan konsep lain yang relevan." },
         ],
       },
       {
         nama: "Argumentasi",
         bobot: 25,
         levels: [
-          { level: 1, deskriptor: "Tidak ada argumen — jawaban hanya menyebut ulang pertanyaan atau mendaftar istilah." },
-          { level: 2, deskriptor: "Ada argumen tetapi lemah, tanpa dasar yang jelas." },
-          { level: 3, deskriptor: "Argumen jelas dan didukung alasan yang masuk akal." },
-          { level: 4, deskriptor: "Argumen kuat, runtut, dan menimbang kemungkinan bantahannya." },
+          { level: 1, minKata: 0, deskriptor: "Tidak ada argumen — jawaban hanya menyebut ulang pertanyaan atau mendaftar istilah." },
+          { level: 2, minKata: 25, deskriptor: "Ada argumen tetapi lemah, tanpa dasar yang jelas." },
+          { level: 3, minKata: 70, deskriptor: "Argumen jelas dan didukung alasan yang masuk akal." },
+          { level: 4, minKata: 140, deskriptor: "Argumen kuat, runtut, dan menimbang kemungkinan bantahannya." },
         ],
       },
       {
         nama: "Analisis",
         bobot: 25,
         levels: [
-          { level: 1, deskriptor: "Tidak ada analisis, atau analisisnya tidak berhubungan dengan pertanyaan." },
-          { level: 2, deskriptor: "Analisis ada tetapi terbatas pada permukaan persoalan." },
-          { level: 3, deskriptor: "Analisis baik dan menjangkau hubungan sebab-akibat." },
-          { level: 4, deskriptor: "Analisis mendalam, menghubungkan beberapa sudut pandang, dan sampai pada kesimpulan yang beralasan." },
+          { level: 1, minKata: 0, deskriptor: "Tidak ada analisis, atau analisisnya tidak berhubungan dengan pertanyaan." },
+          { level: 2, minKata: 25, deskriptor: "Analisis ada tetapi terbatas pada permukaan persoalan." },
+          { level: 3, minKata: 70, deskriptor: "Analisis baik dan menjangkau hubungan sebab-akibat." },
+          { level: 4, minKata: 140, deskriptor: "Analisis mendalam, menghubungkan beberapa sudut pandang, dan sampai pada kesimpulan yang beralasan." },
         ],
       },
       {
         nama: "Referensi & Contoh",
         bobot: 20,
         levels: [
-          { level: 1, deskriptor: "Tidak ada rujukan maupun contoh." },
-          { level: 2, deskriptor: "Rujukan atau contohnya minim dan kurang berkaitan." },
-          { level: 3, deskriptor: "Rujukan dan contohnya cukup serta berkaitan dengan pembahasan." },
-          { level: 4, deskriptor: "Rujukan relevan dan kuat, contohnya tepat dan benar-benar menjelaskan." },
+          { level: 1, minKata: 0, deskriptor: "Tidak ada rujukan maupun contoh." },
+          { level: 2, minKata: 25, deskriptor: "Rujukan atau contohnya minim dan kurang berkaitan." },
+          { level: 3, minKata: 70, deskriptor: "Rujukan dan contohnya cukup serta berkaitan dengan pembahasan." },
+          { level: 4, minKata: 140, deskriptor: "Rujukan relevan dan kuat, contohnya tepat dan benar-benar menjelaskan." },
         ],
       },
     ],
@@ -429,30 +446,30 @@ export const RUBRIK_BAWAAN: Rubrik[] = [
         nama: "Kebenaran Isi",
         bobot: 50,
         levels: [
-          { level: 1, deskriptor: "Isi jawabannya keliru." },
-          { level: 2, deskriptor: "Sebagian isinya benar, sebagian keliru." },
-          { level: 3, deskriptor: "Isi jawabannya benar." },
-          { level: 4, deskriptor: "Isi jawabannya benar dan lengkap, termasuk bagian yang sering terlewat." },
+          { level: 1, minKata: 0, deskriptor: "Isi jawabannya keliru." },
+          { level: 2, minKata: 25, deskriptor: "Sebagian isinya benar, sebagian keliru." },
+          { level: 3, minKata: 70, deskriptor: "Isi jawabannya benar." },
+          { level: 4, minKata: 140, deskriptor: "Isi jawabannya benar dan lengkap, termasuk bagian yang sering terlewat." },
         ],
       },
       {
         nama: "Kelengkapan",
         bobot: 30,
         levels: [
-          { level: 1, deskriptor: "Hanya menyebut satu bagian dari yang diminta." },
-          { level: 2, deskriptor: "Menyebut sebagian yang diminta." },
-          { level: 3, deskriptor: "Menyebut hampir seluruh yang diminta." },
-          { level: 4, deskriptor: "Menyebut seluruh yang diminta beserta keterangannya." },
+          { level: 1, minKata: 0, deskriptor: "Hanya menyebut satu bagian dari yang diminta." },
+          { level: 2, minKata: 25, deskriptor: "Menyebut sebagian yang diminta." },
+          { level: 3, minKata: 70, deskriptor: "Menyebut hampir seluruh yang diminta." },
+          { level: 4, minKata: 140, deskriptor: "Menyebut seluruh yang diminta beserta keterangannya." },
         ],
       },
       {
         nama: "Kejelasan Bahasa",
         bobot: 20,
         levels: [
-          { level: 1, deskriptor: "Sulit dipahami." },
-          { level: 2, deskriptor: "Dapat dipahami dengan membaca ulang." },
-          { level: 3, deskriptor: "Jelas dan mudah dipahami." },
-          { level: 4, deskriptor: "Jelas, ringkas, dan tepat istilah." },
+          { level: 1, minKata: 0, deskriptor: "Sulit dipahami." },
+          { level: 2, minKata: 25, deskriptor: "Dapat dipahami dengan membaca ulang." },
+          { level: 3, minKata: 70, deskriptor: "Jelas dan mudah dipahami." },
+          { level: 4, minKata: 140, deskriptor: "Jelas, ringkas, dan tepat istilah." },
         ],
       },
     ],

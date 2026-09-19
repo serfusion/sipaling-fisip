@@ -64,6 +64,10 @@ function bersihkanKriteria(masukan: unknown): KriteriaRubrik[] {
         .map((l) => ({
           level: Math.round(Number((l as { level?: unknown })?.level) || 0),
           deskriptor: String((l as { deskriptor?: unknown })?.deskriptor ?? "").trim().slice(0, 2000),
+          // Ambang panjang, inti penilaian yang berjalan sampai selesai
+          // tanpa ketukan pengajar. Dijepit pada batas yang masih masuk akal
+          // untuk satu jawaban esai.
+          minKata: Math.max(0, Math.min(5000, Math.round(Number((l as { minKata?: unknown })?.minKata) || 0))),
         }))
         .filter((l) => Number.isFinite(l.level) && l.level > 0)
         .sort((a, b) => a.level - b.level);
