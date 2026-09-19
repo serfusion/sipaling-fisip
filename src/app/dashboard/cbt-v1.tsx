@@ -109,7 +109,16 @@ async function bacaWord(berkas: File) {
   return bacaTempelMahasiswa(teks);
 }
 
-export function PanelMahasiswa({ bolehKelola }: { bolehKelola: boolean }) {
+export function PanelMahasiswa({ bolehKelola: awal }: { bolehKelola: boolean }) {
+  /**
+   * Hak kelola datang dari SERVER, bukan ditebak dari role di peramban.
+   *
+   * Tebakannya dulu meleset: panel dipanggil dengan `pemantau` — benar hanya
+   * untuk admin — sehingga pengajar melihat daftar tanpa satu pun tombol
+   * impor. Nilai dari prop dipakai sampai jawaban pertama datang, supaya
+   * tombolnya tidak berkedip muncul-hilang.
+   */
+  const [bolehKelola, setBolehKelola] = useState(awal);
   const [daftar, setDaftar] = useState<Mahasiswa[]>([]);
   const [jumlah, setJumlah] = useState(0);
   const [cari, setCari] = useState("");
@@ -136,6 +145,8 @@ export function PanelMahasiswa({ bolehKelola }: { bolehKelola: boolean }) {
   const [pesertaLepas, setPesertaLepas] = useState<PesertaLepas[]>([]);
   const [pilihLepas, setPilihLepas] = useState<string[]>([]);
   const [bukaLepas, setBukaLepas] = useState(false);
+  /** Daftar tetapnya kosong, tetapi ada yang sudah ikut ujian. */
+  const kosongTapiAdaPeserta = jumlah === 0 && pesertaLepas.length > 0;
 
   const muatDaftar = useCallback(async (q: string) => {
     setMuat(true);
@@ -145,6 +156,7 @@ export function PanelMahasiswa({ bolehKelola }: { bolehKelola: boolean }) {
       if (!jawab.ok || !data.success) throw new Error(data.message || "Gagal memuat.");
       setDaftar(data.mahasiswa || []);
       setJumlah(data.jumlah || 0);
+      if (typeof data.bolehKelola === "boolean") setBolehKelola(data.bolehKelola);
       setGalat("");
     } catch (alasan: unknown) {
       setGalat(alasan instanceof Error ? alasan.message : "Daftar mahasiswa gagal dimuat.");
@@ -416,13 +428,13 @@ export function PanelMahasiswa({ bolehKelola }: { bolehKelola: boolean }) {
           <button
             type="button"
             className="cbt-lipat"
-            aria-expanded={bukaLepas}
-            onClick={() => setBukaLepas((b) => !b)}
+            aria-expanded={bukaLepas || kosongTapiAdaPeserta}
+            onClick={() => setBukaLepas((b) => !(b || kosongTapiAdaPeserta))}
           >
             <b>Dari peserta ujian ({pesertaLepas.length})</b>
-            <span>{bukaLepas ? "▲ Sembunyikan" : "▼ Lihat"}</span>
+            <span>{bukaLepas || kosongTapiAdaPeserta ? "▲ Sembunyikan" : "▼ Lihat"}</span>
           </button>
-          {bukaLepas && (
+          {(bukaLepas || kosongTapiAdaPeserta) && (
             <div className="cbt-lipat-isi">
               <ul className="cbtv-lepas-daftar">
                 {pesertaLepas.map((p) => (
@@ -477,7 +489,13 @@ export function PanelMahasiswa({ bolehKelola }: { bolehKelola: boolean }) {
         {muat ? (
           <div className="dempty">Memuat…</div>
         ) : daftar.length === 0 ? (
-          <div className="dempty">{cari ? "Tidak ada yang cocok." : "Belum ada mahasiswa di daftar."}</div>
+          <div className="dempty">
+            {cari
+              ? "Tidak ada yang cocok."
+              : pesertaLepas.length > 0
+                ? `Daftar tetap masih kosong. ${pesertaLepas.length} peserta sudah ikut ujian — tambahkan dari kotak di atas.`
+                : "Belum ada peserta. Impor dari Excel, Word, tempelan, atau tambah manual di atas."}
+          </div>
         ) : (
           <table className="dsh-table cbtv-tabel">
             <thead>
@@ -1321,7 +1339,6 @@ export function DaftarMirip({ pasangan, skor, status }: { pasangan: PasanganMiri
 // PEMUTAR REKAMAN
 // ============================================================
 
-type Potongan = { urut: number; url: string; mulai: number };
 type Penggal = { mulai: number; selesai: number; teks: string; kata: string; risiko: string; alasan: string };
 
 export function PemutarRekaman({ ujianId, attemptId }: { ujianId: number; attemptId: number }) {
@@ -1329,7 +1346,6 @@ export function PemutarRekaman({ ujianId, attemptId }: { ujianId: number; attemp
     status: string; durasi: number; potongan: number; transkrip: string;
     tanda: string; jumlahTanda: number; catatan: string;
   } | null>(null);
-  const [potongan, setPotongan] = useState<Potongan[]>([]);
   const [penggal, setPenggal] = useState<Penggal[]>([]);
   const [bolehTranskrip, setBolehTranskrip] = useState(false);
   const [muat, setMuat] = useState(true);
@@ -1340,17 +1356,6 @@ export function PemutarRekaman({ ujianId, attemptId }: { ujianId: number; attemp
   const [semuaPenggal, setSemuaPenggal] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  /**
-   * Potongan mana yang sedang diputar.
-   *
-   * Disimpan dua kali dengan sengaja: `urut` untuk digambar, `urutRef` untuk
-   * dibaca panggilan balik audio yang menangkap nilai lamanya. Membaca ref
-   * saat menggambar tidak memicu gambar ulang — nomor potongannya akan
-   * membeku pada angka pertama sepanjang pemutaran.
-   */
-  const [urut, setUrut] = useState(0);
-  const urutRef = useRef(0);
-  const pakaiUrut = useCallback((n: number) => { urutRef.current = n; setUrut(n); }, []);
 
   const muatRekaman = useCallback(async () => {
     setMuat(true);
@@ -1359,7 +1364,6 @@ export function PemutarRekaman({ ujianId, attemptId }: { ujianId: number; attemp
       const isi = await jawab.json();
       if (!jawab.ok || !isi.success) throw new Error(isi.message || "Gagal memuat.");
       setRekaman(isi.rekaman);
-      setPotongan(isi.potongan || []);
       setPenggal(isi.penggal || []);
       setBolehTranskrip(Boolean(isi.bolehTranskrip));
       setGalat("");
@@ -1380,45 +1384,30 @@ export function PemutarRekaman({ ujianId, attemptId }: { ujianId: number; attemp
   }, [muatRekaman]);
 
   /**
-   * Lompat ke satu detik di dalam rekaman utuh.
+   * Lompat ke satu detik di dalam rekaman.
    *
-   * Rekamannya tersimpan sebagai potongan terpisah, jadi detik ke-400 berarti
-   * potongan ke-20 pada detik ke-0. Penghitungannya di sini, satu tempat:
-   * penanda yang ditekan dan tombol maju/mundur harus mendarat di titik yang
-   * sama, dan dua rumus yang sama pada akhirnya akan berbeda.
+   * Sekarang sesederhana ini karena yang dimuat pemutar SATU berkas utuh
+   * (lihat `utuh=1` pada /api/cbt/rekaman). Sebelumnya rekamannya diputar
+   * potongan demi potongan, dan fungsi ini harus mencari potongan mana yang
+   * memuat detik itu, mengganti sumbernya, menunggunya termuat, lalu mencari
+   * posisinya di dalam potongan — empat langkah yang masing-masing punya cara
+   * gagalnya sendiri, dan satu jeda terdengar tiap dua puluh detik.
    */
   const lompat = useCallback((detik: number) => {
-    if (potongan.length === 0) return;
-    let pilih = potongan[0];
-    for (const p of potongan) if (p.mulai <= detik) pilih = p;
-    pakaiUrut(pilih.urut);
     const audio = audioRef.current;
     if (!audio) return;
-    audio.src = pilih.url;
-    audio.currentTime = 0;
-    void audio.play().then(() => {
-      // Pencarian di dalam potongan baru dilakukan SESUDAH ia mulai dimuat.
-      // Menyetel currentTime pada elemen yang sumbernya baru diganti akan
-      // terbuang begitu berkasnya benar-benar terbaca.
-      const dalam = Math.max(0, detik - pilih.mulai);
-      if (dalam > 0 && Number.isFinite(audio.duration)) audio.currentTime = Math.min(dalam, audio.duration - 0.1);
-      else if (dalam > 0) audio.addEventListener("loadedmetadata", () => { audio.currentTime = dalam; }, { once: true });
-    }).catch(() => {
+    try {
+      audio.currentTime = detik;
+    } catch {
+      // Pencarian pada berkas yang metadatanya belum terbaca. Dicoba lagi
+      // begitu ia siap.
+      audio.addEventListener("loadedmetadata", () => { audio.currentTime = detik; }, { once: true });
+    }
+    void audio.play().catch(() => {
       setGalat("Peramban menolak memutar otomatis. Tekan tombol putar pada pemutar di bawah.");
     });
     setKini(detik);
-  }, [potongan, pakaiUrut]);
-
-  /** Potongan berikutnya diputar sendiri begitu yang sekarang habis. */
-  function lanjut() {
-    const berikut = potongan.find((p) => p.urut === urutRef.current + 1);
-    if (!berikut) return;
-    pakaiUrut(berikut.urut);
-    const audio = audioRef.current;
-    if (!audio) return;
-    audio.src = berikut.url;
-    void audio.play().catch(() => { /* pemutaran otomatis ditolak; tidak apa-apa */ });
-  }
+  }, []);
 
   async function transkripkan() {
     setSibuk(true); setGalat(""); setKabar("");
@@ -1474,20 +1463,20 @@ export function PemutarRekaman({ ujianId, attemptId }: { ujianId: number; attemp
         </div>
       ) : (
         <>
+          {/* SATU berkas, dari awal sampai habis. Potongannya disambung di
+              server; pemutar ini tidak pernah berganti sumber, jadi tidak ada
+              jeda tiap dua puluh detik dan bilah gesernya menunjuk posisi yang
+              sebenarnya di dalam rekaman. */}
           <audio
             ref={audioRef}
             controls
+            preload="metadata"
             className="cbtv-audio"
-            src={potongan[0]?.url}
-            onTimeUpdate={(e) => {
-              const p = potongan.find((x) => x.urut === urutRef.current);
-              setKini((p?.mulai ?? 0) + Math.floor(e.currentTarget.currentTime));
-            }}
-            onEnded={lanjut}
+            src={`/api/cbt/rekaman?ujian=${ujianId}&attempt=${attemptId}&utuh=1`}
+            onTimeUpdate={(e) => setKini(Math.floor(e.currentTarget.currentTime))}
           />
           <div className="cbtv-rekam-jam">
             {ejaJamRekaman(kini)} / {ejaJamRekaman(rekaman.durasi)}
-            <small>potongan {urut + 1} dari {potongan.length}</small>
           </div>
 
           <div className="cbtv-rekam-aksi">
