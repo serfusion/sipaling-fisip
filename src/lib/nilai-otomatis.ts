@@ -67,6 +67,23 @@ export type Pekerjaan = {
 export type PembandingSoal = Map<number, number[]>;
 
 /**
+ * Lembar ini masih dikerjakan, jadi belum boleh dinilai.
+ *
+ * Satu fungsi, dipakai kedua penjaga di bawah, dan sengaja diekspor supaya
+ * aturannya dapat diuji tanpa basis data. Kesalahan yang pernah terjadi di
+ * sini tidak terlihat sama sekali dari luar: yang salah bukan angkanya,
+ * melainkan tidak adanya angka — penilaian yang diam-diam tidak pernah
+ * berjalan, dan peserta yang terus membaca "menunggu koreksi pengajar".
+ *
+ * Statusnya harus dibaca dari BARIS BASIS DATA YANG TERBARU. Obyek attempt
+ * yang dipegang pemanggil dapat saja masih membawa "berjalan" walaupun
+ * barisnya sudah lama berubah menjadi "selesai".
+ */
+export function masihMengerjakan(status: string): boolean {
+  return status === "berjalan";
+}
+
+/**
  * Jenis soal yang dinilai rubrik.
  *
  * Esai: selalu — ia memang tidak punya kunci.
@@ -102,7 +119,7 @@ export async function antreEsai(
     // Yang MASIH mengerjakan tidak pernah ikut: menilai jawaban setengah jadi
     // menghabiskan biaya pada teks yang akan berubah, dan meninggalkan nilai
     // yang terlihat final pada lembar yang belum selesai.
-    if (p.status === "berjalan") continue;
+    if (masihMengerjakan(p.status)) continue;
 
     const lembar = bacaLembar(p.paper);
     const jawaban = await db.select().from(cbtAnswers).where(eq(cbtAnswers.attemptId, p.id));
@@ -148,7 +165,7 @@ export async function pembandingPanjang(
 ): Promise<PembandingSoal> {
   const peta: PembandingSoal = new Map();
   for (const p of peserta) {
-    if (p.status === "berjalan") continue;
+    if (masihMengerjakan(p.status)) continue;
     const jawaban = await db.select().from(cbtAnswers).where(eq(cbtAnswers.attemptId, p.id));
     for (const j of jawaban) {
       const isi = String(j.answer ?? "").trim();
@@ -498,12 +515,29 @@ export async function kerjakanPenilaian(
  */
 export async function nilaiEsaiSaatKumpul(
   ujian: { id: number; rubricId: number | null; courseName: string },
-  attempt: typeof cbtAttempts.$inferSelect,
+  attemptId: number,
 ): Promise<NilaiUlang | null> {
   if (!ujian.rubricId) return null;
 
   const rubrik = await rubrikUjian(ujian.rubricId);
   if (!rubrik || rubrik.kriteria.length === 0) return null;
+
+  // Barisnya DIBACA ULANG dari basis data, bukan diterima dari pemanggil.
+  //
+  // Inilah yang dahulu membuat seluruh fitur ini diam-diam tidak pernah
+  // berjalan. Pemanggilnya — nilaiDanTutup() — baru saja mengubah status
+  // attempt menjadi "selesai" DI BASIS DATA, tetapi obyek JavaScript yang ia
+  // pegang masih membawa status lamanya, "berjalan". antreEsai() melewati
+  // attempt yang masih berjalan (dan memang harus: menilai lembar yang belum
+  // selesai adalah pemborosan), jadi antreannya selalu kosong, penilaiannya
+  // tidak pernah terjadi, dan peserta tetap membaca "menunggu koreksi
+  // pengajar" pada ujian yang rubrik dan acuannya sudah lengkap.
+  //
+  // Membaca ulang satu baris menutup seluruh golongan kesalahan itu: fungsi
+  // ini tidak dapat lagi dibohongi obyek basi milik siapa pun.
+  const baris = await db.select().from(cbtAttempts).where(eq(cbtAttempts.id, attemptId)).limit(1);
+  const attempt = baris[0];
+  if (!attempt) return null;
 
   const antre = await antreEsai(ujian.id, [attempt]);
   if (antre.length === 0) return null;
@@ -515,5 +549,5 @@ export async function nilaiEsaiSaatKumpul(
   // Yang dipakai ambang rubrik — sama untuk semua orang, apa pun urutannya.
   await kerjakanPenilaianLokal(rubrik, antre, new Map());
 
-  return hitungUlangAttempt(attempt.id);
+  return hitungUlangAttempt(attemptId);
 }
