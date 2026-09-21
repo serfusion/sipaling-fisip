@@ -339,7 +339,7 @@ async function nilaiDanTutup(
   // Yang hilang bila ia gagal hanya angka esainya, dan pengajar dapat
   // menghitungnya ulang kapan saja dari panelnya.
   try {
-    const segar = await nilaiEsaiSaatKumpul(ujian, attempt);
+    const segar = await nilaiEsaiSaatKumpul(ujian, attempt.id);
     if (segar) {
       // Angka yang dikirim balik ke peserta diambil dari hitungan TERBARU,
       // bukan dari ringkasan sebelum esainya dinilai. Tanpa ini peserta

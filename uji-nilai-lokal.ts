@@ -14,6 +14,7 @@ import {
   kesesuaianAcuan, levelDariAmbang, menyalinSoal, ngawur, nilaiLokal, redundansi,
 } from "./src/lib/nilai-lokal";
 import { RUBRIK_BAWAAN, hitungRubrik, predikat, rubrikBawaan, type Rubrik } from "./src/lib/rubrik";
+import { masihMengerjakan } from "./src/lib/nilai-otomatis";
 
 let lulus = 0;
 const gagal: string[] = [];
@@ -387,6 +388,19 @@ benar("tanpa acuan keyakinannya selalu di bawah ambang 'mohon diperiksa'",
 benar("tanpa acuan, ringkasannya menyuruh mengisi Pembahasan",
   nilaiLokal({ jawaban: tepatBeda, pertanyaan: SOAL, acuan: "", rubrik: RUBRIK_ISI })
     .ringkasan.includes("Pembahasan"));
+
+console.log("\n=== SIAPA YANG BOLEH DINILAI ===\n");
+
+// Penjaga ini pernah membuat SELURUH penilaian otomatis diam-diam tidak
+// berjalan: pemanggilnya menyerahkan obyek attempt yang statusnya masih
+// "berjalan" padahal barisnya sudah "selesai", antreannya kosong, dan tidak
+// ada satu pun galat yang muncul. Yang terlihat peserta hanya "menunggu
+// koreksi pengajar" pada ujian yang rubriknya sudah lengkap.
+benar("lembar yang masih dikerjakan tidak dinilai", masihMengerjakan("berjalan"));
+benar("lembar yang sudah dikumpulkan dinilai", !masihMengerjakan("selesai"));
+benar("lembar yang kehabisan waktu ikut dinilai", !masihMengerjakan("waktu_habis"),
+  "waktunya habis berarti sudah selesai, bukan sedang dikerjakan");
+benar("lembar yang dihentikan pengawas ikut dinilai", !masihMengerjakan("dihentikan"));
 
 console.log("");
 if (gagal.length === 0) {
