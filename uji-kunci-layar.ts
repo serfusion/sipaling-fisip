@@ -17,10 +17,11 @@
 
 import { readFileSync } from "node:fs";
 import {
-  KEMAMPUAN, KLIEN_LABEL, PENANDA_KLIEN, PESAN_TIRAI, SEMUA_KLIEN, TIRAI_MS,
+  JEDA_LUAR_LAYAR_MS, KEMAMPUAN, KLIEN_LABEL, PENANDA_KLIEN, PESAN_TIRAI,
+  SEMUA_KLIEN, TIRAI_MS,
   PERANGKAT_LABEL, SEMUA_PERANGKAT, bacaKlien, bolehMasukKlien, kunciSistem,
-  periksaKunciKlien, rapikanKlien, rapikanPerangkatKunci,
-  type JenisKlien, type SebabTirai,
+  periksaKunciKlien, periksaLayarPenuh, rapikanKlien, rapikanPerangkatKunci,
+  type JenisKlien, type KeadaanLayarPenuh, type SebabTirai,
 } from "./src/lib/kunci-layar";
 import { KEADAAN_JAWAB_LABEL, keadaanJawab } from "./src/lib/cbt";
 import { namaBerkasQr } from "./src/lib/qr-ujian";
@@ -273,6 +274,162 @@ benar("penjaga memasang tirai layar penuh sendiri",
   "kalau halaman yang memutuskannya, mode Biasa ikut tertutup tirai");
 benar("hanya pada mode yang menuntut layar penuh",
   /aturan\.layarPenuh && keluarLayarPenuh/.test(penjagaLayar));
+
+console.log("\n=== KELUAR LAYAR PENUH: ESCAPE DAN MUAT ULANG ===\n");
+
+// Celah yang melahirkan bagian ini, dan bentuknya persis dua ketukan:
+//
+//   Escape melepas layar penuh. Bilah peramban muncul kembali justru karena
+//   layar penuhnya lepas, dan tombol muat ulang ada di sana. Satu ketukan lagi
+//   dan lembarnya terbuka dari awal — kali ini DI LUAR layar penuh.
+//
+// Sesudah muat ulang itu tidak ada satu pun peristiwa `fullscreenchange` yang
+// menyala, karena tidak ada perpindahan apa pun: halamannya memang lahir di
+// luar layar penuh. Penjaga yang hanya mendengarkan peristiwa karena itu diam,
+// tidak ada tirai, tidak ada catatan, dan seluruh sisa ujian dikerjakan di
+// dalam jendela biasa yang bilahnya lengkap.
+//
+// Yang menutupnya adalah membaca KEADAAN layarnya berulang, bukan menunggu
+// kabar perpindahan. Aturannya di periksaLayarPenuh, dan ini ujinya.
+
+const DASAR: KeadaanLayarPenuh = {
+  diLayarPenuh: true, pernahMenyala: true, lamaDiLuarMs: 0,
+  kiosk: false, masaMula: false, mengakhiri: false, sudahDilapor: false,
+};
+const layarPenuh = (ubah: Partial<KeadaanLayarPenuh>) =>
+  periksaLayarPenuh({ ...DASAR, ...ubah });
+
+// Di dalam layar penuh: tidak ada tirai, tidak ada catatan, dan penghitungnya
+// dikokang ulang — keluar BERIKUTNYA adalah perbuatan berikutnya.
+const diDalam = layarPenuh({});
+sama("di layar penuh: tidak ada tirai", diDalam.tutup, false);
+sama("di layar penuh: tidak ada catatan", diDalam.lapor, false);
+sama("kembali ke layar penuh mengokang ulang penghitungnya", diDalam.sudahDilapor, false);
+
+// ESCAPE. Tadi di dalam, sekarang di luar: ada tangan yang mengerjakannya, dan
+// itu dicatat seketika — tanpa menunggu apa pun. Inilah yang dahulu berjalan,
+// dan inilah yang harus tetap berjalan.
+const escape = layarPenuh({ diLayarPenuh: false });
+sama("Escape: soalnya ditutup", escape.tutup, true);
+sama("Escape: dicatat seketika", escape.lapor, true);
+benar("Escape: catatannya menyebut perbuatannya",
+  escape.detail.includes("keluar dari layar penuh"), escape.detail);
+
+// Dan hanya SEKALI untuk keluar yang sama. Pemeriksaan berkala berdetak tiap
+// detik; tanpa penahan ini, peserta yang bertahan di luar sana satu menit
+// mengumpulkan enam puluh pelanggaran untuk satu perbuatan — dan mode
+// Sertifikasi mengumpulkan ujiannya secara paksa pada detik kelima.
+const masihDiLuar = layarPenuh({ diLayarPenuh: false, sudahDilapor: true, lamaDiLuarMs: 30_000 });
+sama("bertahan di luar: tiraïnya tetap", masihDiLuar.tutup, true);
+sama("bertahan di luar: tidak dicatat dua kali", masihDiLuar.lapor, false);
+
+// MUAT ULANG DI LUAR LAYAR PENUH — inti celahnya. Layar penuhnya tidak pernah
+// menyala pada sesi ini, jadi tidak ada perpindahan yang dapat didengar.
+// Tiraïnya jatuh SEKETIKA; yang ditunggu hanya catatannya.
+const baruPulih = layarPenuh({ diLayarPenuh: false, pernahMenyala: false, lamaDiLuarMs: 0 });
+sama("sesi tanpa layar penuh: soalnya langsung ditutup", baruPulih.tutup, true);
+sama("sesi tanpa layar penuh: belum dicatat pada detik pertama", baruPulih.lapor, false);
+
+// Peserta yang sesinya baru pulih lalu menekan tombol "kembali ke layar penuh"
+// tidak membawa catatan apa pun: ia sudah kembali sebelum jedanya habis.
+const pulihLaluKembali = layarPenuh({
+  diLayarPenuh: false, pernahMenyala: false, lamaDiLuarMs: JEDA_LUAR_LAYAR_MS - 1,
+});
+sama("sempat kembali sebelum jeda habis: tidak dituduh", pulihLaluKembali.lapor, false);
+
+// Yang TIDAK kembali tetap tercatat. Tanpa baris ini, muat ulang di luar layar
+// penuh menjadi ujian tanpa pengawasan yang catatannya tetap bersih.
+const bertahanTelanjang = layarPenuh({
+  diLayarPenuh: false, pernahMenyala: false, lamaDiLuarMs: JEDA_LUAR_LAYAR_MS,
+});
+sama("ujian yang berjalan tanpa layar penuh tetap tercatat", bertahanTelanjang.lapor, true);
+benar("catatannya menyebut keadaannya, bukan menebak perbuatannya",
+  bertahanTelanjang.detail.includes("tanpa layar penuh"), bertahanTelanjang.detail);
+
+// DUA KEADAAN YANG TIDAK PERNAH MENJADI CATATAN ATAS NAMA PESERTA, dan
+// keduanya perbuatan halaman itu sendiri.
+const saatMengakhiri = layarPenuh({ diLayarPenuh: false, mengakhiri: true });
+sama("layar penuh yang dilepas saat mengumpulkan tidak dicatat", saatMengakhiri.lapor, false);
+sama("tetapi soalnya tetap ditutup", saatMengakhiri.tutup, true);
+// Dan ia tidak boleh ikut mengunci penghitungnya: peserta yang batal
+// mengumpulkan kembali mengerjakan, dan keluarnya yang berikutnya harus tetap
+// tercatat.
+sama("mengakhiri tidak mengunci penghitung laporannya", saatMengakhiri.sudahDilapor, false);
+
+const masaMula = layarPenuh({ diLayarPenuh: false, masaMula: true });
+sama("detik-detik pembukaan tidak dicatat", masaMula.lapor, false);
+sama("tetapi soalnya tetap ditutup sejak detik pertama", masaMula.tutup, true);
+sama("dan masa mula tidak menghabiskan jatah catatannya", masaMula.sudahDilapor, false);
+
+// Keluar tiga kali tetap tiga catatan. Yang dikokang ulang penghitungnya
+// adalah KEMBALINYA ke layar penuh, bukan lewatnya waktu.
+let penanda = false;
+let dicatat = 0;
+for (let ke = 0; ke < 3; ke++) {
+  // keluar
+  const keluar = periksaLayarPenuh({ ...DASAR, diLayarPenuh: false, sudahDilapor: penanda });
+  penanda = keluar.sudahDilapor;
+  if (keluar.lapor) dicatat += 1;
+  // masih di luar, satu detik kemudian
+  const lagi = periksaLayarPenuh({
+    ...DASAR, diLayarPenuh: false, lamaDiLuarMs: 1000, sudahDilapor: penanda,
+  });
+  penanda = lagi.sudahDilapor;
+  if (lagi.lapor) dicatat += 1;
+  // kembali
+  penanda = periksaLayarPenuh({ ...DASAR, diLayarPenuh: true, sudahDilapor: penanda }).sudahDilapor;
+}
+sama("keluar tiga kali tercatat tiga kali", dicatat, 3);
+
+// APLIKASI UJIAN ANDROID. WebView-nya tidak melayani requestFullscreen sama
+// sekali kecuali aplikasinya memasang WebChromeClient beserta onShowCustomView
+// — dan lockdown/android/ tidak memasangnya, karena jendelanya sudah
+// disematkan sistem lewat startLockTask(). Di sana document.fullscreenElement
+// selamanya kosong.
+//
+// Tanpa pembebasan ini, setiap peserta yang justru memakai perangkat PALING
+// terkunci mendapat tirai yang tidak akan pernah terbuka, beserta satu
+// pelanggaran atas nama orang yang tidak dapat berbuat apa-apa terhadapnya.
+const aplikasiTerkunci = layarPenuh({
+  diLayarPenuh: false, pernahMenyala: false, kiosk: true, lamaDiLuarMs: 60_000,
+});
+sama("aplikasi terkunci: soalnya tidak ditutup", aplikasiTerkunci.tutup, false);
+sama("aplikasi terkunci: tidak dituduh", aplikasiTerkunci.lapor, false);
+// Termasuk pada detik-detik pembukaan dan detik-detik pengumpulan, yang
+// keduanya tetap memasang tirai bagi peramban biasa.
+sama("aplikasi terkunci: tidak tertutup pada masa mula",
+  layarPenuh({ diLayarPenuh: false, pernahMenyala: false, kiosk: true, masaMula: true }).tutup,
+  false);
+
+// Tetapi aplikasi Windows MELAYANI requestFullscreen dengan baik, jadi peserta
+// di sana yang tadi di dalam lalu sekarang di luar tetap tercatat seperti
+// peserta mana pun. Pembebasan di atas hanya untuk yang tidak pernah menyala.
+const windowsKeluar = layarPenuh({ diLayarPenuh: false, pernahMenyala: true, kiosk: true });
+sama("aplikasi terkunci yang pernah menyala: keluarnya tetap ditutup", windowsKeluar.tutup, true);
+sama("aplikasi terkunci yang pernah menyala: keluarnya tetap dicatat", windowsKeluar.lapor, true);
+
+// Dan pembebasan itu memang diambil dari daftar kemampuan, bukan ditebak
+// halaman. Peramban biasa TIDAK boleh ikut terbebas — di situlah seluruh
+// celahnya berada.
+sama("peramban biasa bukan kiosk", KEMAMPUAN.peramban.kiosk, false);
+sama("aplikasi Android kiosk", KEMAMPUAN.android.kiosk, true);
+sama("aplikasi Windows kiosk", KEMAMPUAN.windows.kiosk, true);
+benar("penjaga membaca kiosk dari daftar kemampuan, bukan menebaknya",
+  /kiosk:\s*KEMAMPUAN\[klien\]\.kiosk/.test(penjagaLayar));
+
+// Dan penjaganya memang memakai pemeriksa itu, bukan hanya mendengar
+// peristiwa. Tanpa dua baris berikut, seluruh uji di atas dapat hijau pada
+// pustaka yang tidak dipanggil siapa pun — dan celahnya tetap terbuka.
+benar("penjaga memakai pemeriksa keadaan layar",
+  penjagaLayar.includes("periksaLayarPenuh("));
+benar("keadaan layarnya diperiksa berulang, bukan sekali saat berpindah",
+  /setInterval\(\s*periksa/.test(penjagaLayar),
+  "peristiwa fullscreenchange tidak pernah menyala pada halaman yang lahir di luar layar penuh");
+benar("peristiwa perpindahannya tetap didengarkan",
+  penjagaLayar.includes('addEventListener("fullscreenchange"'),
+  "tanpa itu tiraïnya jatuh satu detik sesudah Escape, bukan pada ketukannya");
+benar("keadaannya dibaca dari document.fullscreenElement",
+  penjagaLayar.includes("document.fullscreenElement"));
 
 console.log("\n=== KOTAK TEGURAN ===\n");
 

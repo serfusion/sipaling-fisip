@@ -325,6 +325,170 @@ export const PESAN_TIRAI: Record<SebabTirai, { judul: string; isi: string }> = {
 export const TIRAI_MS = 2200;
 
 // ------------------------------------------------------------
+// LAYAR PENUH: APA YANG BENAR-BENAR TERJADI, BUKAN APA YANG TERDENGAR
+// ------------------------------------------------------------
+
+/**
+ * Berapa lama peserta boleh berada di luar layar penuh TANPA pernah terlihat
+ * masuk ke dalamnya, sebelum keadaan itu dicatat.
+ *
+ * Jeda ini hanya dipakai untuk satu keadaan, dan keadaan itu perlu dijelaskan
+ * karena ia adalah celah yang melahirkan seluruh bagian ini:
+ *
+ *   Peristiwa `fullscreenchange` hanya menyala pada PERPINDAHAN. Ujian yang
+ *   tidak pernah sempat masuk layar penuh karena itu tidak pernah menyalakan
+ *   satu peristiwa pun — dan halaman yang hanya mendengarkan peristiwa akan
+ *   menyangka semuanya baik-baik saja. Tiga jalan nyata menuju keadaan itu:
+ *
+ *     - SESI YANG DIPULIHKAN. Peramban yang tertutup lalu dibuka lagi kembali
+ *       ke lembar yang sama, tetapi permintaan layar penuh MENUNTUT ketukan
+ *       orang dan pemulihan itu berjalan sendiri. Lembarnya terbuka, layar
+ *       penuhnya tidak.
+ *     - MUAT ULANG SESUDAH ESCAPE. Escape melepas layar penuh, lalu tombol
+ *       muat ulang peramban — yang bilahnya baru saja muncul kembali karena
+ *       layar penuhnya lepas — mengembalikan ujian dalam keadaan telanjang.
+ *       Inilah jalan yang paling sering benar-benar dipakai.
+ *     - PERMINTAAN YANG GAGAL DIAM-DIAM. requestFullscreen ditolak peramban
+ *       tanpa suara; yang tersisa hanya Promise yang ditampik.
+ *
+ * Delapan detik, dan angkanya dipilih dari dua sisi: cukup panjang supaya
+ * peserta yang sesinya baru pulih sempat membaca tiraïnya dan menekan tombol
+ * "kembali ke layar penuh" tanpa membawa catatan atas nama orang yang tidak
+ * berbuat apa-apa, dan cukup pendek supaya ujian yang memang dikerjakan di
+ * luar layar penuh tidak berjalan setengah jam tanpa satu baris pun tercatat.
+ */
+export const JEDA_LUAR_LAYAR_MS = 8000;
+
+/** Keadaan layar ujian pada satu saat, sebagaimana terbaca halaman. */
+export type KeadaanLayarPenuh = {
+  /** document.fullscreenElement ada isinya. */
+  diLayarPenuh: boolean;
+  /**
+   * Sepanjang sesi mengerjakan ini, layar penuhnya PERNAH benar-benar menyala.
+   *
+   * Inilah yang membedakan dua hal yang kelihatannya sama. Peserta yang tadi
+   * di dalam lalu sekarang di luar SUDAH melakukan sesuatu — menekan Escape,
+   * menekan F11, mengetuk keluar — dan itu dicatat seketika. Peserta yang
+   * tidak pernah terlihat di dalamnya mungkin hanya sesi yang baru pulih, dan
+   * ia diberi jeda lebih dulu.
+   */
+  pernahMenyala: boolean;
+  /** Sudah berapa lama tanpa henti di luar layar penuh, dalam milidetik. */
+  lamaDiLuarMs: number;
+  /**
+   * Jendelanya dipegang aplikasi ujian, bukan peramban (lihat KEMAMPUAN.kiosk).
+   *
+   * Ini ada untuk satu keadaan yang nyata, dan mengabaikannya berarti menuduh
+   * seluruh peserta yang justru memakai perangkat paling terkunci:
+   *
+   *   WebView Android TIDAK MELAYANI requestFullscreen sama sekali kecuali
+   *   aplikasinya memasang WebChromeClient beserta onShowCustomView. Aplikasi
+   *   ujian di lockdown/android/ tidak memasangnya — dan memang tidak
+   *   membutuhkannya, karena jendelanya sudah disematkan sistem lewat
+   *   startLockTask() dan bilah sistemnya sudah disembunyikan. Di sana
+   *   document.fullscreenElement selamanya kosong, dan yang "kosong" itu
+   *   bukan peserta yang keluar dari mana pun.
+   *
+   * Yang dibebaskan olehnya HANYA satu cabang: keadaan yang layar penuhnya
+   * tidak pernah sekali pun menyala. Aplikasi Windows melayani
+   * requestFullscreen dengan baik, jadi peserta di sana yang tadi di dalam
+   * lalu sekarang di luar tetap tercatat seperti peserta mana pun.
+   *
+   * BATASNYA, dan ia harus dikatakan terus terang: pengenalan aplikasi ini
+   * PENGAKUAN, bukan bukti — User-Agent dapat ditulis siapa saja. Yang
+   * menutupnya bukan baris ini melainkan gerbang di server: ujian yang
+   * mewajibkan aplikasi menuntut kunci bersama (periksaKunciKlien), dan
+   * pengakuan tanpa kunci ditolak di sana. Yang tersisa sesudah itu adalah
+   * peramban yang sengaja dijalankan dengan User-Agent palsu — perbuatan yang
+   * sudah menuntut persiapan, dan yang sama sekali tidak dapat dihalangi oleh
+   * halaman yang JavaScript-nya berjalan di tangan orang itu sendiri.
+   */
+  kiosk: boolean;
+  /** Sedang di dalam detik-detik pembukaan yang tidak boleh dituduhkan. */
+  masaMula: boolean;
+  /** Ujiannya sedang ditutup — layar penuh yang lepas perbuatan halaman. */
+  mengakhiri: boolean;
+  /** Keluarnya yang SEKARANG sudah pernah dilaporkan. */
+  sudahDilapor: boolean;
+};
+
+export type PutusanLayarPenuh = {
+  /** Soalnya ditutup tirai. */
+  tutup: boolean;
+  /** Kirim insiden "fullscreen" sekarang juga. */
+  lapor: boolean;
+  /** Keterangan yang ikut dicatat, supaya penguji tahu yang mana. */
+  detail: string;
+  /** Nilai baru penanda "sudah dilaporkan", untuk dipakai pemeriksaan berikutnya. */
+  sudahDilapor: boolean;
+};
+
+/**
+ * Satu pemeriksaan keadaan layar penuh, tanpa DOM dan tanpa jam.
+ *
+ * Dipisahkan dari penjaganya supaya dapat diuji apa adanya (uji-kunci-layar.ts)
+ * — dan karena aturannya memang aturan, bukan tempelan pada pendengar
+ * peristiwa.
+ *
+ * TIGA hal yang dijaga aturan di bawah ini:
+ *
+ *   TIRAINYA SELALU. Di luar layar penuh berarti soalnya ditutup, tanpa
+ *     kecuali dan tanpa jeda. Yang ditahan jeda hanyalah CATATANNYA; soal yang
+ *     terbuka di luar layar penuh tidak boleh terlihat walau sedetik.
+ *   SATU CATATAN PER EPISODE. Keluar sekali dicatat sekali, bukan sekali tiap
+ *     detik selama ia di luar sana. Penghitungnya baru dikokang ulang sesudah
+ *     peserta benar-benar kembali ke layar penuh — jadi keluar tiga kali tetap
+ *     tercatat tiga kali, dan bertahan di luar selama sepuluh menit tetap satu.
+ *   YANG RAGU DIAM. Detik-detik pembukaan dan detik-detik pengumpulan
+ *     keduanya melepas layar penuh tanpa peserta menyentuh apa pun, dan
+ *     keduanya tidak pernah menjadi catatan atas namanya.
+ */
+export function periksaLayarPenuh(k: KeadaanLayarPenuh): PutusanLayarPenuh {
+  // Kembali ke dalam layar penuh mengokang ulang penghitungnya: keluar
+  // berikutnya adalah perbuatan berikutnya, dan memang dicatat lagi.
+  if (k.diLayarPenuh) {
+    return { tutup: false, lapor: false, detail: "", sudahDilapor: false };
+  }
+
+  // Jendelanya dipegang aplikasi ujian DAN layar penuh peramban tidak pernah
+  // sekali pun menyala di sana: bukan ukuran apa pun — lihat `kiosk` di atas.
+  //
+  // Diperiksa paling awal, sebelum masa mula dan masa mengakhiri, karena
+  // keduanya tetap memasang tirai. Pada aplikasi Android tirai itu tidak akan
+  // pernah terbuka lagi: yang ditunggunya keadaan yang tidak pernah mungkin
+  // terjadi, dan yang tersisa adalah ujian yang tidak dapat dikerjakan.
+  if (k.kiosk && !k.pernahMenyala) {
+    return { tutup: false, lapor: false, detail: "", sudahDilapor: false };
+  }
+
+  const diam = (sudahDilapor: boolean): PutusanLayarPenuh => ({
+    tutup: true, lapor: false, detail: "", sudahDilapor,
+  });
+
+  // Perbuatan halaman ini sendiri, bukan perbuatan pesertanya.
+  if (k.mengakhiri) return diam(k.sudahDilapor);
+  // Sudah dicatat sekali untuk keluarnya yang ini.
+  if (k.sudahDilapor) return diam(true);
+  // Kotak izin kamera dan peralihan layar penuh merebut detik-detik pertama.
+  if (k.masaMula) return diam(false);
+
+  // Tadi di dalam, sekarang di luar: ada tangan yang mengerjakannya. Escape
+  // termasuk di sini — ia tidak pernah dapat dicegat satu baris kode pun,
+  // tetapi akibatnya terbaca di sini, dan akibatnya yang dicatat.
+  if (k.pernahMenyala) {
+    return { tutup: true, lapor: true, detail: "keluar dari layar penuh", sudahDilapor: true };
+  }
+
+  // Tidak pernah terlihat di dalamnya. Ditunggu dulu — lihat JEDA_LUAR_LAYAR_MS.
+  if (k.lamaDiLuarMs < JEDA_LUAR_LAYAR_MS) return diam(false);
+  return {
+    tutup: true, lapor: true,
+    detail: "ujian berjalan tanpa layar penuh",
+    sudahDilapor: true,
+  };
+}
+
+// ------------------------------------------------------------
 // APA YANG TIDAK LAGI ADA DI SINI
 //
 // `pesanKunciLayar` dan `ajakanAplikasi` dibuang. Keduanya menuliskan di layar
