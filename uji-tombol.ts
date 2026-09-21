@@ -67,10 +67,6 @@ lolos("panah kiri", { key: "ArrowLeft", code: "ArrowLeft" });
 // Tab tidak boleh dicegat: ia satu-satunya jalan peserta yang memakai papan
 // ketik saja untuk berpindah antar pilihan jawaban.
 lolos("Tab", { key: "Tab", code: "Tab" });
-// Escape tidak dicegat, dan itu disengaja. Ia jalan keluar dari layar penuh
-// yang memang tidak dapat dicegah peramban mana pun — yang menjaganya
-// peristiwa fullscreenchange, bukan daftar ini.
-lolos("Escape", { key: "Escape", code: "Escape" });
 // Ctrl+C dan Ctrl+V memang terlarang, tetapi bukan di sini: peristiwa copy dan
 // paste yang menanganinya, dan itu jalan yang jauh lebih dapat diandalkan
 // karena ikut menangkap salin lewat menu klik kanan.
@@ -170,7 +166,7 @@ tertangkap("Ctrl+A pada papan ketik Yunani",
   { key: "α", code: "KeyA", ctrlKey: true },
   { golongan: "pilih_semua", nama: "Ctrl+A", insiden: null, tercegah: true });
 
-console.log("=== MUAT ULANG, SOROT SEMUA, F11 ===\n");
+console.log("=== MUAT ULANG, SOROT SEMUA, KELUAR LAYAR PENUH ===\n");
 
 // Ketiganya dicegah TANPA dicatat. Peserta yang panik menekan F5 bukan peserta
 // yang curang, dan memotong skor integritasnya untuk itu hanya menghukum
@@ -185,6 +181,20 @@ tertangkap("Ctrl+A", { key: "a", code: "KeyA", ctrlKey: true },
   { golongan: "pilih_semua", nama: "Ctrl+A", insiden: null, tercegah: true });
 tertangkap("F11", { key: "F11", code: "F11" },
   { golongan: "layar_penuh", nama: "F11", insiden: null, tercegah: false });
+
+// Escape dikenali supaya pesertanya mendapat kalimat yang menerangkan apa yang
+// barusan terjadi — dan HANYA itu. `insiden: null` menjaga satu perbuatan
+// tetap tercatat satu kali: yang mencatat keluarnya layar penuh adalah
+// pemeriksaan keadaan layar di penjaga.ts, yang menyala apa pun cara keluarnya
+// — termasuk lewat menu peramban, yang tidak menyentuh papan ketik sama sekali.
+tertangkap("Escape", { key: "Escape", code: "Escape" },
+  { golongan: "layar_penuh", nama: "Escape", insiden: null, tercegah: false });
+// Sebagian peramban lama mengirim nama pendeknya.
+tertangkap("Esc (nama lama)", { key: "Esc" },
+  { golongan: "layar_penuh", nama: "Escape", insiden: null, tercegah: false });
+// Papan ketik bertata letak bukan-Latin: codenya yang menyelamatkan.
+tertangkap("Escape lewat code saja", { key: "", code: "Escape" },
+  { golongan: "layar_penuh", nama: "Escape", insiden: null, tercegah: false });
 
 // SATU-SATUNYA pembebasan karena sedang mengetik. Orang yang menulis jawaban
 // essay panjang harus dapat menyorot kalimatnya sendiri untuk membetulkannya;
@@ -206,6 +216,9 @@ const MILIK_SISTEM: Array<[string, Isyarat]> = [
   ["F12", { key: "F12", code: "F12" }],
   ["Ctrl+Shift+I", { key: "I", code: "KeyI", ctrlKey: true, shiftKey: true }],
   ["F11", { key: "F11", code: "F11" }],
+  // preventDefault TIDAK membatalkan Escape yang melepas layar penuh. Yang
+  // menutup celahnya pemeriksaan keadaan layar, bukan pencegahan ketukan ini.
+  ["Escape", { key: "Escape", code: "Escape" }],
 ];
 for (const [nama, t] of MILIK_SISTEM) {
   benar(`${nama} tidak pernah mengaku tercegah`,
@@ -238,6 +251,7 @@ const CONTOH: Isyarat[] = [
   { key: "F5", code: "F5" },
   { key: "a", code: "KeyA", ctrlKey: true },
   { key: "F11", code: "F11" },
+  { key: "Escape", code: "Escape" },
 ];
 for (const t of CONTOH) {
   const p = periksaTombol(t);

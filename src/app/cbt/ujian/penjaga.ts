@@ -59,7 +59,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { aturanMode, milikPengakhiran, type JenisInsiden, type ModePengawasan } from "@/lib/pengawasan";
 import { PESAN_TOMBOL, periksaTombol } from "@/lib/tombol-terlarang";
 import {
-  bacaKlien, TIRAI_MS, type JembatanKlien, type JenisKlien, type SebabTirai,
+  bacaKlien, KEMAMPUAN, periksaLayarPenuh, TIRAI_MS,
+  type JembatanKlien, type JenisKlien, type SebabTirai,
 } from "@/lib/kunci-layar";
 
 /**
@@ -296,19 +297,86 @@ export function usePenjaga({ aktif, mode, tenang = true, mengakhiri = false, lap
     mulaiLayarPenuh();
   }, [mulaiLayarPenuh]);
 
+  // Layar penuh DIPERIKSA, bukan sekadar didengarkan.
+  //
+  // Dahulu di sini hanya ada satu pendengar `fullscreenchange`, dan di situlah
+  // celahnya: peristiwa itu hanya menyala pada PERPINDAHAN. Ujian yang tidak
+  // pernah sempat masuk layar penuh karena itu tidak pernah menyalakan satu
+  // peristiwa pun — tidak ada tirai, tidak ada catatan, dan soalnya terbuka
+  // lebar di dalam jendela biasa yang bilah perambannya lengkap.
+  //
+  // Jalan yang paling sering benar-benar dipakai hanya dua ketukan: Escape
+  // melepas layar penuh, lalu tombol muat ulang peramban — yang bilahnya baru
+  // saja muncul kembali justru karena layar penuhnya lepas — membuka lembar
+  // yang sama dari awal. Sesudah itu peserta mengerjakan seluruh ujiannya di
+  // luar layar penuh, dan yang tercatat di server tetap "bersih".
+  //
+  // Karena itu keadaan layarnya sekarang dibaca berulang dari
+  // `document.fullscreenElement` — sumber yang tidak dapat dilewatkan dengan
+  // tidak menyalakan peristiwa — dan peristiwanya tinggal menjadi jalan cepat
+  // supaya tiraïnya jatuh pada ketukan yang sama, bukan satu detik sesudahnya.
+  //
+  // Aturannya sendiri tidak ada di sini melainkan pada periksaLayarPenuh di
+  // src/lib/kunci-layar.ts, lengkap dengan alasan tiap baris dan ujinya.
   useEffect(() => {
     if (!aktif || !aturan.layarPenuh) return;
-    function berubah() {
+
+    // Pernah benar-benar menyala sepanjang sesi mengerjakan INI. Keluar dari
+    // sesuatu yang pernah menyala adalah perbuatan; tidak pernah menyala sama
+    // sekali bisa jadi hanya sesi yang baru pulih, dan keduanya dijawab
+    // berbeda.
+    let pernahMenyala = false;
+    // Jam ketika episode "di luar layar penuh" yang sekarang dimulai.
+    let sejakDiLuar = 0;
+    let sudahDilapor = false;
+
+    function periksa() {
       const di = Boolean(document.fullscreenElement);
+      if (di) {
+        pernahMenyala = true;
+        sejakDiLuar = 0;
+      } else if (sejakDiLuar === 0) {
+        sejakDiLuar = Date.now();
+      }
+
+      const putusan = periksaLayarPenuh({
+        diLayarPenuh: di,
+        pernahMenyala,
+        lamaDiLuarMs: sejakDiLuar === 0 ? 0 : Date.now() - sejakDiLuar,
+        // WebView aplikasi Android tidak melayani requestFullscreen sama
+        // sekali, dan memang tidak perlu: jendelanya sudah disematkan sistem.
+        // Tanpa keterangan ini, setiap peserta di sana mendapat tirai yang
+        // tidak akan pernah terbuka. Alasan lengkapnya pada `kiosk` di
+        // src/lib/kunci-layar.ts.
+        kiosk: KEMAMPUAN[klien].kiosk,
+        masaMula: masaMula(),
+        mengakhiri: mengakhiriRef.current,
+        sudahDilapor,
+      });
+      sudahDilapor = putusan.sudahDilapor;
+
       // Tirainya dipasang SELALU, juga pada detik-detik pembukaan. Yang ditahan
       // masa mula hanya laporannya; soal yang terbuka di luar layar penuh tetap
       // tidak boleh terlihat, dan pesertanya tetap diminta kembali.
-      setKeluarLayarPenuh(!di);
-      if (!di && !masaMula()) kirim("fullscreen");
+      setKeluarLayarPenuh(putusan.tutup);
+      if (putusan.lapor) kirim("fullscreen", putusan.detail);
     }
-    document.addEventListener("fullscreenchange", berubah);
-    return () => document.removeEventListener("fullscreenchange", berubah);
-  }, [aktif, aturan.layarPenuh, masaMula, kirim]);
+
+    // Peristiwanya tetap didengarkan — ia yang membuat tirai jatuh pada ketukan
+    // Escape itu juga, bukan pada detak pemeriksaan berikutnya. Nama berawalan
+    // webkit ikut, karena Safari lama hanya mengirim yang itu.
+    document.addEventListener("fullscreenchange", periksa);
+    document.addEventListener("webkitfullscreenchange", periksa);
+    // Dan pemeriksaan berkalanya yang menutup celah di atas. Sedetik sekali:
+    // cukup rapat untuk tidak menyisakan ujian yang berjalan telanjang, cukup
+    // jarang untuk tidak berarti apa-apa bagi perangkat pesertanya.
+    const detak = window.setInterval(periksa, 1000);
+    return () => {
+      window.clearInterval(detak);
+      document.removeEventListener("fullscreenchange", periksa);
+      document.removeEventListener("webkitfullscreenchange", periksa);
+    };
+  }, [aktif, aturan.layarPenuh, klien, masaMula, kirim]);
 
   // ---------- PINDAH TAB DAN HILANG FOKUS ----------
   //

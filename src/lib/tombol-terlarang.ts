@@ -20,8 +20,11 @@
 //     F12 dan Ctrl+Shift+I/J/C — peramban memakainya lebih dulu untuk dirinya
 //       sendiri. preventDefault tetap dipanggil karena sebagian peramban lama
 //       menghormatinya, tetapi TIDAK BOLEH dijanjikan.
-//     F11 — layar penuh peramban. Yang menjaganya bukan tombol ini melainkan
-//       peristiwa fullscreenchange, yang menyala apa pun cara keluarnya.
+//     F11 dan Escape — dua jalan keluar dari layar penuh. Yang menjaganya
+//       bukan daftar ini melainkan pemeriksaan keadaan layar di
+//       src/app/cbt/ujian/penjaga.ts, yang membaca document.fullscreenElement
+//       berulang dan karena itu menyala apa pun cara keluarnya — termasuk
+//       lewat menu peramban, yang tidak pernah menyentuh papan ketik.
 //
 // Yang tidak dapat dibatalkan tetap dicatat, dan pencatatannya bukan hiasan:
 // tiga kali menekannya mengumpulkan ujian sertifikasi secara paksa. Halaman
@@ -45,7 +48,7 @@ export type GolonganTombol =
   | "muat_ulang"
   /** Menyorot seluruh naskah sekaligus — langkah pertama menyalinnya. */
   | "pilih_semua"
-  /** Menyalakan atau mematikan layar penuh peramban lewat F11. */
+  /** Keluar dari layar penuh ujian — lewat F11 maupun Escape. */
   | "layar_penuh";
 
 /** Bentuk peristiwa papan ketik yang dibutuhkan, tanpa DOM. */
@@ -253,14 +256,30 @@ export function periksaTombol(t: Isyarat, mengetik = false): PutusanTombol | nul
     };
   }
 
-  // ---------- 9. F11 ----------
-  // Dicatat sebagai upaya, bukan sebagai pelanggaran: keluar dari layar penuh
-  // sudah punya penjaganya sendiri lewat fullscreenchange, yang menyala apa pun
-  // cara keluarnya — termasuk Escape, yang tidak pernah dapat dicegat.
-  // Melaporkannya dari sini juga akan menghitung satu perbuatan dua kali.
+  // ---------- 9. F11 DAN ESCAPE ----------
+  // Keduanya jalan keluar dari layar penuh, dan keduanya dikenali DI SINI
+  // hanya supaya pesertanya mendapat satu kalimat yang menerangkan apa yang
+  // barusan terjadi. Pencatatannya bukan urusan berkas ini.
+  //
+  // `insiden: null` dan itu disengaja: yang mencatat keluarnya layar penuh
+  // adalah pemeriksaan keadaan di src/app/cbt/ujian/penjaga.ts, yang membaca
+  // document.fullscreenElement apa pun cara keluarnya — termasuk lewat menu
+  // peramban, yang tidak pernah menyentuh papan ketik sama sekali. Mencatatnya
+  // dari sini juga akan menghitung satu perbuatan dua kali.
+  //
+  // `benarTercegah: false` dan itu juga apa adanya: preventDefault TIDAK
+  // membatalkan Escape yang melepas layar penuh. Peramban menanganinya pada
+  // jalur yang tidak diserahkan kepada halaman, dan mengaku sebaliknya hanya
+  // akan terbukti bohong pada peserta pertama yang mencobanya.
   if (kunci === "F11" || t.code === "F11") {
     return {
       golongan: "layar_penuh", nama: "F11",
+      insiden: null, tirai: false, benarTercegah: false,
+    };
+  }
+  if (kunci === "Escape" || kunci === "Esc" || t.code === "Escape") {
+    return {
+      golongan: "layar_penuh", nama: "Escape",
       insiden: null, tirai: false, benarTercegah: false,
     };
   }
