@@ -484,13 +484,24 @@ export default function UjianApp() {
   }, [menungguJadwal, ujian?.kode]);
 
   // ---------- jam mundur ----------
+  //
+  // BERHENTI begitu peserta menekan kumpulkan, bukan menunggu layar berganti.
+  // Di antara keduanya ada satu permintaan ke server, dan selama permintaan
+  // itu berjalan jamnya dahulu terus berkurang — peserta yang menekan
+  // kumpulkan pada 00:04 melihat angkanya habis menjadi 00:00 sementara
+  // jawabannya sedang dikirim. Yang terbaca olehnya: "saya terlambat".
+  //
+  // Waktunya sendiri memang sudah berhenti di server sejak saat itu:
+  // batas keterlambatan dihitung dari `sekarang` di dalam permintaan yang
+  // sama. Jadi yang dibetulkan di sini hanya angka di layar, supaya ia
+  // mengatakan hal yang sama dengan yang sudah terjadi.
   useEffect(() => {
-    if (layar !== "kerja") return;
+    if (layar !== "kerja" || mengakhiri) return;
     const jam = setInterval(() => {
       setSisa((kini) => Math.max(0, kini - 1));
     }, 1000);
     return () => clearInterval(jam);
-  }, [layar]);
+  }, [layar, mengakhiri]);
 
 
   const kumpulkan = useCallback(async (otomatis: boolean) => {
@@ -726,8 +737,13 @@ export default function UjianApp() {
   }
 
   // ---------- denyut: simpan berkala dan luruskan jamnya ----------
+  //
+  // Ikut berhenti saat pengumpulan berjalan. Denyut yang tetap menyapa server
+  // di tengah pengumpulan berebut jalur dengan permintaan yang sedang
+  // ditunggu peserta, dan jawabannya — sisa waktu — akan menimpa jam yang
+  // baru saja sengaja dihentikan.
   useEffect(() => {
-    if (layar !== "kerja") return;
+    if (layar !== "kerja" || mengakhiri) return;
     const denyut = setInterval(() => {
       if (!kunciRef.current) return;
       // Ada yang tertahan di antrean → kirim. Tidak ada → tetap menyapa server
@@ -753,12 +769,12 @@ export default function UjianApp() {
         });
     }, DENYUT_MS);
     return () => clearInterval(denyut);
-    // Bergantung pada layar saja. kirimAntrean dibuat ulang pada tiap gambar,
-    // dan memasukkannya ke daftar membuat denyutnya disetel ulang terus-menerus
-    // sehingga tidak pernah benar-benar berdenyut. Isinya aman dipegang dari
-    // gambar pertama: yang dibacanya hanya ref dan penyetel keadaan, dan
-    // keduanya tidak pernah basi.
-  }, [layar]);
+    // Bergantung pada layar dan `mengakhiri` saja. kirimAntrean dibuat ulang
+    // pada tiap gambar, dan memasukkannya ke daftar membuat denyutnya disetel
+    // ulang terus-menerus sehingga tidak pernah benar-benar berdenyut. Isinya
+    // aman dipegang dari gambar pertama: yang dibacanya hanya ref dan penyetel
+    // keadaan, dan keduanya tidak pernah basi.
+  }, [layar, mengakhiri]);
 
   function keSoal(index: number) {
     setNomor(index);

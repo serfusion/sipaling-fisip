@@ -29,7 +29,7 @@
 
 import { db } from "@/db";
 import { cbtAnswers, cbtAttempts, cbtRubricScores } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { bacaLembar, skorRubrikAttempt, soalUjian } from "@/lib/cbt-store";
 import { hitungRubrik, poinDariRubrik, type Rubrik } from "@/lib/rubrik";
 import { nilaiSoal, type Acuan } from "@/lib/nilai-acuan";
@@ -243,27 +243,40 @@ async function simpanUsulan(
   catatan: string,
   sekarang: Date,
 ) {
-  for (const k of usulan) {
-    const nilaiKriteria = {
-      criterionName: rubrik.kriteria[k.urut]?.nama ?? "",
-      weight: rubrik.kriteria[k.urut]?.bobot ?? 0,
-      aiLevel: k.level,
-      aiReason: k.alasan,
-      aiConfidence: keyakinan,
-      updatedAt: sekarang,
-    };
+  // Seluruh kriteria ditulis SEKALI JALAN.
+  //
+  // Lima kriteria dikali lima soal esai adalah dua puluh lima perjalanan
+  // pulang-pergi ke basis data bila ditulis satu per satu — dan seluruhnya
+  // terjadi di dalam permintaan yang sedang ditunggu peserta sesudah menekan
+  // KUMPULKAN.
+  if (usulan.length > 0) {
     await db
       .insert(cbtRubricScores)
-      .values({
+      .values(usulan.map((k) => ({
         attemptId: kerja.attemptId,
         questionId: kerja.soalId,
         criterionIndex: k.urut,
-        ...nilaiKriteria,
-      })
-      // Keputusan pengajar yang sudah ada TIDAK dihapus oleh penilaian ulang.
+        criterionName: rubrik.kriteria[k.urut]?.nama ?? "",
+        weight: rubrik.kriteria[k.urut]?.bobot ?? 0,
+        aiLevel: k.level,
+        aiReason: k.alasan,
+        aiConfidence: keyakinan,
+        updatedAt: sekarang,
+      })))
+      // Keputusan pengajar yang sudah ada TIDAK dihapus oleh penilaian ulang:
+      // yang ditimpa hanya kolom usulan, sedangkan finalLevel tidak disentuh.
+      // `excluded` menunjuk baris yang sedang dicoba masukkan, jadi tiap
+      // kriteria memperbarui dirinya dengan nilainya sendiri.
       .onConflictDoUpdate({
         target: [cbtRubricScores.attemptId, cbtRubricScores.questionId, cbtRubricScores.criterionIndex],
-        set: nilaiKriteria,
+        set: {
+          criterionName: sql`excluded.criterion_name`,
+          weight: sql`excluded.weight`,
+          aiLevel: sql`excluded.ai_level`,
+          aiReason: sql`excluded.ai_reason`,
+          aiConfidence: sql`excluded.ai_confidence`,
+          updatedAt: sekarang,
+        },
       });
   }
   await simpanPoinRubrik(kerja.attemptId, kerja.soalId, kerja.bobot, rubrik, penilai, catatan);

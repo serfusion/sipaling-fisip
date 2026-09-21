@@ -272,18 +272,39 @@ async function nilaiDanTutup(
 
   // Tiap jawaban ikut dinilai satu per satu, supaya pengajar dapat melihat mana
   // yang benar dan mana yang salah tanpa menghitung ulang.
-  for (const soal of dipakai) {
+  //
+  // Ditulis SEKALI JALAN, bukan satu perintah per soal. Bedanya bukan
+  // kerapian melainkan waktu yang dirasakan peserta: tiap perintah adalah satu
+  // perjalanan pulang-pergi ke basis data, dan ujian empat puluh soal berarti
+  // empat puluh perjalanan berurutan — masing-masing beberapa puluh milidetik
+  // pada pooler Supabase. Itulah jeda yang terasa sesudah menekan KUMPULKAN,
+  // dan sebagian besarnya hilang begitu keempat puluhnya berangkat bersama.
+  const nilaiBaris = dipakai.map((soal) => {
     const isi = String(jawaban[soal.id] ?? "");
     const hasil = nilaiJawaban(soal, isi, petaPilihan[soal.id]);
+    return {
+      attemptId: attempt.id, questionId: soal.id, answer: isi,
+      isCorrect: hasil.benar, points: hasil.poin, updatedAt: sekarang,
+    };
+  });
+
+  // Dipotong seratus baris sekali kirim. Satu perintah berisi lima ratus soal
+  // melampaui batas parameter driver, dan gagalnya terjadi SESUDAH peserta
+  // menunggu — bukan sebelum.
+  for (let i = 0; i < nilaiBaris.length; i += 100) {
     await db
       .insert(cbtAnswers)
-      .values({
-        attemptId: attempt.id, questionId: soal.id, answer: isi,
-        isCorrect: hasil.benar, points: hasil.poin, updatedAt: sekarang,
-      })
+      .values(nilaiBaris.slice(i, i + 100))
       .onConflictDoUpdate({
         target: [cbtAnswers.attemptId, cbtAnswers.questionId],
-        set: { isCorrect: hasil.benar, points: hasil.poin, updatedAt: sekarang },
+        // `excluded` menunjuk baris yang SEDANG dicoba masukkan, jadi tiap
+        // baris memperbarui dirinya dengan nilainya sendiri. Tanpa itu,
+        // seluruh baris dalam satu perintah akan ditimpa nilai yang sama.
+        set: {
+          isCorrect: sql`excluded.is_correct`,
+          points: sql`excluded.points`,
+          updatedAt: sekarang,
+        },
       });
   }
 
