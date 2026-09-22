@@ -1119,6 +1119,12 @@ export default function DashboardApp({
       desc: "Impor Excel yudisium fakultas → tanggal lulus & semester keluar terisi per mahasiswa → Excel siap unggah PDDIKTI.",
       href: "/dashboard/template?jenis=kelulusan",
     });
+    templateCards.push({
+      icon: "📚",
+      title: "Buat Kurikulum",
+      desc: "Impor Excel acuan kurikulum fakultas → kode, nama, SKS, dan semester tersusun → Excel matakuliah siap unggah PDDIKTI.",
+      href: "/dashboard/template?jenis=kurikulum",
+    });
   }
   if (["admin_perpustakaan", "admin_laboratorium"].includes(profile.role)) {
     templateCards.push({ icon: "＋", title: "Template unit Anda", desc: "Pola yang sama dengan Transkrip/Surat. Template unit ini akan ditambahkan berikutnya.", href: undefined });

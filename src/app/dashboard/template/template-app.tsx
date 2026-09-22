@@ -20,6 +20,7 @@ import {
   isTemplateWorkbook, parseTemplateBio, parseTemplateNilai,
 } from "./transkrip-template";
 import KelulusanModule from "./kelulusan-panel";
+import KurikulumModule from "./kurikulum-panel";
 
 type Role =
   | "super_admin"
@@ -69,7 +70,7 @@ function fmtIPK(value: number) {
 
 /* ---------- komponen utama ---------- */
 
-type Jenis = "transkrip" | "kelulusan" | LetterSlug;
+type Jenis = "transkrip" | "kelulusan" | "kurikulum" | LetterSlug;
 const LETTER_SLUGS: LetterSlug[] = ["surat-aktif", "izin-penelitian", "pkl"];
 
 export default function TemplateApp({ profile, initialJenis, initialArsip }: { profile: SessionProfile | null; initialJenis?: string; initialArsip?: string }) {
@@ -84,11 +85,13 @@ export default function TemplateApp({ profile, initialJenis, initialArsip }: { p
           : initialJenis === "transkrip-en" ? "transkrip-en"
             : initialJenis === "transkrip" ? "transkrip"
               : initialJenis === "kelulusan" ? "kelulusan"
-                : null;
+                : initialJenis === "kurikulum" ? "kurikulum"
+                  : null;
   const defaultJenis: Jenis =
     (normalizedInitial === "transkrip" || normalizedInitial === "transkrip-en") && canTranskrip ? normalizedInitial
-      : normalizedInitial === "kelulusan" && canKelulusan ? "kelulusan"
-        : normalizedInitial && normalizedInitial !== "transkrip" && normalizedInitial !== "transkrip-en" && normalizedInitial !== "kelulusan" && canSurat ? normalizedInitial
+      : (normalizedInitial === "kelulusan" || normalizedInitial === "kurikulum") && canKelulusan ? normalizedInitial
+        : normalizedInitial && normalizedInitial !== "transkrip" && normalizedInitial !== "transkrip-en"
+          && normalizedInitial !== "kelulusan" && normalizedInitial !== "kurikulum" && canSurat ? normalizedInitial
           : canTranskrip ? "transkrip"
             : canKelulusan ? "kelulusan"
               : "surat-aktif";
@@ -137,6 +140,9 @@ export default function TemplateApp({ profile, initialJenis, initialArsip }: { p
           {canKelulusan && (
             <button type="button" className={jenis === "kelulusan" ? "on" : ""} onClick={() => setJenis("kelulusan")}>Input Kelulusan &amp; Dropout</button>
           )}
+          {canKelulusan && (
+            <button type="button" className={jenis === "kurikulum" ? "on" : ""} onClick={() => setJenis("kurikulum")}>Buat Kurikulum</button>
+          )}
           {canSurat && LETTER_SLUGS.map((slug) => (
             <button type="button" key={slug} className={jenis === slug ? "on" : ""} onClick={() => setJenis(slug)}>{LETTER_TITLES[slug]}</button>
           ))}
@@ -145,7 +151,11 @@ export default function TemplateApp({ profile, initialJenis, initialArsip }: { p
       {jenis === "transkrip" && canTranskrip ? <TranskripModule lang="id" arsipAwal={initialArsip} key="tk-id" />
         : jenis === "transkrip-en" && canTranskrip ? <TranskripModule lang="en" arsipAwal={initialArsip} key="tk-en" />
           : jenis === "kelulusan" && canKelulusan ? <KelulusanModule key="kelulusan" />
-            : <LetterModule slug={jenis === "transkrip" || jenis === "transkrip-en" || jenis === "kelulusan" ? "surat-aktif" : jenis} key={jenis} />}
+            : jenis === "kurikulum" && canKelulusan ? <KurikulumModule key="kurikulum" />
+              : <LetterModule
+                  slug={jenis === "transkrip" || jenis === "transkrip-en" || jenis === "kelulusan" || jenis === "kurikulum" ? "surat-aktif" : jenis}
+                  key={jenis}
+                />}
     </div>
   );
 }
