@@ -7259,3 +7259,50 @@ table.qt td small { font-size: 11.5px; }
 .cbtv-penggal-kata { display: inline-block; margin-top: 3px; font-size: 12px; font-weight: 700; color: #b91c1c; }
 .cbtv-penggal-alasan { display: block; margin-top: 3px; font-size: 11.5px; line-height: 1.55; color: #64748b; }
 
+
+
+/* ---------- BUAT KURIKULUM ----------
+   Menumpang gaya panel Kelulusan (.kel-*) yang sudah ada; yang ditambah di
+   sini hanya yang benar-benar baru. */
+.krk-ringkas {
+  display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: baseline;
+  margin-bottom: 12px; font-size: 13px; color: #475569;
+}
+.krk-ringkas b { font-size: 16px; color: var(--ink); }
+.krk-sem { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.krk-sem button {
+  padding: 5px 11px; border: 1px solid #cbd5e1; border-radius: 999px;
+  background: #fff; font-size: 12.5px; font-weight: 700; color: #475569;
+}
+.krk-sem button:hover { background: #f1f5f9; }
+.krk-sem button.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.krk-sem i { font-style: normal; opacity: .7; }
+.krk-lipat { margin: 10px 0; font-size: 12.5px; }
+.krk-lipat summary { cursor: pointer; color: #475569; }
+.krk-lipat ul { margin: 7px 0 0; padding-left: 18px; line-height: 1.7; color: #64748b; }
+.krk-tabel { font-size: 13px; margin-top: 10px; }
+.krk-tabel code { font-size: 12.5px; }
+.krk-salah { background: #fef2f2; }
+
+/* Di ponsel tabelnya menjadi kartu, sama seperti tabel rubrik: menggulir ke
+   samping untuk membaca satu kode adalah pekerjaan. */
+@media (max-width: 640px) {
+  .krk-tabel, .krk-tabel thead, .krk-tabel tbody,
+  .krk-tabel tr, .krk-tabel th, .krk-tabel td { display: block; width: auto; }
+  .krk-tabel thead { display: none; }
+  .krk-tabel tbody tr {
+    margin-bottom: 9px; padding: 10px 12px;
+    border: 1px solid #e2e8f0; border-radius: 9px; background: #fbfcfd;
+  }
+  .krk-tabel tbody td {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
+    padding: 3px 0; border: 0; text-align: left;
+  }
+  .krk-tabel tbody td[data-kolom]::before {
+    content: attr(data-kolom);
+    flex: 0 0 88px;
+    font-size: 11px; font-weight: 800; letter-spacing: .04em;
+    text-transform: uppercase; color: #64748b;
+  }
+  .krk-tabel tbody .cbtv-ka { text-align: left; }
+}
