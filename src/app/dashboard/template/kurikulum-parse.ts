@@ -18,9 +18,11 @@
 //   …
 //  15    KD MATKUL  BK    SEMESTER 2           SKS      …            …
 //
-// Perhatikan bahwa nama mata kuliahnya berada di kolom yang JUDULNYA adalah
-// "SEMESTER 1". Judul itu memikul dua pekerjaan sekaligus — menamai kolomnya
-// dan menyebut semesternya — dan itulah kunci pembacaan seluruh lembar.
+// Bentuk di atas hanya SALAH SATU yang pernah dikirim. Berkas berikutnya
+// menulis kolom SKS-nya "Bobot MK (sks)", menaruhnya di tempat lain, dan
+// memindahkan "SEMESTER 4" ke judul pita di atas tabelnya. Karena itu tidak
+// satu pun letak atau judul kolom ditanam di sini: lihat "MENGENALI KOLOM DARI
+// ISINYA" di bawah.
 //
 // ------------------------------------------------------------
 // YANG DIMINTA PDDIKTI
@@ -30,10 +32,11 @@
 // ------------------------------------------------------------
 // EMPAT YANG DIPETAKAN, SISANYA DISETEL SEKALI
 // ------------------------------------------------------------
-//   Kode MK        ← KD MATKUL
-//   Nama MK        ← kolom di bawah judul "SEMESTER n"
-//   SKS Tatap Muka ← SKS
-//   Semester       ← angka pada judul "SEMESTER n"
+//   Kode MK        ← kolom berisi kode: "MKU-0201", "IKM 8258"
+//   Nama MK        ← kolom berisi kata-kata: "Komunikasi Antar Budaya"
+//   SKS Tatap Muka ← kolom berisi satu angka kecil: 2, 3, 4
+//   Semester       ← angka pada judul "SEMESTER n", judul pitanya, atau
+//                    kolom "Semester" tersendiri
 //
 // Sisanya tidak ada di berkas fakultas dan memang tidak bisa ditebak: tahun
 // kurikulum, kode prodi, jenis mata kuliah. Ketiganya disetel sekali di layar
@@ -147,14 +150,169 @@ function teks(sel: Sel): string {
 
 const rapat = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
 
-/** Baris ini judul pita semester? Ditandai sel "KD MATKUL". */
+// ------------------------------------------------------------
+// MENGENALI KOLOM DARI ISINYA
+// ------------------------------------------------------------
+//
+// Letak kolom pada kiriman fakultas TIDAK tetap. Satu berkas menulis
+// "KD MATKUL | BK | SEMESTER 1 | SKS"; berkas berikutnya menulis kolom SKS-nya
+// "Bobot MK (sks)" dan menaruhnya di tempat lain. Menanam urutan kolom berarti
+// pembacanya patah tiap kali fakultas mengubah judulnya.
+//
+// Karena itu tiap kolom dikenali dua lapis:
+//
+//   1. DARI JUDULNYA, lewat daftar sebutan yang sudah dikenal di bawah.
+//   2. Bila judulnya tidak dikenal — DARI ISINYA. Kode mata kuliah berbentuk
+//      huruf lalu angka ("MKU-0201", "IKM 8258"); SKS adalah satu angka kecil
+//      (2, 3, 4); nama mata kuliah adalah kata-kata ("Komunikasi Antar
+//      Budaya"). Ketiganya tidak mungkin tertukar bila yang dibaca isinya.
+//
+// Lapis kedua itulah yang membuat berkas dengan judul yang belum pernah
+// dilihat tetap terbaca.
+
+const SEBUTAN_KODE = ["kd matkul", "kode matkul", "kode mk", "kode mata kuliah", "kd mk", "kd", "kode"];
+const SEBUTAN_NAMA = ["nama mk", "nama mata kuliah", "mata kuliah", "matakuliah", "matkul", "nama"];
+const SEBUTAN_SKS = ["sks", "bobot mk (sks)", "bobot mk", "bobot sks", "bobot", "jumlah sks", "sks tatap muka", "bobot (sks)"];
+const SEBUTAN_SEMESTER = ["semester", "smt", "smtr"];
+/** Judul yang JANGAN pernah dianggap kode, nama, atau sks. */
+const SEBUTAN_ABAIKAN = ["bk", "bahan kajian", "no", "no.", "nomor", "urut", "ket", "keterangan"];
+
+/**
+ * Kode mata kuliah: huruf lalu angka.
+ *
+ * "MKU-0201", "IKM 8258", "MKN 0102", "SIP0801" — pemisah di tengahnya boleh
+ * apa saja atau tidak ada sama sekali.
+ */
+export function polaKodeMk(nilai: string): boolean {
+  return /^[A-Za-z]{2,6}[\s\-._/]*\d{2,6}[A-Za-z]?$/.test(String(nilai ?? "").trim());
+}
+
+/** Satu angka kecil yang masuk akal sebagai bobot satu mata kuliah. */
+function polaSks(nilai: string): boolean {
+  const t = String(nilai ?? "").trim().replace(",", ".");
+  if (!t) return false;
+  const n = Number(t);
+  return Number.isFinite(n) && n >= 1 && n <= 12;
+}
+
+/** Kata-kata: nama mata kuliah, bukan kode dan bukan angka. */
+function polaNamaMk(nilai: string): boolean {
+  const t = String(nilai ?? "").trim();
+  if (t.length < 3) return false;
+  if (polaKodeMk(t)) return false;
+  // Harus memuat cukup huruf. "3" dan "2,0" gugur di sini.
+  const huruf = (t.match(/[A-Za-z\u00c0-\u024f]/g) ?? []).length;
+  return huruf >= 3;
+}
+
+/** Baris ini judul pita? Ditandai sel yang menyebut kode mata kuliah. */
 function kolomJudul(baris: Sel[]): number[] {
   const hasil: number[] = [];
   baris.forEach((sel, i) => {
-    const t = rapat(teks(sel));
-    if (t === "kd matkul" || t === "kode matkul" || t === "kode mk") hasil.push(i);
+    if (SEBUTAN_KODE.includes(rapat(teks(sel)))) hasil.push(i);
   });
   return hasil;
+}
+
+export type PetaKolom = {
+  kode: number;
+  nama: number;
+  sks: number;
+  /** Kolom yang memuat angka semester per baris, bila ada. */
+  kolomSemester: number;
+};
+
+/**
+ * Tentukan kolom kode, nama, dan SKS di dalam satu kelompok kolom.
+ *
+ * `awal` kolom kode kelompok ini, `akhir` batas kanannya (eksklusif). Contoh
+ * beserta dua isinya dikirim supaya lapis kedua punya bahan untuk dibaca.
+ */
+export function petaKolom(judul: Sel[], contoh: Sel[][], awal: number, akhir: number): PetaKolom {
+  const peta: PetaKolom = { kode: awal, nama: -1, sks: -1, kolomSemester: -1 };
+  const terpakai = new Set<number>([awal]);
+  const diabaikan = new Set<number>();
+
+  // ---------- lapis 1: judul yang dikenal ----------
+  for (let c = awal; c < akhir; c += 1) {
+    const t = rapat(teks(judul[c]));
+    if (!t) continue;
+    if (SEBUTAN_ABAIKAN.includes(t)) { diabaikan.add(c); continue; }
+    if (c !== awal && SEBUTAN_KODE.includes(t)) continue;
+    if (peta.nama < 0 && SEBUTAN_NAMA.includes(t)) { peta.nama = c; terpakai.add(c); continue; }
+    if (peta.sks < 0 && SEBUTAN_SKS.includes(t)) { peta.sks = c; terpakai.add(c); continue; }
+    // "SEMESTER 3" sebagai judul kolom nama: judulnya memikul dua pekerjaan
+    // sekaligus, dan kolomnya memang berisi nama mata kuliah.
+    if (peta.nama < 0 && semesterDariJudul(t) > 0 && SEBUTAN_SEMESTER.some((x) => t.startsWith(x))) {
+      peta.nama = c; terpakai.add(c); continue;
+    }
+    if (peta.kolomSemester < 0 && SEBUTAN_SEMESTER.includes(t)) { peta.kolomSemester = c; terpakai.add(c); }
+  }
+
+  // ---------- lapis 2: isinya ----------
+  const nilai = (c: number) => contoh.map((r) => teks(r[c])).filter(Boolean);
+  const bagian = (c: number, uji: (t: string) => boolean) => {
+    const isi = nilai(c);
+    return isi.length === 0 ? 0 : isi.filter(uji).length / isi.length;
+  };
+
+  if (peta.nama < 0) {
+    let terbaik = -1;
+    let skor = 0;
+    for (let c = awal + 1; c < akhir; c += 1) {
+      if (terpakai.has(c) || diabaikan.has(c)) continue;
+      const s = bagian(c, polaNamaMk);
+      if (s > skor) { skor = s; terbaik = c; }
+    }
+    if (skor >= 0.6) { peta.nama = terbaik; terpakai.add(terbaik); }
+  }
+
+  if (peta.sks < 0) {
+    let terbaik = -1;
+    let skor = 0;
+    for (let c = awal + 1; c < akhir; c += 1) {
+      if (terpakai.has(c) || diabaikan.has(c)) continue;
+      const s = bagian(c, polaSks);
+      // Kolom SKS berdiri SESUDAH nama mata kuliah pada hampir semua kiriman,
+      // sedangkan kolom bahan kajian — yang angkanya mirip — berdiri sebelum.
+      // Dorongan kecil ini memutuskan ketika keduanya sama-sama berisi angka
+      // dan judulnya tidak terbaca.
+      const dorong = peta.nama >= 0 && c > peta.nama ? 0.15 : 0;
+      if (s + dorong > skor) { skor = s + dorong; terbaik = c; }
+    }
+    if (skor >= 0.6) { peta.sks = terbaik; terpakai.add(terbaik); }
+  }
+
+  return peta;
+}
+
+/**
+ * Cari angka semester untuk satu kelompok kolom.
+ *
+ * Dicari pada baris judulnya lebih dulu, lalu beberapa baris di atasnya —
+ * sebagian lembar menaruh "SEMESTER 3" sebagai judul pita di atas tabelnya,
+ * bukan sebagai judul kolom. Dicari di dalam kelompoknya dulu, baru selebar
+ * lembar, karena judul pita kadang ditulis sekali untuk ketiga konsentrasi.
+ */
+export function semesterPita(aoa: Aoa, barisJudul: number, awal: number, akhir: number): number {
+  const cari = (baris: Sel[], dari: number, sampai: number) => {
+    for (let c = dari; c < sampai; c += 1) {
+      const t = rapat(teks(baris[c]));
+      if (!t || !/semester|smt/.test(t)) continue;
+      const n = semesterDariJudul(t);
+      if (n > 0) return n;
+    }
+    return 0;
+  };
+
+  for (let r = barisJudul; r >= Math.max(0, barisJudul - 3); r -= 1) {
+    const baris = aoa[r] ?? [];
+    const dalam = cari(baris, awal, akhir);
+    if (dalam > 0) return dalam;
+    const selebar = cari(baris, 0, baris.length);
+    if (selebar > 0) return selebar;
+  }
+  return 0;
 }
 
 /**
@@ -198,8 +356,6 @@ export type BarisMatkul = {
   semester: number;
   /** Nama konsentrasi tempat baris ini ditemukan, untuk ditunjukkan. */
   konsentrasi: string;
-  /** Kolom BK pada lembar fakultas. Tidak dikirim ke PDDIKTI. */
-  bk: string;
   /** Baris asalnya di lembar acuan, 1-berbasis — untuk menunjuk saat salah. */
   barisAsal: number;
 };
@@ -263,43 +419,72 @@ export function bacaKurikulumAcuan(aoa: Aoa): HasilBacaKurikulum {
   pita.forEach((p, urut) => {
     const akhir = urut + 1 < pita.length ? pita[urut + 1].baris : aoa.length;
     const barisJudul = aoa[p.baris] ?? [];
+    const lebarLembar = Math.max(...aoa.map((r) => (r ?? []).length), 0);
 
-    for (const kolom of p.kolom) {
-      const semester = semesterDariJudul(teks(barisJudul[kolom + 2]));
-      if (semester === 0) {
+    p.kolom.forEach((kolom, kIdx) => {
+      // Batas kanan kelompok ini: tempat kelompok berikutnya mulai.
+      const batas = kIdx + 1 < p.kolom.length ? p.kolom[kIdx + 1] : lebarLembar;
+
+      // Beberapa baris pertama di bawah judul dipakai mengenali kolom dari
+      // isinya. Yang kosong dilewati: lembar fakultas memuat banyak baris
+      // penyela agar ketiga kelompoknya sejajar di layar.
+      const contoh: Sel[][] = [];
+      for (let r = p.baris + 1; r < akhir && contoh.length < 12; r += 1) {
+        const baris = aoa[r] ?? [];
+        if (baris.slice(kolom, batas).some((sel) => teks(sel) !== "")) contoh.push(baris);
+      }
+
+      const peta = petaKolom(barisJudul, contoh, kolom, batas);
+      const semesterPitaIni = semesterPita(aoa, p.baris, kolom, batas);
+      const konsentrasi = namaKolom.get(kolom) ?? `Kolom ${kolom + 1}`;
+
+      if (peta.nama < 0) {
         tolak.push({
           baris: `Baris ${p.baris + 1}, kolom ${kolom + 1}`,
-          alasan: `Judul semesternya tidak terbaca: "${teks(barisJudul[kolom + 2])}".`,
+          alasan: "Kolom nama mata kuliahnya tidak ditemukan pada kelompok ini.",
         });
-        continue;
+        return;
       }
-      semesterAda.add(semester);
-      const konsentrasi = namaKolom.get(kolom) ?? `Kolom ${kolom + 1}`;
+      if (semesterPitaIni === 0 && peta.kolomSemester < 0) {
+        tolak.push({
+          baris: `Baris ${p.baris + 1}, kolom ${kolom + 1}`,
+          alasan:
+            "Semesternya tidak ditemukan. Tulis \"SEMESTER 1\" pada judul kolom mata kuliah, " +
+            "pada judul pita di atasnya, atau sediakan kolom \"Semester\".",
+        });
+        return;
+      }
 
       for (let r = p.baris + 1; r < akhir; r += 1) {
         const baris = aoa[r] ?? [];
-        const kode = rapikanKodeMk(baris[kolom]);
-        const nama = rapikanNamaMk(baris[kolom + 2]);
-        // Baris kosong dilewati diam-diam: lembar fakultas memang memuat
-        // banyak baris penyela agar ketiga kolomnya sejajar di layar.
+        const kode = rapikanKodeMk(baris[peta.kode]);
+        const nama = rapikanNamaMk(baris[peta.nama]);
         if (!kode && !nama) continue;
 
-        const petunjuk = `Baris ${r + 1} · ${konsentrasi} · semester ${semester}`;
+        // Semester per baris bila lembarnya menyediakan kolomnya; kalau tidak,
+        // semester pita yang berlaku untuk seluruh baris di bawahnya.
+        const semester =
+          peta.kolomSemester >= 0
+            ? semesterDariJudul(teks(baris[peta.kolomSemester])) || semesterPitaIni
+            : semesterPitaIni;
+
+        const petunjuk = `Baris ${r + 1} · ${konsentrasi}${semester ? ` · semester ${semester}` : ""}`;
         if (!kode) { tolak.push({ baris: petunjuk, alasan: `"${nama}" tidak punya kode mata kuliah.` }); continue; }
         if (!nama) { tolak.push({ baris: petunjuk, alasan: `Kode ${kode} tidak punya nama mata kuliah.` }); continue; }
+        if (!semester) { tolak.push({ baris: petunjuk, alasan: `${kode} tidak punya semester.` }); continue; }
 
+        semesterAda.add(semester);
         hasil.push({
           id: `${r}-${kolom}`,
           kode,
           nama,
-          sks: rapikanSks(baris[kolom + 3]),
+          sks: peta.sks >= 0 ? rapikanSks(baris[peta.sks]) : null,
           semester,
           konsentrasi,
-          bk: teks(baris[kolom + 1]),
           barisAsal: r + 1,
         });
       }
-    }
+    });
   });
 
   if (hasil.length === 0 && tolak.length === 0) {
