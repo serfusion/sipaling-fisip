@@ -12,7 +12,7 @@
 import {
   KOLOM_MATKUL, OPSI_BAWAAN, SEMESTER_MAKS, bacaKurikulumAcuan, barisKeAoa,
   gabungKonsentrasi, periksaBaris, rapikanKodeMk, rapikanSks, semesterDariJudul,
-  tahunKurikulumSah, type Aoa,
+  tahunKurikulumSah, type Aoa, type Sel,
 } from "./src/app/dashboard/template/kurikulum-parse";
 
 let lulus = 0;
@@ -96,10 +96,71 @@ sama("AIKA muncul di tiga konsentrasi", aika.length, 3);
 sama("semesternya ikut judul kolom namanya", aika[0].semester, 1);
 sama("namanya diambil dari kolom di bawah judul semester", aika[0].nama, "AIKA 1");
 sama("sks dari kolom keempat", aika[0].sks, 2);
-sama("BK ikut terbaca untuk ditampilkan", aika[0].bk, "17");
 
 const bind = baca.baris.find((b) => b.kode === "MKN 0102");
 sama("pita kedua bersemester dua", bind?.semester, 2);
+
+console.log("\n=== TATA LETAK YANG BERBEDA-BEDA ===\n");
+
+// Kiriman fakultas tidak selalu berbentuk sama. Yang dijaga di sini: kolom
+// dikenali dari ISINYA, bukan dari urutannya — sehingga judul yang belum
+// pernah dilihat pun tetap terbaca.
+function satuBlok(judul: string[], isi: string[][], judulPita?: string): Aoa {
+  const kosongkan = () => Array(8).fill("") as Sel[];
+  const lembar: Aoa = [];
+  if (judulPita) { const atas = kosongkan(); atas[2] = judulPita; lembar.push(atas); }
+  const barisJudul = kosongkan();
+  judul.forEach((t, i) => { barisJudul[i] = t; });
+  lembar.push(barisJudul);
+  for (const b of isi) {
+    const r = kosongkan();
+    b.forEach((t, i) => { r[i] = t; });
+    lembar.push(r);
+  }
+  return lembar;
+}
+
+const ISI_UJI = [
+  ["MKU-0201", "AIKA 1", "2"],
+  ["IKM 8258", "Komunikasi Antar Budaya", "2"],
+  ["MKN 0102", "Bahasa Indonesia", "3"],
+];
+
+// Inilah bentuk yang dahulu gagal dengan pesan
+// 'Judul semesternya tidak terbaca: "Bobot MK (sks)"'.
+const bobot = bacaKurikulumAcuan(satuBlok(["KD MATKUL", "Nama MK", "Bobot MK (sks)"], ISI_UJI, "SEMESTER 4"));
+sama('judul "Bobot MK (sks)" dikenali sebagai SKS', bobot.baris.map((b) => b.sks), [2, 2, 3]);
+sama("semester dari judul pita di atas tabel", bobot.baris.map((b) => b.semester), [4, 4, 4]);
+sama("namanya tetap benar", bobot.baris[0].nama, "AIKA 1");
+
+// Judul yang belum pernah dilihat sama sekali: hanya isinya yang menolong.
+const asing = bacaKurikulumAcuan(satuBlok(["KD MATKUL", "Xyz", "Qqq"], ISI_UJI, "SEMESTER 6"));
+sama("judul tak dikenal: kode tetap terbaca", asing.baris.map((b) => b.kode), ["MKU-0201", "IKM 8258", "MKN 0102"]);
+sama("judul tak dikenal: nama tetap terbaca", asing.baris.map((b) => b.nama), ["AIKA 1", "Komunikasi Antar Budaya", "Bahasa Indonesia"]);
+sama("judul tak dikenal: sks tetap terbaca", asing.baris.map((b) => b.sks), [2, 2, 3]);
+
+// Urutan kolom dibalik: SKS berdiri sebelum nama.
+const balik = bacaKurikulumAcuan(satuBlok(
+  ["KD MATKUL", "Bobot MK (sks)", "Nama MK"],
+  ISI_UJI.map((b) => [b[0], b[2], b[1]]),
+  "SEMESTER 2",
+));
+sama("urutan kolom dibalik: sks benar", balik.baris.map((b) => b.sks), [2, 2, 3]);
+sama("urutan kolom dibalik: nama benar", balik.baris[1].nama, "Komunikasi Antar Budaya");
+
+// Semester sebagai kolom tersendiri, berbeda tiap baris.
+const perBaris = bacaKurikulumAcuan(satuBlok(
+  ["KD MATKUL", "Mata Kuliah", "Bobot MK (sks)", "Semester"],
+  ISI_UJI.map((b, i) => [...b, String(i + 1)]),
+));
+sama("semester per baris dibaca dari kolomnya", perBaris.baris.map((b) => b.semester), [1, 2, 3]);
+
+// Kolom BK berisi angka seperti SKS. Yang dipilih harus tetap SKS-nya.
+const denganBk = bacaKurikulumAcuan(satuBlok(
+  ["KD MATKUL", "BK", "SEMESTER 1", "SKS"],
+  ISI_UJI.map((b) => [b[0], "17", b[1], b[2]]),
+));
+sama("kolom BK tidak tertukar dengan SKS", denganBk.baris.map((b) => b.sks), [2, 2, 3]);
 
 console.log("\n=== BARIS YANG HARUS DILEWATI ===\n");
 
