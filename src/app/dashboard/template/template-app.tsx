@@ -306,8 +306,8 @@ function metaAwal() {
     tanggal: todayID(),
     dekan: "Dr. H. Achmad Kosasih, MM.",
     nbmdekan: "739.574",
-    rektor: "Dr. H. Desri Arwen, M.Pd.",
-    nbmrektor: "837.138",
+    rektor: "Dr. Warsito, M.Si.",
+    nbmrektor: "1.146.132",
     // "dekan-rektor" = dua tanda tangan seperti transkrip lama;
     // "dekan" = Dekan sendirian DI KANAN, kolom kiri tidak disisakan kosong.
     // Disimpan sebagai teks, bukan boolean: `bersihkanMeta` di server hanya

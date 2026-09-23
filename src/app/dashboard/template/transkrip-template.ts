@@ -141,8 +141,8 @@ export const TEMPLATE_BIO_ROWS: Array<[string, string]> = [
   ["Tanggal Surat", ""],
   ["Dekan", "Dr. H. Achmad Kosasih, MM."],
   ["NBM Dekan", "739.574"],
-  ["Rektor", "Dr. H. Desri Arwen, M.Pd."],
-  ["NBM Rektor", "837.138"],
+  ["Rektor", "Dr. Warsito, M.Si."],
+  ["NBM Rektor", "1.146.132"],
 ];
 
 export const TEMPLATE_NILAI_HEADER = [
