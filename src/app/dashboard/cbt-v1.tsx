@@ -29,6 +29,10 @@ import {
   MAKS_KRITERIA, RUBRIK_BAWAAN, hitungRubrik, predikat, periksaRubrik, ratakanBobot,
   rubrikKosong, type KriteriaRubrik, type Rubrik,
 } from "@/lib/rubrik";
+import { imporRubrikExcel, imporRubrikWord } from "@/lib/impor-rubrik";
+import {
+  LEMBAR_RUBRIK, buatDocxRubrik, buatXlsxDariRubrik, buatXlsxRubrik,
+} from "@/lib/template-rubrik";
 import { STATUS_MIRIP_LABEL, STATUS_MIRIP_WARNA, type StatusMirip } from "@/lib/mirip-jawaban";
 import { STATUS_TANDA_LABEL, STATUS_TANDA_WARNA, ejaJamRekaman, type StatusTanda } from "@/lib/rekaman";
 import {
@@ -568,6 +572,18 @@ export function PanelRubrik() {
   /** Rubrik yang sedang disunting. null berarti tidak ada formulir terbuka. */
   const [susun, setSusun] = useState<{ id: number | null; isi: Rubrik } | null>(null);
 
+  /**
+   * Hal yang ditebak atau dibetulkan pembaca template, ditampilkan bersama
+   * formulirnya.
+   *
+   * Dipisahkan dari `kabar` karena keduanya berbeda umur: kabar hilang begitu
+   * ada tindakan berikutnya, sedangkan catatan ini harus bertahan selama
+   * formulirnya terbuka — ia satu-satunya tempat dosen dapat melihat bahwa
+   * bobotnya dibagi rata, bukan ia yang menuliskannya.
+   */
+  const [catatan, setCatatan] = useState<string[]>([]);
+  const [namaBerkas, setNamaBerkas] = useState("");
+
   const muatDaftar = useCallback(async () => {
     setMuat(true);
     try {
@@ -608,6 +624,8 @@ export function PanelRubrik() {
       if (!jawab.ok || !data.success) throw new Error(data.message || "Gagal menyimpan.");
       setKabar(susun.id ? "Rubrik tersimpan." : "Rubrik baru dibuat.");
       setSusun(null);
+      setCatatan([]);
+      setNamaBerkas("");
       await muatDaftar();
     } catch (alasan: unknown) {
       setGalat(alasan instanceof Error ? alasan.message : "Rubrik gagal disimpan.");
@@ -625,6 +643,84 @@ export function PanelRubrik() {
       await muatDaftar();
     } catch (alasan: unknown) {
       setGalat(alasan instanceof Error ? alasan.message : "Rubrik gagal dihapus.");
+    }
+  }
+
+  function unduh(isi: Blob, nama: string) {
+    const alamat = URL.createObjectURL(isi);
+    const tautan = document.createElement("a");
+    tautan.href = alamat;
+    tautan.download = nama;
+    tautan.click();
+    URL.revokeObjectURL(alamat);
+  }
+
+  /** Nama berkas yang aman dipakai di seluruh sistem berkas. */
+  function namaUnduhan(nama: string) {
+    const bersih = nama.trim().replace(/[^A-Za-z0-9 _-]+/g, "").replace(/\s+/g, "-").slice(0, 60);
+    return bersih || "Rubrik";
+  }
+
+  /**
+   * Baca template rubrik yang diunggah dosen.
+   *
+   * Diurai DI PERAMBAN, sama seperti impor soal dan impor mahasiswa. Rubrik
+   * bukan rahasia, tetapi tidak ada gunanya ia singgah di server sebelum
+   * pemiliknya sendiri melihat hasil bacaannya — dan yang diurai di peramban
+   * memberi jawaban seketika, tanpa satu pun perjalanan jaringan.
+   *
+   * Hasilnya mendarat di FORMULIR, bukan di basis data. Yang menyimpan tetap
+   * dosen, dengan periksaRubrik() berlaku seperti biasa.
+   */
+  async function bacaBerkasRubrik(berkas: File) {
+    setGalat(""); setKabar(""); setCatatan([]);
+    setNamaBerkas(berkas.name);
+    try {
+      const nama = berkas.name.toLowerCase();
+      let hasil;
+      if (nama.endsWith(".docx")) {
+        // Modul yang sama dipakai pengimpor soal; dimuat saat dipakai, bukan
+        // saat panel dibuka.
+        const mammoth = await import("mammoth");
+        const teks = await mammoth.extractRawText({ arrayBuffer: await berkas.arrayBuffer() });
+        hasil = imporRubrikWord(teks.value || "");
+      } else if (nama.endsWith(".xlsx") || nama.endsWith(".xls") || nama.endsWith(".csv")) {
+        const XLSX = await import("xlsx");
+        const kerja = XLSX.read(new Uint8Array(await berkas.arrayBuffer()), { type: "array" });
+        // Lembar "Rubrik" lebih dulu, bukan lembar pertama: template membawa
+        // lembar "Contoh" dan "Petunjuk" di sebelahnya, dan yang aktif terakhir
+        // saat berkasnya disimpan dosen bisa lembar mana pun.
+        const lembar = kerja.Sheets[LEMBAR_RUBRIK] ?? kerja.Sheets[kerja.SheetNames[0]];
+        const aoa = XLSX.utils.sheet_to_json(lembar as Parameters<typeof XLSX.utils.sheet_to_json>[0], {
+          header: 1, defval: "", raw: false,
+        }) as Aoa;
+        hasil = imporRubrikExcel(aoa);
+      } else {
+        throw new Error("Berkasnya harus .xlsx, .xls, .csv, atau .docx.");
+      }
+
+      if (!hasil.ok) {
+        setNamaBerkas("");
+        setGalat(hasil.pesan);
+        return;
+      }
+      // Rubrik hasil unggahan selalu masuk sebagai rubrik BARU (id null),
+      // termasuk ketika namanya sama dengan yang sudah ada. Menimpa rubrik yang
+      // sudah dipakai ujian hanya karena namanya cocok akan mengubah arti nilai
+      // yang sudah keluar, tanpa seorang pun memintanya.
+      setSusun({ id: null, isi: hasil.rubrik });
+      setCatatan(hasil.catatan);
+      setKabar(
+        `Rubrik terbaca dari ${berkas.name}: ${hasil.rubrik.kriteria.length} kriteria, ` +
+          `skala ${hasil.rubrik.skalaMin}–${hasil.rubrik.skalaMax}. Periksa lalu simpan.`,
+      );
+    } catch (alasan: unknown) {
+      setNamaBerkas("");
+      setGalat(
+        alasan instanceof Error
+          ? alasan.message
+          : "Berkasnya tidak dapat dibaca. Pastikan berupa Excel (.xlsx) atau Word (.docx).",
+      );
     }
   }
 
@@ -662,6 +758,77 @@ export function PanelRubrik() {
 
       {kabar && <div className="dsh-ok">{kabar}</div>}
       {galat && <div className="dsh-error">{galat}</div>}
+
+      {/* ---------- CATATAN PEMBACA TEMPLATE ----------
+          Tampil bersama formulirnya, bukan sekejap seperti kabar biasa: isinya
+          hal-hal yang TIDAK ditulis dosen sendiri, dan yang tidak tahu bahwa
+          bobotnya dibagi rata akan menyimpannya tanpa memeriksanya. */}
+      {catatan.length > 0 && (
+        <div className="cbtv-catatan">
+          <b>Yang perlu Anda periksa{namaBerkas ? ` dari ${namaBerkas}` : ""}:</b>
+          <ul>
+            {catatan.map((c, i) => <li key={i}>{c}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {/* ---------- TEMPLATE: UNDUH, ISI, UNGGAH ----------
+          Rubrik hampir selalu SUDAH ADA sebelum menyentuh portal — ia lampiran
+          RPS, dan sudah diketik di Word atau Excel. Tanpa jalan ini, dosen
+          mengetik ulang dua puluh kotak deskriptor yang sudah selesai ia tulis.
+
+          Disembunyikan ketika formulir terbuka, supaya "unggah" tidak tampak
+          seperti pilihan lain untuk isian yang sedang dikerjakan. */}
+      {!susun && (
+        <div className="panel cbt-impor">
+          <div className="cbt-impor-kepala">
+            <b>Susun rubrik lewat Excel atau Word</b>
+            <span>
+              Unduh template, isi di komputer, lalu unggah kembali di sini. Yang diunggah
+              masuk ke formulir penyusun lebih dahulu — <b>belum tersimpan</b> — supaya
+              bobot dan deskriptornya dapat Anda periksa sendiri sebelum dipakai menilai.
+            </span>
+          </div>
+
+          <div className="cbt-impor-tombol">
+            <button
+              type="button"
+              className="btn btn-light btn-mini"
+              onClick={() => {
+                unduh(buatXlsxRubrik(), "Template-Rubrik-SiPaling.xlsx");
+                setKabar("Template Excel terunduh. Isi lembar \"Rubrik\", lalu unggah kembali di sini.");
+              }}
+            >
+              ⇩ Template Excel (.xlsx)
+            </button>
+            <button
+              type="button"
+              className="btn btn-light btn-mini"
+              onClick={() => {
+                unduh(buatDocxRubrik(), "Template-Rubrik-SiPaling.docx");
+                setKabar("Template Word terunduh. Ganti isi contohnya, lalu unggah kembali di sini.");
+              }}
+            >
+              ⇩ Template Word (.docx)
+            </button>
+            <label className="btn btn-primary btn-mini cbt-unggah">
+              ⇧ Unggah rubrik
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv,.docx"
+                onChange={(e) => {
+                  const berkas = e.target.files?.[0];
+                  // Dikosongkan supaya berkas yang SAMA dapat diunggah lagi
+                  // sesudah dibetulkan — tanpa ini, memilih berkas bernama sama
+                  // tidak memicu apa pun dan tampak seperti tombol yang rusak.
+                  e.target.value = "";
+                  if (berkas) void bacaBerkasRubrik(berkas);
+                }}
+              />
+            </label>
+          </div>
+        </div>
+      )}
 
       {/* ---------- RUBRIK SIAP PAKAI ----------
           Ditaruh di ATAS daftar milik sendiri, dan itu disengaja. Dosen yang
@@ -828,7 +995,13 @@ export function PanelRubrik() {
             <button type="button" className="btn btn-primary btn-mini" disabled={sibuk} onClick={() => void simpan()}>
               {sibuk ? "Menyimpan…" : "Simpan rubrik"}
             </button>
-            <button type="button" className="btn btn-light btn-mini" onClick={() => setSusun(null)}>Batal</button>
+            <button
+              type="button"
+              className="btn btn-light btn-mini"
+              onClick={() => { setSusun(null); setCatatan([]); setNamaBerkas(""); }}
+            >
+              Batal
+            </button>
           </div>
         </div>
       )}
@@ -872,6 +1045,25 @@ export function PanelRubrik() {
                       })}
                     >
                       Salin
+                    </button>
+                    {/* Unduhan berbentuk template yang sama, jadi berkasnya dapat
+                        disunting di komputer atau dikirim ke rekan pengajar lewat
+                        surel, lalu diunggah kembali tanpa mengetik ulang apa pun. */}
+                    <button
+                      type="button" className="btn btn-light btn-mini"
+                      title="Unduh sebagai template Excel — boleh disunting lalu diunggah kembali"
+                      onClick={() => {
+                        unduh(
+                          buatXlsxDariRubrik({
+                            nama: r.nama, keterangan: r.keterangan,
+                            skalaMin: r.skalaMin, skalaMax: r.skalaMax, kriteria: r.kriteria,
+                          }),
+                          `Rubrik-${namaUnduhan(r.nama)}.xlsx`,
+                        );
+                        setKabar(`"${r.nama}" terunduh sebagai Excel.`);
+                      }}
+                    >
+                      ⇩ Excel
                     </button>
                     {r.bolehSunting && (
                       <button type="button" className="btn btn-light btn-mini" onClick={() => void hapus(r)}>Hapus</button>
