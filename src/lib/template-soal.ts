@@ -5,19 +5,24 @@
 // yang sudah benar pada baris pertama: template kosong melulu membuat orang
 // menebak-nebak bentuknya, dan tebakannya ditolak saat diunggah.
 //
-// Berkas .docx dirakit sendiri di sini — sebuah .docx pada dasarnya zip
-// berisi tiga XML, dan perakit zip-nya sudah ada di src/lib/zip.ts untuk
-// keperluan arsip. Menambah satu pustaka penulis Word demi satu template
-// yang bentuknya tidak pernah berubah tidak sepadan harganya.
+// Berkas .docx dirakit sendiri, bukan lewat pustaka penulis Word: perakitnya
+// ada di src/lib/template-docx.ts dan dipakai bersama template rubrik.
 // ============================================================
-import { buatZip, type Bita } from "@/lib/zip";
 import { buatXlsx, GAYA, hurufKolom, type Baris } from "@/lib/template-xlsx";
+import { MIME_DOCX, buatDocx } from "@/lib/template-docx";
 import { KOLOM_EXCEL } from "@/lib/impor-soal";
 
-export { KOLOM_EXCEL };
+export { KOLOM_EXCEL, MIME_DOCX };
 
-export const MIME_DOCX =
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+/**
+ * Template soal dalam bentuk Word.
+ *
+ * Perakit .docx-nya sendiri tinggal di src/lib/template-docx.ts, dipakai
+ * bersama template rubrik. Yang tinggal di sini hanya naskahnya.
+ */
+export function buatDocxTemplate(baris: string[] = NASKAH_WORD): Blob {
+  return buatDocx(baris);
+}
 
 /**
  * Satu contoh untuk TIAP jenis soal, dan semuanya sudah benar.
@@ -113,69 +118,6 @@ const NASKAH_WORD = [
   "TINGKAT: sulit",
   "",
 ];
-
-function lolosXml(teks: string) {
-  return teks
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-const enc = (teks: string): Bita => new TextEncoder().encode(teks) as Bita;
-
-/**
- * Rakit berkas .docx berisi naskah template.
- *
- * Tiga bagian yang wajib ada agar Word mau membukanya: daftar jenis isi,
- * hubungan akar, dan dokumennya sendiri. Paragraf pertama dibuat tebal
- * sebagai judul; sisanya paragraf biasa.
- */
-export function buatDocxTemplate(baris: string[] = NASKAH_WORD): Blob {
-  const paragraf = baris
-    .map((isi, urut) => {
-      if (!isi) return "<w:p/>";
-      const tebal = urut === 0 ? "<w:rPr><w:b/><w:sz w:val=\"28\"/></w:rPr>" : "";
-      // xml:space="preserve" menjaga spasi di awal baris, yang dipakai
-      // pembacanya untuk mengenali baris lanjutan.
-      return `<w:p><w:r>${tebal}<w:t xml:space="preserve">${lolosXml(isi)}</w:t></w:r></w:p>`;
-    })
-    .join("");
-
-  const dokumen =
-    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
-    `<w:body>${paragraf}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/></w:sectPr></w:body>` +
-    "</w:document>";
-
-  const jenisIsi =
-    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
-    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
-    '<Default Extension="xml" ContentType="application/xml"/>' +
-    '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
-    "</Types>";
-
-  const hubungan =
-    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
-    "</Relationships>";
-
-  // Jenis isinya HARUS jenis Word, bukan "application/zip". Sebuah .docx
-  // memang zip, tetapi zip yang berlabel zip akan tersimpan sebagai arsip di
-  // komputer pengajarnya — dan itulah sebab template Word sebelumnya turun
-  // sebagai .zip.
-  return buatZip(
-    [
-      { nama: "[Content_Types].xml", data: enc(jenisIsi) },
-      { nama: "_rels/.rels", data: enc(hubungan) },
-      { nama: "word/document.xml", data: enc(dokumen) },
-    ],
-    new Date(),
-    MIME_DOCX,
-  );
-}
 
 // ---------- EXCEL BERHIAS ----------
 

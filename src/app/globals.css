@@ -6888,6 +6888,26 @@ table.qt td small { font-size: 11.5px; }
 .cbtv-bawaan-kartu small { font-size: 11.5px; line-height: 1.5; color: #64748b; }
 .cbtv-bawaan-kartu button { margin-top: auto; align-self: flex-start; }
 
+/* Catatan pembaca template rubrik: apa yang ditebak atau dibetulkan sendiri
+   oleh pembacanya, dan karena itu harus dibaca sebelum rubriknya disimpan.
+   Warnanya kuning, bukan merah: tidak ada yang gagal, hanya ada yang perlu
+   dipastikan — dan merah pada hal yang berhasil membuat orang berhenti
+   membedakan peringatan dari kegagalan. */
+.cbtv-catatan {
+  margin: 10px 0 0;
+  padding: 11px 14px;
+  border: 1px solid #fde68a;
+  border-left: 4px solid #d97706;
+  border-radius: 10px;
+  background: #fffbeb;
+  color: #713f12;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.cbtv-catatan b { display: block; margin-bottom: 5px; color: #78350f; font-size: 12.5px; }
+.cbtv-catatan ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.cbtv-catatan li { overflow-wrap: anywhere; }
+
 .cbtv-bobot-kabar {
   display: flex; align-items: center; gap: 9px; margin: 12px 0;
   padding: 9px 13px; border-radius: 8px; background: #f1f5f9; font-size: 13px;
