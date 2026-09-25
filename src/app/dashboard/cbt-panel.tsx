@@ -168,15 +168,14 @@ type Statistik = {
 };
 
 /**
- * Menu "Buat soal dengan AI" DIPADAMKAN.
+ * Menu "Buat soal dengan AI" — MENYALA.
  *
- * Bukan dihapus: seluruh jalannya masih utuh, dari pembaca dokumen di peramban
- * sampai /api/cbt/ai-soal, dan menyalakannya kembali cukup dengan menyetel
- * tetapan ini menjadi true. Yang dimatikan hanya pintunya di layar pengajar,
- * beserta satu permintaan ke server yang tadinya berjalan pada tiap pemuatan
- * panel hanya untuk menanyakan apakah kuncinya terpasang.
+ * Sempat dipadamkan selama portal belum punya kunci model sama sekali. Sejak
+ * kuncinya dikelola dari Dashboard Super Admin → Kunci AI, menu ini tampil
+ * lagi; tanpa kunci ia menampilkan keterangan yang menunjuk ke sana, bukan
+ * menghilang.
  */
-const AI_SOAL_TAMPIL = false;
+const AI_SOAL_TAMPIL = true;
 
 const SOAL_KOSONG = {
   jenis: "pg" as JenisSoal,
@@ -2942,8 +2941,8 @@ export default function CbtPanel({ role }: { role: string }) {
 
             {aiSiap === false ? (
               <p className="cbt-catatan">
-                Pembuat soal AI belum tersambung ke model mana pun. Pasang <code>ANTHROPIC_API_KEY</code>
-                {" "}(Claude) atau <code>GEMINI_API_KEY</code> pada environment Vercel, lalu deploy ulang.
+                Pembuat soal AI belum tersambung. Minta Super Admin menempel kunci Gemini,
+                ChatGPT, atau Claude di Dashboard → Kunci AI.
                 Menu lain tetap berjalan tanpa itu.
               </p>
             ) : (

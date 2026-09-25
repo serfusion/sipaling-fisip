@@ -215,7 +215,7 @@ export async function GET(request: Request) {
             catatan: rekaman.note || "",
           }
         : null,
-      aiSiap: aiSiap(),
+      aiSiap: await aiSiap(),
     });
   } catch (error: unknown) {
     console.error("lembar penilaian", error);
@@ -341,13 +341,13 @@ export async function POST(request: Request) {
       return Response.json({ success: false, message: "Aksi tidak dikenali." }, { status: 400 });
     }
 
-    if (aksi === "ai" && !aiSiap()) {
+    if (aksi === "ai" && !(await aiSiap())) {
       return Response.json(
         {
           success: false,
           message:
-            "Penilaian AI belum tersambung ke model mana pun. Pasang ANTHROPIC_API_KEY atau " +
-            "GEMINI_API_KEY pada environment, lalu deploy ulang. Penilaian otomatis tanpa " +
+            "Penilaian AI belum tersambung. Tempel kunci Gemini, ChatGPT, atau Claude di " +
+            "Dashboard Super Admin → Kunci AI. Penilaian otomatis tanpa " +
             "model dan penilaian manual tetap jalan.",
         },
         { status: 503 },

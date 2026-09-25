@@ -38,7 +38,7 @@ export async function GET() {
   if (!bolehCbt(profile)) {
     return Response.json({ success: false, message: "Menu CBT tidak tersedia untuk role Anda." }, { status: 403 });
   }
-  const tersedia = penyediaTersedia();
+  const tersedia = await penyediaTersedia();
   return Response.json({
     success: true,
     tersedia,
