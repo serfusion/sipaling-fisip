@@ -17,6 +17,7 @@
 // tidak melihat menu ini sama sekali.
 // ============================================================
 
+import { STATUS_TANDA_LABEL, STATUS_TANDA_WARNA, type StatusTanda } from "@/lib/rekaman";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ejaWaktu, JENIS_LABEL, KEADAAN_JAWAB_LABEL, keadaanJawab, kunciTerbaca, labelStatusPeserta,
@@ -138,6 +139,10 @@ type Peserta = {
   disetujui?: string | null;
   disetujuiOleh?: string;
   predikat?: { huruf: string; sebutan: string } | null;
+  /** Temuan pemeriksa kamera AI. */
+  kamera?: { orangLain: number; tanpaWajah: number };
+  /** Putusan rekaman suara; null bila tidak ada rekaman. */
+  suara?: { tanda: string; jumlah: number } | null;
   laporanTerkirim?: string | null;
 };
 
@@ -460,6 +465,29 @@ function SetelPenilaian({
  * "curang" — yang memutuskan tetap manusia, dengan garis waktu insidennya di
  * depan mata.
  */
+function SelKamera({ k }: { k?: { orangLain: number; tanpaWajah: number } }) {
+  if (!k) return <small className="psn-nama">-</small>;
+  const total = k.orangLain + k.tanpaWajah;
+  if (total === 0) return <span className="cbtv-lencana" style={{ background: "#16a34a" }}>Bersih</span>;
+  return (
+    <span className="cbtv-lencana" style={{ background: k.orangLain > 0 ? "#dc2626" : "#d97706" }}>
+      {[k.orangLain > 0 && `${k.orangLain} orang lain`, k.tanpaWajah > 0 && `${k.tanpaWajah} tanpa wajah`]
+        .filter(Boolean).join(" · ")}
+    </span>
+  );
+}
+
+function SelSuara({ s }: { s?: { tanda: string; jumlah: number } | null }) {
+  if (!s) return <small className="psn-nama">-</small>;
+  if (s.tanda === "belum") return <span className="cbtv-lencana" style={{ background: "#94a3b8" }}>Belum diperiksa</span>;
+  return (
+    <span className="cbtv-lencana" style={{ background: STATUS_TANDA_WARNA[s.tanda as StatusTanda] ?? "#64748b" }}>
+      {STATUS_TANDA_LABEL[s.tanda as StatusTanda] ?? s.tanda}
+      {s.jumlah > 0 && ` · ${s.jumlah}`}
+    </span>
+  );
+}
+
 function SkorIntegritas({
   skor, dihentikan,
 }: {
@@ -3637,7 +3665,7 @@ export default function CbtPanel({ role }: { role: string }) {
                           dipakai" — dan pertanyaan itu muncul pada tiap
                           pengawas baru yang membuka papan ini. */}
                       {terbuka.checkSimilarity !== false && <th>Mirip</th>}
-                      <th>Integritas</th><th /></tr>
+                      <th>Integritas</th><th>Kamera</th><th>Suara</th><th /></tr>
                   </thead>
                   <tbody>
                     {peserta.map((p) => (
@@ -3717,6 +3745,8 @@ export default function CbtPanel({ role }: { role: string }) {
                             dihentikan={p.dihentikan}
                           />
                         </td>
+                        <td><SelKamera k={p.kamera} /></td>
+                        <td><SelSuara s={p.suara} /></td>
                         <td>
                           <button
                             type="button"

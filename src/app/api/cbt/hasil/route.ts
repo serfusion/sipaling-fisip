@@ -7,7 +7,7 @@
 // ============================================================
 import { createClient } from "@supabase/supabase-js";
 import { db } from "@/db";
-import { cbtAnswers, cbtAttempts, cbtExams, cbtIncidents, cbtTranscriptSegments } from "@/db/schema";
+import { cbtAnswers, cbtAttempts, cbtExams, cbtIncidents, cbtRecordings, cbtTranscriptSegments } from "@/db/schema";
 import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 import { getCurrentProfile } from "@/lib/supabase-server";
 import { getSupabaseSecretKey, getSupabaseUrl } from "@/lib/supabase-config";
@@ -323,6 +323,22 @@ export async function GET(request: Request) {
           .where(inArray(cbtAnswers.attemptId, idPeserta))
       : [];
 
+    // Putusan suara per peserta. "Bersih" hanya berarti bersih bila
+    // transkripnya sudah selesai; sebelum itu dikirim "belum".
+    const rekamanUjian = idPeserta.length
+      ? await db
+          .select({
+            attemptId: cbtRecordings.attemptId,
+            potongan: cbtRecordings.chunkCount,
+            transkrip: cbtRecordings.transcriptStatus,
+            tanda: cbtRecordings.flagStatus,
+            jumlahTanda: cbtRecordings.flagCount,
+          })
+          .from(cbtRecordings)
+          .where(inArray(cbtRecordings.attemptId, idPeserta))
+      : [];
+    const suaraPeserta = new Map(rekamanUjian.map((r) => [r.attemptId, r]));
+
     const terisi = new Map<number, number>();
     for (const j of jawabanUjian) {
       if (String(j.answer ?? "").trim()) terisi.set(j.attemptId, (terisi.get(j.attemptId) ?? 0) + 1);
@@ -379,6 +395,14 @@ export async function GET(request: Request) {
         nilaiAkhir: p.finalScore,
         disetujui: p.approvedAt ? p.approvedAt.toISOString() : null,
         laporanTerkirim: p.reportSentAt ? p.reportSentAt.toISOString() : null,
+        kamera: { orangLain: p.otherPerson, tanpaWajah: p.faceMissing },
+        suara: (() => {
+          const r = suaraPeserta.get(p.id);
+          if (!r || r.potongan === 0) return null;
+          return r.transkrip === "selesai"
+            ? { tanda: r.tanda, jumlah: r.jumlahTanda }
+            : { tanda: "belum", jumlah: 0 };
+        })(),
       })),
       statistik: statistikNilai(nilai, ujian.passingGrade),
       analisis: analisisSoal(

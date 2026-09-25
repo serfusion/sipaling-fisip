@@ -7366,3 +7366,8 @@ table.qt td small { font-size: 11.5px; }
 .kai-fitur-pakai { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 12px; font-size: 13px; color: #475569; }
 .kai-fitur-pakai b { color: var(--ink); }
 .kai-fitur-pakai i { font-style: normal; color: #b91c1c; }
+
+.kai-batas { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 14px; margin-bottom: 14px; }
+.kai-batas label { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; font-weight: 700; color: #334155; }
+.kai-batas input { width: 130px; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 7px; }
+.kai-batas small { font-weight: 400; color: #64748b; }

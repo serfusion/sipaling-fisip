@@ -14,7 +14,7 @@ import {
   LABEL_PENYEDIA, MODEL_BAWAAN, SEMUA_PENYEDIA, daftarKunci, daftarTersamar, simpanDaftar,
 } from "@/lib/ai-kunci";
 import { GalatModel, ujiKunci } from "@/lib/ai-penyedia";
-import { bacaPemakaian, bulanIni, daftarBulan } from "@/lib/ai-pemakaian";
+import { FITUR_BERBATAS, bacaBatas, bacaPemakaian, bulanIni, daftarBulan, simpanBatas } from "@/lib/ai-pemakaian";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,7 +52,9 @@ export async function GET(request: Request) {
   try {
     const diminta = new URL(request.url).searchParams.get("bulan") || "";
     const bulan = /^\d{4}-\d{2}$/.test(diminta) ? diminta : bulanIni();
-    const [daftar, pemakaian, bulanAda] = await Promise.all([daftarTersamar(), bacaPemakaian(bulan), daftarBulan()]);
+    const [daftar, pemakaian, bulanAda, batas] = await Promise.all([
+      daftarTersamar(), bacaPemakaian(bulan), daftarBulan(), bacaBatas(),
+    ]);
     const aktif = [...new Set(daftar.filter((k) => k.aktif).map((k) => k.penyedia))];
     return Response.json({
       success: true,
@@ -60,6 +62,8 @@ export async function GET(request: Request) {
       penyedia: SEMUA_PENYEDIA.map((p) => ({ kode: p, label: LABEL_PENYEDIA[p], modelBawaan: MODEL_BAWAAN[p] })),
       fitur: fiturMenyala(aktif),
       pemakaian,
+      batas,
+      fiturBerbatas: FITUR_BERBATAS,
       bulanAda: bulanAda.includes(bulanIni()) ? bulanAda : [bulanIni(), ...bulanAda],
     });
   } catch (error: unknown) {
@@ -74,7 +78,11 @@ export async function PUT(request: Request) {
   const tolak = await hanyaSuperAdmin();
   if (tolak) return tolak;
   try {
-    const body = (await request.json()) as { daftar?: unknown };
+    const body = (await request.json()) as { daftar?: unknown; batas?: unknown };
+    if (body.batas && typeof body.batas === "object" && !Array.isArray(body.batas)) {
+      await simpanBatas(body.batas as Record<string, unknown>);
+      return Response.json({ success: true });
+    }
     const daftar = Array.isArray(body.daftar) ? body.daftar : [];
     await simpanDaftar(
       daftar

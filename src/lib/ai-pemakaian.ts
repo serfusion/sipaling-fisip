@@ -28,7 +28,7 @@
 // ============================================================
 import { db } from "@/db";
 import { appSettings } from "@/db/schema";
-import { like, sql } from "drizzle-orm";
+import { eq, like, sql } from "drizzle-orm";
 import { pushNotification } from "@/lib/notify";
 import { LABEL_PENYEDIA, type PenyediaAi } from "@/lib/ai-kunci";
 
@@ -177,6 +177,59 @@ export async function laporkanKunciGagal(input: {
     });
   } catch (galat) {
     console.error("lapor kunci AI gagal", galat);
+  }
+}
+
+// ------------------------------------------------------------
+// BATAS BULANAN PER FITUR
+// ------------------------------------------------------------
+// Pemeriksa kamera memanggil AI beberapa kali per menit per peserta; tanpa
+// batas ia dapat menghabiskan kuota sebelum transkrip suara sempat berjalan.
+// 0 atau kosong = tanpa batas. Yang dihitung: panggilan berhasil + gagal.
+
+export const FITUR_BERBATAS: FiturAi[] = ["Buat soal", "Penilaian esai", "Transkrip suara", "Pemeriksa kamera"];
+const KUNCI_BATAS = "ai_batas";
+
+export async function bacaBatas(): Promise<Partial<Record<FiturAi, number>>> {
+  try {
+    const b = await db.select().from(appSettings).where(eq(appSettings.key, KUNCI_BATAS)).limit(1);
+    return b[0] ? (JSON.parse(b[0].value) as Partial<Record<FiturAi, number>>) : {};
+  } catch {
+    return {};
+  }
+}
+
+export async function simpanBatas(masuk: Record<string, unknown>): Promise<void> {
+  const rapi: Partial<Record<FiturAi, number>> = {};
+  for (const f of FITUR_BERBATAS) {
+    const n = Math.max(0, Math.floor(Number(masuk[f]) || 0));
+    if (n > 0) rapi[f] = n;
+  }
+  const nilai = JSON.stringify(rapi);
+  await db
+    .insert(appSettings)
+    .values({ key: KUNCI_BATAS, value: nilai, updatedAt: new Date() })
+    .onConflictDoUpdate({ target: appSettings.key, set: { value: nilai, updatedAt: new Date() } });
+}
+
+/** null = boleh jalan; selain itu pesan penolakannya. Tidak pernah melempar. */
+export async function cekBatas(fitur: FiturAi): Promise<string | null> {
+  try {
+    const batas = (await bacaBatas())[fitur];
+    if (!batas) return null;
+    const b = await db
+      .select({ value: appSettings.value })
+      .from(appSettings)
+      .where(eq(appSettings.key, `aip:${bulanIni()}:f:${fitur}`.slice(0, 64)))
+      .limit(1);
+    if (!b[0]) return null;
+    const c = JSON.parse(b[0].value) as CatatanPemakaian;
+    const pakai = (c.ok ?? 0) + (c.gagal ?? 0);
+    return pakai >= batas
+      ? `Batas bulanan fitur "${fitur}" (${batas} panggilan) sudah tercapai. Naikkan di Dashboard → Kunci AI.`
+      : null;
+  } catch {
+    return null;
   }
 }
 

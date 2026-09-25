@@ -58,6 +58,8 @@ export default function KunciAiPanel() {
   const [pemakaian, setPemakaian] = useState<Pemakaian | null>(null);
   const [bulanAda, setBulanAda] = useState<string[]>([]);
   const [bulan, setBulan] = useState("");
+  const [batas, setBatas] = useState<Record<string, number>>({});
+  const [fiturBerbatas, setFiturBerbatas] = useState<string[]>([]);
   const [muat, setMuat] = useState(true);
   const [sibuk, setSibuk] = useState(false);
   const [berubah, setBerubah] = useState(false);
@@ -79,6 +81,8 @@ export default function KunciAiPanel() {
       setFitur(data.fitur);
       setPemakaian(data.pemakaian ?? null);
       setBulanAda(data.bulanAda ?? []);
+      setBatas(data.batas ?? {});
+      setFiturBerbatas(data.fiturBerbatas ?? []);
       setBulan(data.pemakaian?.bulan ?? "");
       setBerubah(false);
     } catch (alasan: unknown) {
@@ -133,6 +137,24 @@ export default function KunciAiPanel() {
     setTambah({ ...tambah, kunci: "", model: "" });
     setBerubah(true);
     setPesan(null);
+  }
+
+  async function simpanBatas() {
+    setSibuk(true); setPesan(null);
+    try {
+      const jawab = await fetch("/api/admin/kunci-ai", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batas }),
+      });
+      const data = await jawab.json();
+      if (!data.success) throw new Error(data.message || "Batas belum tersimpan.");
+      setPesan({ ok: true, teks: "Batas bulanan tersimpan." });
+    } catch (alasan) {
+      setPesan({ ok: false, teks: alasan instanceof Error ? alasan.message : "Gagal menyimpan." });
+    } finally {
+      setSibuk(false);
+    }
   }
 
   async function simpan() {
@@ -304,6 +326,28 @@ export default function KunciAiPanel() {
             {bulanAda.map((b) => <option key={b} value={b}>{ejaBulan(b)}</option>)}
           </select>
         </div>
+
+        {fiturBerbatas.length > 0 && (
+          <div className="kai-batas">
+            {fiturBerbatas.map((f) => {
+              const pakai = pemakaian?.fitur.find((x) => x.nama === f);
+              return (
+                <label key={f}>
+                  <span>{f}</span>
+                  <input
+                    type="number" min={0} placeholder="Tanpa batas"
+                    value={batas[f] || ""}
+                    onChange={(e) => setBatas((b) => ({ ...b, [f]: Number(e.target.value) || 0 }))}
+                  />
+                  <small>{angka((pakai?.ok ?? 0) + (pakai?.gagal ?? 0))} terpakai</small>
+                </label>
+              );
+            })}
+            <button type="button" className="text-action" disabled={sibuk} onClick={() => void simpanBatas()}>
+              Simpan batas
+            </button>
+          </div>
+        )}
 
         {!pemakaian || (pemakaian.kunci.length === 0 && pemakaian.fitur.length === 0) ? (
           <div className="dempty">Belum ada pemakaian bulan ini.</div>

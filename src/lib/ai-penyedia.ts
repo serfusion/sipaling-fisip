@@ -14,7 +14,7 @@
 // ============================================================
 import Anthropic from "@anthropic-ai/sdk";
 import { kunciAktif, LABEL_PENYEDIA, samarkan, type KunciAi, type PenyediaAi } from "@/lib/ai-kunci";
-import { catatPanggilan, laporkanKunciGagal, type FiturAi } from "@/lib/ai-pemakaian";
+import { catatPanggilan, laporkanKunciGagal, type FiturAi, cekBatas } from "@/lib/ai-pemakaian";
 
 export type NamaPenyedia = PenyediaAi;
 
@@ -110,6 +110,8 @@ export async function mintaJson(input: {
   fitur?: FiturAi;
 }): Promise<JawabanModel> {
   const fitur = input.fitur ?? "Lainnya";
+  const tolakBatas = await cekBatas(fitur);
+  if (tolakBatas) throw new GalatModel(tolakBatas, 429);
   const semua = await kunciAktif();
   if (semua.length === 0) {
     throw new GalatModel(
