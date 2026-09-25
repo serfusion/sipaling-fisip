@@ -27,10 +27,37 @@ type Baris = {
 type InfoPenyedia = { kode: Penyedia; label: string; modelBawaan: string };
 type Fitur = { nama: string; nyala: boolean; catatan?: string };
 
+type Catatan = {
+  ok: number; gagal: number; masuk: number; keluar: number;
+  penyedia?: string; label?: string; galat?: string; waktuGalat?: string; terakhir?: string;
+};
+type Pemakaian = {
+  bulan: string;
+  kunci: Array<{ id: string } & Catatan>;
+  fitur: Array<{ nama: string } & Catatan>;
+};
+
+const NAMA_BULAN = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+function ejaBulan(b: string) {
+  const [t, m] = b.split("-");
+  return `${NAMA_BULAN[Number(m) - 1] ?? m} ${t}`;
+}
+function ejaWaktu(iso?: string) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? ""
+    : d.toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" });
+}
+const angka = (n: number) => n.toLocaleString("id-ID");
+
 export default function KunciAiPanel() {
   const [daftar, setDaftar] = useState<Baris[]>([]);
   const [penyedia, setPenyedia] = useState<InfoPenyedia[]>([]);
   const [fitur, setFitur] = useState<Fitur[]>([]);
+  const [pemakaian, setPemakaian] = useState<Pemakaian | null>(null);
+  const [bulanAda, setBulanAda] = useState<string[]>([]);
+  const [bulan, setBulan] = useState("");
   const [muat, setMuat] = useState(true);
   const [sibuk, setSibuk] = useState(false);
   const [berubah, setBerubah] = useState(false);
@@ -41,15 +68,18 @@ export default function KunciAiPanel() {
     penyedia: "gemini", kunci: "", model: "",
   });
 
-  const muatDaftar = useCallback(async () => {
+  const muatDaftar = useCallback(async (pilihBulan = "") => {
     setMuat(true);
     try {
-      const jawab = await fetch("/api/admin/kunci-ai", { cache: "no-store" });
+      const jawab = await fetch(`/api/admin/kunci-ai${pilihBulan ? `?bulan=${pilihBulan}` : ""}`, { cache: "no-store" });
       const data = await jawab.json();
       if (!jawab.ok || !data.success) throw new Error(data.message || "Gagal memuat.");
       setDaftar(data.daftar);
       setPenyedia(data.penyedia);
       setFitur(data.fitur);
+      setPemakaian(data.pemakaian ?? null);
+      setBulanAda(data.bulanAda ?? []);
+      setBulan(data.pemakaian?.bulan ?? "");
       setBerubah(false);
     } catch (alasan: unknown) {
       setPesan({ ok: false, teks: alasan instanceof Error ? alasan.message : "Gagal memuat." });
@@ -261,6 +291,58 @@ export default function KunciAiPanel() {
           </button>
           {berubah && <span className="cbt-catatan">Ada perubahan yang belum disimpan.</span>}
         </div>
+      </div>
+
+      {/* ---------- PEMAKAIAN BULANAN ---------- */}
+      <div className="panel">
+        <div className="kai-pakai-kepala">
+          <b className="kai-sub">Pemakaian</b>
+          <select
+            value={bulan}
+            onChange={(e) => { setBulan(e.target.value); void muatDaftar(e.target.value); }}
+          >
+            {bulanAda.map((b) => <option key={b} value={b}>{ejaBulan(b)}</option>)}
+          </select>
+        </div>
+
+        {!pemakaian || (pemakaian.kunci.length === 0 && pemakaian.fitur.length === 0) ? (
+          <div className="dempty">Belum ada pemakaian bulan ini.</div>
+        ) : (
+          <>
+            <div className="qtable-wrap">
+              <table className="dsh-table kai-pakai">
+                <thead>
+                  <tr><th>Kunci</th><th>Berhasil</th><th>Gagal</th><th>Token</th><th>Galat terakhir</th></tr>
+                </thead>
+                <tbody>
+                  {pemakaian.kunci.map((k) => (
+                    <tr key={k.id}>
+                      <td data-kolom="Kunci">
+                        <b>{labelPenyedia((k.penyedia as Penyedia) ?? "gemini")}</b>{" "}
+                        <code>{k.label ?? k.id}</code>
+                      </td>
+                      <td data-kolom="Berhasil" className="cbtv-ka">{angka(k.ok)}</td>
+                      <td data-kolom="Gagal" className={`cbtv-ka${k.gagal > 0 ? " kai-gagal-angka" : ""}`}>{angka(k.gagal)}</td>
+                      <td data-kolom="Token" className="cbtv-ka">{k.masuk + k.keluar > 0 ? angka(k.masuk + k.keluar) : "—"}</td>
+                      <td data-kolom="Galat terakhir" className="kai-galat-sel">
+                        {k.galat ? <><small>{ejaWaktu(k.waktuGalat)}</small> {k.galat}</> : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="kai-fitur-pakai">
+              {pemakaian.fitur.map((f) => (
+                <span key={f.nama}>
+                  <b>{angka(f.ok + f.gagal)}</b> {f.nama}
+                  {f.gagal > 0 && <i> · {angka(f.gagal)} gagal</i>}
+                </span>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </section>
   );

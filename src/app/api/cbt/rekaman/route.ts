@@ -341,6 +341,7 @@ async function transkripkan(body: Record<string, unknown>) {
       const bita = Buffer.from(await data.arrayBuffer());
 
       const jawab = await mintaJson({
+      fitur: "Transkrip suara",
         sistem: SISTEM_TRANSKRIP,
         perintah:
           `Tuliskan seluruh yang terdengar pada potongan rekaman ruang ujian ini. ` +

@@ -154,6 +154,7 @@ export async function POST(request: Request) {
     let bacaan: BacaanModel;
     try {
       const jawab = await mintaJson({
+      fitur: "Pemeriksa kamera",
         sistem: SISTEM,
         perintah:
           gambar.length === 1

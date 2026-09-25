@@ -13,7 +13,8 @@
 // berpindah sendiri ke kunci cadangan.
 // ============================================================
 import Anthropic from "@anthropic-ai/sdk";
-import { kunciAktif, LABEL_PENYEDIA, type KunciAi, type PenyediaAi } from "@/lib/ai-kunci";
+import { kunciAktif, LABEL_PENYEDIA, samarkan, type KunciAi, type PenyediaAi } from "@/lib/ai-kunci";
+import { catatPanggilan, laporkanKunciGagal, type FiturAi } from "@/lib/ai-pemakaian";
 
 export type NamaPenyedia = PenyediaAi;
 
@@ -105,7 +106,10 @@ export async function mintaJson(input: {
    * menambah ketepatan.
    */
   usaha?: "low" | "medium" | "high";
+  /** Untuk catatan pemakaian bulanan: fitur mana yang memanggil. */
+  fitur?: FiturAi;
 }): Promise<JawabanModel> {
+  const fitur = input.fitur ?? "Lainnya";
   const semua = await kunciAktif();
   if (semua.length === 0) {
     throw new GalatModel(
@@ -136,14 +140,32 @@ export async function mintaJson(input: {
   }
 
   const gagal: string[] = [];
+  const gagalRinci: Array<{ penyedia: PenyediaAi; label: string; sebab: string }> = [];
   for (const k of calon) {
+    const label = samarkan(k.kunci);
     try {
-      return await lewatKunci(k, input);
+      const jawab = await lewatKunci(k, input);
+      await catatPanggilan({
+        kunciId: k.id, penyedia: k.penyedia, label, fitur, berhasil: true,
+        masuk: jawab.pemakaian?.masuk, keluar: jawab.pemakaian?.keluar,
+      });
+      // Berhasil, TETAPI lewat cadangan: kunci di atasnya gagal. Justru
+      // inilah yang harus dikabarkan — perpindahan yang diam-diam membuat
+      // kunci yang mati tidak ketahuan berminggu-minggu.
+      if (gagalRinci.length > 0) {
+        await laporkanKunciGagal({ gagal: gagalRinci, dipakai: { penyedia: k.penyedia, label }, fitur });
+      }
+      return jawab;
     } catch (galat) {
+      const sebab = (galat as Error)?.message ?? "gagal";
+      await catatPanggilan({ kunciId: k.id, penyedia: k.penyedia, label, fitur, berhasil: false, galat: sebab });
       if (!bolehPindah(galat)) throw galat;
-      gagal.push(`${LABEL_PENYEDIA[k.penyedia]}: ${(galat as Error).message}`);
+      gagal.push(`${LABEL_PENYEDIA[k.penyedia]}: ${sebab}`);
+      gagalRinci.push({ penyedia: k.penyedia, label, sebab });
     }
   }
+
+  await laporkanKunciGagal({ gagal: gagalRinci, dipakai: null, fitur });
 
   // Seluruh kunci gagal. Sebab masing-masing disebut, supaya yang membaca
   // tahu kunci mana yang harus diganti — bukan hanya bahwa "AI gagal".
@@ -178,6 +200,7 @@ export async function ujiKunci(k: KunciAi & { model: string }): Promise<{ model:
     // sebagai rusak.
     maksKeluaran: 1024,
     usaha: "low",
+    fitur: "Uji kunci",
   });
   return { model: jawab.model, ms: Date.now() - mulai };
 }

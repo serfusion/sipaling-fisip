@@ -89,6 +89,7 @@ export async function POST(request: Request) {
     }
 
     const jawaban = await mintaJson({
+      fitur: "Buat soal",
       sistem: PERAN_SISTEM,
       perintah: susunPerintah(minta),
       skema: SKEMA_JAWABAN as unknown as Record<string, unknown>,

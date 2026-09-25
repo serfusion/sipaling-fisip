@@ -262,6 +262,7 @@ export async function nilaiEsai(input: {
   penyedia?: NamaPenyedia;
 }): Promise<PenilaianEsai> {
   const jawab = await mintaJson({
+      fitur: "Penilaian esai",
     sistem: SISTEM,
     perintah: susunPerintah(input),
     skema: skemaPenilaian(input.rubrik.kriteria.length) as unknown as Record<string, unknown>,

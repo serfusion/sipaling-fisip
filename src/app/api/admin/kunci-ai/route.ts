@@ -14,6 +14,7 @@ import {
   LABEL_PENYEDIA, MODEL_BAWAAN, SEMUA_PENYEDIA, daftarKunci, daftarTersamar, simpanDaftar,
 } from "@/lib/ai-kunci";
 import { GalatModel, ujiKunci } from "@/lib/ai-penyedia";
+import { bacaPemakaian, bulanIni, daftarBulan } from "@/lib/ai-pemakaian";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,17 +46,21 @@ function fiturMenyala(penyedia: string[]) {
   ];
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const tolak = await hanyaSuperAdmin();
   if (tolak) return tolak;
   try {
-    const daftar = await daftarTersamar();
+    const diminta = new URL(request.url).searchParams.get("bulan") || "";
+    const bulan = /^\d{4}-\d{2}$/.test(diminta) ? diminta : bulanIni();
+    const [daftar, pemakaian, bulanAda] = await Promise.all([daftarTersamar(), bacaPemakaian(bulan), daftarBulan()]);
     const aktif = [...new Set(daftar.filter((k) => k.aktif).map((k) => k.penyedia))];
     return Response.json({
       success: true,
       daftar,
       penyedia: SEMUA_PENYEDIA.map((p) => ({ kode: p, label: LABEL_PENYEDIA[p], modelBawaan: MODEL_BAWAAN[p] })),
       fitur: fiturMenyala(aktif),
+      pemakaian,
+      bulanAda: bulanAda.includes(bulanIni()) ? bulanAda : [bulanIni(), ...bulanAda],
     });
   } catch (error: unknown) {
     return Response.json(
