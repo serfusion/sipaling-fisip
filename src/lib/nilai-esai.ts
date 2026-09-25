@@ -262,6 +262,7 @@ export async function nilaiEsai(input: {
   penyedia?: NamaPenyedia;
 }): Promise<PenilaianEsai> {
   const jawab = await mintaJson({
+      fitur: "Penilaian esai",
     sistem: SISTEM,
     perintah: susunPerintah(input),
     skema: skemaPenilaian(input.rubrik.kriteria.length) as unknown as Record<string, unknown>,
@@ -294,6 +295,6 @@ export async function nilaiEsai(input: {
 }
 
 /** Apakah penilaian AI dapat ditawarkan sama sekali di portal ini. */
-export function aiSiap(): boolean {
-  return penyediaTersedia().length > 0;
+export async function aiSiap(): Promise<boolean> {
+  return (await penyediaTersedia()).length > 0;
 }

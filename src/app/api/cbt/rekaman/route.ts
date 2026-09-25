@@ -276,12 +276,12 @@ async function transkripkan(body: Record<string, unknown>) {
     );
   }
 
-  if (penyediaDengar().length === 0) {
+  if ((await penyediaDengar()).length === 0) {
     return Response.json(
       {
         success: false,
         message:
-          "Transkrip memerlukan GEMINI_API_KEY pada environment. Rekamannya tetap tersimpan " +
+          "Transkrip memerlukan kunci Gemini di Dashboard Super Admin → Kunci AI. Rekamannya tetap tersimpan " +
           "dan tetap dapat diputar serta diunduh dari sini.",
       },
       { status: 503 },
@@ -341,6 +341,7 @@ async function transkripkan(body: Record<string, unknown>) {
       const bita = Buffer.from(await data.arrayBuffer());
 
       const jawab = await mintaJson({
+      fitur: "Transkrip suara",
         sistem: SISTEM_TRANSKRIP,
         perintah:
           `Tuliskan seluruh yang terdengar pada potongan rekaman ruang ujian ini. ` +
@@ -573,7 +574,7 @@ export async function GET(request: Request) {
         risiko: p.risk,
         alasan: p.reason || "",
       })),
-      bolehTranskrip: bolehUbah(profile, ujian) && penyediaDengar().length > 0,
+      bolehTranskrip: bolehUbah(profile, ujian) && (await penyediaDengar()).length > 0,
     });
   } catch (error: unknown) {
     console.error("baca rekaman", error);

@@ -38,7 +38,7 @@ export async function GET() {
   if (!bolehCbt(profile)) {
     return Response.json({ success: false, message: "Menu CBT tidak tersedia untuk role Anda." }, { status: 403 });
   }
-  const tersedia = penyediaTersedia();
+  const tersedia = await penyediaTersedia();
   return Response.json({
     success: true,
     tersedia,
@@ -89,6 +89,7 @@ export async function POST(request: Request) {
     }
 
     const jawaban = await mintaJson({
+      fitur: "Buat soal",
       sistem: PERAN_SISTEM,
       perintah: susunPerintah(minta),
       skema: SKEMA_JAWABAN as unknown as Record<string, unknown>,

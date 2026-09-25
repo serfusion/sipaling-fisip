@@ -6,6 +6,7 @@ import { DEFAULT_MAINTENANCE, type MaintenanceState } from "@/lib/maintenance";
 import { sisaPemakaian, type CakrawalaCode } from "@/lib/cakrawala";
 import type { LecturerOption } from "../lecturer-picker";
 import DatabasePanel from "./database-panel";
+import KunciAiPanel from "./kunci-ai-panel";
 import GuidancePanel from "./guidance-panel";
 import NotificationBell from "./notification-bell";
 import CbtPanel from "./cbt-panel";
@@ -162,6 +163,7 @@ type ViewId =
   | "absensi"
   | "pengumuman"
   | "maintenance"
+  | "kunci-ai"
   | "cakrawala"
   | "cbt"
   | "outreach"
@@ -311,6 +313,7 @@ const MENU: MenuItem[] = [
   { id: "absensi", icon: "◔", label: "Absensi Perpustakaan", roles: ATTENDANCE_ROLES, grup: "dokumen" },
   { id: "pengumuman", icon: "✎", label: "Pengumuman & Status", roles: ["super_admin", "admin"] },
   { id: "maintenance", icon: "☾", label: "Mode Maintenance", roles: ["super_admin"] },
+  { id: "kunci-ai", icon: "✦", label: "Kunci AI", roles: ["super_admin"] },
   { id: "cakrawala", icon: "✧", label: "Kunci Cakrawala", roles: ["super_admin"] },
   { id: "akun", icon: "⚙", label: "Akun", roles: "all" },
 ];
@@ -357,6 +360,7 @@ const VIEW_TITLES: Record<ViewId, string> = {
   absensi: "Absensi Perpustakaan",
   pengumuman: "Pengumuman & Status",
   maintenance: "Mode Maintenance",
+  "kunci-ai": "Kunci AI",
   cakrawala: "Kunci Cakrawala",
   cbt: "Ujian Online (CBT)",
   outreach: "Outreach Ultramailer (OUS)",
@@ -1600,6 +1604,8 @@ export default function DashboardApp({
               </form>
             </section>
           )}
+
+          {view === "kunci-ai" && profile.role === "super_admin" && <KunciAiPanel />}
 
           {view === "maintenance" && profile.role === "super_admin" && (
             <section>

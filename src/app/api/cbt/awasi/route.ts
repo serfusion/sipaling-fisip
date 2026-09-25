@@ -129,7 +129,7 @@ export async function POST(request: Request) {
       return Response.json({ success: false, message: "Cuplikan tidak terbaca." }, { status: 400 });
     }
 
-    if (penyediaTersedia().length === 0) {
+    if ((await penyediaTersedia()).length === 0) {
       // Tanpa kunci model, pengawasan kameranya tetap berjalan — yang hilang
       // hanya lapisan yang paling mahal. Ini dijawab sebagai keadaan biasa,
       // bukan galat, supaya ujiannya tidak terganggu oleh hal yang bukan
@@ -154,6 +154,7 @@ export async function POST(request: Request) {
     let bacaan: BacaanModel;
     try {
       const jawab = await mintaJson({
+      fitur: "Pemeriksa kamera",
         sistem: SISTEM,
         perintah:
           gambar.length === 1

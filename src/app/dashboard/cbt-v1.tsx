@@ -2188,24 +2188,55 @@ export function PemutarRekaman({ ujianId, attemptId }: { ujianId: number; attemp
     setKini(detik);
   }, []);
 
-  async function transkripkan() {
+  /**
+   * Transkripkan SAMPAI SELESAI, bukan satu gelombang lalu menyuruh menekan
+   * lagi.
+   *
+   * Server mengerjakan rekaman sepotong demi sepotong karena satu permintaan
+   * punya umur, dan dulu tiap gelombang berakhir dengan "tekan sekali lagi".
+   * Untuk ujian sembilan puluh menit itu berarti belasan ketukan per peserta —
+   * dan yang tidak sabar berhenti di tengah, dengan status "Bersih" yang
+   * sebenarnya berarti "belum selesai diperiksa". Di sini gelombangnya
+   * diulang sendiri sampai sisanya nol.
+   */
+  const transkripkan = useCallback(async () => {
     setSibuk(true); setGalat(""); setKabar("");
     try {
-      const jawab = await fetch("/api/cbt/rekaman", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ aksi: "transkrip", ujian: ujianId, attempt: attemptId }),
-      });
-      const isi = await jawab.json();
-      if (!jawab.ok || !isi.success) throw new Error(isi.message || "Gagal.");
-      setKabar(isi.pesan || "Transkrip diperbarui.");
+      for (let gelombang = 0; gelombang < 40; gelombang += 1) {
+        const jawab = await fetch("/api/cbt/rekaman", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ aksi: "transkrip", ujian: ujianId, attempt: attemptId }),
+        });
+        const isi = await jawab.json();
+        if (!jawab.ok || !isi.success) throw new Error(isi.message || "Gagal.");
+        if (!(Number(isi.sisa) > 0)) {
+          setKabar("Rekaman selesai diperiksa.");
+          break;
+        }
+        setKabar(`Memeriksa rekaman… sisa ${isi.sisa} potongan.`);
+      }
       await muatRekaman();
     } catch (alasan: unknown) {
       setGalat(alasan instanceof Error ? alasan.message : "Transkrip gagal dibuat.");
     } finally {
       setSibuk(false);
     }
-  }
+  }, [ujianId, attemptId, muatRekaman]);
+
+  // Berjalan SENDIRI begitu rekaman dibuka dan belum diperiksa. Pengajar yang
+  // membuka lembar seorang peserta sedang ingin tahu apakah ada yang
+  // mencurigakan; menyuruhnya menekan tombol lebih dulu hanya menunda
+  // jawabannya. Sekali per pembukaan — penjaga ini yang mencegahnya berulang
+  // pada tiap gambar ulang.
+  const sudahOtomatis = useRef(false);
+  useEffect(() => {
+    if (sudahOtomatis.current || !rekaman || !bolehTranskrip) return;
+    if (rekaman.potongan === 0 || rekaman.transkrip === "selesai") return;
+    sudahOtomatis.current = true;
+    const jam = setTimeout(() => void transkripkan(), 0);
+    return () => clearTimeout(jam);
+  }, [rekaman, bolehTranskrip, transkripkan]);
 
   if (muat) return <div className="dempty">Memuat rekaman…</div>;
   if (!rekaman) return null;
@@ -2226,10 +2257,20 @@ export function PemutarRekaman({ ujianId, attemptId }: { ujianId: number; attemp
           </small>
         </div>
         {rekaman.potongan > 0 && (
-          <span className="cbtv-lencana" style={{ background: warnaTanda }}>
-            {STATUS_TANDA_LABEL[rekaman.tanda as StatusTanda] ?? rekaman.tanda}
-            {rekaman.jumlahTanda > 0 && ` · ${rekaman.jumlahTanda}`}
-          </span>
+          // "Bersih" hanya boleh tampil sesudah rekamannya BENAR-BENAR selesai
+          // diperiksa. Sebelum itu status bawaannya memang "bersih", dan
+          // menampilkannya apa adanya berarti menyatakan bersih rekaman yang
+          // belum didengar sepotong pun.
+          rekaman.transkrip === "selesai" ? (
+            <span className="cbtv-lencana" style={{ background: warnaTanda }}>
+              {STATUS_TANDA_LABEL[rekaman.tanda as StatusTanda] ?? rekaman.tanda}
+              {rekaman.jumlahTanda > 0 && ` · ${rekaman.jumlahTanda}`}
+            </span>
+          ) : (
+            <span className="cbtv-lencana" style={{ background: "#94a3b8" }}>
+              {sibuk ? "Memeriksa…" : "Belum diperiksa"}
+            </span>
+          )
         )}
       </div>
 

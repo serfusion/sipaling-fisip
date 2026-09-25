@@ -7326,3 +7326,48 @@ table.qt td small { font-size: 11.5px; }
   }
   .krk-tabel tbody .cbtv-ka { text-align: left; }
 }
+
+
+/* ---------- KUNCI AI (Super Admin) ---------- */
+.kai-fitur { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; }
+.kai-nyala { color: #15803d; font-weight: 700; }
+.kai-mati { color: #94a3b8; }
+.kai-sub { display: block; margin-bottom: 10px; font-size: 14px; }
+.kai-tambah { align-items: end; }
+.kai-kunci { flex: 2 1 260px; }
+.kai-tombol { align-self: end; }
+.kai-daftar { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 8px; }
+.kai-daftar li {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+  padding: 11px 13px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fbfcfd;
+}
+.kai-daftar li.kai-padam { opacity: .55; }
+.kai-no {
+  flex: 0 0 26px; height: 26px; display: grid; place-items: center;
+  border-radius: 50%; background: var(--primary); color: #fff; font-size: 12px; font-weight: 800;
+}
+.kai-isi { flex: 1 1 260px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
+.kai-isi code { font-size: 12.5px; color: #475569; }
+.kai-model { flex: 1 1 160px; min-width: 0; padding: 5px 9px; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 12.5px; }
+.kai-env { font-size: 11px; font-weight: 700; color: #b45309; }
+.kai-lulus { flex: 1 1 100%; font-size: 12px; color: #15803d; }
+.kai-gagal { flex: 1 1 100%; font-size: 12px; color: #b91c1c; }
+.kai-aksi { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.kai-saklar { display: flex; align-items: center; gap: 5px; font-size: 12.5px; }
+
+.kai-pakai-kepala { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.kai-pakai-kepala .kai-sub { margin: 0; }
+.kai-pakai-kepala select { padding: 5px 9px; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 12.5px; }
+.kai-pakai { font-size: 13px; }
+.kai-pakai code { font-size: 12px; color: #475569; }
+.kai-gagal-angka { color: #b91c1c; font-weight: 800; }
+.kai-galat-sel { max-width: 340px; font-size: 12px; color: #64748b; }
+.kai-galat-sel small { display: block; font-weight: 700; color: #b91c1c; }
+.kai-fitur-pakai { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 12px; font-size: 13px; color: #475569; }
+.kai-fitur-pakai b { color: var(--ink); }
+.kai-fitur-pakai i { font-style: normal; color: #b91c1c; }
+
+.kai-batas { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 14px; margin-bottom: 14px; }
+.kai-batas label { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; font-weight: 700; color: #334155; }
+.kai-batas input { width: 130px; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 7px; }
+.kai-batas small { font-weight: 400; color: #64748b; }
