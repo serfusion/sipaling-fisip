@@ -4,25 +4,32 @@
 // Satu jalan untuk tiga pemanggil, supaya ketiganya menilai dengan cara yang
 // sama persis:
 //
-//   1. SESUDAH PESERTA MENGUMPULKAN. Penilaiannya dijadwalkan lewat after()
-//      dari Next.js: jawaban "kumpulkan" sampai ke peserta lebih dulu, lalu
-//      fungsi server yang sama melanjutkan menilai esainya. Peserta yang
-//      ujiannya menampilkan nilai melihat angkanya lengkap beberapa detik
-//      kemudian, tanpa siapa pun menekan apa pun.
+//   1. SAAT PESERTA MENGUMPULKAN. Esai dinilai DI DALAM permintaan
+//      "kumpulkan", seluruh esai satu peserta bersamaan, dan permintaan itu
+//      menunggu hasilnya paling lama TUNGGU_SAAT_KUMPUL_MS. Karena AI hanya
+//      mengklasifikasikan jawaban ke level rubrik (lihat nilai-esai.ts),
+//      hampir selalu selesai dalam hitungan detik, dan peserta langsung
+//      melihat nilai lengkapnya. Yang melewati batas tunggu dilanjutkan
+//      fungsi yang sama lewat after(), tanpa menahan peserta lebih lama.
 //   2. PAPAN PANTAU PENGAJAR, yang menyegar tiap sepuluh detik dan menilai
 //      sisa yang belum ternilai: jawaban yang penilaiannya gagal karena kuota,
 //      dan ujian lama yang esainya belum pernah dibaca AI.
 //   3. TOMBOL "NILAI ULANG" yang ditekan pengajar.
 //
 // ------------------------------------------------------------
-// KENAPA TIDAK DI DALAM PERMINTAAN "KUMPULKAN" ITU SENDIRI
+// KENAPA MENUNGGU, DAN KENAPA ADA BATASNYA
 // ------------------------------------------------------------
-// Satu panggilan model memakan belasan detik, dan ujian berisi lima soal esai
-// berarti lima panggilan. Menahan tombol "kumpulkan" selama itu berarti
-// peserta melihat layar berputar setengah menit pada jalur yang 504-nya baru
-// diperbaiki v45, lalu menekan tombolnya lagi atau mengira jawabannya hilang.
-// after() memisahkan keduanya: pengumpulan selesai seketika, penilaian
-// menyusul di fungsi yang sama.
+// Rubrik yang sudah dipasang pengajar tidak berarti apa-apa bagi peserta yang
+// membaca "sedang dinilai" lalu menutup halamannya. Karena itu permintaan
+// "kumpulkan" menunggu penilaiannya, dan seluruh esai dinilai bersamaan,
+// bukan bergiliran: lima esai selesai dalam waktu satu esai.
+//
+// Batasnya tetap ada, karena penyedia model kadang lambat pada jam sibuk, dan
+// jalur pengumpulan adalah jalur yang 504-nya baru diperbaiki v45. Peserta
+// yang menunggu lebih dari beberapa detik akan menekan tombolnya lagi atau
+// mengira jawabannya hilang. Melewati batas itu, jawabannya dikirim dengan
+// keterangan "masih dinilai", penilaiannya berjalan terus di fungsi yang
+// sama, dan layar peserta menanyakan nilainya lagi.
 //
 // ------------------------------------------------------------
 // RUBRIK ADALAH SATU-SATUNYA ACUAN
@@ -42,7 +49,7 @@ import { bacaLembar, rubrikUjian, soalUjian } from "@/lib/cbt-store";
 import { hitungRubrik, poinDariRubrik, type Rubrik } from "@/lib/rubrik";
 import { GalatModel } from "@/lib/ai-penyedia";
 import { aiSiap, nilaiEsai } from "@/lib/nilai-esai";
-import { hitungUlangAttempt } from "@/lib/nilai-attempt";
+import { hitungUlangAttempt, type NilaiUlang } from "@/lib/nilai-attempt";
 import {
   MASA_KLAIM_MS, TANDA_MENILAI, berbarengan, dinilaiRubrik, klaimMasihBerlaku, perluDinilaiAi,
 } from "@/lib/penilaian-ai";
@@ -57,6 +64,23 @@ export const MAKS_SEKALI_NILAI = 12;
 
 /** Berapa panggilan model berjalan bersamaan. Lihat berbarengan(). */
 export const SEKALIGUS = 4;
+
+/**
+ * Esai satu peserta yang dinilai bersamaan saat ia mengumpulkan.
+ *
+ * Lebih longgar daripada SEKALIGUS karena yang dinilai hanya lembar satu
+ * orang: ujian dengan delapan soal esai tetap selesai dalam waktu satu esai.
+ */
+export const SEKALIGUS_SATU_PESERTA = 8;
+
+/**
+ * Batas tunggu penilaian di dalam permintaan "kumpulkan".
+ *
+ * Klasifikasi satu esai biasanya selesai dalam dua sampai lima detik. Sepuluh
+ * detik memberi ruang untuk penyedia yang sedang lambat tanpa membuat peserta
+ * mengira tombolnya macet.
+ */
+export const TUNGGU_SAAT_KUMPUL_MS = 10_000;
 
 export type Pekerjaan = {
   attemptId: number;
@@ -318,7 +342,7 @@ export async function kerjakanPenilaian(
   kerjakan: Pekerjaan[],
   mataKuliah: string,
   sekaligus = SEKALIGUS,
-): Promise<{ dinilai: number; gagal: string[]; dilewati: number }> {
+): Promise<{ dinilai: number; gagal: string[]; dilewati: number; nilai: Map<number, NilaiUlang> }> {
   let dinilai = 0;
   let dilewati = 0;
   const gagal: string[] = [];
@@ -371,19 +395,21 @@ export async function kerjakanPenilaian(
   // Nilai attempt dihitung ulang sesudah SELURUH jawabannya selesai, bukan tiap
   // kali satu jawaban tersimpan: satu peserta dengan lima soal esai akan
   // menghitung ulang lima kali untuk sampai pada angka yang sama.
+  const nilai = new Map<number, NilaiUlang>();
   for (const id of tersentuh) {
-    await hitungUlangAttempt(id);
+    const segar = await hitungUlangAttempt(id);
+    if (segar) nilai.set(id, segar);
   }
 
-  return { dinilai, gagal, dilewati };
+  return { dinilai, gagal, dilewati, nilai };
 }
 
 // ------------------------------------------------------------
-// SESUDAH PESERTA MENGUMPULKAN
+// SAAT PESERTA MENGUMPULKAN
 // ------------------------------------------------------------
 
 /**
- * Nilai seluruh esai satu peserta dengan AI. Dipanggil dari after().
+ * Nilai seluruh esai satu peserta dengan AI, bersamaan.
  *
  * Barisnya DIBACA ULANG dari basis data, bukan diterima dari pemanggil. Obyek
  * attempt yang dipegang jalur pengumpulan masih membawa status "berjalan",
@@ -405,45 +431,70 @@ export async function nilaiEsaiAttempt(
   const antre = await antreEsai(ujian.id, [attempt]);
   if (antre.length === 0) return null;
 
-  return kerjakanPenilaian(rubrik, antre, ujian.courseName);
+  return kerjakanPenilaian(
+    rubrik, antre, ujian.courseName, Math.min(SEKALIGUS_SATU_PESERTA, antre.length),
+  );
 }
 
+export type HasilSaatKumpul = {
+  /** Penilaian masih berjalan sesudah batas tunggu; layar peserta menanyakan lagi. */
+  menungguAi: boolean;
+  /** Nilai attempt yang sudah memuat esainya, bila penilaiannya selesai. */
+  nilai: NilaiUlang | null;
+};
+
 /**
- * Jadwalkan penilaian AI satu peserta, sesudah jawaban "kumpulkan" terkirim.
+ * Nilai esai satu peserta di dalam permintaan "kumpulkan".
  *
- * Mengembalikan true bila penilaian memang dijadwalkan, supaya layar peserta
- * dapat berkata "sedang dinilai AI" alih-alih "menunggu koreksi pengajar",
- * dan menanyakan nilainya lagi beberapa detik kemudian.
+ * Penilaiannya dimulai seketika dan didaftarkan ke after(), lalu ditunggu
+ * paling lama `tungguMs`. Selesai sebelum batas: nilai lengkapnya
+ * dikembalikan untuk langsung ditampilkan kepada peserta. Melewati batas:
+ * yang kembali hanya keterangan bahwa esainya masih dinilai, dan after()
+ * menjaga fungsi ini tetap hidup sampai penilaiannya tuntas. Pekerjaannya
+ * hanya satu; yang berbeda hanya siapa yang sempat menunggunya.
  *
- * Tidak dijadwalkan bila mata kuliahnya belum punya rubrik, atau belum ada
- * kunci AI satu pun. Keduanya dikatakan papan pantau kepada pengajarnya.
+ * `tungguMs` 0 berarti tidak menunggu sama sekali, untuk pengumpulan paksa
+ * oleh aturan pengawasan: layar peserta itu harus segera tahu ujiannya
+ * dihentikan, bukan sepuluh detik kemudian.
+ *
+ * Tidak berjalan bila mata kuliahnya belum punya rubrik, atau belum ada kunci
+ * AI satu pun. Keduanya dikatakan papan pantau kepada pengajarnya.
  */
-export async function jadwalkanNilaiEsai(
+export async function nilaiEsaiSaatKumpul(
   ujian: { id: number; courseName: string },
   attemptId: number,
-): Promise<boolean> {
+  tungguMs: number = TUNGGU_SAAT_KUMPUL_MS,
+): Promise<HasilSaatKumpul> {
+  const tidakAda: HasilSaatKumpul = { menungguAi: false, nilai: null };
   const rubrik = await rubrikUjian(ujian);
-  if (!rubrik || rubrik.kriteria.length === 0) return false;
-  if (!(await aiSiap())) return false;
+  if (!rubrik || rubrik.kriteria.length === 0) return tidakAda;
+  if (!(await aiSiap())) return tidakAda;
 
-  const kerja = async () => {
-    try {
-      await nilaiEsaiAttempt(ujian, attemptId, rubrik);
-    } catch (galat) {
-      // Yang gagal di sini tidak hilang: jawabannya tetap terhitung belum
-      // dinilai, dan papan pantau pengajar menilainya pada penyegaran
-      // berikutnya.
-      console.error("nilai esai sesudah kumpul", attemptId, galat);
-    }
-  };
+  const kerja = nilaiEsaiAttempt(ujian, attemptId, rubrik).catch((galat: unknown) => {
+    // Yang gagal di sini tidak hilang: jawabannya tetap terhitung belum
+    // dinilai, dan papan pantau pengajar menilainya pada penyegaran
+    // berikutnya.
+    console.error("nilai esai saat kumpul", attemptId, galat);
+    return null;
+  });
 
   try {
     after(kerja);
   } catch {
     // Di luar lingkup permintaan (mis. dipanggil dari skrip), after() tidak
-    // tersedia. Dikerjakan langsung tanpa ditunggu; papan pantau tetap
-    // menjadi jaring pengamannya.
-    void kerja();
+    // tersedia. Pekerjaannya sudah berjalan; papan pantau tetap menjadi
+    // jaring pengamannya bila prosesnya berhenti lebih dulu.
   }
-  return true;
+
+  if (tungguMs <= 0) return { menungguAi: true, nilai: null };
+
+  let jam: ReturnType<typeof setTimeout> | undefined;
+  const habis = new Promise<"habis">((selesai) => {
+    jam = setTimeout(() => selesai("habis"), tungguMs);
+  });
+  const hasil = await Promise.race([kerja, habis]);
+  if (jam) clearTimeout(jam);
+
+  if (hasil === "habis") return { menungguAi: true, nilai: null };
+  return { menungguAi: false, nilai: hasil?.nilai.get(attemptId) ?? null };
 }
