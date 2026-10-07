@@ -199,6 +199,12 @@ export default function UjianApp() {
   const [hasil, setHasil] = useState<Hasil | null>(null);
   const [pesanSelesai, setPesanSelesai] = useState("");
   /**
+   * Esai peserta ini sedang dinilai AI di server, sesudah ia mengumpulkan.
+   * Selama menyala, layar "Ujian selesai" menanyakan nilainya lagi tiap
+   * beberapa detik sampai seluruh esainya ternilai.
+   */
+  const [menungguAi, setMenungguAi] = useState(false);
+  /**
    * Teguran yang sedang menutup soal, atau null.
    *
    * Ia TIDAK menghilang sendiri — satu-satunya jalan keluarnya tombol di
@@ -561,6 +567,7 @@ export default function UjianApp() {
       const isi = await jawab.json();
       if (!jawab.ok || !isi.success) throw new Error(isi.message || "Ujian belum dapat dikumpulkan.");
       setHasil(isi.hasil ?? null);
+      setMenungguAi(Boolean(isi.menungguAi));
       setPesanSelesai(
         otomatis ? "Waktu habis. Jawabanmu sudah dikumpulkan otomatis." : "Jawabanmu sudah dikumpulkan.",
       );
@@ -577,6 +584,47 @@ export default function UjianApp() {
       setSibuk(false);
     }
   }, []);
+
+  // ---------- nilai esai yang menyusul, dinilai AI ----------
+  //
+  // Esai dinilai AI terhadap rubrik mata ujinya beberapa detik SESUDAH
+  // jawaban "kumpulkan" sampai. Layar ini menanyakan nilainya lagi tiap
+  // delapan detik, paling lama tiga menit, lalu berhenti sendiri. Yang belum
+  // selesai dalam tiga menit tetap dinilai; hanya layarnya yang berhenti
+  // menunggu.
+  //
+  // Delapan detik, bukan lebih rapat: satu laboratorium sering keluar lewat
+  // satu alamat jaringan, dan batas permintaan per alamat dipakai bersama
+  // peserta lain yang masih mengerjakan.
+  useEffect(() => {
+    if (layar !== "selesai" || !menungguAi || !kunciRef.current) return;
+    let hidup = true;
+    let putaran = 0;
+    let jam: ReturnType<typeof setTimeout> | undefined;
+    const tanya = async () => {
+      putaran += 1;
+      try {
+        const jawab = await fetch("/api/cbt/ikut", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ aksi: "hasil", kunciSesi: kunciRef.current }),
+        });
+        const isi = await jawab.json();
+        if (!hidup) return;
+        if (jawab.ok && isi.success) {
+          if (isi.hasil) setHasil(isi.hasil);
+          if (!isi.menungguAi) { setMenungguAi(false); return; }
+        }
+      } catch {
+        // Jaringan tersendat: dicoba lagi pada putaran berikutnya.
+      }
+      if (!hidup) return;
+      if (putaran >= 23) { setMenungguAi(false); return; }
+      jam = setTimeout(() => void tanya(), 8000);
+    };
+    jam = setTimeout(() => void tanya(), 5000);
+    return () => { hidup = false; if (jam) clearTimeout(jam); };
+  }, [layar, menungguAi]);
 
   // ---------- waktu habis: kumpulkan sendiri ----------
   useEffect(() => {
@@ -1083,7 +1131,7 @@ export default function UjianApp() {
         poin={[
           "Jawabanmu sudah tersimpan di server.",
           "Halaman ini boleh ditutup.",
-          "Nilai essay menunggu koreksi pengajar bila ada.",
+          "Essay dinilai AI dengan rubrik mata uji ini, lalu disahkan pengajar.",
         ]}
       >
         <div className="uj-dalam-rangka uj-kotak-selesai">
@@ -1119,11 +1167,17 @@ export default function UjianApp() {
                   sebagian tetap mendapat nilai.
                 </p>
               )}
-              {hasil.tertunda > 0 && (
-                <p className="uj-catatan">
-                  {hasil.tertunda} soal essay menunggu koreksi pengajar, jadi nilai ini masih bisa naik.
+              {menungguAi ? (
+                <p className="uj-catatan uj-catatan-ai" aria-live="polite">
+                  <span className="uj-putar" aria-hidden="true" />
+                  Essay-mu sedang dinilai AI dengan rubrik mata uji ini. Nilai di atas diperbarui sendiri
+                  begitu penilaiannya selesai, tidak perlu memuat ulang halaman.
                 </p>
-              )}
+              ) : hasil.tertunda > 0 ? (
+                <p className="uj-catatan">
+                  {hasil.tertunda} soal essay masih menunggu dinilai, jadi nilai ini masih bisa berubah.
+                </p>
+              ) : null}
             </>
           ) : (
             <p className="uj-catatan">

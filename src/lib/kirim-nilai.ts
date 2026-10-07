@@ -153,7 +153,7 @@ export async function kirimLaporanNilai(input: {
   const pred = predikat(nilai);
   const lulus = nilai >= ujian.passingGrade;
 
-  const rubrik = await rubrikUjian(ujian.rubricId);
+  const rubrik = await rubrikUjian(ujian);
   const bank = await soalUjian(input.examId);
   const lembar = bacaLembar(attempt.paper);
   const jawaban = await db.select().from(cbtAnswers).where(eq(cbtAnswers.attemptId, attempt.id));
@@ -210,7 +210,7 @@ export async function kirimLaporanNilai(input: {
               (k) =>
                 `<tr><td style="padding:7px 9px;border:1px solid #e5e7eb;">${lolos(k.nama)}</td>` +
                 `<td align="right" style="padding:7px 9px;border:1px solid #e5e7eb;">${k.bobot}%</td>` +
-                `<td align="center" style="padding:7px 9px;border:1px solid #e5e7eb;font-weight:700;">${k.level || "–"} / ${rubrik.skalaMax}</td></tr>`,
+                `<td align="center" style="padding:7px 9px;border:1px solid #e5e7eb;font-weight:700;">${k.gerbang ? 0 : k.level || "–"} / ${rubrik.skalaMax}</td></tr>`,
             )
             .join("") +
           `<tr style="background:#f9fafb;"><td colspan="2" style="padding:7px 9px;border:1px solid #e5e7eb;font-weight:700;">Nilai bagian ini</td>` +

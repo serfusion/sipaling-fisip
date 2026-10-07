@@ -17,6 +17,7 @@ import {
   kunciTerbaca, sisaDetik, statistikNilai, statusUjian,
 } from "@/lib/cbt";
 import { bacaLembar, rekamanAttempt, rubrikUjian, skorRubrikAttempt, soalUjian } from "@/lib/cbt-store";
+import { dinilaiRubrik, perluDinilaiAi } from "@/lib/penilaian-ai";
 import { hitungRubrik, predikat } from "@/lib/rubrik";
 import { pasanganPeserta } from "@/lib/mirip-simpan";
 import { ejaJamRekaman } from "@/lib/rekaman";
@@ -132,7 +133,7 @@ export async function GET(request: Request) {
       // yang memakainya adalah TOMBOL CETAK — dan tombol cetak yang harus
       // menunggu tiga perjalanan ke server sebelum jendela cetaknya terbuka
       // akan terasa seperti tombol yang tidak menjawab.
-      const rubrik = await rubrikUjian(ujian.rubricId);
+      const rubrik = await rubrikUjian(ujian);
       const skorRubrik = rubrik ? await skorRubrikAttempt(attempt.id) : null;
       const rekaman = await rekamanAttempt(attempt.id);
       const penggalTanda = rekaman
@@ -226,6 +227,7 @@ export async function GET(request: Request) {
                     level: k.level,
                     terbobot: k.terbobot,
                     diubahDosen: k.diubahDosen,
+                    gerbang: k.gerbang,
                     alasan: per.get(i)?.aiReason || "",
                     keyakinan: per.get(i)?.aiConfidence ?? null,
                   })),
@@ -318,6 +320,8 @@ export async function GET(request: Request) {
             questionId: cbtAnswers.questionId,
             answer: cbtAnswers.answer,
             isCorrect: cbtAnswers.isCorrect,
+            gradedBy: cbtAnswers.gradedBy,
+            updatedAt: cbtAnswers.updatedAt,
           })
           .from(cbtAnswers)
           .where(inArray(cbtAnswers.attemptId, idPeserta))
@@ -347,6 +351,32 @@ export async function GET(request: Request) {
     const nilai = peserta.filter((p) => p.status !== "berjalan" && p.score !== null).map((p) => p.score as number);
     const bank = await soalUjian(examId);
 
+    // ---------- ESAI YANG MASIH MENUNGGU DINILAI AI ----------
+    //
+    // Per peserta, dengan aturan yang SAMA dengan yang dipakai antrean
+    // penilaiannya (perluDinilaiAi). Papan pantau memakainya untuk memutuskan
+    // kapan menilai sendiri, dan angka "tertunda" saja tidak cukup untuk itu:
+    // isian tanpa kunci keluar dari pengumpulan sebagai "salah", dan esai yang
+    // dahulu dinilai jawaban acuan atau penilai tanpa model sudah tidak
+    // tertunda, padahal keduanya belum pernah dibaca AI terhadap rubrik.
+    const rubrikMatkul = await rubrikUjian(ujian);
+    const jenisAi = new Set(bank.filter(dinilaiRubrik).map((s) => s.id));
+    const disahkan = new Map(peserta.map((p) => [p.id, Boolean(p.approvedAt)]));
+    const menungguAi = new Map<number, number>();
+    if (rubrikMatkul) {
+      for (const j of jawabanUjian) {
+        if (!jenisAi.has(j.questionId)) continue;
+        const ok = perluDinilaiAi(
+          {
+            jawaban: j.answer, isCorrect: j.isCorrect, gradedBy: j.gradedBy,
+            diubah: j.updatedAt, disahkan: disahkan.get(j.attemptId) ?? false,
+          },
+          sekarang,
+        );
+        if (ok) menungguAi.set(j.attemptId, (menungguAi.get(j.attemptId) ?? 0) + 1);
+      }
+    }
+
     return Response.json({
       success: true,
       ujian: {
@@ -362,7 +392,8 @@ export async function GET(request: Request) {
         // kolom kosong berisi tanda hubung — kolom kosong menimbulkan
         // pertanyaan yang jawabannya "memang tidak dipakai".
         periksaKemiripan: ujian.checkSimilarity,
-        pakaiRubrik: Boolean(ujian.rubricId),
+        pakaiRubrik: Boolean(rubrikMatkul),
+        rubrikMatkul: rubrikMatkul ? { id: rubrikMatkul.id, nama: rubrikMatkul.nama } : null,
         rekamSuara: ujian.recordAudio,
       },
       peserta: peserta.map((p) => ({
@@ -370,6 +401,7 @@ export async function GET(request: Request) {
         terjawab: terisi.get(p.id) ?? 0,
         nilai: p.score,
         tertunda: p.pending,
+        menungguAi: p.status === "berjalan" ? 0 : (menungguAi.get(p.id) ?? 0),
         sisaDetik: p.status === "berjalan" ? sisaDetik(p.deadlineAt, sekarang) : 0,
         // Berapa detik sejak perambannya terakhir menyapa. Inilah yang
         // membedakan "sedang mengerjakan" dari "layarnya mati sejak sepuluh

@@ -8,9 +8,9 @@
 // menit untuk menemukan satu tombol adalah berkas yang berhenti dibetulkan.
 //
 //   PanelMahasiswa    daftar mahasiswa + impor
+//   PanelPenilaianEsai  rubrik tiap mata uji + pustaka rubrik
 //   PanelRubrik       rubrik: pilih dari yang siap pakai, atau susun sendiri
-//   PanelAcuan        kunci jawaban acuan dosen: unduh template, isi, unggah
-//   LembarRubrik      penilaian esai satu peserta + pengesahan nilai
+//   LembarRubrik      penilaian esai satu peserta oleh AI + pengesahan nilai
 //   PemutarRekaman    rekaman suara + penanda yang dapat ditekan
 //   DaftarMirip       pasangan jawaban yang mirip
 //
@@ -39,12 +39,6 @@ import {
   STATUS_MAHASISWA, STATUS_MAHASISWA_LABEL, bacaImporMahasiswa, bacaTempelMahasiswa,
   type Aoa, type BarisImpor, type Mahasiswa,
 } from "@/lib/mahasiswa";
-import {
-  AMBANG_NOL_BAWAAN, AMBANG_PENUH_BAWAAN, MAKS_BUTIR, MIN_KATA_ACUAN,
-  acuanKosong, kurvaNilai, periksaAcuan, ratakanBobotButir,
-  type Acuan, type ButirAcuan,
-} from "@/lib/nilai-acuan";
-import { acuanDariExcel, acuanDariWord, buatDocxAcuan, buatXlsxAcuan } from "@/lib/template-acuan";
 
 // ============================================================
 // DAFTAR MAHASISWA
@@ -562,7 +556,7 @@ export type RubrikRingkas = {
   dipakai: number;
 };
 
-export function PanelRubrik() {
+export function PanelRubrik({ onBerubah }: { onBerubah?: () => void } = {}) {
   const [daftar, setDaftar] = useState<RubrikRingkas[]>([]);
   const [muat, setMuat] = useState(true);
   const [kabar, setKabar] = useState("");
@@ -622,11 +616,12 @@ export function PanelRubrik() {
       });
       const data = await jawab.json();
       if (!jawab.ok || !data.success) throw new Error(data.message || "Gagal menyimpan.");
-      setKabar(susun.id ? "Rubrik tersimpan." : "Rubrik baru dibuat.");
+      setKabar(susun.id ? "Rubrik tersimpan." : "Rubrik baru dibuat. Pasang pada mata ujinya di atas.");
       setSusun(null);
       setCatatan([]);
       setNamaBerkas("");
       await muatDaftar();
+      onBerubah?.();
     } catch (alasan: unknown) {
       setGalat(alasan instanceof Error ? alasan.message : "Rubrik gagal disimpan.");
     } finally {
@@ -641,6 +636,7 @@ export function PanelRubrik() {
       const data = await jawab.json();
       if (!jawab.ok || !data.success) throw new Error(data.message || "Gagal menghapus.");
       await muatDaftar();
+      onBerubah?.();
     } catch (alasan: unknown) {
       setGalat(alasan instanceof Error ? alasan.message : "Rubrik gagal dihapus.");
     }
@@ -730,7 +726,7 @@ export function PanelRubrik() {
     setSusun({ ...susun, isi: { ...susun.isi, kriteria } });
   }
 
-  function ubahLevel(urutK: number, level: number, ubah: { deskriptor?: string; minKata?: number }) {
+  function ubahLevel(urutK: number, level: number, ubah: { deskriptor: string }) {
     if (!susun) return;
     const kriteria = susun.isi.kriteria.map((k, i) => {
       if (i !== urutK) return k;
@@ -746,9 +742,10 @@ export function PanelRubrik() {
     <div className="cbtv-rubrik">
       <div className="panel cbt-kepala">
         <div>
-          <b>Rubrik penilaian esai</b>
+          <b>Pustaka rubrik</b>
           <span>
-            Tiap level punya ambang panjang. Itu yang dipakai menilai esai otomatis saat peserta mengumpulkan.
+            AI membaca deskriptor tiap level untuk memilih level jawaban peserta, jadi tulislah apa
+            yang membedakan satu level dari level di bawahnya.
           </span>
         </div>
         <button type="button" className="btn btn-primary btn-mini" onClick={() => setSusun({ id: null, isi: rubrikKosong() })}>
@@ -785,7 +782,7 @@ export function PanelRubrik() {
             <b>Susun rubrik lewat Excel atau Word</b>
             <span>
               Unduh template, isi di komputer, lalu unggah kembali di sini. Yang diunggah
-              masuk ke formulir penyusun lebih dahulu — <b>belum tersimpan</b> — supaya
+              masuk ke formulir penyusun lebih dahulu, <b>belum tersimpan</b>, supaya
               bobot dan deskriptornya dapat Anda periksa sendiri sebelum dipakai menilai.
             </span>
           </div>
@@ -945,17 +942,6 @@ export function PanelRubrik() {
                 <div key={l.level} className="cbt-lebar cbtv-level">
                   <div className="cbtv-level-kepala">
                     <span>Level {l.level}</span>
-                    {/* Angka inilah yang membuat esai dapat ternilai sampai
-                        selesai tanpa satu ketukan pun: tangga yang ditetapkan
-                        sebelum ujian dan berlaku sama untuk semua peserta. */}
-                    <label className="cbtv-ambang-kata">
-                      <span>mulai</span>
-                      <input
-                        type="number" min={0} max={5000} value={l.minKata ?? 0}
-                        onChange={(e) => ubahLevel(urut, l.level, { minKata: Number(e.target.value) })}
-                      />
-                      <span>kata</span>
-                    </label>
                   </div>
                   <textarea
                     rows={2}
@@ -1022,7 +1008,7 @@ export function PanelRubrik() {
                     <b>{r.nama}</b>
                     <small>
                       {r.kriteria.length} kriteria · skala {r.skalaMin}–{r.skalaMax} · oleh {r.pemilik}
-                      {r.dipakai > 0 && ` · dipakai ${r.dipakai} ujian`}
+                      {r.dipakai > 0 && ` · dipakai ${r.dipakai} mata uji`}
                     </small>
                   </div>
                   <span className="cbtv-aksi-rubrik">
@@ -1051,7 +1037,7 @@ export function PanelRubrik() {
                         surel, lalu diunggah kembali tanpa mengetik ulang apa pun. */}
                     <button
                       type="button" className="btn btn-light btn-mini"
-                      title="Unduh sebagai template Excel — boleh disunting lalu diunggah kembali"
+                      title="Unduh sebagai template Excel, boleh disunting lalu diunggah kembali"
                       onClick={() => {
                         unduh(
                           buatXlsxDariRubrik({
@@ -1080,561 +1066,167 @@ export function PanelRubrik() {
 }
 
 // ============================================================
-// PENILAIAN ESAI: DUA CARA, SATU MENU
+// RUBRIK PENILAIAN: SATU RUBRIK UNTUK SATU MATA UJI
 //
-// Jawaban acuan dan rubrik mengukur hal yang BERBEDA, dan itulah sebabnya
-// keduanya ada berdampingan alih-alih yang satu menggantikan yang lain:
+// Sejak v49 rubrik dipasang SEKALI pada mata ujinya, dan seluruh ujian
+// dengan nama mata uji yang sama memakainya, termasuk ujian yang dibuat
+// sebelum rubriknya dipasang. Esai ujian-ujian itu dinilai AI terhadap rubrik
+// tersebut segera sesudah pesertanya mengumpulkan.
 //
-//   jawaban acuan   mengukur ISI    apakah yang dibicarakan peserta sama
-//                                   dengan yang dibicarakan dosen
-//   rubrik          mengukur BENTUK panjangnya, susunannya, berapa istilah
-//                                   soal yang muncul
+// Jawaban acuan pengajar dan penilai "bentuk jawaban" tanpa model sudah
+// dihapus. Rubrik adalah satu-satunya acuan, dan AI satu-satunya penilainya;
+// pengajar tetap dapat mengubah level mana pun dan tetap yang mengesahkan.
 //
-// Jawaban acuan didahulukan dan menjadi bawaannya. Ia menjawab pertanyaan
-// yang sebenarnya ditanyakan dosen ketika menilai esai, dan rubrik tidak
-// pernah dapat menjawabnya betapa pun rapi deskriptornya disusun.
-//
-// Rubrik tidak dihapus, dan itu bukan keraguan. Ujian yang sudah dinilai
-// dengan rubrik masih menyimpan skor per kriterianya, dan lembar penilaian
-// ujian-ujian itu harus tetap dapat dibuka bertahun-tahun kemudian ketika ada
-// yang menggugat nilainya. Menghapus rubrik berarti menghapus jawaban atas
-// gugatan itu.
+// Menu ini karena itu dimulai dari pertanyaan yang memang ditanyakan
+// pengajar ("mata uji saya dinilai dengan rubrik apa"), baru sesudahnya
+// pustaka rubrik tempat rubrik itu disusun.
 // ============================================================
 
+type MatkulRubrik = {
+  kunci: string;
+  mataKuliah: string;
+  jumlahUjian: number;
+  rubrikId: number | null;
+  rubrikNama: string;
+  diaturOleh: string;
+  diubah: string | null;
+  bolehAtur: boolean;
+};
+
 export function PanelPenilaianEsai() {
-  /** Jawaban acuan lebih dulu, karena itulah yang dianjurkan sekarang. */
-  const [cara, setCara] = useState<"acuan" | "rubrik">("acuan");
+  /** Dinaikkan tiap kali pustaka rubrik berubah, supaya pemilih ikut segar. */
+  const [segar, setSegar] = useState(0);
 
   return (
     <div className="cbtv-penilaian">
-      <div className="cbt-tab cbtv-cara">
-        <button type="button" className={cara === "acuan" ? "on" : ""} onClick={() => setCara("acuan")}>
-          Jawaban acuan
-        </button>
-        <button type="button" className={cara === "rubrik" ? "on" : ""} onClick={() => setCara("rubrik")}>
-          Rubrik
-        </button>
-      </div>
-
       <p className="cbtv-cara-baca">
-        {cara === "acuan"
-          ? "Mengukur ISI jawaban: seberapa dekat yang ditulis peserta dengan jawaban acuan Anda. Dianjurkan."
-          : "Mengukur BENTUK jawaban: panjang, susunan, dan istilah soal yang muncul. Tidak tahu apakah isinya benar."}
+        Satu mata uji memakai satu rubrik. Esai seluruh ujian mata uji itu, termasuk yang
+        sudah dibuat, dinilai AI terhadap rubriknya segera sesudah peserta mengumpulkan.
       </p>
-
-      {cara === "acuan" ? <PanelAcuan /> : <PanelRubrik />}
+      <PanelRubrikMatkul segar={segar} />
+      <PanelRubrik onBerubah={() => setSegar((n) => n + 1)} />
     </div>
   );
 }
 
-// ============================================================
-// KUNCI JAWABAN ACUAN DOSEN
-//
-// Susunan layarnya sengaja meniru impor soal, sampai ke letak tombolnya:
-// unduh template, isi di komputer, unggah sekali. Dosen yang pernah mengimpor
-// soal sudah tahu cara memakai panel ini sebelum membacanya.
-//
-// Ada juga jalan menyusun langsung di layar, dan ia ditaruh SESUDAH jalur
-// berkas, bukan sebelumnya. Yang butirnya tiga memang lebih cepat mengetik di
-// sini; yang butirnya dua puluh akan menyesal di butir ketujuh belas.
-// ============================================================
-
-export type AcuanRingkas = {
-  id: number;
-  nama: string;
-  keterangan: string;
-  ambangNol: number;
-  ambangPenuh: number;
-  butir: ButirAcuan[];
-  pemilik: string;
-  milikSaya: boolean;
-  bolehSunting: boolean;
-  dipakai: number;
-};
-
-/** Berapa kata sebuah jawaban acuan, dihitung kasar untuk ditampilkan. */
-function jumlahKata(teks: string) {
-  return teks.trim() ? teks.trim().split(/\s+/).length : 0;
-}
-
-export function PanelAcuan() {
-  const [daftar, setDaftar] = useState<AcuanRingkas[]>([]);
+function PanelRubrikMatkul({ segar }: { segar: number }) {
+  const [daftar, setDaftar] = useState<MatkulRubrik[]>([]);
+  const [rubrik, setRubrik] = useState<Array<{ id: number; nama: string; kriteria: unknown[] }>>([]);
+  const [siap, setSiap] = useState(true);
   const [muat, setMuat] = useState(true);
+  const [sibuk, setSibuk] = useState("");
   const [kabar, setKabar] = useState("");
   const [galat, setGalat] = useState("");
-  const [sibuk, setSibuk] = useState(false);
-
-  /** Acuan yang sedang disunting. null berarti tidak ada formulir terbuka. */
-  const [susun, setSusun] = useState<{ id: number | null; isi: Acuan } | null>(null);
-
-  /** Baris yang ditolak pembaca berkas, ditahan untuk diperlihatkan. */
-  const [tolak, setTolak] = useState<Array<{ baris: string; alasan: string }>>([]);
-  const [namaBerkas, setNamaBerkas] = useState("");
-  const [membaca, setMembaca] = useState(false);
 
   const muatDaftar = useCallback(async () => {
     setMuat(true);
     try {
-      const jawab = await fetch("/api/cbt/acuan", { cache: "no-store" });
+      const jawab = await fetch("/api/cbt/rubrik", { cache: "no-store" });
       const data = await jawab.json();
       if (!jawab.ok || !data.success) throw new Error(data.message || "Gagal memuat.");
-      setDaftar(data.acuan || []);
+      setDaftar(data.matkul || []);
+      setRubrik(data.rubrik || []);
+      setSiap(data.matkulSiap !== false);
       setGalat("");
     } catch (alasan: unknown) {
-      setGalat(alasan instanceof Error ? alasan.message : "Daftar jawaban acuan gagal dimuat.");
+      setGalat(alasan instanceof Error ? alasan.message : "Daftar mata uji gagal dimuat.");
     } finally {
       setMuat(false);
     }
   }, []);
 
-  // Ditunda satu putaran, sama seperti PanelRubrik di atas: pemuat ini
-  // menyetel state pada baris pertamanya, dan menyetel state serentak di dalam
-  // efek memicu gambar ulang berantai.
+  // Ditunda satu putaran, pola yang sama dengan pemuat lain di berkas ini.
   useEffect(() => {
     const tunda = window.setTimeout(() => void muatDaftar(), 0);
     return () => window.clearTimeout(tunda);
-  }, [muatDaftar]);
+  }, [muatDaftar, segar]);
 
-  function unduh(berkas: Blob, nama: string) {
-    const url = URL.createObjectURL(berkas);
-    const tautan = document.createElement("a");
-    tautan.href = url;
-    tautan.download = nama;
-    tautan.click();
-    URL.revokeObjectURL(url);
-  }
-
-  /**
-   * Baca berkas acuan yang diunggah.
-   *
-   * Seluruhnya diurai DI PERAMBAN, sama seperti pengimpor soal. Berkas Word
-   * dan Excel dosen tidak perlu singgah di server hanya untuk dibaca, dan yang
-   * tidak singgah tidak dapat tertinggal di sana.
-   */
-  async function bacaBerkas(berkas: File) {
-    setMembaca(true);
-    setGalat("");
-    setKabar("");
-    setNamaBerkas(berkas.name);
+  async function pasang(m: MatkulRubrik, rubrikId: number) {
+    if (rubrikId === 0 && !window.confirm(
+      `Lepas rubrik ${m.mataKuliah}? Esai seluruh ujiannya tidak dinilai AI sampai rubrik dipasang lagi.`,
+    )) return;
+    setSibuk(m.kunci); setGalat(""); setKabar("");
     try {
-      let hasil: { butir: ButirAcuan[]; tolak: Array<{ baris: string; alasan: string }> };
-      if (/\.docx?$/i.test(berkas.name)) {
-        const mammoth = await import("mammoth");
-        const dibaca = await mammoth.convertToHtml({ arrayBuffer: await berkas.arrayBuffer() });
-        hasil = acuanDariWord(dibaca.value || "");
-      } else {
-        const XLSX = await import("xlsx");
-        const buku = XLSX.read(await berkas.arrayBuffer(), { type: "array" });
-        const lembar = buku.Sheets[buku.SheetNames[0]];
-        const aoa = XLSX.utils.sheet_to_json(lembar, { header: 1, raw: false, defval: "" }) as Aoa;
-        hasil = acuanDariExcel(aoa);
-      }
-
-      setTolak(hasil.tolak);
-      if (hasil.butir.length === 0) {
-        setGalat(hasil.tolak[0]?.alasan || "Tidak ada butir yang terbaca dari berkas ini.");
-        return;
-      }
-
-      // Berkas yang terbaca langsung membuka formulir, bukan sekadar menjadi
-      // pratinjau yang masih harus ditekan sekali lagi. Yang baru saja
-      // mengunggah berkas bermaksud menyimpannya; nama acuannya yang masih
-      // perlu ia ketik, dan itulah satu-satunya yang diminta di sini.
-      setSusun({
-        id: null,
-        isi: {
-          nama: berkas.name.replace(/\.(xlsx|xls|csv|docx?)$/i, "").slice(0, 160),
-          keterangan: "",
-          ambangNol: AMBANG_NOL_BAWAAN,
-          ambangPenuh: AMBANG_PENUH_BAWAAN,
-          butir: hasil.butir,
-        },
-      });
-      setKabar(`${hasil.butir.length} jawaban acuan terbaca dari ${berkas.name}. Periksa lalu simpan.`);
-    } catch (alasan: unknown) {
-      setGalat(alasan instanceof Error ? alasan.message : "Berkas belum dapat dibaca.");
-    } finally {
-      setMembaca(false);
-    }
-  }
-
-  async function simpan() {
-    if (!susun) return;
-    const periksa = periksaAcuan(susun.isi);
-    if (!periksa.ok) { setGalat(periksa.pesan); return; }
-
-    setSibuk(true); setGalat(""); setKabar("");
-    try {
-      const jawab = await fetch("/api/cbt/acuan", {
-        method: susun.id ? "PATCH" : "POST",
+      const jawab = await fetch("/api/cbt/rubrik", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: susun.id ?? undefined, ...susun.isi }),
+        body: JSON.stringify({ aksi: "matkul", mataKuliah: m.mataKuliah, rubrikId }),
       });
       const data = await jawab.json();
       if (!jawab.ok || !data.success) throw new Error(data.message || "Gagal menyimpan.");
-      setKabar(
-        susun.id
-          ? data.dipakai > 0
-            ? `Acuan tersimpan. Ia dipakai ${data.dipakai} ujian; nilai yang sudah keluar dihitung dengan acuan versi lama sampai penilaiannya dijalankan lagi.`
-            : "Acuan tersimpan."
-          : "Acuan baru tersimpan.",
-      );
-      setSusun(null);
-      setTolak([]);
-      setNamaBerkas("");
+      setKabar(data.pesan || "Rubrik mata uji tersimpan.");
       await muatDaftar();
     } catch (alasan: unknown) {
-      setGalat(alasan instanceof Error ? alasan.message : "Acuan gagal disimpan.");
+      setGalat(alasan instanceof Error ? alasan.message : "Rubrik mata uji gagal disimpan.");
     } finally {
-      setSibuk(false);
+      setSibuk("");
     }
   }
 
-  async function hapus(a: AcuanRingkas) {
-    if (!window.confirm(`Hapus jawaban acuan "${a.nama}"?`)) return;
-    try {
-      const jawab = await fetch(`/api/cbt/acuan?id=${a.id}`, { method: "DELETE" });
-      const data = await jawab.json();
-      if (!jawab.ok || !data.success) throw new Error(data.message || "Gagal menghapus.");
-      await muatDaftar();
-    } catch (alasan: unknown) {
-      setGalat(alasan instanceof Error ? alasan.message : "Acuan gagal dihapus.");
-    }
-  }
-
-  function ubahButir(urut: number, ubah: Partial<ButirAcuan>) {
-    if (!susun) return;
-    const butir = susun.isi.butir.map((b, i) => (i === urut ? { ...b, ...ubah } : b));
-    setSusun({ ...susun, isi: { ...susun.isi, butir } });
-  }
-
-  const jumlahBobot = susun ? susun.isi.butir.reduce((n, b) => n + b.bobot, 0) : 0;
+  const tanpaRubrik = daftar.filter((m) => !m.rubrikId).length;
 
   return (
-    <div className="cbtv-acuan">
-      <div className="panel cbt-kepala">
+    <div className="panel cbtv-matkul">
+      <div className="cbt-kepala cbtv-matkul-kepala">
         <div>
-          <b>Kunci jawaban acuan Dosen / Pengajar</b>
+          <b>Rubrik tiap Mata Kuliah / Materi</b>
           <span>
-            Jawaban peserta dinilai dari kedekatannya dengan jawaban acuan Anda, memakai cosine
-            similarity atas bobot kata TF-IDF. Parafrase yang benar tetap bernilai tinggi;
-            jawaban panjang di luar topik tidak terbantu oleh panjangnya.
+            {tanpaRubrik > 0
+              ? `${tanpaRubrik} mata uji belum punya rubrik. Esainya menunggu sampai rubrik dipasang.`
+              : "Seluruh mata uji sudah punya rubrik."}
           </span>
         </div>
-        <button
-          type="button"
-          className="btn btn-light btn-mini"
-          onClick={() => { setSusun({ id: null, isi: acuanKosong() }); setTolak([]); setNamaBerkas(""); }}
-        >
-          + Susun di layar
-        </button>
       </div>
 
       {kabar && <div className="dsh-ok">{kabar}</div>}
       {galat && <div className="dsh-error">{galat}</div>}
-
-      {/* ---------- UNDUH, ISI, UNGGAH ----------
-          Tombolnya memakai kelas yang sama persis dengan impor soal, sehingga
-          keduanya tidak dapat berselisih rupa ketika salah satunya diubah. */}
-      {!susun && (
-        <div className="panel cbt-impor">
-          <div className="cbt-impor-kepala">
-            <b>Isi lewat Excel atau Word</b>
-            <span>
-              Unduh template, tulis jawaban acuan di komputer, unggah sekali untuk seluruh butir.
-              Excel untuk butir yang banyak; Word untuk jawaban berupa paragraf.
-            </span>
-          </div>
-
-          <div className="cbt-impor-tombol">
-            <button
-              type="button"
-              className="btn btn-light"
-              onClick={() => unduh(buatXlsxAcuan(), "template-jawaban-acuan.xlsx")}
-            >
-              &#8681; Template Excel (.xlsx)
-            </button>
-            <button
-              type="button"
-              className="btn btn-light"
-              onClick={() => unduh(buatDocxAcuan(), "template-jawaban-acuan.docx")}
-            >
-              &#8681; Template Word (.docx)
-            </button>
-            <label className={`btn btn-primary cbt-unggah ${membaca ? "mati" : ""}`}>
-              {membaca ? "Membaca…" : "⇧ Unggah acuan"}
-              <input
-                type="file"
-                accept=".xlsx,.xls,.csv,.docx"
-                disabled={membaca}
-                onChange={(e) => {
-                  const berkas = e.target.files?.[0];
-                  e.target.value = "";
-                  if (berkas) void bacaBerkas(berkas);
-                }}
-              />
-            </label>
-          </div>
-
-          {tolak.length > 0 && (
-            <div className="cbt-impor-hasil">
-              <div className="cbt-impor-angka">
-                <span className="cbt-impor-gagal"><b>{tolak.length}</b> baris perlu diperbaiki</span>
-                {namaBerkas && <span className="cbt-impor-nama">{namaBerkas}</span>}
-              </div>
-              <ul className="cbt-impor-tolak">
-                {tolak.slice(0, 8).map((t, i) => <li key={i}><b>{t.baris}</b>: {t.alasan}</li>)}
-                {tolak.length > 8 && <li>…dan {tolak.length - 8} lagi.</li>}
-              </ul>
-            </div>
-          )}
+      {!siap && (
+        <div className="dsh-error">
+          Tabel rubrik mata uji belum ada. Jalankan <b>supabase-update-v49-rubrik-matkul.sql</b> di
+          Supabase, SQL Editor, lalu muat ulang halaman ini.
         </div>
       )}
 
-      {/* ---------- FORMULIR ---------- */}
-      {susun && (
-        <div className="panel cbt-form cbtv-susun">
-          <div className="cbt-baris">
-            <label><span>Nama acuan *</span>
-              <input
-                value={susun.isi.nama}
-                onChange={(e) => setSusun({ ...susun, isi: { ...susun.isi, nama: e.target.value } })}
-                placeholder="mis. Acuan UAS Komunikasi Massa"
-              />
-            </label>
-          </div>
-
-          <label className="cbt-lebar"><span>Keterangan singkat</span>
-            <input
-              value={susun.isi.keterangan}
-              onChange={(e) => setSusun({ ...susun, isi: { ...susun.isi, keterangan: e.target.value } })}
-              placeholder="Untuk mata kuliah dan semester apa acuan ini dipakai"
-            />
-          </label>
-
-          {/* ---------- DUA AMBANG ----------
-              Ditaruh di atas daftar butir, bukan disembunyikan di bawahnya:
-              keduanya berlaku untuk SELURUH butir, dan yang mengubahnya perlu
-              melihat akibatnya sebelum mengetik dua puluh jawaban acuan. */}
-          <div className="cbtv-ambang-acuan">
-            <div className="cbtv-ambang-baris">
-              <label>
-                <span>Nilai nol di bawah</span>
-                <input
-                  type="number" min={0} max={98} value={susun.isi.ambangNol}
-                  onChange={(e) => setSusun({
-                    ...susun,
-                    isi: { ...susun.isi, ambangNol: Math.max(0, Math.min(98, Number(e.target.value) || 0)) },
-                  })}
-                />
-                <i>% mirip</i>
-              </label>
-              <label>
-                <span>Nilai penuh mulai</span>
-                <input
-                  type="number" min={1} max={100} value={susun.isi.ambangPenuh}
-                  onChange={(e) => setSusun({
-                    ...susun,
-                    isi: { ...susun.isi, ambangPenuh: Math.max(1, Math.min(100, Number(e.target.value) || 0)) },
-                  })}
-                />
-                <i>% mirip</i>
-              </label>
-            </div>
-            <p className="cbt-catatan">
-              Nilai penuh sengaja tidak menunggu kemiripan 100%. Kemiripan 100% hanya dicapai
-              jawaban yang menyalin acuan kata demi kata, dan menuntutnya berarti memberi nilai
-              tertinggi kepada yang menghafal. Bawaannya {AMBANG_NOL_BAWAAN}% dan {AMBANG_PENUH_BAWAAN}%.
-            </p>
-            <div className="cbtv-kurva">
-              {[10, 25, 40, 55, 70, 85, 100].map((k) => (
-                <span key={k}>
-                  <b>{k}%</b> mirip <i>→</i> nilai {kurvaNilai(k, susun.isi.ambangNol, susun.isi.ambangPenuh)}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className="cbtv-bobot-kabar">
-            Jumlah bobot: <b className={jumlahBobot === 100 ? "ok" : "salah"}>{jumlahBobot}%</b>
-            {jumlahBobot !== 100 && <> harus tepat 100%.</>}
-            <button
-              type="button"
-              className="btn btn-light btn-mini"
-              onClick={() => {
-                const rata = ratakanBobotButir(susun.isi.butir.length);
-                setSusun({
-                  ...susun,
-                  isi: { ...susun.isi, butir: susun.isi.butir.map((b, i) => ({ ...b, bobot: rata[i] })) },
-                });
-              }}
-            >
-              Ratakan
-            </button>
-          </div>
-
-          {susun.isi.butir.map((b, urut) => {
-            const kata = jumlahKata(b.jawaban);
-            return (
-              <div key={urut} className="cbtv-butir">
-                <div className="cbt-baris">
-                  <label className="cbtv-nomor"><span>Soal nomor</span>
-                    <input
-                      type="number" min={1} max={999} value={b.nomor}
-                      onChange={(e) => ubahButir(urut, { nomor: Math.max(1, Number(e.target.value) || 1) })}
-                    />
-                  </label>
-                  <label><span>Pertanyaan (tidak dinilai)</span>
-                    <input
-                      value={b.pertanyaan}
-                      onChange={(e) => ubahButir(urut, { pertanyaan: e.target.value })}
-                      placeholder="Disalin sekadar agar Anda tahu sedang menjawab soal yang mana"
-                    />
-                  </label>
-                  <label className="cbtv-bobot"><span>Bobot %</span>
-                    <input
-                      type="number" min={0} max={100} value={b.bobot}
-                      onChange={(e) => ubahButir(urut, { bobot: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })}
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    className="btn btn-light btn-mini cbtv-buang"
-                    onClick={() => setSusun({
-                      ...susun,
-                      isi: { ...susun.isi, butir: susun.isi.butir.filter((_, i) => i !== urut) },
-                    })}
-                  >
-                    Buang
-                  </button>
-                </div>
-
-                <div className="cbt-lebar cbtv-jawab">
-                  <div className="cbtv-jawab-kepala">
-                    <span>Jawaban acuan</span>
-                    {/* Jumlah kata ditulis terus terang, dan warnanya berubah di
-                        bawah ambang. Acuan yang terlalu pendek baru ketahuan saat
-                        disimpan akan membuat dosen mengulang dari awal. */}
-                    <em className={kata < MIN_KATA_ACUAN ? "kurang" : ""}>
-                      {kata} kata{kata < MIN_KATA_ACUAN ? `, paling sedikit ${MIN_KATA_ACUAN}` : ""}
-                    </em>
-                  </div>
-                  <textarea
-                    rows={4}
-                    value={b.jawaban}
-                    onChange={(e) => ubahButir(urut, { jawaban: e.target.value })}
-                    placeholder="Tulis jawaban terbaik yang Anda harapkan, dengan kalimat penuh"
-                  />
-                </div>
-
-                <label className="cbt-lebar cbtv-wajib"><span>Istilah wajib, dipisah koma (opsional)</span>
-                  <input
-                    value={b.wajib.join(", ")}
-                    onChange={(e) => ubahButir(urut, {
-                      wajib: e.target.value.split(",").map((w) => w.trim().toLowerCase()).filter((w) => w !== ""),
-                    })}
-                    placeholder="mis. agenda setting, khalayak"
-                  />
-                </label>
+      {muat ? (
+        <div className="dempty">Memuat…</div>
+      ) : daftar.length === 0 ? (
+        <div className="dempty">Belum ada ujian. Mata uji muncul di sini begitu ujiannya dibuat.</div>
+      ) : (
+        <ul className="cbtv-daftar-matkul">
+          {daftar.map((m) => (
+            <li key={m.kunci} className={m.rubrikId ? "" : "cbtv-matkul-kosong"}>
+              <div>
+                <b>{m.mataKuliah}</b>
+                <small>
+                  {m.jumlahUjian > 0 ? `${m.jumlahUjian} ujian` : "tanpa ujian"}
+                  {m.rubrikId && m.diaturOleh ? ` · dipasang ${m.diaturOleh}` : ""}
+                  {!m.rubrikId && " · belum dinilai otomatis"}
+                </small>
               </div>
-            );
-          })}
-
-          <div className="cbtv-susun-tombol">
-            <button
-              type="button"
-              className="btn btn-light btn-mini"
-              disabled={susun.isi.butir.length >= MAKS_BUTIR}
-              onClick={() => setSusun({
-                ...susun,
-                isi: {
-                  ...susun.isi,
-                  butir: [
-                    ...susun.isi.butir,
-                    { nomor: susun.isi.butir.length + 1, pertanyaan: "", jawaban: "", bobot: 0, wajib: [] },
-                  ],
-                },
-              })}
-            >
-              + Tambah butir
-            </button>
-            <button type="button" className="btn btn-primary btn-mini" disabled={sibuk} onClick={() => void simpan()}>
-              {sibuk ? "Menyimpan…" : "Simpan acuan"}
-            </button>
-            <button
-              type="button"
-              className="btn btn-light btn-mini"
-              onClick={() => { setSusun(null); setTolak([]); setNamaBerkas(""); }}
-            >
-              Batal
-            </button>
-          </div>
-        </div>
+              <select
+                value={m.rubrikId ?? 0}
+                disabled={!m.bolehAtur || !siap || sibuk === m.kunci}
+                title={m.bolehAtur ? "" : "Hanya pengajar pemilik ujian mata uji ini, atau Admin."}
+                onChange={(e) => void pasang(m, Number(e.target.value))}
+              >
+                <option value={0}>Belum ada rubrik</option>
+                {rubrik.map((r) => (
+                  <option key={r.id} value={r.id}>{r.nama} ({r.kriteria.length} kriteria)</option>
+                ))}
+              </select>
+            </li>
+          ))}
+        </ul>
       )}
-
-      {/* ---------- ACUAN YANG SUDAH ADA ---------- */}
-      {!susun && (
-        <div className="panel">
-          <b className="cbtv-sub">Acuan di portal ini</b>
-          {muat ? (
-            <div className="dempty">Memuat…</div>
-          ) : daftar.length === 0 ? (
-            <div className="dempty">
-              Belum ada jawaban acuan. Unduh template di atas, isi di komputer, lalu unggah kembali.
-            </div>
-          ) : (
-            <ul className="cbtv-daftar-rubrik">
-              {daftar.map((a) => (
-                <li key={a.id}>
-                  <div>
-                    <b>{a.nama}</b>
-                    <small>
-                      {a.butir.length} butir · nilai penuh mulai {a.ambangPenuh}% mirip · oleh {a.pemilik}
-                      {a.dipakai > 0 && ` · dipakai ${a.dipakai} ujian`}
-                    </small>
-                  </div>
-                  <span className="cbtv-aksi-rubrik">
-                    {a.bolehSunting && (
-                      <button
-                        type="button" className="btn btn-light btn-mini"
-                        onClick={() => setSusun({
-                          id: a.id,
-                          isi: {
-                            nama: a.nama, keterangan: a.keterangan,
-                            ambangNol: a.ambangNol, ambangPenuh: a.ambangPenuh,
-                            butir: JSON.parse(JSON.stringify(a.butir)) as ButirAcuan[],
-                          },
-                        })}
-                      >
-                        Sunting
-                      </button>
-                    )}
-                    <button
-                      type="button" className="btn btn-light btn-mini"
-                      onClick={() => setSusun({
-                        id: null,
-                        isi: {
-                          nama: `${a.nama} (salinan)`, keterangan: a.keterangan,
-                          ambangNol: a.ambangNol, ambangPenuh: a.ambangPenuh,
-                          butir: JSON.parse(JSON.stringify(a.butir)) as ButirAcuan[],
-                        },
-                      })}
-                    >
-                      Salin
-                    </button>
-                    {a.bolehSunting && (
-                      <button type="button" className="btn btn-light btn-mini" onClick={() => void hapus(a)}>Hapus</button>
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+      {rubrik.length === 0 && !muat && (
+        <p className="cbt-catatan">
+          Belum ada rubrik di pustaka. Salin salah satu rubrik siap pakai di bawah, atau susun sendiri.
+        </p>
       )}
     </div>
   );
 }
+
 
 // ============================================================
 // LEMBAR PENILAIAN RUBRIK SATU PESERTA
@@ -1675,7 +1267,8 @@ export type LembarPenilaian = {
     laporanTerkirim: string | null;
     kemiripan: number; statusKemiripan: string;
   };
-  rubrik: { nama: string; skalaMin: number; skalaMax: number; jumlahKriteria: number } | null;
+  rubrik: { nama: string; skalaMin: number; skalaMax: number; jumlahKriteria: number; diaturOleh?: string } | null;
+  mataKuliah?: string;
   esai: EsaiNilai[];
   aiSiap: boolean;
 };
@@ -1722,13 +1315,13 @@ export function LembarRubrik({
     return () => window.clearTimeout(tunda);
   }, [muatLembar]);
 
-  async function nilaiAi(ulangi: boolean, aksi: "ai" | "lokal" = "ai") {
-    setSibuk(aksi); setGalat(""); setKabar("");
+  async function nilaiAi(ulangi: boolean) {
+    setSibuk("ai"); setGalat(""); setKabar("");
     try {
       const jawab = await fetch("/api/cbt/penilaian", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ aksi, ujian: ujianId, attempt: attemptId, ulangi }),
+        body: JSON.stringify({ aksi: "ai", ujian: ujianId, attempt: attemptId, ulangi }),
       });
       const isi = await jawab.json();
       if (!jawab.ok || !isi.success) throw new Error(isi.message || "Gagal menilai.");
@@ -1841,47 +1434,49 @@ export function LembarRubrik({
 
       {!data.rubrik ? (
         <div className="dsh-note">
-          Ujian ini belum memakai rubrik, jadi esai dinilai seperti biasa, Anda mengetik
-          angkanya sendiri pada lembar jawaban. Untuk memakai rubrik, pilih satu pada
-          <b> Pengaturan ujian → Rubrik penilaian esai</b>.
+          Mata uji <b>{data.mataKuliah || "ujian ini"}</b> belum punya rubrik, jadi esainya belum dinilai
+          AI. Pasang satu rubrik di menu <b>Rubrik penilaian</b> atau lewat <b>Pengaturan ujian</b>; esai yang
+          sudah dikumpulkan ikut dinilai begitu rubriknya terpasang. Sampai itu, Anda dapat mengetik
+          angkanya sendiri pada lembar jawaban.
         </div>
       ) : (
         <>
           <div className="cbtv-lembar-kepala">
             <div>
-              <b>Penilaian rubrik: {data.rubrik.nama}</b>
+              <b>Rubrik mata uji: {data.rubrik.nama}</b>
               <small>
                 {data.esai.length} soal esai · skala {data.rubrik.skalaMin}–{data.rubrik.skalaMax}
                 {belumDinilai > 0 && ` · ${belumDinilai} belum dinilai`}
               </small>
             </div>
-            {data.aiSiap ? (
-              <span className="cbtv-aksi-rubrik">
-                <button type="button" className="btn btn-primary btn-mini" disabled={sibuk === "ai"} onClick={() => void nilaiAi(false)}>
-                  {sibuk === "ai" ? "Menilai…" : "✨ Nilai dengan AI"}
-                </button>
-                <button type="button" className="btn btn-light btn-mini" disabled={sibuk === "ai"} onClick={() => void nilaiAi(true)}>
-                  Nilai ulang
-                </button>
-              </span>
-            ) : (
-              <span className="cbtv-lembar-aksi">
-                <button
-                  type="button" className="btn btn-light btn-mini"
-                  disabled={sibuk === "lokal"}
-                  onClick={() => void nilaiAi(true, "lokal")}
-                >
-                  {sibuk === "lokal" ? "Menghitung…" : "↻ Hitung ulang otomatis"}
-                </button>
-                <small className="cbt-catatan">Pembacaan isi oleh AI tidak tersedia.</small>
-              </span>
-            )}
+            <span className="cbtv-aksi-rubrik">
+              <button
+                type="button" className="btn btn-primary btn-mini"
+                disabled={sibuk === "ai" || !data.aiSiap} onClick={() => void nilaiAi(false)}
+              >
+                {sibuk === "ai" ? "Menilai…" : "✨ Nilai dengan AI"}
+              </button>
+              <button
+                type="button" className="btn btn-light btn-mini"
+                disabled={sibuk === "ai" || !data.aiSiap} onClick={() => void nilaiAi(true)}
+              >
+                Nilai ulang
+              </button>
+            </span>
           </div>
 
-          <p className="cbt-catatan cbtv-prinsip">
-            Esai dinilai otomatis dari ambang panjang rubrik saat peserta mengumpulkan.
-            Ubah level bila ada yang meleset, nilainya ikut berubah.
-          </p>
+          {data.aiSiap ? (
+            <p className="cbt-catatan cbtv-prinsip">
+              Esai dinilai AI terhadap rubrik mata uji segera sesudah peserta mengumpulkan. Jawaban yang
+              tidak menjawab pertanyaan tidak lolos gerbang rubrik dan bernilai 0. Ubah level bila ada yang
+              meleset, nilainya ikut berubah.
+            </p>
+          ) : (
+            <div className="dsh-error">
+              Belum ada kunci AI yang tersambung, jadi esai menunggu dinilai. Super Admin dapat menempel kunci
+              Gemini, ChatGPT, atau Claude di Dashboard Super Admin → Kunci AI.
+            </div>
+          )}
 
           {data.esai.length === 0 && <div className="dempty">Tidak ada soal esai pada lembar peserta ini.</div>}
 
@@ -1935,6 +1530,7 @@ export function LembarRubrik({
                               title={k.levels.find((l) => l.level === k.level)?.deskriptor ?? ""}
                             >
                               <option value="">-</option>
+                              <option value={0}>0 · Tidak lolos gerbang rubrik</option>
                               {k.levels.map((l) => (
                                 <option key={l.level} value={l.level} title={l.deskriptor}>
                                   {l.level}{l.deskriptor ? ` · ${l.deskriptor.slice(0, 60)}${l.deskriptor.length > 60 ? "…" : ""}` : ""}

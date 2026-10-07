@@ -22,6 +22,8 @@ import {
   pemilik, PEMANTAU, statusUjian,
 } from "@/lib/cbt";
 import { rapikanMode } from "@/lib/pengawasan";
+import { daftarRubrikMatkul, pasangRubrikMatkul } from "@/lib/cbt-store";
+import { kunciMatkul } from "@/lib/penilaian-ai";
 import { rapikanPerangkatKunci } from "@/lib/kunci-layar";
 import { hapusMediaUjian } from "@/lib/media-simpan";
 
@@ -37,22 +39,34 @@ const teks = (nilai: unknown, batas: number) =>
   typeof nilai === "string" ? nilai.replace(/\s+/g, " ").trim().slice(0, batas) : "";
 
 /**
- * Id rubrik atau id acuan dari kiriman layar, atau null.
+ * Rubrik mata uji dari kiriman layar.
  *
- * Kosong, nol, dan "tanpa rubrik" semuanya berarti hal yang sama: esai dinilai
- * seperti sebelum V1, dosen mengetik angkanya sendiri. Ketiganya dijadikan
- * null di satu tempat supaya tidak ada rubrik bernomor nol yang dicari-cari
- * kemudian di tabel dan tidak pernah ketemu.
+ *   undefined / null   tidak diubah: ujian ini ikut rubrik mata ujinya
+ *   0                  lepas rubrik mata ujinya
+ *   angka > 0          pasang rubrik itu untuk mata ujinya
  *
- * Dipakai juga oleh answerKeyId, yang jepitannya sama persis. Menyalin fungsi
- * ini menjadi idAcuan hanya akan membuat dua jepitan yang dapat berbeda
- * diam-diam, dan bedanya baru ketahuan sebagai acuan bernomor nol yang tidak
- * pernah ketemu.
+ * Yang diubah adalah rubrik MATA UJI, bukan rubrik ujian ini saja: seluruh
+ * ujian dengan nama mata uji yang sama ikut memakainya. Layar pengaturan
+ * mengatakan itu tepat di bawah pemilihnya.
  */
-const idRubrik = (nilai: unknown): number | null => {
+const pilihanRubrik = (nilai: unknown): number | null | undefined => {
+  if (nilai === undefined || nilai === null || nilai === "") return undefined;
   const angkanya = Number(nilai);
-  return Number.isInteger(angkanya) && angkanya > 0 ? angkanya : null;
+  if (!Number.isInteger(angkanya) || angkanya < 0) return undefined;
+  return angkanya === 0 ? null : angkanya;
 };
+
+/** Terapkan pilihan rubrik mata uji. Mengembalikan pesan bila gagal. */
+async function terapkanRubrik(courseName: string, pilihan: number | null | undefined, oleh: string) {
+  if (pilihan === undefined) return null;
+  try {
+    const hasil = await pasangRubrikMatkul(courseName, pilihan, oleh);
+    return hasil.ok ? null : hasil.pesan;
+  } catch (galat) {
+    console.error("rubrik mata uji", galat);
+    return "Rubrik mata uji belum tersimpan. Pastikan supabase-update-v49-rubrik-matkul.sql sudah dijalankan.";
+  }
+}
 
 const angka = (nilai: unknown, bawaan: number, min: number, maks: number) => {
   const n = Number(nilai);
@@ -133,8 +147,6 @@ export async function GET() {
         instruction: cbtExams.instruction,
         createdAt: cbtExams.createdAt,
         // ---------- CBT V1 ----------
-        rubricId: cbtExams.rubricId,
-        answerKeyId: cbtExams.answerKeyId,
         recordAudio: cbtExams.recordAudio,
         checkSimilarity: cbtExams.checkSimilarity,
         similarityReview: cbtExams.similarityReview,
@@ -166,6 +178,11 @@ export async function GET() {
       .groupBy(cbtAttempts.examId);
     const peserta = new Map(pesertaRows.map((p) => [p.examId, p]));
 
+    // Rubrik tiap mata uji, sekali untuk seluruh daftar. null berarti
+    // SQL v49 belum dijalankan; layar pengajar mengatakannya.
+    const terpasang = await daftarRubrikMatkul();
+    const rubrikMatkul = new Map((terpasang ?? []).map((m) => [m.kunci, m]));
+
     const sekarang = new Date();
     return Response.json({
       success: true,
@@ -173,8 +190,14 @@ export async function GET() {
       // ujian, karena satu orang dapat memiliki sebagian dan hanya memantau
       // sisanya.
       pemantau: PEMANTAU.includes(profile.role),
+      rubrikMatkulSiap: terpasang !== null,
       ujian: daftar.map((u) => ({
         ...u,
+        // Rubrik yang menilai esai ujian ini: rubrik MATA UJINYA.
+        rubrikMatkul: (() => {
+          const m = rubrikMatkul.get(kunciMatkul(u.courseName));
+          return m ? { id: m.rubrikId, nama: m.rubrikNama, kriteria: m.jumlahKriteria, diaturOleh: m.diaturOleh } : null;
+        })(),
         status: statusUjian({ aktif: Boolean(u.activatedAt), mulai: u.startAt, selesai: u.endAt }, sekarang),
         jumlahBank: bank.get(u.id) ?? 0,
         peserta: peserta.get(u.id) ?? { total: 0, berjalan: 0, selesai: 0 },
@@ -249,8 +272,6 @@ export async function POST(request: Request) {
             // Seluruhnya punya nilai bawaan yang berarti "seperti sebelum V1",
             // jadi layar pembuatan ujian yang tidak menyebutkannya sama sekali
             // tetap menghasilkan ujian yang sah.
-            rubricId: idRubrik(body.rubricId),
-            answerKeyId: idRubrik(body.answerKeyId),
             recordAudio: body.recordAudio === true,
             checkSimilarity: body.checkSimilarity !== false,
             similarityReview: angka(body.similarityReview, 30, 1, 99),
@@ -258,7 +279,14 @@ export async function POST(request: Request) {
             autoEmail: body.autoEmail === true,
           })
           .returning({ id: cbtExams.id, code: cbtExams.code });
-        return Response.json({ success: true, ujian: dibuat[0] }, { status: 201 });
+        // Rubrik dipasang pada MATA UJINYA sesudah ujiannya ada. Yang gagal
+        // di sini tidak membatalkan ujian yang sudah tersimpan; ia dikabarkan,
+        // dan dapat dipasang lagi dari Pengaturan ujian.
+        const galatRubrik = await terapkanRubrik(courseName, pilihanRubrik(body.rubrikMatkul), profile.fullName);
+        return Response.json(
+          { success: true, ujian: dibuat[0], ...(galatRubrik ? { peringatan: galatRubrik } : {}) },
+          { status: 201 },
+        );
       } catch (error) {
         if (coba >= 4) throw error;
       }
@@ -335,13 +363,6 @@ export async function PATCH(request: Request) {
     if (body.token !== undefined) ubah.token = teks(body.token, 12).toUpperCase() || null;
 
     // ---------- CBT V1 ----------
-    // Rubrik boleh diganti kapan saja, termasuk sesudah sebagian esai dinilai.
-    // Skor yang sudah ada TIDAK ikut terhapus — ia tetap menempel pada nomor
-    // urut kriterianya, dan panel penilaian akan menunjukkan mana yang tidak
-    // lagi cocok dengan rubrik yang sekarang. Menghapusnya diam-diam akan
-    // membuang pekerjaan dosen yang barangkali hanya salah pilih satu kali.
-    if (body.rubricId !== undefined) ubah.rubricId = idRubrik(body.rubricId);
-    if (body.answerKeyId !== undefined) ubah.answerKeyId = idRubrik(body.answerKeyId);
     // Rekaman suara TIDAK boleh menyala di tengah ujian yang sedang berjalan.
     // Ini satu-satunya setelan V1 yang ditahan, dan sebabnya bukan teknis:
     // peserta yang sudah duduk mengerjakan tidak diberi tahu bahwa mikrofonnya
@@ -412,6 +433,22 @@ export async function PATCH(request: Request) {
     }
 
     await db.update(cbtExams).set(ubah).where(eq(cbtExams.id, id));
+
+    // Rubrik MATA UJI, dipasang sesudah namanya mungkin berubah pada
+    // kiriman yang sama. Boleh kapan saja, termasuk saat ujian berlangsung:
+    // skor yang sudah ada TIDAK terhapus, dan panel penilaian menunjukkan
+    // mana yang tidak lagi cocok dengan rubrik yang sekarang.
+    const galatRubrik = await terapkanRubrik(
+      typeof ubah.courseName === "string" ? ubah.courseName : ujian.courseName,
+      pilihanRubrik(body.rubrikMatkul),
+      profile.fullName,
+    );
+    if (galatRubrik) {
+      return Response.json(
+        { success: false, message: `${galatRubrik} Pengaturan lainnya sudah tersimpan.` },
+        { status: 400 },
+      );
+    }
     return Response.json({ success: true, berlangsung });
   } catch (error: unknown) {
     console.error("ubah ujian cbt", error);

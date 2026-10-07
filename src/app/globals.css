@@ -5798,6 +5798,15 @@ a.al-mini:hover { color: var(--al-ink); }
 .uj-dalam-rangka .uj-galat, .uj-dalam-rangka .uj-kabar,
 .uj-dalam-rangka .uj-instruksi, .uj-dalam-rangka .uj-waktu { margin: 14px 0; }
 .uj-dalam-rangka .uj-catatan { margin-top: 12px; font-size: 12px; line-height: 1.65; }
+/* Esai sedang dinilai AI sesudah dikumpulkan: satu putaran kecil di depan
+   kalimatnya, supaya angka yang belum lengkap tidak terbaca sebagai final. */
+.uj-catatan-ai { display: flex; align-items: flex-start; gap: 8px; }
+.uj-putar {
+  flex: none; width: 12px; height: 12px; margin-top: 3px; border-radius: 50%;
+  border: 2px solid currentColor; border-right-color: transparent;
+  animation: al-putar .9s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) { .uj-putar { animation: none; } }
 .uj-dalam-rangka .uj-kaki { margin-top: 18px; }
 .uj-dalam-rangka.uj-kotak-selesai { text-align: center; }
 .uj-dalam-rangka .uj-ceklis { margin: 0 auto 12px; }
@@ -6952,11 +6961,6 @@ table.qt td small { font-size: 11.5px; }
 .cbtv-buang { align-self: end; }
 .cbtv-level-kepala { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 4px; }
 .cbtv-level-kepala > span { font-size: 12px; font-weight: 800; color: #334155; }
-.cbtv-ambang-kata { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: #64748b; }
-.cbtv-ambang-kata input {
-  width: 74px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 6px;
-  font-size: 12.5px; text-align: center;
-}
 .cbtv-level textarea {
   width: 100%; padding: 8px 11px; border: 1px solid #cbd5e1; border-radius: 7px;
   font: inherit; font-size: 13px;
@@ -7017,23 +7021,37 @@ table.qt td small { font-size: 11.5px; }
 }
 .cbtv-ambang label > i { font-style: normal; font-weight: 700; color: #64748b; }
 
-/* ---------- PENILAIAN ESAI: DUA CARA DALAM SATU MENU ---------- */
-.cbtv-cara { margin-bottom: 8px; }
+/* ---------- RUBRIK PENILAIAN: SATU RUBRIK UNTUK SATU MATA KULIAH ---------- */
 .cbtv-cara-baca {
   margin: 0 0 14px; padding: 9px 13px; border-radius: 8px;
   background: var(--blue-soft); color: var(--navy); font-size: 12.5px; line-height: 1.6;
 }
+.cbtv-matkul { margin-bottom: 14px; }
+.cbtv-matkul-kepala { margin-bottom: 10px; }
+.cbtv-daftar-matkul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.cbtv-daftar-matkul li {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 8px 14px; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 9px; background: #fbfcfd;
+}
+.cbtv-daftar-matkul li > div { min-width: 0; flex: 1 1 14rem; }
+.cbtv-daftar-matkul li b { display: block; font-size: 13.5px; color: #1e293b; overflow-wrap: anywhere; }
+.cbtv-daftar-matkul li small { display: block; margin-top: 2px; font-size: 12px; color: #64748b; }
+/* Mata kuliah tanpa rubrik ditandai, karena esainya tidak dinilai sama sekali
+   sampai rubriknya dipasang. Itu yang paling perlu terlihat dari daftar ini. */
+.cbtv-daftar-matkul li.cbtv-matkul-kosong { border-color: #fde68a; background: #fffbeb; }
+.cbtv-daftar-matkul select {
+  flex: 1 1 15rem; max-width: 100%; padding: 8px 11px; border: 1px solid #cbd5e1; border-radius: 8px;
+  background: var(--white); font: inherit; font-size: 13.5px;
+}
 
-/* ---------- DUA PEMILIH PENILAI ESAI, SEJAJAR ----------
-   Keduanya menjawab pertanyaan yang sama, jadi keduanya berdampingan. Di layar
-   sempit mereka menumpuk sendiri, dan urutan menumpuknya tetap acuan lebih
-   dulu karena itulah yang dianjurkan. */
+/* ---------- PEMILIH RUBRIK MATA KULIAH PADA PENGATURAN UJIAN ---------- */
 .cbtv-penilai {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
   gap: 12px 16px; margin-bottom: 12px;
 }
+.cbtv-penilai-satu { grid-template-columns: minmax(0, 32rem); }
 .cbtv-penilai label { display: grid; gap: 6px; min-width: 0; }
-.cbtv-penilai > label > span { font-size: 13px; font-weight: 600; color: #334155; }
+.cbtv-penilai > label > span { font-size: 13px; font-weight: 600; color: #334155; overflow-wrap: anywhere; }
 .cbtv-penilai select {
   width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px;
   background: var(--white); font: inherit; font-size: 14px;
@@ -7041,58 +7059,8 @@ table.qt td small { font-size: 11.5px; }
 .cbtv-penilai > label > i {
   font-style: normal; font-size: 11.5px; line-height: 1.5; color: #64748b;
 }
-
-/* ---------- KUNCI JAWABAN ACUAN ---------- */
-.cbtv-acuan { display: grid; gap: 14px; }
-.cbtv-butir {
-  margin: 12px 0; padding: 13px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fbfcfd;
-}
-.cbtv-nomor { max-width: 118px; }
-.cbtv-jawab-kepala {
-  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
-  gap: 6px 12px; margin-bottom: 5px;
-}
-.cbtv-jawab-kepala > span { font-size: 12px; font-weight: 800; color: #334155; }
-/* Jumlah kata, dan warnanya ketika masih di bawah ambang. Acuan yang terlalu
-   pendek harus ketahuan saat diketik, bukan saat tombol simpan ditekan. */
-.cbtv-jawab-kepala em { font-style: normal; font-size: 11.5px; color: #64748b; }
-.cbtv-jawab-kepala em.kurang { color: #b91c1c; font-weight: 700; }
-.cbtv-jawab textarea {
-  width: 100%; padding: 9px 11px; border: 1px solid #cbd5e1; border-radius: 7px;
-  font: inherit; font-size: 13px; line-height: 1.6;
-}
-.cbtv-wajib { margin-top: 10px; }
-
-.cbtv-ambang-acuan {
-  margin: 12px 0; padding: 13px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fbfcfd;
-}
-.cbtv-ambang-acuan .cbt-catatan { margin: 10px 0 0; font-size: 12px; line-height: 1.6; }
-.cbtv-ambang-baris {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px 18px;
-}
-.cbtv-ambang-baris label {
-  display: grid; grid-template-columns: auto auto; align-items: center;
-  justify-content: start; gap: 6px 8px; font-size: 12px; font-weight: 600; color: #475569;
-}
-.cbtv-ambang-baris label > span { grid-column: 1 / -1; }
-.cbtv-ambang-baris input {
-  width: 96px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 7px;
-  font-size: 13px; font-variant-numeric: tabular-nums; text-align: center;
-}
-.cbtv-ambang-baris label > i { font-style: normal; font-weight: 700; color: #64748b; }
-
-/* Tangga kurva nilai, terbaca sebelum satu butir pun diketik. Angka ambang
-   sendirian tidak mengatakan apa-apa; yang menjawab "kemiripan 55% itu
-   nilainya berapa" adalah deretan ini. */
-.cbtv-kurva {
-  display: flex; flex-wrap: wrap; gap: 6px 8px; margin-top: 11px;
-}
-.cbtv-kurva span {
-  padding: 4px 9px; border-radius: 999px; background: #eef2f7;
-  font-size: 11.5px; color: #475569; font-variant-numeric: tabular-nums;
-}
-.cbtv-kurva b { font-weight: 800; color: #334155; }
-.cbtv-kurva i { font-style: normal; color: #94a3b8; }
+/* Pilihan yang belum disimpan dan akan mengenai SELURUH ujian mata kuliahnya. */
+.cbtv-setel-tegas { color: #92400e; font-weight: 600; }
 
 /* ---------- LEMBAR PENILAIAN RUBRIK ---------- */
 .cbtv-lembar { margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0; }
@@ -7102,7 +7070,6 @@ table.qt td small { font-size: 11.5px; }
 }
 .cbtv-lembar-kepala small { display: block; margin-top: 2px; font-size: 12px; color: #64748b; }
 .cbtv-prinsip { margin-bottom: 13px; }
-.cbtv-lembar-aksi { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 11px; }
 .cbtv-lembar-aksi .cbt-catatan { margin: 0; }
 .cbtv-esai { margin: 14px 0; padding: 14px; border: 1px solid #e2e8f0; border-radius: 10px; }
 .cbtv-esai > header {

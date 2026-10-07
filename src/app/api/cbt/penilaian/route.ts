@@ -2,7 +2,7 @@
 // CBT — PENILAIAN RUBRIK, KEMIRIPAN, DAN PERSETUJUAN AKHIR
 //
 // GET    ?ujian=&attempt=       lembar penilaian satu peserta
-// POST   aksi=ai                model menilai esai terhadap rubrik
+// POST   aksi=ai                AI menilai esai terhadap rubrik mata uji
 // POST   aksi=hitung-kemiripan  hitung ulang kemiripan seluruh ujian
 // PATCH  aksi=level             dosen mengubah level satu kriteria
 // PATCH  aksi=setuju            dosen menyetujui nilai akhir
@@ -32,22 +32,25 @@ import { getCurrentProfile } from "@/lib/supabase-server";
 import { explainServerError } from "@/lib/api-errors";
 import { angkaParam, bolehCbt, bolehPantau, bolehUbah } from "@/lib/cbt";
 import {
-  acuanUjian, bacaLembar, rekamanAttempt, rubrikUjian, skorRubrikAttempt, soalUjian,
+  bacaLembar, rekamanAttempt, rubrikUjian, skorRubrikAttempt, soalUjian,
 } from "@/lib/cbt-store";
-import { hitungRubrik, levelBerlaku, poinDariRubrik, predikat, type Rubrik } from "@/lib/rubrik";
-import { aiSiap, nilaiEsai } from "@/lib/nilai-esai";
+import { LEVEL_GERBANG, hitungRubrik, levelBerlaku, predikat } from "@/lib/rubrik";
+import { aiSiap } from "@/lib/nilai-esai";
 import { GalatModel } from "@/lib/ai-penyedia";
 import { hitungUlangUjian, pasanganPeserta } from "@/lib/mirip-simpan";
 import { hitungUlangAttempt } from "@/lib/nilai-attempt";
 import {
-  MAKS_SEKALI_NILAI, antreEsai, kerjakanPenilaian, kerjakanPenilaianAcuan, kerjakanPenilaianLokal,
-  pembandingPanjang, simpanPoinRubrik,
+  MAKS_SEKALI_NILAI, antreEsai, kerjakanPenilaian, simpanPoinRubrik,
 } from "@/lib/nilai-otomatis";
 import { kirimLaporanNilai } from "@/lib/kirim-nilai";
 import { STATUS_TANDA_LABEL, type StatusTanda } from "@/lib/rekaman";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// Satu putaran menilai sampai MAKS_SEKALI_NILAI jawaban dengan AI, beberapa
+// berjalan bersamaan. Batas bawaan Vercel terlalu pendek untuk itu.
+export const maxDuration = 300;
 
 /**
  * Batas jawaban yang dinilai model dalam satu permintaan.
@@ -120,7 +123,7 @@ export async function GET(request: Request) {
     const attempt = baris[0];
     if (!attempt) return Response.json({ success: false, message: "Peserta tidak ditemukan." }, { status: 404 });
 
-    const rubrik = await rubrikUjian(ujian.rubricId);
+    const rubrik = await rubrikUjian(ujian);
     const bank = await soalUjian(examId);
     const lembar = bacaLembar(attempt.paper);
     const jawaban = await db.select().from(cbtAnswers).where(eq(cbtAnswers.attemptId, attemptId));
@@ -199,8 +202,12 @@ export async function GET(request: Request) {
         statusKemiripan: attempt.similarityStatus,
       },
       rubrik: rubrik
-        ? { nama: rubrik.nama, skalaMin: rubrik.skalaMin, skalaMax: rubrik.skalaMax, jumlahKriteria: rubrik.kriteria.length }
+        ? {
+            nama: rubrik.nama, skalaMin: rubrik.skalaMin, skalaMax: rubrik.skalaMax,
+            jumlahKriteria: rubrik.kriteria.length, diaturOleh: rubrik.diaturOleh,
+          }
         : null,
+      mataKuliah: ujian.courseName,
       esai,
       kemiripan: await pasanganPeserta(attemptId),
       rekaman: rekaman
@@ -254,114 +261,39 @@ export async function POST(request: Request) {
       });
     }
 
-    // ---------- PENILAIAN DARI JAWABAN ACUAN PENGAJAR ----------
+    // ---------- PENILAIAN ESAI OLEH AI ----------
     //
-    // Jalur ketiga, dan satu-satunya yang mengukur ISI jawaban. Tanpa
-    // jaringan, tanpa kunci API, tanpa biaya per jawaban. Rumusnya cosine
-    // similarity atas bobot kata TF-IDF; lihat src/lib/nilai-acuan.ts.
+    // Satu-satunya penilai esai sejak v49: AI membaca jawaban terhadap rubrik
+    // mata ujinya. Jawaban acuan dan penilai "bentuk jawaban" tanpa model
+    // sudah dihapus. Yang ditulis model tetap hanya USULAN level; level yang
+    // diubah pengajar selalu menang.
     //
-    // Batas MAKS_SEKALI_NILAI tidak berlaku, sama seperti penilaian lokal:
-    // yang membatasi penilaian model adalah umur satu permintaan HTTP yang
-    // diisi panggilan jaringan berulang, dan di sini tidak ada satu pun
-    // panggilan jaringan.
-    if (aksi === "acuan") {
-      const acuan = await acuanUjian(ujian.answerKeyId);
-      if (!acuan || acuan.butir.length === 0) {
-        return Response.json(
-          {
-            success: false,
-            message:
-              "Ujian ini belum memakai jawaban acuan. Pilih satu acuan pada Pengaturan Ujian, " +
-              "atau buat yang baru di menu Penilaian esai.",
-          },
-          { status: 400 },
-        );
-      }
-
-      const attemptSatu = angkaParam(String(body.attempt ?? ""));
-      const pesertaAcuan = attemptSatu
-        ? await db
-            .select()
-            .from(cbtAttempts)
-            .where(and(eq(cbtAttempts.id, attemptSatu), eq(cbtAttempts.examId, examId)))
-            .limit(1)
-        : await db.select().from(cbtAttempts).where(eq(cbtAttempts.examId, examId)).limit(400);
-
-      if (pesertaAcuan.length === 0) {
-        return Response.json({ success: false, message: "Belum ada peserta yang dapat dinilai." }, { status: 400 });
-      }
-
-      const antreAcuan = await antreEsai(examId, pesertaAcuan, body.ulangi === true);
-      if (antreAcuan.length === 0) {
-        return Response.json({
-          success: true,
-          dinilai: 0,
-          sisa: 0,
-          pesan: "Semua jawaban sudah pernah dinilai. Pakai 'nilai ulang' bila ingin mengulanginya.",
-        });
-      }
-
-      const dinilaiAcuan = await kerjakanPenilaianAcuan(examId, acuan, antreAcuan);
-
-      // Bobot kata TF-IDF bergantung pada seluruh lembar yang dibandingkan,
-      // jadi menilai di tengah ujian memakai korpus yang belum lengkap. Itu
-      // tidak salah, tetapi harus dikatakan: dua jawaban yang sama persis
-      // dapat bernilai sedikit berbeda bila dinilai pada putaran yang berbeda.
-      // "Nilai ulang" sesudah kelasnya selesai menyamakan semuanya dengan satu
-      // korpus yang sama.
-      const masihBerjalan = await db
-        .select({ jumlah: sql<number>`count(*)::int` })
-        .from(cbtAttempts)
-        .where(and(eq(cbtAttempts.examId, examId), eq(cbtAttempts.status, "berjalan")));
-      const belumKumpul = masihBerjalan[0]?.jumlah ?? 0;
-
-      return Response.json({
-        success: true,
-        dinilai: dinilaiAcuan,
-        sisa: 0,
-        pesan:
-          belumKumpul > 0
-            ? `${dinilaiAcuan} jawaban dinilai dengan acuan "${acuan.nama}". ${belumKumpul} peserta masih mengerjakan; ` +
-              "jalankan nilai ulang sesudah semuanya mengumpulkan supaya seluruh kelas dinilai dengan pembanding yang sama."
-            : `${dinilaiAcuan} jawaban dinilai dengan acuan "${acuan.nama}".`,
-      });
-    }
-
-    // ---------- DUA PENILAI LAIN ----------
-    //
-    // "lokal" adalah bawaan. Menghitung dari bentuk jawaban: panjang dibanding
-    //   sekelas, cakupan istilah soal, susunan kalimat. Tanpa jaringan, tanpa
-    //   kunci, tanpa biaya. Inilah yang dijalankan papan pantau sendiri.
-    // "ai" berjalan atas permintaan, lewat tombolnya. Membaca isinya, dan itu
-    //   satu panggilan model berbayar per jawaban.
-    //
-    // Keduanya menulis ke kolom yang sama dan sama-sama hanya MENGUSULKAN;
-    // level yang diubah pengajar selalu menang atas keduanya.
-    if (aksi !== "ai" && aksi !== "lokal") {
+    // Dipanggil papan pantau sendiri (tanpa `ulangi`) untuk menilai sisa yang
+    // belum ternilai, dan tombol pengajar (dengan `ulangi`) untuk menilai ulang.
+    if (aksi !== "ai") {
       return Response.json({ success: false, message: "Aksi tidak dikenali." }, { status: 400 });
     }
 
-    if (aksi === "ai" && !(await aiSiap())) {
+    if (!(await aiSiap())) {
       return Response.json(
         {
           success: false,
           message:
             "Penilaian AI belum tersambung. Tempel kunci Gemini, ChatGPT, atau Claude di " +
-            "Dashboard Super Admin → Kunci AI. Penilaian otomatis tanpa " +
-            "model dan penilaian manual tetap jalan.",
+            "Dashboard Super Admin → Kunci AI. Sampai itu terpasang, esai menunggu dinilai.",
         },
         { status: 503 },
       );
     }
 
-    const rubrik = await rubrikUjian(ujian.rubricId);
+    const rubrik = await rubrikUjian(ujian);
     if (!rubrik || rubrik.kriteria.length === 0) {
       return Response.json(
         {
           success: false,
           message:
-            "Ujian ini belum memakai rubrik. Pilih satu rubrik pada Pengaturan Ujian, " +
-            "ada beberapa rubrik siap pakai yang tinggal disalin.",
+            `Mata uji "${ujian.courseName}" belum punya rubrik, jadi esainya belum dapat dinilai AI. ` +
+            "Pasang satu rubrik untuk mata uji ini di menu Rubrik penilaian, atau lewat Pengaturan ujian.",
         },
         { status: 400 },
       );
@@ -393,24 +325,22 @@ export async function POST(request: Request) {
       });
     }
 
-    // Penilaian lokal tidak memanggil apa pun ke luar, jadi batas per
-    // panggilan tidak berlaku untuknya: yang membatasi penilaian model adalah
-    // umur satu permintaan HTTP yang diisi panggilan jaringan berulang.
-    const kerjakan = aksi === "lokal" ? antre : antre.slice(0, MAKS_SEKALI_NILAI);
-    const { dinilai, gagal } =
-      aksi === "lokal"
-        ? await kerjakanPenilaianLokal(rubrik, kerjakan, await pembandingPanjang(peserta))
-        : await kerjakanPenilaian(rubrik, kerjakan, ujian.courseName);
+    const kerjakan = antre.slice(0, MAKS_SEKALI_NILAI);
+    const { dinilai, gagal, dilewati } = await kerjakanPenilaian(rubrik, kerjakan, ujian.courseName);
 
     return Response.json({
       success: true,
       dinilai,
       sisa: antre.length - kerjakan.length,
+      // Jawaban yang sedang dinilai penilai lain (biasanya penilaian sesudah
+      // kumpul yang masih berjalan). Bukan kegagalan, dan tidak dihitung ulang.
+      dilewati,
       gagal,
       pesan:
-        antre.length > kerjakan.length
-          ? `${dinilai} jawaban dinilai. Masih ada ${antre.length - kerjakan.length} lagi, tekan sekali lagi untuk melanjutkan.`
-          : `${dinilai} jawaban dinilai.`,
+        (antre.length > kerjakan.length
+          ? `${dinilai} jawaban dinilai AI. Masih ada ${antre.length - kerjakan.length} lagi, tekan sekali lagi untuk melanjutkan.`
+          : `${dinilai} jawaban dinilai AI.`) +
+        (dilewati > 0 ? ` ${dilewati} lainnya sedang dinilai sesudah pesertanya mengumpulkan.` : ""),
     });
   } catch (error: unknown) {
     if (error instanceof GalatModel) {
@@ -454,8 +384,10 @@ export async function PATCH(request: Request) {
 
     // ---------- DOSEN MENGUBAH SATU LEVEL ----------
     if (aksi === "level") {
-      const rubrik = await rubrikUjian(ujian.rubricId);
-      if (!rubrik) return Response.json({ success: false, message: "Ujian ini belum memakai rubrik." }, { status: 400 });
+      const rubrik = await rubrikUjian(ujian);
+      if (!rubrik) {
+        return Response.json({ success: false, message: "Mata uji ujian ini belum punya rubrik." }, { status: 400 });
+      }
 
       const questionId = angkaParam(String(body.soal ?? ""));
       const urut = Number(body.kriteria);
@@ -466,11 +398,18 @@ export async function PATCH(request: Request) {
       // null berarti dosen MENCABUT keputusannya dan kembali memakai pembacaan
       // model. Itu perbuatan yang sah dan harus ada jalannya: dosen yang salah
       // menekan tidak boleh terkunci pada angka yang ia tekan keliru.
+      //
+      // LEVEL_GERBANG (0) diterima apa adanya, tidak dijepit ke level
+      // terendah: pengajar boleh menyatakan sendiri bahwa sebuah jawaban
+      // tidak menjawab pertanyaannya, sama seperti AI.
       const mentah = body.level;
+      const angka = Math.round(Number(mentah));
       const level =
         mentah === null || mentah === "" || mentah === undefined
           ? null
-          : Math.max(rubrik.skalaMin, Math.min(rubrik.skalaMax, Math.round(Number(mentah))));
+          : angka === LEVEL_GERBANG
+            ? LEVEL_GERBANG
+            : Math.max(rubrik.skalaMin, Math.min(rubrik.skalaMax, angka));
       if (level !== null && !Number.isFinite(level)) {
         return Response.json({ success: false, message: "Level tidak dikenali." }, { status: 400 });
       }
