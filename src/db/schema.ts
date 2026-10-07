@@ -571,30 +571,15 @@ export const cbtExams = pgTable("cbt_exams", {
   token: varchar("token", { length: 12 }),
 
   // ---------- CBT V1 ----------
-  /**
-   * Rubrik yang dipakai menilai SELURUH soal esai pada ujian ini.
-   *
-   * Satu rubrik untuk satu ujian, bukan satu rubrik untuk satu soal. Rancangan
-   * per soal lebih luwes dan hampir tidak pernah dipakai: dosen yang menyusun
-   * lima soal esai menilai kelimanya dengan ukuran yang sama, dan memintanya
-   * memasangkan rubrik lima kali adalah pekerjaan yang hasilnya selalu sama.
-   *
-   * Null berarti esai dinilai seperti sebelum V1 — dosen mengetik angkanya
-   * sendiri. Itu tetap jalan yang sah dan tetap menjadi bawaannya.
-   */
-  rubricId: integer("rubric_id").references(() => cbtRubrics.id, { onDelete: "set null" }),
-  /**
-   * Kunci jawaban acuan dosen yang dipakai menilai esai ujian ini.
-   *
-   * Berdampingan dengan rubricId, bukan menggantikannya, dan keduanya boleh
-   * menyala bersama-sama. Yang diukur keduanya memang berbeda: rubrik
-   * mengukur BENTUK jawaban, acuan mengukur ISINYA. Dosen yang memakai
-   * keduanya mendapat dua pembacaan atas lembar yang sama, dan dua pembacaan
-   * yang berselisih adalah justru lembar yang paling perlu ia baca sendiri.
-   *
-   * Null berarti tidak ada acuan, dan itu bawaannya.
-   */
-  answerKeyId: integer("answer_key_id").references(() => cbtAnswerKeys.id, { onDelete: "set null" }),
+  //
+  // Rubrik TIDAK lagi menempel pada ujian. Sejak v49 satu mata kuliah punya
+  // satu rubrik (cbt_course_rubrics), dan seluruh ujian dengan nama mata
+  // kuliah yang sama memakainya, termasuk ujian yang dibuat sebelumnya.
+  //
+  // Kolom lama rubric_id dan answer_key_id masih ada di basis data, tetapi
+  // tidak dibaca lagi. Isinya dipakai SQL v49 sekali untuk mengisi rubrik
+  // mata kuliah, dan dibiarkan supaya migrasi itu dapat dijalankan ulang.
+
   /**
    * Merekam suara peserta selama ujian.
    *
@@ -981,38 +966,24 @@ export const cbtRubrics = pgTable("cbt_rubrics", {
 });
 
 /**
- * KUNCI JAWABAN ACUAN DOSEN.
+ * SATU RUBRIK UNTUK SATU MATA KULIAH.
  *
- * Sebuah pustaka yang dipakai bersama, sama seperti rubrik: dosen A menulis
- * acuan untuk mata kuliah yang diampunya, dan dosen B memakainya pada kelas
- * paralel. Yang MENYUNTING tetap pemiliknya saja ditambah pengelola, karena
- * mengubah jawaban acuan berarti mengubah arti nilai yang sudah keluar.
+ * Rubrik dipasang sekali pada mata kuliahnya, bukan berulang pada tiap ujian,
+ * dan berlaku untuk SELURUH ujian yang nama mata kuliahnya sama, termasuk
+ * yang dibuat sebelum rubriknya dipasang. Seluruh esai ujian-ujian itu
+ * dinilai AI terhadap rubrik ini begitu pesertanya mengumpulkan.
  *
- * Butirnya disimpan sebagai JSON, bukan tabel anak tersendiri. Satu acuan
- * selalu dibaca utuh dan tidak pernah dipertanyakan per butir lewat SQL;
- * tabel anak hanya akan menambah satu penggabungan pada tiap pembacaan tanpa
- * menjawab satu pertanyaan pun yang tidak terjawab sekarang.
- *
- * Lihat src/lib/nilai-acuan.ts untuk cara butir-butir ini menjadi angka.
+ * Kuncinya nama mata kuliah yang dinormalkan (huruf kecil, spasi tunggal),
+ * karena nama itu diketik bebas pada tiap ujian. Rumusnya ada di
+ * src/lib/penilaian-ai.ts → kunciMatkul(), dan SQL v49 memakai rumus yang
+ * sama.
  */
-export const cbtAnswerKeys = pgTable("cbt_answer_keys", {
-  id: serial("id").primaryKey(),
-  name: varchar("name", { length: 160 }).notNull(),
-  description: text("description"),
-  /**
-   * Dua ambang kurva nilai, dalam persen kemiripan.
-   *
-   * Disimpan per acuan, bukan tetap di dalam kode, karena soal yang jawabannya
-   * sempit dan soal yang jawabannya terbuka tidak dapat memakai ambang yang
-   * sama. Bawaannya 15 dan 65; alasan kedua angka itu ada di nilai-acuan.ts.
-   */
-  zeroThreshold: integer("zero_threshold").notNull().default(15),
-  fullThreshold: integer("full_threshold").notNull().default(65),
-  /** Butir acuan beserta bobot dan istilah wajibnya, sebagai JSON. */
-  items: text("items").notNull().default("[]"),
-  ownerId: varchar("owner_id", { length: 64 }),
-  createdBy: varchar("created_by", { length: 120 }).notNull().default(""),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+export const cbtCourseRubrics = pgTable("cbt_course_rubrics", {
+  courseKey: varchar("course_key", { length: 160 }).primaryKey(),
+  /** Ejaan yang tampil, diambil dari ujian tempat rubriknya dipasang. */
+  courseName: varchar("course_name", { length: 120 }).notNull(),
+  rubricId: integer("rubric_id").notNull().references(() => cbtRubrics.id, { onDelete: "cascade" }),
+  setBy: varchar("set_by", { length: 120 }).notNull().default(""),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

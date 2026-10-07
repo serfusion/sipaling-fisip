@@ -33,7 +33,7 @@ import {
   statusUjian, susunPaket, type Soal,
 } from "@/lib/cbt";
 import {
-  attemptDariKunci, bacaLembar, mahasiswaDariNim, soalUjian, ujianDariKode,
+  attemptDariKunci, bacaLembar, mahasiswaDariNim, rubrikUjian, soalUjian, ujianDariKode,
   type Attempt, type Ujian,
 } from "@/lib/cbt-store";
 import {
@@ -45,11 +45,18 @@ import {
   bacaKlien, bolehMasukKlien, periksaKunciKlien, rapikanKlien, rapikanPerangkatKunci,
 } from "@/lib/kunci-layar";
 import { periksaKemiripan } from "@/lib/mirip-simpan";
-import { nilaiEsaiSaatKumpul } from "@/lib/nilai-otomatis";
+import { jadwalkanNilaiEsai } from "@/lib/nilai-otomatis";
+import { dinilaiRubrik, klaimMasihBerlaku, perluDinilaiAi } from "@/lib/penilaian-ai";
 import { jamIndonesia } from "@/lib/waktu-indonesia";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// Bukan untuk jalur peserta, yang semuanya selesai dalam hitungan detik,
+// melainkan untuk penilaian esai oleh AI yang dijadwalkan after() sesudah
+// "kumpulkan" terjawab. Ia berjalan di fungsi yang sama, dan batas bawaan
+// Vercel akan menghentikannya di tengah esai kedua.
+export const maxDuration = 300;
 
 /**
  * Berapa angka minimal sebuah nomor peserta. Menahan salah ketik, bukan
@@ -342,43 +349,29 @@ async function nilaiDanTutup(
     console.error("periksa kemiripan", galat);
   }
 
-  // ---------- PENILAIAN ESAI, DI DALAM PERMINTAAN YANG SAMA ----------
+  // ---------- PENILAIAN ESAI OLEH AI, SESUDAH JAWABAN INI TERKIRIM ----------
   //
-  // Ujian yang memakai rubrik berambang panjang menilai esainya di sini juga,
-  // dan nilainya FINAL — bukan usulan yang menunggu disetujui. Peserta yang
-  // ujiannya menampilkan nilai karena itu melihat angka yang lengkap, bukan
-  // "3 esai menunggu koreksi" yang tidak berarti apa pun baginya.
-  //
-  // Boleh berada di sini karena ia TIDAK memanggil apa pun ke luar: hitungan
-  // kata di dalam proses yang sama, persis seperti pemeriksaan kemiripan di
-  // atas. Penilaian oleh model tetap tidak boleh di sini — lihat catatan di
-  // kepala src/lib/nilai-otomatis.ts.
+  // Esai dinilai AI terhadap rubrik mata ujinya. Penilaiannya DIJADWALKAN
+  // di sini lewat after(), bukan dikerjakan: satu panggilan model memakan
+  // belasan detik, dan peserta tidak boleh menatap layar berputar selama itu
+  // sesudah menekan KUMPULKAN. Jawaban ini sampai ke peserta lebih dulu,
+  // lalu fungsi yang sama melanjutkan menilai. Lihat src/lib/nilai-otomatis.ts.
   //
   // Dibungkus penangkap galat dengan alasan yang sama seperti kemiripan: yang
-  // sudah tersimpan di atas adalah nilai objektif seseorang, dan penilaian
-  // esai yang gagal tidak boleh membuat pengumpulannya berakhir dengan galat.
-  // Yang hilang bila ia gagal hanya angka esainya, dan pengajar dapat
-  // menghitungnya ulang kapan saja dari panelnya.
-  try {
-    const segar = await nilaiEsaiSaatKumpul(ujian, attempt.id);
-    if (segar) {
-      // Angka yang dikirim balik ke peserta diambil dari hitungan TERBARU,
-      // bukan dari ringkasan sebelum esainya dinilai. Tanpa ini peserta
-      // melihat nilai tanpa esainya sementara basis data sudah memuat nilai
-      // lengkapnya — dua angka berbeda untuk satu ujian yang sama.
-      ringkas.nilai = segar.nilai;
-      ringkas.benar = segar.benar;
-      ringkas.salah = segar.salah;
-      ringkas.sebagian = segar.sebagian;
-      ringkas.kosong = segar.kosong;
-      ringkas.tertunda = segar.tertunda;
-      ringkas.lulus = segar.nilai >= ujian.passingGrade;
+  // sudah tersimpan di atas adalah nilai objektif seseorang, dan penjadwalan
+  // yang gagal tidak boleh membuat pengumpulannya berakhir dengan galat.
+  // Esai yang tidak sempat dijadwalkan dinilai papan pantau pengajar.
+  let menungguAi = false;
+  const adaUntukAi = dipakai.some((soal) => dinilaiRubrik(soal) && String(jawaban[soal.id] ?? "").trim() !== "");
+  if (adaUntukAi) {
+    try {
+      menungguAi = await jadwalkanNilaiEsai(ujian, attempt.id);
+    } catch (galat) {
+      console.error("jadwalkan nilai esai", attempt.id, galat);
     }
-  } catch (galat) {
-    console.error("nilai esai saat kumpul", attempt.id, galat);
   }
 
-  return ringkas;
+  return { ...ringkas, menungguAi };
 }
 
 export async function POST(request: Request) {
@@ -680,6 +673,54 @@ export async function POST(request: Request) {
       });
     }
 
+    // ---------- HASIL TERBARU, SESUDAH KUMPUL ----------
+    //
+    // Esai dinilai AI beberapa detik SESUDAH peserta mengumpulkan (lihat
+    // nilaiDanTutup). Layar "Ujian selesai" menanyakan nilainya lagi lewat
+    // jalur ini sampai seluruh esainya ternilai, supaya peserta melihat angka
+    // yang lengkap tanpa memuat ulang halaman, dan tanpa angka itu harus
+    // menunggu pengajar membuka papan pantaunya.
+    if (aksi === "hasil") {
+      if (attempt.status === "berjalan") {
+        return Response.json({ success: false, message: "Ujian ini belum dikumpulkan." }, { status: 409 });
+      }
+      const ujianRow = await db.select().from(cbtExams).where(eq(cbtExams.id, attempt.examId)).limit(1);
+      const ujian = ujianRow[0];
+      if (!ujian) return Response.json({ success: false, message: "Ujian tidak ditemukan." }, { status: 404 });
+      // Nilai yang pengajarnya memilih untuk diumumkan belakangan tidak
+      // bocor lewat jalan memutar ini.
+      if (!ujian.showScore) return Response.json({ success: true, tampilkanNilai: false, hasil: null, menungguAi: false });
+
+      let menungguAi = false;
+      if (await rubrikUjian(ujian)) {
+        const bank = await soalUjian(attempt.examId);
+        const jawaban = await db.select().from(cbtAnswers).where(eq(cbtAnswers.attemptId, attempt.id));
+        const petaJawab = new Map(jawaban.map((j) => [j.questionId, j]));
+        menungguAi = bacaLembar(attempt.paper).some((l) => {
+          const soal = bank.find((s) => s.id === l.id);
+          const j = petaJawab.get(l.id);
+          if (!soal || !j || !dinilaiRubrik(soal)) return false;
+          const keadaan = {
+            jawaban: j.answer, isCorrect: j.isCorrect, gradedBy: j.gradedBy,
+            diubah: j.updatedAt, disahkan: Boolean(attempt.approvedAt),
+          };
+          return perluDinilaiAi(keadaan, sekarang) || klaimMasihBerlaku(j.gradedBy, j.updatedAt, sekarang);
+        });
+      }
+
+      const nilai = attempt.score ?? 0;
+      return Response.json({
+        success: true,
+        tampilkanNilai: true,
+        menungguAi,
+        hasil: {
+          nilai, benar: attempt.correct, salah: attempt.wrong, sebagian: attempt.partial,
+          kosong: attempt.blank, tertunda: attempt.pending,
+          lulus: nilai >= ujian.passingGrade, passing: ujian.passingGrade,
+        },
+      });
+    }
+
     if (attempt.status !== "berjalan") {
       return Response.json({ success: false, message: "Ujian ini sudah dikumpulkan." }, { status: 409 });
     }
@@ -861,7 +902,10 @@ export async function POST(request: Request) {
         tampilkanNilai: ujian.showScore,
         hasil: ujian.showScore
           ? {
-              nilai: ringkas.nilai, benar: ringkas.benar, salah: ringkas.salah,
+              // Dibulatkan seperti yang tersimpan di basis data. Tanpa itu
+              // layar peserta menampilkan 33,3 lalu berganti 33 begitu
+              // nilai esainya ditanyakan ulang, tanpa ada yang berubah.
+              nilai: Math.round(ringkas.nilai), benar: ringkas.benar, salah: ringkas.salah,
               // Ikut dikirim sejak ada PG kompleks dan penjodohan. Tanpa
               // angka ini, peserta yang benar sebagian pada dua soal
               // membaca "1 benar, 0 salah" dari empat soal — dan dua soal
@@ -871,6 +915,10 @@ export async function POST(request: Request) {
               lulus: ringkas.lulus, passing: ujian.passingGrade,
             }
           : null,
+        // Esainya sedang dinilai AI di belakang jawaban ini. Layar peserta
+        // memakainya untuk berkata begitu, dan untuk menanyakan nilainya lagi
+        // lewat aksi "hasil" sampai penilaiannya selesai.
+        menungguAi: ujian.showScore && ringkas.menungguAi,
       });
     }
 

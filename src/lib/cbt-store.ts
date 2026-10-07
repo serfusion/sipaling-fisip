@@ -3,13 +3,13 @@
 // ============================================================
 import { db } from "@/db";
 import {
-  cbtAnswerKeys, cbtAnswers, cbtAttempts, cbtExams, cbtQuestions, cbtRecordings,
+  cbtAnswers, cbtAttempts, cbtCourseRubrics, cbtExams, cbtQuestions, cbtRecordings,
   cbtRubrics, cbtRubricScores, students,
 } from "@/db/schema";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import type { JenisMedia, JenisSoal, Pasangan, Soal } from "@/lib/cbt";
 import { bacaKriteria, type Rubrik } from "@/lib/rubrik";
-import { bacaButir, type Acuan } from "@/lib/nilai-acuan";
+import { kunciMatkul } from "@/lib/penilaian-ai";
 
 export type Ujian = typeof cbtExams.$inferSelect;
 export type Attempt = typeof cbtAttempts.$inferSelect;
@@ -151,48 +151,154 @@ export async function mahasiswaDariNim(nim: string): Promise<{ id: number; email
 
 export type RubrikBaris = typeof cbtRubrics.$inferSelect;
 
-/** Rubrik satu ujian, sudah berbentuk objek yang dipakai mesin penilai. */
-export async function rubrikUjian(rubricId: number | null): Promise<Rubrik | null> {
-  if (!rubricId) return null;
-  const baris = await db.select().from(cbtRubrics).where(eq(cbtRubrics.id, rubricId)).limit(1);
-  const r = baris[0];
-  if (!r) return null;
-  return {
-    nama: r.name,
-    keterangan: r.description || "",
-    skalaMin: r.scaleMin,
-    skalaMax: r.scaleMax,
-    kriteria: bacaKriteria(r.criteria),
-  };
-}
+/** Rubrik satu mata uji beserta siapa yang memasangnya. */
+export type RubrikMatkul = Rubrik & { id: number; diaturOleh: string };
 
 /**
- * Kunci jawaban acuan satu ujian, siap dipakai mesin penilai.
+ * Rubrik yang berlaku untuk mata uji ini, atau null.
  *
- * Bentuknya sejajar dengan rubrikUjian di atas dan alasannya sama: pemanggil
- * tidak perlu tahu bahwa butirnya tersimpan sebagai JSON, dan tidak ada satu
- * pun jalur penilaian yang perlu mengurai kolomnya sendiri.
+ * Satu mata uji, satu rubrik: inilah satu-satunya tempat rubrik sebuah
+ * ujian dicari, dan yang dicari adalah NAMA MATA UJINYA, bukan ujiannya.
+ * Ujian yang dibuat sebelum rubriknya dipasang karena itu ikut memakainya
+ * tanpa disentuh satu per satu.
  *
- * Tabelnya bisa saja belum ada karena migrasi v47 belum dijalankan. Yang
- * terjadi kemudian adalah ujian tetap berjalan dan esainya dinilai seperti
- * sebelumnya, bukan seluruh penilaian gagal.
+ * Tabelnya bisa saja belum ada karena migrasi v49 belum dijalankan. Yang
+ * terjadi kemudian adalah esai tidak dinilai otomatis dan papan pantau
+ * mengatakannya, bukan seluruh panel CBT menolak terbuka.
  */
-export async function acuanUjian(answerKeyId: number | null): Promise<Acuan | null> {
-  if (!answerKeyId) return null;
+export async function rubrikMatkul(courseName: string | null | undefined): Promise<RubrikMatkul | null> {
+  const kunci = kunciMatkul(courseName);
+  if (!kunci) return null;
   try {
-    const baris = await db.select().from(cbtAnswerKeys).where(eq(cbtAnswerKeys.id, answerKeyId)).limit(1);
-    const a = baris[0];
-    if (!a) return null;
+    const baris = await db
+      .select({ rubrik: cbtRubrics, diaturOleh: cbtCourseRubrics.setBy })
+      .from(cbtCourseRubrics)
+      .innerJoin(cbtRubrics, eq(cbtRubrics.id, cbtCourseRubrics.rubricId))
+      .where(eq(cbtCourseRubrics.courseKey, kunci))
+      .limit(1);
+    const r = baris[0]?.rubrik;
+    if (!r) return null;
     return {
-      nama: a.name,
-      keterangan: a.description || "",
-      ambangNol: a.zeroThreshold,
-      ambangPenuh: a.fullThreshold,
-      butir: bacaButir(a.items),
+      id: r.id,
+      nama: r.name,
+      keterangan: r.description || "",
+      skalaMin: r.scaleMin,
+      skalaMax: r.scaleMax,
+      kriteria: bacaKriteria(r.criteria),
+      diaturOleh: baris[0].diaturOleh,
     };
   } catch {
     return null;
   }
+}
+
+/** Rubrik yang dipakai menilai esai satu ujian: rubrik mata ujinya. */
+export async function rubrikUjian(ujian: { courseName: string }): Promise<RubrikMatkul | null> {
+  return rubrikMatkul(ujian.courseName);
+}
+
+/** Satu baris rubrik mata uji, untuk daftar dan pemilih di layar. */
+export type RubrikMatkulRingkas = {
+  kunci: string;
+  mataKuliah: string;
+  rubrikId: number;
+  rubrikNama: string;
+  jumlahKriteria: number;
+  diaturOleh: string;
+  diubah: string;
+};
+
+/**
+ * Seluruh rubrik mata uji, atau null bila tabelnya belum ada.
+ *
+ * Null dan daftar kosong sengaja dibedakan. Daftar kosong berarti belum ada
+ * mata uji yang dipasangi rubrik; null berarti SQL v49 belum dijalankan,
+ * dan layar pengajar harus mengatakan itu, bukan menawarkan pemilih yang
+ * pilihannya tidak akan pernah tersimpan.
+ */
+export async function daftarRubrikMatkul(): Promise<RubrikMatkulRingkas[] | null> {
+  try {
+    const baris = await db
+      .select({
+        kunci: cbtCourseRubrics.courseKey,
+        mataKuliah: cbtCourseRubrics.courseName,
+        rubrikId: cbtCourseRubrics.rubricId,
+        diaturOleh: cbtCourseRubrics.setBy,
+        diubah: cbtCourseRubrics.updatedAt,
+        rubrikNama: cbtRubrics.name,
+        kriteria: cbtRubrics.criteria,
+      })
+      .from(cbtCourseRubrics)
+      .innerJoin(cbtRubrics, eq(cbtRubrics.id, cbtCourseRubrics.rubricId))
+      .orderBy(asc(cbtCourseRubrics.courseName));
+    return baris.map((b) => ({
+      kunci: b.kunci,
+      mataKuliah: b.mataKuliah,
+      rubrikId: b.rubrikId,
+      rubrikNama: b.rubrikNama,
+      jumlahKriteria: bacaKriteria(b.kriteria).length,
+      diaturOleh: b.diaturOleh,
+      diubah: b.diubah.toISOString(),
+    }));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Pasang, ganti, atau lepas rubrik satu mata uji.
+ *
+ * `rubrikId` null melepasnya: esai seluruh ujian mata uji itu berhenti
+ * dinilai AI sampai rubrik dipasang lagi. Skor yang sudah tersimpan tidak
+ * ikut terhapus, sama seperti ketika rubrik sebuah ujian diganti dahulu.
+ *
+ * Yang memeriksa siapa boleh memanggilnya adalah jalur API. Di sini hanya
+ * penulisannya, supaya pengaturan ujian dan menu rubrik menulis dengan cara
+ * yang sama persis.
+ */
+export async function pasangRubrikMatkul(
+  courseName: string,
+  rubrikId: number | null,
+  oleh: string,
+): Promise<{ ok: true } | { ok: false; pesan: string }> {
+  const kunci = kunciMatkul(courseName);
+  if (!kunci) return { ok: false, pesan: "Nama mata uji belum diisi." };
+
+  if (rubrikId === null) {
+    await db.delete(cbtCourseRubrics).where(eq(cbtCourseRubrics.courseKey, kunci));
+    return { ok: true };
+  }
+
+  const ada = await db
+    .select({ id: cbtRubrics.id, kriteria: cbtRubrics.criteria })
+    .from(cbtRubrics)
+    .where(eq(cbtRubrics.id, rubrikId))
+    .limit(1);
+  if (!ada[0]) return { ok: false, pesan: "Rubrik tidak ditemukan." };
+  if (bacaKriteria(ada[0].kriteria).length === 0) {
+    return { ok: false, pesan: "Rubrik itu belum punya kriteria, jadi belum dapat dipakai menilai." };
+  }
+
+  const sekarang = new Date();
+  await db
+    .insert(cbtCourseRubrics)
+    .values({
+      courseKey: kunci,
+      courseName: String(courseName).replace(/\s+/g, " ").trim().slice(0, 120),
+      rubricId: rubrikId,
+      setBy: oleh.slice(0, 120),
+      updatedAt: sekarang,
+    })
+    .onConflictDoUpdate({
+      target: cbtCourseRubrics.courseKey,
+      set: {
+        courseName: sql`excluded.course_name`,
+        rubricId: sql`excluded.rubric_id`,
+        setBy: sql`excluded.set_by`,
+        updatedAt: sekarang,
+      },
+    });
+  return { ok: true };
 }
 
 /** Skor rubrik satu attempt, dikelompokkan per soal lalu per urutan kriteria. */

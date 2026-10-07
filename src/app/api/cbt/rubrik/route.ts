@@ -2,9 +2,20 @@
 // CBT — RUBRIK PENILAIAN ESAI
 //
 // GET             daftar rubrik milik portal + rubrik siap pakai bawaan
+//                 + rubrik tiap mata uji yang boleh dilihat pemanggilnya
 // POST            buat rubrik baru (boleh menyalin salah satu bawaan)
+// POST aksi=matkul  pasang / ganti / lepas rubrik satu mata uji
 // PATCH           sunting rubrik
 // DELETE ?id=     hapus rubrik
+//
+// ------------------------------------------------------------
+// SATU MATA UJI, SATU RUBRIK
+// ------------------------------------------------------------
+// Sejak v49 rubrik dipasang pada MATA UJI, bukan pada ujian. Seluruh ujian
+// yang nama mata ujinya sama dinilai AI dengan rubrik itu, termasuk ujian
+// yang dibuat sebelum rubriknya dipasang. Yang boleh memasangnya: pengajar
+// yang memiliki minimal satu ujian mata uji itu, ditambah Admin dan Super
+// Admin.
 //
 // ------------------------------------------------------------
 // SIAPA YANG BOLEH MENYUNTING APA
@@ -24,11 +35,13 @@
 // seluruh portal.
 // ============================================================
 import { db } from "@/db";
-import { cbtExams, cbtRubrics } from "@/db/schema";
+import { cbtCourseRubrics, cbtExams, cbtRubrics } from "@/db/schema";
 import { desc, eq, sql } from "drizzle-orm";
 import { getCurrentProfile } from "@/lib/supabase-server";
 import { explainServerError } from "@/lib/api-errors";
-import { angkaParam, bolehCbt } from "@/lib/cbt";
+import { angkaParam, bolehCbt, pemilik } from "@/lib/cbt";
+import { daftarRubrikMatkul, pasangRubrikMatkul } from "@/lib/cbt-store";
+import { kunciMatkul } from "@/lib/penilaian-ai";
 import {
   MAKS_KRITERIA, MAKS_LEVEL, RUBRIK_BAWAAN, bacaKriteria, periksaRubrik,
   type KriteriaRubrik, type Rubrik,
@@ -42,6 +55,42 @@ const PENGELOLA = ["super_admin", "admin"];
 function bolehSunting(profile: { id: string; role: string }, rubrik: { ownerId: string | null }) {
   if (PENGELOLA.includes(profile.role)) return true;
   return Boolean(rubrik.ownerId) && rubrik.ownerId === profile.id;
+}
+
+type Profil = NonNullable<Awaited<ReturnType<typeof getCurrentProfile>>>;
+
+/**
+ * Mata uji dari ujian-ujian yang ada, beserta apakah pemanggil boleh
+ * memasang rubriknya.
+ *
+ * Pengajar melihat mata uji dari ujiannya sendiri; Admin dan Super Admin
+ * melihat semuanya. Yang boleh MEMASANG sama dengan yang boleh melihat:
+ * pengajar yang memiliki minimal satu ujian mata uji itu, karena rubrik
+ * yang ia pasang langsung menilai ujiannya sendiri.
+ */
+async function matkulDariUjian(profile: Profil) {
+  const ujian = await db
+    .select({
+      courseName: cbtExams.courseName,
+      lecturerId: cbtExams.lecturerId,
+      createdBy: cbtExams.createdBy,
+      createdById: cbtExams.createdById,
+    })
+    .from(cbtExams)
+    .orderBy(desc(cbtExams.createdAt))
+    .limit(3000);
+
+  const kelola = PENGELOLA.includes(profile.role);
+  const peta = new Map<string, { mataKuliah: string; jumlahUjian: number }>();
+  for (const u of ujian) {
+    if (!kelola && !pemilik(profile, u)) continue;
+    const kunci = kunciMatkul(u.courseName);
+    if (!kunci) continue;
+    const ada = peta.get(kunci);
+    if (ada) ada.jumlahUjian += 1;
+    else peta.set(kunci, { mataKuliah: u.courseName, jumlahUjian: 1 });
+  }
+  return { peta, kelola };
 }
 
 /**
@@ -64,10 +113,6 @@ function bersihkanKriteria(masukan: unknown): KriteriaRubrik[] {
         .map((l) => ({
           level: Math.round(Number((l as { level?: unknown })?.level) || 0),
           deskriptor: String((l as { deskriptor?: unknown })?.deskriptor ?? "").trim().slice(0, 2000),
-          // Ambang panjang, inti penilaian yang berjalan sampai selesai
-          // tanpa ketukan pengajar. Dijepit pada batas yang masih masuk akal
-          // untuk satu jawaban esai.
-          minKata: Math.max(0, Math.min(5000, Math.round(Number((l as { minKata?: unknown })?.minKata) || 0))),
         }))
         .filter((l) => Number.isFinite(l.level) && l.level > 0)
         .sort((a, b) => a.level - b.level);
@@ -101,16 +146,37 @@ export async function GET() {
 
     const baris = await db.select().from(cbtRubrics).orderBy(desc(cbtRubrics.updatedAt)).limit(200);
 
-    // Berapa ujian yang memakai tiap rubrik. Dihitung sekali untuk seluruh
-    // daftar, bukan satu pertanyaan per rubrik — dan yang membacanya adalah
-    // tombol hapus, yang harus dapat mengatakan "dipakai 3 ujian" SEBELUM
-    // ditekan, bukan sesudahnya.
-    const pakai = await db
-      .select({ rubricId: cbtExams.rubricId, jumlah: sql<number>`count(*)::int` })
-      .from(cbtExams)
-      .where(sql`${cbtExams.rubricId} is not null`)
-      .groupBy(cbtExams.rubricId);
-    const petaPakai = new Map(pakai.map((p) => [p.rubricId, p.jumlah]));
+    // Rubrik tiap mata uji. null berarti SQL v49 belum dijalankan.
+    const terpasang = await daftarRubrikMatkul();
+
+    // Berapa mata uji yang memakai tiap rubrik. Yang membacanya adalah
+    // tombol hapus, yang harus dapat mengatakan "dipakai 3 mata uji"
+    // SEBELUM ditekan, bukan sesudahnya.
+    const petaPakai = new Map<number, number>();
+    for (const m of terpasang ?? []) petaPakai.set(m.rubrikId, (petaPakai.get(m.rubrikId) ?? 0) + 1);
+
+    // Daftar mata uji yang dapat dilihat pemanggil: dari ujiannya, dan
+    // (bagi pengelola) juga yang sudah berubrik walau ujiannya sudah dihapus.
+    const { peta, kelola } = await matkulDariUjian(profile);
+    const petaTerpasang = new Map((terpasang ?? []).map((m) => [m.kunci, m]));
+    const kunciTampil = new Set(peta.keys());
+    if (kelola) for (const m of terpasang ?? []) kunciTampil.add(m.kunci);
+    const matkul = [...kunciTampil]
+      .map((kunci) => {
+        const u = peta.get(kunci);
+        const m = petaTerpasang.get(kunci);
+        return {
+          kunci,
+          mataKuliah: m?.mataKuliah || u?.mataKuliah || kunci,
+          jumlahUjian: u?.jumlahUjian ?? 0,
+          rubrikId: m?.rubrikId ?? null,
+          rubrikNama: m?.rubrikNama ?? "",
+          diaturOleh: m?.diaturOleh ?? "",
+          diubah: m?.diubah ?? null,
+          bolehAtur: kelola || Boolean(u),
+        };
+      })
+      .sort((a, b) => a.mataKuliah.localeCompare(b.mataKuliah, "id"));
 
     return Response.json({
       success: true,
@@ -124,12 +190,22 @@ export async function GET() {
         pemilik: r.createdBy,
         milikSaya: r.ownerId === profile.id,
         bolehSunting: bolehSunting(profile, r),
+        // Jumlah MATA UJI yang memakainya, bukan jumlah ujian.
         dipakai: petaPakai.get(r.id) ?? 0,
         diubah: r.updatedAt.toISOString(),
       })),
       // Rubrik siap pakai, dikirim apa adanya untuk disalin. Tidak punya id
       // karena ia memang bukan baris basis data.
       bawaan: RUBRIK_BAWAAN,
+      matkul,
+      // Seluruh rubrik mata uji yang terpasang, termasuk mata uji yang
+      // ujiannya bukan milik pemanggil. Dipakai formulir ujian untuk
+      // menunjukkan rubrik yang SUDAH berlaku begitu nama mata ujinya
+      // diketik, misalnya yang dipasang rekan pengajar kelas paralel.
+      terpasang: (terpasang ?? []).map((m) => ({
+        kunci: m.kunci, rubrikId: m.rubrikId, rubrikNama: m.rubrikNama, diaturOleh: m.diaturOleh,
+      })),
+      matkulSiap: terpasang !== null,
     });
   } catch (error: unknown) {
     console.error("daftar rubrik", error);
@@ -148,6 +224,54 @@ export async function POST(request: Request) {
     }
 
     const body = (await request.json()) as Record<string, unknown>;
+
+    // ---------- RUBRIK SATU MATA UJI ----------
+    if (body.aksi === "matkul") {
+      const mataKuliah = String(body.mataKuliah ?? "").replace(/\s+/g, " ").trim().slice(0, 120);
+      const kunci = kunciMatkul(mataKuliah);
+      if (!kunci) return Response.json({ success: false, message: "Mata uji tidak dikenali." }, { status: 400 });
+
+      const { peta, kelola } = await matkulDariUjian(profile);
+      if (!kelola && !peta.has(kunci)) {
+        return Response.json(
+          {
+            success: false,
+            message: "Rubrik mata uji ini hanya dapat dipasang pengajar yang memiliki ujiannya, atau Admin.",
+          },
+          { status: 403 },
+        );
+      }
+
+      // Ejaan yang tersimpan diambil dari ujiannya bila ada, supaya daftar
+      // menampilkan nama yang sama dengan yang tertulis di kartu ujian.
+      const ejaan = peta.get(kunci)?.mataKuliah || mataKuliah;
+      const rubrikId = angkaParam(String(body.rubrikId ?? ""));
+      try {
+        const hasil = await pasangRubrikMatkul(ejaan, rubrikId, profile.fullName);
+        if (!hasil.ok) return Response.json({ success: false, message: hasil.pesan }, { status: 400 });
+      } catch (galat) {
+        console.error("pasang rubrik mata uji", galat);
+        return Response.json(
+          {
+            success: false,
+            message:
+              "Rubrik mata uji belum dapat disimpan. Pastikan supabase-update-v49-rubrik-matkul.sql " +
+              "sudah dijalankan di Supabase.",
+          },
+          { status: 500 },
+        );
+      }
+
+      const jumlah = peta.get(kunci)?.jumlahUjian ?? 0;
+      return Response.json({
+        success: true,
+        pesan: rubrikId
+          ? `Rubrik dipasang untuk ${ejaan}. Esai ${jumlah > 0 ? `${jumlah} ujian` : "seluruh ujian"} mata uji ini ` +
+            "dinilai AI dengan rubrik ini, termasuk yang sudah dikumpulkan dan belum dinilai."
+          : `Rubrik ${ejaan} dilepas. Esainya tidak dinilai AI sampai rubrik dipasang lagi.`,
+      });
+    }
+
     const rubrik = bentukRubrik(body);
     const periksa = periksaRubrik(rubrik);
     if (!periksa.ok) return Response.json({ success: false, message: periksa.pesan }, { status: 400 });
@@ -244,20 +368,27 @@ export async function DELETE(request: Request) {
       return Response.json({ success: false, message: "Rubrik ini milik pengajar lain." }, { status: 403 });
     }
 
-    // Rubrik yang masih dipakai ujian TIDAK dihapus, dan penolakannya menyebut
-    // berapa ujian. Menghapusnya akan membuat lembar penilaian ujian-ujian itu
-    // kehilangan nama kriterianya berbulan-bulan kemudian — tepat ketika ada
-    // yang menggugat nilainya dan bertanya "dinilai pakai rubrik yang mana".
-    const [{ jumlah }] = await db
-      .select({ jumlah: sql<number>`count(*)::int` })
-      .from(cbtExams)
-      .where(eq(cbtExams.rubricId, id));
+    // Rubrik yang masih dipakai mata uji TIDAK dihapus, dan penolakannya
+    // menyebut berapa. Menghapusnya akan membuat lembar penilaian ujian-ujian
+    // itu kehilangan nama kriterianya berbulan-bulan kemudian, tepat ketika
+    // ada yang menggugat nilainya dan bertanya "dinilai pakai rubrik yang mana".
+    let jumlah = 0;
+    try {
+      const [baris] = await db
+        .select({ jumlah: sql<number>`count(*)::int` })
+        .from(cbtCourseRubrics)
+        .where(eq(cbtCourseRubrics.rubricId, id));
+      jumlah = baris?.jumlah ?? 0;
+    } catch {
+      // Tabelnya belum ada (SQL v49 belum dijalankan): belum ada mata uji
+      // yang dapat memakainya.
+    }
     if (jumlah > 0) {
       return Response.json(
         {
           success: false,
           message:
-            `Rubrik ini masih dipakai ${jumlah} ujian. Lepaskan dulu dari ujiannya, ` +
+            `Rubrik ini masih dipakai ${jumlah} mata uji. Ganti dulu rubrik mata ujinya, ` +
             "atau biarkan saja, rubrik yang tidak dipakai tidak mengganggu apa pun.",
         },
         { status: 409 },

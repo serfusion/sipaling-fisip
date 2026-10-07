@@ -685,7 +685,11 @@ export type RubrikCetak = {
   totalTerbobot: number;
   skalaMax: number;
   catatan?: string;
-  kriteria: Array<{ nama: string; bobot: number; level: number; terbobot: number; alasan?: string; diubahDosen?: boolean }>;
+  kriteria: Array<{
+    nama: string; bobot: number; level: number; terbobot: number; alasan?: string; diubahDosen?: boolean;
+    /** Tidak lolos gerbang rubrik: level 0, bukan "belum dinilai". */
+    gerbang?: boolean;
+  }>;
 };
 
 /** Laporan satu peserta: nilai, rincian jawaban, dan catatan koreksinya. */
@@ -817,7 +821,7 @@ function bagianRubrik(rubrik: RubrikCetak[], namaRubrik: string): string {
           (k) => `<tr>
         <td>${lolos(k.nama)}</td>
         <td class="ka">${k.bobot}%</td>
-        <td class="te">${k.level > 0 ? `${k.level} / ${r.skalaMax}` : "-"}${k.diubahDosen ? " *" : ""}</td>
+        <td class="te">${k.gerbang ? `0 / ${r.skalaMax}` : k.level > 0 ? `${k.level} / ${r.skalaMax}` : "-"}${k.diubahDosen ? " *" : ""}</td>
         <td class="ka">${k.terbobot.toFixed(2)}</td>
       </tr>${k.alasan ? `<tr><td colspan="4" class="alasan">${lolos(k.alasan)}</td></tr>` : ""}`,
         )
@@ -836,7 +840,7 @@ ${r.catatan ? `<p class="catatan-rubrik"><b>Catatan:</b> ${lolos(r.catatan)}</p>
 
   return `
 <h3>C. Penilaian rubrik${namaRubrik ? `: ${lolos(namaRubrik)}` : ""}</h3>
-<p class="rumus">Nilai = (total skor terbobot ÷ level tertinggi) × 100. Tanda * berarti level ditentukan dosen.</p>
+<p class="rumus">Nilai = (total skor terbobot ÷ level tertinggi) × 100. Level 0 berarti jawaban tidak lolos gerbang rubrik. Tanda * berarti level ditentukan pengajar.</p>
 ${isi}`;
 }
 

@@ -1,51 +1,62 @@
 // ============================================================
-// PENILAIAN OTOMATIS BERBASIS RUBRIK
+// PENILAIAN ESAI OTOMATIS OLEH AI, TERHADAP RUBRIK MATA KULIAH
 //
-// Dipisahkan dari /api/cbt/penilaian supaya dua pemanggil memakai jalan yang
-// sama persis: tombol "Nilai dengan AI" yang ditekan pengajar, dan penilaian
-// yang berjalan SENDIRI begitu ada jawaban yang menunggu.
+// Satu jalan untuk tiga pemanggil, supaya ketiganya menilai dengan cara yang
+// sama persis:
+//
+//   1. SESUDAH PESERTA MENGUMPULKAN. Penilaiannya dijadwalkan lewat after()
+//      dari Next.js: jawaban "kumpulkan" sampai ke peserta lebih dulu, lalu
+//      fungsi server yang sama melanjutkan menilai esainya. Peserta yang
+//      ujiannya menampilkan nilai melihat angkanya lengkap beberapa detik
+//      kemudian, tanpa siapa pun menekan apa pun.
+//   2. PAPAN PANTAU PENGAJAR, yang menyegar tiap sepuluh detik dan menilai
+//      sisa yang belum ternilai: jawaban yang penilaiannya gagal karena kuota,
+//      dan ujian lama yang esainya belum pernah dibaca AI.
+//   3. TOMBOL "NILAI ULANG" yang ditekan pengajar.
 //
 // ------------------------------------------------------------
-// KENAPA IA TIDAK BERJALAN DI DALAM PERMINTAAN "KUMPULKAN"
+// KENAPA TIDAK DI DALAM PERMINTAAN "KUMPULKAN" ITU SENDIRI
 // ------------------------------------------------------------
-// Tempat yang paling masuk akal untuk menaruhnya — tepat sesudah nilai
-// dihitung di nilaiDanTutup() — justru tempat yang paling berbahaya.
-// Pemeriksaan kemiripan boleh di sana karena ia berjalan di dalam server,
-// tanpa jaringan, dalam hitungan milidetik. Penilaian rubrik memanggil model
-// lewat internet, satu panggilan per jawaban esai, masing-masing beberapa
-// detik. Ujian berisi lima soal esai akan menahan tombol "kumpulkan" selama
-// setengah menit, dan v45 baru saja memperbaiki 504 pada jalur penyerahan.
+// Satu panggilan model memakan belasan detik, dan ujian berisi lima soal esai
+// berarti lima panggilan. Menahan tombol "kumpulkan" selama itu berarti
+// peserta melihat layar berputar setengah menit pada jalur yang 504-nya baru
+// diperbaiki v45, lalu menekan tombolnya lagi atau mengira jawabannya hilang.
+// after() memisahkan keduanya: pengumpulan selesai seketika, penilaian
+// menyusul di fungsi yang sama.
 //
-// Peserta yang melihat "gagal mengumpulkan" akan menekan tombolnya lagi, atau
-// mengira jawabannya hilang. Itu harga yang tidak sebanding dengan menghemat
-// satu putaran.
-//
-// Karena itu urutannya: kumpulkan → nilai objektif + kemiripan (seketika) →
-// penilaian rubrik menyusul, dijalankan papan pantau pengajar yang memang
-// sudah menyegar tiap sepuluh detik. Dari kursi pengajar hasilnya sama —
-// nilainya sudah ada tanpa ia mengoreksi apa pun — tanpa satu detik pun
-// ditambahkan ke jalur yang dilewati peserta.
+// ------------------------------------------------------------
+// RUBRIK ADALAH SATU-SATUNYA ACUAN
+// ------------------------------------------------------------
+// Rubrik yang dipakai adalah rubrik MATA KULIAH ujiannya (lihat
+// rubrikMatkul() di src/lib/cbt-store.ts). Jawaban acuan dan penilai "bentuk
+// jawaban" tanpa model sudah dihapus pada v49: ujian yang mata kuliahnya
+// belum punya rubrik tidak dinilai otomatis sama sekali, dan papan pantaunya
+// mengatakan itu.
 // ============================================================
 
+import { after } from "next/server";
 import { db } from "@/db";
 import { cbtAnswers, cbtAttempts, cbtRubricScores } from "@/db/schema";
-import { and, eq, sql } from "drizzle-orm";
-import { bacaLembar, skorRubrikAttempt, soalUjian } from "@/lib/cbt-store";
+import { and, eq, isNull, lt, ne, or, sql } from "drizzle-orm";
+import { bacaLembar, rubrikUjian, soalUjian } from "@/lib/cbt-store";
 import { hitungRubrik, poinDariRubrik, type Rubrik } from "@/lib/rubrik";
-import { nilaiSoal, type Acuan } from "@/lib/nilai-acuan";
 import { GalatModel } from "@/lib/ai-penyedia";
-import { nilaiEsai } from "@/lib/nilai-esai";
-import { kataDariTeks, nilaiLokal } from "@/lib/nilai-lokal";
-import { hitungUlangAttempt, type NilaiUlang } from "@/lib/nilai-attempt";
-import { rubrikUjian } from "@/lib/cbt-store";
+import { aiSiap, nilaiEsai } from "@/lib/nilai-esai";
+import { hitungUlangAttempt } from "@/lib/nilai-attempt";
+import {
+  MASA_KLAIM_MS, TANDA_MENILAI, berbarengan, dinilaiRubrik, klaimMasihBerlaku, perluDinilaiAi,
+} from "@/lib/penilaian-ai";
 
 /**
- * Berapa jawaban dinilai dalam satu panggilan.
+ * Berapa jawaban dinilai dalam satu panggilan dari papan pantau.
  *
  * Batasnya ada karena satu permintaan HTTP punya umur. Sisanya dikerjakan
  * panggilan berikutnya, dan pemanggilnya diberi tahu berapa yang tersisa.
  */
 export const MAKS_SEKALI_NILAI = 12;
+
+/** Berapa panggilan model berjalan bersamaan. Lihat berbarengan(). */
+export const SEKALIGUS = 4;
 
 export type Pekerjaan = {
   attemptId: number;
@@ -53,59 +64,37 @@ export type Pekerjaan = {
   soalId: number;
   bobot: number;
   pertanyaan: string;
-  acuan: string;
   jawaban: string;
+  /**
+   * Isi graded_by sebelum diklaim. Dikembalikan bila penilaian gagal, supaya
+   * jawaban yang sebelumnya dinilai pengajar tidak berubah menjadi "sedang
+   * dinilai" selamanya hanya karena kuota AI habis.
+   */
+  penilaiLama: string | null;
 };
-
-/**
- * Jumlah kata jawaban peserta lain, per soal.
- *
- * Dipakai penilaian tanpa model: panjang yang "cukup" tidak sama antara soal
- * yang minta definisi dan soal yang minta analisis kasus, jadi yang dipakai
- * kedudukan jawaban ini di antara jawaban sekelas pada soal yang SAMA.
- */
-export type PembandingSoal = Map<number, number[]>;
 
 /**
  * Lembar ini masih dikerjakan, jadi belum boleh dinilai.
  *
- * Satu fungsi, dipakai kedua penjaga di bawah, dan sengaja diekspor supaya
- * aturannya dapat diuji tanpa basis data. Kesalahan yang pernah terjadi di
- * sini tidak terlihat sama sekali dari luar: yang salah bukan angkanya,
- * melainkan tidak adanya angka — penilaian yang diam-diam tidak pernah
- * berjalan, dan peserta yang terus membaca "menunggu koreksi pengajar".
- *
  * Statusnya harus dibaca dari BARIS BASIS DATA YANG TERBARU. Obyek attempt
  * yang dipegang pemanggil dapat saja masih membawa "berjalan" walaupun
- * barisnya sudah lama berubah menjadi "selesai".
+ * barisnya sudah lama berubah menjadi "selesai", dan kesalahan itu pernah
+ * membuat seluruh penilaian sesudah kumpul diam-diam tidak pernah berjalan.
  */
 export function masihMengerjakan(status: string): boolean {
   return status === "berjalan";
 }
 
 /**
- * Jenis soal yang dinilai rubrik.
+ * Susun daftar jawaban yang menunggu dinilai AI.
  *
- * Esai: selalu — ia memang tidak punya kunci.
+ * `ulangi` false: hanya yang memang perlu (aturannya di perluDinilaiAi).
+ * `ulangi` true:  seluruh jawaban esai, atas permintaan pengajar. Keputusan
+ * level pengajar tetap tidak tersentuh, karena yang ditimpa penilaian hanya
+ * kolom usulan AI.
  *
- * Isian singkat: HANYA bila soalnya tidak punya kunci. Isian yang berkunci
- * sudah dinilai tepat oleh pencocokan teks, gratis dan tanpa salah baca;
- * menyerahkannya ke model berarti membayar untuk jawaban yang lebih buruk.
- * Yang tidak berkunci tidak punya penilai lain sama sekali — itulah yang
- * dimaksud "isian singkat dinilai otomatis".
- */
-function dinilaiRubrik(soal: { jenis: string; kunci?: string }): boolean {
-  if (soal.jenis === "essay") return true;
-  if (soal.jenis === "isian") return String(soal.kunci ?? "").trim() === "";
-  return false;
-}
-
-/**
- * Susun daftar jawaban yang menunggu dinilai.
- *
- * Disusun lengkap lebih dulu, baru dipotong sesuai batas — dengan begitu
- * pemanggilnya dapat mengatakan berapa yang TERSISA, bukan menyuruh menekan
- * berulang sampai entah kapan.
+ * Disusun lengkap lebih dulu, baru dipotong pemanggilnya, supaya ia dapat
+ * mengatakan berapa yang TERSISA.
  */
 export async function antreEsai(
   examId: number,
@@ -114,29 +103,41 @@ export async function antreEsai(
 ): Promise<Pekerjaan[]> {
   const bank = await soalUjian(examId);
   const antre: Pekerjaan[] = [];
+  const sekarang = new Date();
 
   for (const p of peserta) {
     // Yang MASIH mengerjakan tidak pernah ikut: menilai jawaban setengah jadi
-    // menghabiskan biaya pada teks yang akan berubah, dan meninggalkan nilai
-    // yang terlihat final pada lembar yang belum selesai.
+    // menghabiskan kuota pada teks yang akan berubah.
     if (masihMengerjakan(p.status)) continue;
 
     const lembar = bacaLembar(p.paper);
     const jawaban = await db.select().from(cbtAnswers).where(eq(cbtAnswers.attemptId, p.id));
     const petaJawab = new Map(jawaban.map((j) => [j.questionId, j]));
-    const sudah = await skorRubrikAttempt(p.id);
 
     for (const l of lembar) {
       const soal = bank.find((s) => s.id === l.id);
       if (!soal || !dinilaiRubrik(soal)) continue;
 
-      const isi = String(petaJawab.get(soal.id)?.answer ?? "").trim();
-      // Jawaban kosong tidak dikirim ke model. Ia tidak memerlukan pembacaan
-      // siapa pun, dan membayar model untuk menyimpulkan bahwa tidak ada
-      // apa-apa di sana adalah pemborosan yang berulang seratus kali pada
-      // kelas yang separuhnya tidak menjawab esai.
-      if (!isi) continue;
-      if (!ulangi && (sudah.get(soal.id)?.length ?? 0) > 0) continue;
+      const j = petaJawab.get(soal.id);
+      const isi = String(j?.answer ?? "").trim();
+      // Jawaban kosong tidak dikirim ke model. Tidak ada yang perlu dibaca,
+      // dan membayar model untuk menyimpulkan bahwa tidak ada apa-apa di sana
+      // adalah pemborosan yang berulang pada tiap kelas.
+      if (!j || !isi) continue;
+
+      const perlu = ulangi
+        ? !klaimMasihBerlaku(j.gradedBy, j.updatedAt, sekarang)
+        : perluDinilaiAi(
+            {
+              jawaban: isi,
+              isCorrect: j.isCorrect,
+              gradedBy: j.gradedBy,
+              diubah: j.updatedAt,
+              disahkan: Boolean(p.approvedAt),
+            },
+            sekarang,
+          );
+      if (!perlu) continue;
 
       antre.push({
         attemptId: p.id,
@@ -144,38 +145,13 @@ export async function antreEsai(
         soalId: soal.id,
         bobot: soal.bobot,
         pertanyaan: soal.pertanyaan,
-        acuan: soal.pembahasan || "",
         jawaban: isi,
+        penilaiLama: j.gradedBy === TANDA_MENILAI ? null : j.gradedBy,
       });
     }
   }
 
   return antre;
-}
-
-/**
- * Susun pembanding panjang per soal dari seluruh jawaban yang sudah masuk.
- *
- * Diambil dari SEMUA peserta yang mengumpulkan, bukan hanya yang sedang
- * diantre: yang sudah dinilai kemarin tetap pembanding yang sah, dan tanpa
- * mereka peserta pertama pada tiap penyegaran hanya punya dirinya sendiri.
- */
-export async function pembandingPanjang(
-  peserta: Array<typeof cbtAttempts.$inferSelect>,
-): Promise<PembandingSoal> {
-  const peta: PembandingSoal = new Map();
-  for (const p of peserta) {
-    if (masihMengerjakan(p.status)) continue;
-    const jawaban = await db.select().from(cbtAnswers).where(eq(cbtAnswers.attemptId, p.id));
-    for (const j of jawaban) {
-      const isi = String(j.answer ?? "").trim();
-      if (!isi) continue;
-      const daftar = peta.get(j.questionId) ?? [];
-      daftar.push(kataDariTeks(isi).length);
-      peta.set(j.questionId, daftar);
-    }
-  }
-  return peta;
 }
 
 /**
@@ -227,12 +203,66 @@ export async function simpanPoinRubrik(
   return hasil;
 }
 
+// ------------------------------------------------------------
+// KLAIM: SATU JAWABAN, SATU PENILAI
+// ------------------------------------------------------------
+
 /**
- * Simpan usulan level satu jawaban, dari mana pun asalnya.
+ * Tandai satu jawaban sedang dinilai. False bila penilai lain lebih dulu.
  *
- * Satu jalan tulis untuk dua penilai — model dan hitungan lokal — supaya
- * keduanya mendarat di kolom yang sama, dibaca lembar penilaian yang sama,
- * dan dapat ditimpa keputusan pengajar dengan cara yang sama.
+ * Satu perintah UPDATE bersyarat, bukan baca-lalu-tulis. Dua penilai yang
+ * mengklaim bersamaan diantrekan Postgres pada kunci baris yang sama, dan
+ * yang kedua memeriksa ulang syaratnya terhadap baris yang sudah diklaim
+ * yang pertama, sehingga hanya satu yang mendapat barisnya kembali.
+ */
+async function klaim(kerja: Pekerjaan, sekarang: Date): Promise<boolean> {
+  const basi = new Date(sekarang.getTime() - MASA_KLAIM_MS);
+  const dapat = await db
+    .update(cbtAnswers)
+    .set({ gradedBy: TANDA_MENILAI, updatedAt: sekarang })
+    .where(and(
+      eq(cbtAnswers.attemptId, kerja.attemptId),
+      eq(cbtAnswers.questionId, kerja.soalId),
+      or(isNull(cbtAnswers.gradedBy), ne(cbtAnswers.gradedBy, TANDA_MENILAI), lt(cbtAnswers.updatedAt, basi)),
+    ))
+    .returning({ id: cbtAnswers.id });
+  return dapat.length > 0;
+}
+
+/** Kembalikan graded_by seperti sebelum diklaim, bila klaimnya masih milik kita. */
+async function lepas(kerja: Pekerjaan) {
+  await db
+    .update(cbtAnswers)
+    .set({ gradedBy: kerja.penilaiLama })
+    .where(and(
+      eq(cbtAnswers.attemptId, kerja.attemptId),
+      eq(cbtAnswers.questionId, kerja.soalId),
+      eq(cbtAnswers.gradedBy, TANDA_MENILAI),
+    ));
+}
+
+/**
+ * Klaimnya masih milik kita?
+ *
+ * Pengajar dapat mengoreksi jawaban yang sama selagi model masih membacanya.
+ * Keputusannya yang menang: hasil model yang datang sesudahnya dibuang, bukan
+ * menimpa angka yang baru saja ia ketik.
+ */
+async function masihDiklaim(kerja: Pekerjaan): Promise<boolean> {
+  const baris = await db
+    .select({ gradedBy: cbtAnswers.gradedBy })
+    .from(cbtAnswers)
+    .where(and(eq(cbtAnswers.attemptId, kerja.attemptId), eq(cbtAnswers.questionId, kerja.soalId)))
+    .limit(1);
+  return baris[0]?.gradedBy === TANDA_MENILAI;
+}
+
+/**
+ * Simpan level usulan AI satu jawaban, lalu hitung poinnya.
+ *
+ * Seluruh kriteria ditulis SEKALI JALAN. Keputusan pengajar yang sudah ada
+ * TIDAK dihapus oleh penilaian ulang: yang ditimpa hanya kolom usulan,
+ * sedangkan finalLevel tidak disentuh.
  */
 async function simpanUsulan(
   kerja: Pekerjaan,
@@ -243,12 +273,6 @@ async function simpanUsulan(
   catatan: string,
   sekarang: Date,
 ) {
-  // Seluruh kriteria ditulis SEKALI JALAN.
-  //
-  // Lima kriteria dikali lima soal esai adalah dua puluh lima perjalanan
-  // pulang-pergi ke basis data bila ditulis satu per satu — dan seluruhnya
-  // terjadi di dalam permintaan yang sedang ditunggu peserta sesudah menekan
-  // KUMPULKAN.
   if (usulan.length > 0) {
     await db
       .insert(cbtRubricScores)
@@ -263,8 +287,6 @@ async function simpanUsulan(
         aiConfidence: keyakinan,
         updatedAt: sekarang,
       })))
-      // Keputusan pengajar yang sudah ada TIDAK dihapus oleh penilaian ulang:
-      // yang ditimpa hanya kolom usulan, sedangkan finalLevel tidak disentuh.
       // `excluded` menunjuk baris yang sedang dicoba masukkan, jadi tiap
       // kriteria memperbarui dirinya dengan nilainya sendiri.
       .onConflictDoUpdate({
@@ -283,271 +305,99 @@ async function simpanUsulan(
 }
 
 /**
- * Nilai antrean dengan KUNCI JAWABAN ACUAN dosen.
- *
- * Jalur ketiga penilaian esai, dan yang pertama di antara ketiganya yang
- * benar-benar mengukur ISI. Rubrik mengukur bentuk; penilaian lokal mengukur
- * bentuk; yang ini mengukur seberapa dekat yang ditulis peserta dengan yang
- * ditulis dosen sebagai jawaban acuan. Rumusnya ada di src/lib/nilai-acuan.ts.
- *
- * ------------------------------------------------------------
- * KENAPA SELURUH KELAS DINILAI SEKALIGUS, BUKAN SATU PER SATU
- * ------------------------------------------------------------
- * Bobot kata TF-IDF bergantung pada df, yaitu berapa lembar di kelas yang
- * memuat tiap kata. Menilai satu peserta sendirian berarti menghitung df dari
- * satu dokumen, dan idf dari satu dokumen bernilai sama untuk setiap kata.
- * Yang tersisa hanyalah TF, dan bersamanya hilang seluruh alasan memakai
- * TF-IDF sejak awal: kata-kata yang datang dari pertanyaannya kembali
- * berbobot penuh, dan penyalin pertanyaan kembali bernilai setinggi yang
- * benar-benar menguraikan.
- *
- * Karena itu antrean dikelompokkan per SOAL lebih dulu, dan tiap kelompok
- * dinilai dalam satu panggilan.
- *
- * ------------------------------------------------------------
- * KORPUSNYA LEBIH LUAS DARIPADA ANTREANNYA
- * ------------------------------------------------------------
- * Yang masuk korpus bukan hanya jawaban yang sedang diantre, melainkan SELURUH
- * jawaban atas soal itu yang sudah terkumpul, termasuk yang sudah dinilai
- * kemarin. Kalau tidak, peserta yang dinilai pada penyegaran berikutnya akan
- * dibandingkan memakai df yang berbeda dari yang dipakai temannya, dan dua
- * jawaban yang sama persis akan bernilai lain hanya karena dinilai pada
- * putaran yang berbeda. Nilai yang bergantung pada urutan penilaian adalah
- * nilai yang tidak dapat dipertahankan di hadapan yang menggugatnya.
- */
-export async function kerjakanPenilaianAcuan(
-  examId: number,
-  acuan: Acuan,
-  antre: Pekerjaan[],
-): Promise<number> {
-  if (antre.length === 0 || acuan.butir.length === 0) return 0;
-
-  // Nomor butir mengikuti urutan bank soal, jadi peta soalId ke nomornya
-  // disusun dari urutan yang sama persis dengan yang dilihat dosen ketika ia
-  // mengisi template.
-  const bank = await soalUjian(examId);
-  const nomorSoal = new Map(bank.map((soal, i) => [soal.id, i + 1]));
-  const butirNomor = new Map(acuan.butir.map((b) => [b.nomor, b]));
-
-  // Antrean dikelompokkan per soal. Lihat keterangan panjang di atas.
-  const perSoal = new Map<number, Pekerjaan[]>();
-  for (const kerja of antre) {
-    const daftar = perSoal.get(kerja.soalId);
-    if (daftar) daftar.push(kerja);
-    else perSoal.set(kerja.soalId, [kerja]);
-  }
-
-  const sekarang = new Date();
-  let dinilai = 0;
-
-  for (const [soalId, kelompok] of perSoal) {
-    const nomor = nomorSoal.get(soalId);
-    const butir = nomor === undefined ? undefined : butirNomor.get(nomor);
-    // Soal yang tidak ada butir acuannya dilewati, bukan dinolkan. Yang
-    // terjadi bukan peserta gagal menjawabnya, melainkan dosen belum menulis
-    // acuannya, dan menolkan seluruh kelas karena itu adalah kesalahan yang
-    // paling mahal yang dapat dilakukan berkas ini.
-    if (!butir) continue;
-
-    // Korpus: seluruh jawaban atas soal ini yang sudah terkumpul.
-    const semua = await db
-      .select({ attemptId: cbtAnswers.attemptId, teks: cbtAnswers.answer })
-      .from(cbtAnswers)
-      .where(eq(cbtAnswers.questionId, soalId));
-
-    const korpus = semua
-      .map((j) => ({ attemptId: j.attemptId, teks: String(j.teks ?? "").trim() }))
-      .filter((j) => j.teks !== "");
-    if (korpus.length === 0) continue;
-
-    const hasil = nilaiSoal(korpus, butir, acuan.ambangNol, acuan.ambangPenuh);
-
-    // Yang DISIMPAN hanya yang diantre, meskipun yang DIHITUNG seluruh kelas.
-    // Peserta yang sudah dinilai kemarin tetap menjadi pembanding tanpa
-    // nilainya ditimpa diam-diam.
-    for (const kerja of kelompok) {
-      const h = hasil.get(kerja.attemptId);
-      if (!h) continue;
-
-      const poin = poinDariRubrik(h.nilai, kerja.bobot);
-      await db
-        .update(cbtAnswers)
-        .set({
-          points: poin,
-          // Jawaban yang terlalu pendek untuk dibandingkan TIDAK ditandai
-          // sudah dinilai: isCorrect null membuatnya tetap muncul sebagai
-          // pekerjaan yang menunggu dosen, dan itu memang yang dikehendaki.
-          isCorrect: h.perluDibaca ? null : poin > 0,
-          gradedBy: `Acuan: ${acuan.nama}`.slice(0, 120),
-          feedback: `${h.alasan}`.slice(0, 4000),
-          updatedAt: sekarang,
-        })
-        .where(and(eq(cbtAnswers.attemptId, kerja.attemptId), eq(cbtAnswers.questionId, soalId)));
-      dinilai += 1;
-    }
-  }
-
-  return dinilai;
-}
-
-/**
- * Nilai antrean TANPA model: dari panjang, cakupan istilah, dan susunan.
- *
- * Inilah jalur bawaan penilaian otomatis. Ia tidak memanggil apa pun ke luar,
- * jadi ia berjalan pada portal yang tidak punya kunci API sama sekali, tidak
- * pernah gagal karena kuota, dan tidak menambah biaya per jawaban. Batasnya
- * ditulis terang di src/lib/nilai-lokal.ts: ia mengukur bentuk jawaban, bukan
- * kebenarannya.
- */
-export async function kerjakanPenilaianLokal(
-  rubrik: Rubrik,
-  kerjakan: Pekerjaan[],
-  pembanding: PembandingSoal,
-): Promise<{ dinilai: number; gagal: string[] }> {
-  const sekarang = new Date();
-  let dinilai = 0;
-  const gagal: string[] = [];
-
-  for (const kerja of kerjakan) {
-    try {
-      // Jawaban peserta ini sendiri dikeluarkan dari pembandingnya. Tanpa itu
-      // satu-satunya peserta yang sudah mengumpulkan selalu dibandingkan
-      // dengan dirinya sendiri, dan selalu berada tepat di tengah.
-      const semua = pembanding.get(kerja.soalId) ?? [];
-      const sendiri = kataDariTeks(kerja.jawaban).length;
-      const lain = [...semua];
-      const posisi = lain.indexOf(sendiri);
-      if (posisi >= 0) lain.splice(posisi, 1);
-
-      const hasil = nilaiLokal({
-        jawaban: kerja.jawaban,
-        pertanyaan: kerja.pertanyaan,
-        acuan: kerja.acuan,
-        rubrik,
-        pembandingKata: lain,
-      });
-
-      await simpanUsulan(
-        kerja, rubrik, hasil.kriteria, hasil.keyakinan,
-        "Otomatis (bentuk jawaban)", hasil.ringkasan, sekarang,
-      );
-      dinilai += 1;
-    } catch (galat: unknown) {
-      const sebab = galat instanceof Error ? galat.message : "gagal";
-      gagal.push(`${kerja.nama}: ${sebab.slice(0, 120)}`);
-      console.error("nilai lokal", kerja.attemptId, kerja.soalId, galat);
-    }
-  }
-
-  for (const id of new Set(kerjakan.map((k) => k.attemptId))) {
-    await hitungUlangAttempt(id);
-  }
-
-  return { dinilai, gagal };
-}
-
-/**
- * Kerjakan sebagian antrean: panggil model, simpan levelnya, hitung ulang.
+ * Nilai daftar pekerjaan dengan AI: klaim, panggil model, simpan, hitung ulang.
  *
  * Satu jawaban yang gagal dinilai tidak menggagalkan sisanya. Kelas berisi
  * empat puluh peserta tidak boleh kehilangan tiga puluh sembilan penilaian
- * karena satu jawaban memuat sesuatu yang membuat model tersedak.
+ * karena satu jawaban memuat sesuatu yang membuat model tersedak. Yang gagal
+ * dilepas klaimnya dan tetap terhitung belum dinilai, sehingga papan pantau
+ * mencobanya lagi.
  */
 export async function kerjakanPenilaian(
   rubrik: Rubrik,
   kerjakan: Pekerjaan[],
   mataKuliah: string,
-): Promise<{ dinilai: number; gagal: string[] }> {
-  const sekarang = new Date();
+  sekaligus = SEKALIGUS,
+): Promise<{ dinilai: number; gagal: string[]; dilewati: number }> {
   let dinilai = 0;
+  let dilewati = 0;
   const gagal: string[] = [];
+  const tersentuh = new Set<number>();
 
-  for (const kerja of kerjakan) {
+  await berbarengan(kerjakan, sekaligus, async (kerja) => {
+    const sekarang = new Date();
+    if (!(await klaim(kerja, sekarang))) {
+      dilewati += 1;
+      return;
+    }
     try {
       const hasil = await nilaiEsai({
         rubrik,
         pertanyaan: kerja.pertanyaan,
         jawaban: kerja.jawaban,
         mataKuliah,
-        acuan: kerja.acuan,
       });
+
+      if (!(await masihDiklaim(kerja))) {
+        dilewati += 1;
+        return;
+      }
 
       // Umpan balik yang dibaca peserta dirakit di SATU tempat, bukan disimpan
       // terpisah lalu dirakit ulang di panel dan sekali lagi di laporan cetak.
       const catatan = [
+        hasil.gerbang.lolos
+          ? ""
+          : `Tidak lolos gerbang rubrik${hasil.gerbang.alasan ? `: ${hasil.gerbang.alasan}` : "."}\n\n`,
         hasil.ringkasan,
         hasil.saran.length > 0 ? `\n\nSaran perbaikan:\n${hasil.saran.map((s) => `• ${s}`).join("\n")}` : "",
-        hasil.perluDosen ? `\n\n(Keyakinan penilaian awal ${hasil.keyakinan}%. Mohon diperiksa.)` : "",
+        hasil.perluDosen ? `\n\n(Keyakinan penilaian AI ${hasil.keyakinan}%. Mohon diperiksa pengajar.)` : "",
       ].join("");
 
       await simpanUsulan(
         kerja, rubrik, hasil.kriteria, hasil.keyakinan,
-        `AI (${hasil.model})`, catatan, sekarang,
+        `AI (${hasil.model})`, catatan, new Date(),
       );
       dinilai += 1;
+      tersentuh.add(kerja.attemptId);
     } catch (galat: unknown) {
+      await lepas(kerja).catch(() => undefined);
       const sebab = galat instanceof GalatModel || galat instanceof Error ? galat.message : "gagal";
-      gagal.push(`${kerja.nama}: ${sebab.slice(0, 120)}`);
-      console.error("nilai esai", kerja.attemptId, kerja.soalId, galat);
+      gagal.push(`${kerja.nama}: ${sebab.slice(0, 160)}`);
+      console.error("nilai esai ai", kerja.attemptId, kerja.soalId, galat);
     }
-  }
+  });
 
   // Nilai attempt dihitung ulang sesudah SELURUH jawabannya selesai, bukan tiap
   // kali satu jawaban tersimpan: satu peserta dengan lima soal esai akan
   // menghitung ulang lima kali untuk sampai pada angka yang sama.
-  for (const id of new Set(kerjakan.map((k) => k.attemptId))) {
+  for (const id of tersentuh) {
     await hitungUlangAttempt(id);
   }
 
-  return { dinilai, gagal };
+  return { dinilai, gagal, dilewati };
 }
 
+// ------------------------------------------------------------
+// SESUDAH PESERTA MENGUMPULKAN
+// ------------------------------------------------------------
 
 /**
- * Nilai seluruh esai satu peserta SEKARANG, di dalam permintaan pengumpulan.
+ * Nilai seluruh esai satu peserta dengan AI. Dipanggil dari after().
  *
- * ------------------------------------------------------------
- * KENAPA INI BOLEH DI SINI, SEDANGKAN PENILAIAN MODEL TIDAK
- * ------------------------------------------------------------
- * Catatan di kepala berkas ini menolak menaruh penilaian di jalur pengumpulan,
- * dan alasannya tetap berlaku — untuk penilaian MODEL. Yang dilarang di sana
- * adalah panggilan jaringan berulang: lima soal esai berarti lima perjalanan
- * ke penyedia model, masing-masing beberapa detik, pada jalur yang 504-nya
- * baru diperbaiki v45.
- *
- * Penilaian dari ambang rubrik tidak memanggil apa pun. Ia menghitung kata di
- * dalam proses yang sama, dalam hitungan milidetik, persis seperti pemeriksaan
- * kemiripan yang sudah berjalan di sana sejak v44. Yang tersisa hanya tulisan
- * ke basis data, dan jumlahnya diketahui sejak awal: satu baris per kriteria
- * per esai.
- *
- * Inilah yang membuat nilainya FINAL saat peserta menekan kumpulkan — bukan
- * usulan yang menunggu seseorang menyetujuinya. Pengajar tetap dapat mengubah
- * level mana pun sesudahnya, dan nilainya ikut berubah; bedanya, ia tidak
- * harus.
+ * Barisnya DIBACA ULANG dari basis data, bukan diterima dari pemanggil. Obyek
+ * attempt yang dipegang jalur pengumpulan masih membawa status "berjalan",
+ * dan antreEsai() melewati yang masih berjalan; kesalahan persis itulah yang
+ * dahulu membuat penilaian sesudah kumpul diam-diam tidak pernah terjadi.
  */
-export async function nilaiEsaiSaatKumpul(
-  ujian: { id: number; rubricId: number | null; courseName: string },
+export async function nilaiEsaiAttempt(
+  ujian: { id: number; courseName: string },
   attemptId: number,
-): Promise<NilaiUlang | null> {
-  if (!ujian.rubricId) return null;
-
-  const rubrik = await rubrikUjian(ujian.rubricId);
+  rubrikSiap?: Rubrik | null,
+) {
+  const rubrik = rubrikSiap ?? (await rubrikUjian(ujian));
   if (!rubrik || rubrik.kriteria.length === 0) return null;
 
-  // Barisnya DIBACA ULANG dari basis data, bukan diterima dari pemanggil.
-  //
-  // Inilah yang dahulu membuat seluruh fitur ini diam-diam tidak pernah
-  // berjalan. Pemanggilnya — nilaiDanTutup() — baru saja mengubah status
-  // attempt menjadi "selesai" DI BASIS DATA, tetapi obyek JavaScript yang ia
-  // pegang masih membawa status lamanya, "berjalan". antreEsai() melewati
-  // attempt yang masih berjalan (dan memang harus: menilai lembar yang belum
-  // selesai adalah pemborosan), jadi antreannya selalu kosong, penilaiannya
-  // tidak pernah terjadi, dan peserta tetap membaca "menunggu koreksi
-  // pengajar" pada ujian yang rubrik dan acuannya sudah lengkap.
-  //
-  // Membaca ulang satu baris menutup seluruh golongan kesalahan itu: fungsi
-  // ini tidak dapat lagi dibohongi obyek basi milik siapa pun.
   const baris = await db.select().from(cbtAttempts).where(eq(cbtAttempts.id, attemptId)).limit(1);
   const attempt = baris[0];
   if (!attempt) return null;
@@ -555,12 +405,45 @@ export async function nilaiEsaiSaatKumpul(
   const antre = await antreEsai(ujian.id, [attempt]);
   if (antre.length === 0) return null;
 
-  // Pembandingnya SENGAJA kosong. Kedudukan relatif terhadap sekelas tidak
-  // dapat dipakai untuk nilai yang langsung terlihat peserta: yang
-  // mengumpulkan pertama belum punya satu pun pembanding, dan jawaban yang
-  // sama persis akan bernilai lain hanya karena dikumpulkan lebih awal.
-  // Yang dipakai ambang rubrik — sama untuk semua orang, apa pun urutannya.
-  await kerjakanPenilaianLokal(rubrik, antre, new Map());
+  return kerjakanPenilaian(rubrik, antre, ujian.courseName);
+}
 
-  return hitungUlangAttempt(attemptId);
+/**
+ * Jadwalkan penilaian AI satu peserta, sesudah jawaban "kumpulkan" terkirim.
+ *
+ * Mengembalikan true bila penilaian memang dijadwalkan, supaya layar peserta
+ * dapat berkata "sedang dinilai AI" alih-alih "menunggu koreksi pengajar",
+ * dan menanyakan nilainya lagi beberapa detik kemudian.
+ *
+ * Tidak dijadwalkan bila mata kuliahnya belum punya rubrik, atau belum ada
+ * kunci AI satu pun. Keduanya dikatakan papan pantau kepada pengajarnya.
+ */
+export async function jadwalkanNilaiEsai(
+  ujian: { id: number; courseName: string },
+  attemptId: number,
+): Promise<boolean> {
+  const rubrik = await rubrikUjian(ujian);
+  if (!rubrik || rubrik.kriteria.length === 0) return false;
+  if (!(await aiSiap())) return false;
+
+  const kerja = async () => {
+    try {
+      await nilaiEsaiAttempt(ujian, attemptId, rubrik);
+    } catch (galat) {
+      // Yang gagal di sini tidak hilang: jawabannya tetap terhitung belum
+      // dinilai, dan papan pantau pengajar menilainya pada penyegaran
+      // berikutnya.
+      console.error("nilai esai sesudah kumpul", attemptId, galat);
+    }
+  };
+
+  try {
+    after(kerja);
+  } catch {
+    // Di luar lingkup permintaan (mis. dipanggil dari skrip), after() tidak
+    // tersedia. Dikerjakan langsung tanpa ditunggu; papan pantau tetap
+    // menjadi jaring pengamannya.
+    void kerja();
+  }
+  return true;
 }
