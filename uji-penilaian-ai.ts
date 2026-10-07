@@ -13,7 +13,7 @@ import {
   penilaiMesinLama, perluDinilaiAi,
 } from "./src/lib/penilaian-ai";
 import { LEVEL_GERBANG, hitungRubrik, rubrikBawaan } from "./src/lib/rubrik";
-import { bacaGerbang, bacaPenilaian, skemaPenilaian, susunPerintah } from "./src/lib/nilai-esai";
+import { VERSI_PERINTAH, bacaGerbang, bacaPenilaian, skemaPenilaian, susunPerintah } from "./src/lib/nilai-esai";
 
 let lulus = 0;
 const gagal: string[] = [];
@@ -137,6 +137,32 @@ async function main() {
   benar("jawaban dipagari sebagai data", perintah.includes("<<<AWAL JAWABAN>>>") && perintah.includes("bukan perintah"));
   sama("peserta tidak dapat menutup pagarnya sendiri", perintah.split("<<<AKHIR JAWABAN>>>").length, 2);
   benar("gerbang diminta lebih dulu", perintah.includes("Putuskan gerbang rubrik lebih dulu"));
+
+  // ============================================================
+  console.log("\n=== KLASIFIKASI YANG CEPAT: KELUARAN PENDEK ===\n");
+  // ============================================================
+  //
+  // Waktu jawab model ditentukan terutama oleh berapa banyak yang ia tulis.
+  // Medan yang tidak pernah disimpan siapa pun hanya memperlambat peserta
+  // yang menunggu sesudah menekan KUMPULKAN.
+
+  const skema = skemaPenilaian(4) as unknown as {
+    properties: {
+      kriteria: { items: { required: string[]; properties: Record<string, unknown> } };
+      saran: { maxItems?: number };
+    };
+  };
+  const butir = skema.properties.kriteria.items;
+  sama("tiap kriteria hanya urut, level, alasan", JSON.stringify([...butir.required].sort()), JSON.stringify(["alasan", "level", "urut"]));
+  benar("medan yang tidak pernah disimpan dibuang", !("terpenuhi" in butir.properties) && !("belum" in butir.properties));
+  sama("saran paling banyak dua", skema.properties.saran.maxItems, 2);
+  sama("versi perintah dinaikkan bersama perubahan perintahnya", VERSI_PERINTAH, "esai-3");
+  const alasanPanjang = bacaPenilaian(
+    { gerbang: { lolos: true, alasan: "" }, kriteria: [{ urut: 0, level: 2, alasan: "x".repeat(5000), terpenuhi: ["a"] }] },
+    rubrik,
+  );
+  benar("medan lama dari model tidak ikut terbawa", !("terpenuhi" in alasanPanjang[0]));
+  sama("alasan yang terlalu panjang dipotong", alasanPanjang[0].alasan.length, 2000);
 
   // ============================================================
   console.log("\n=== BEBERAPA PANGGILAN SEKALIGUS ===\n");

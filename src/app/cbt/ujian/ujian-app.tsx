@@ -587,13 +587,13 @@ export default function UjianApp() {
 
   // ---------- nilai esai yang menyusul, dinilai AI ----------
   //
-  // Esai dinilai AI terhadap rubrik mata ujinya beberapa detik SESUDAH
-  // jawaban "kumpulkan" sampai. Layar ini menanyakan nilainya lagi tiap
-  // delapan detik, paling lama tiga menit, lalu berhenti sendiri. Yang belum
-  // selesai dalam tiga menit tetap dinilai; hanya layarnya yang berhenti
-  // menunggu.
+  // Biasanya tidak pernah berjalan: esai dinilai AI di dalam permintaan
+  // "kumpulkan" itu sendiri, dan nilainya sudah lengkap ketika layar ini
+  // muncul. Ia hanya berjalan ketika penyedia AI sedang lambat dan penilaian
+  // melewati batas tunggu server; penilaiannya berlanjut di sana, dan layar
+  // ini menanyakan nilainya lagi tiap lima detik, paling lama tiga menit.
   //
-  // Delapan detik, bukan lebih rapat: satu laboratorium sering keluar lewat
+  // Lima detik, bukan lebih rapat: satu laboratorium sering keluar lewat
   // satu alamat jaringan, dan batas permintaan per alamat dipakai bersama
   // peserta lain yang masih mengerjakan.
   useEffect(() => {
@@ -619,10 +619,10 @@ export default function UjianApp() {
         // Jaringan tersendat: dicoba lagi pada putaran berikutnya.
       }
       if (!hidup) return;
-      if (putaran >= 23) { setMenungguAi(false); return; }
-      jam = setTimeout(() => void tanya(), 8000);
+      if (putaran >= 36) { setMenungguAi(false); return; }
+      jam = setTimeout(() => void tanya(), 5000);
     };
-    jam = setTimeout(() => void tanya(), 5000);
+    jam = setTimeout(() => void tanya(), 3000);
     return () => { hidup = false; if (jam) clearTimeout(jam); };
   }, [layar, menungguAi]);
 
@@ -1170,8 +1170,8 @@ export default function UjianApp() {
               {menungguAi ? (
                 <p className="uj-catatan uj-catatan-ai" aria-live="polite">
                   <span className="uj-putar" aria-hidden="true" />
-                  Essay-mu sedang dinilai AI dengan rubrik mata uji ini. Nilai di atas diperbarui sendiri
-                  begitu penilaiannya selesai, tidak perlu memuat ulang halaman.
+                  Essay-mu masih dinilai AI sesuai rubrik; penyedia AI sedang lambat. Nilai di atas
+                  diperbarui sendiri begitu selesai, tidak perlu memuat ulang halaman.
                 </p>
               ) : hasil.tertunda > 0 ? (
                 <p className="uj-catatan">

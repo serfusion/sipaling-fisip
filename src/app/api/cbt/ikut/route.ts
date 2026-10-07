@@ -45,7 +45,7 @@ import {
   bacaKlien, bolehMasukKlien, periksaKunciKlien, rapikanKlien, rapikanPerangkatKunci,
 } from "@/lib/kunci-layar";
 import { periksaKemiripan } from "@/lib/mirip-simpan";
-import { jadwalkanNilaiEsai } from "@/lib/nilai-otomatis";
+import { TUNGGU_SAAT_KUMPUL_MS, nilaiEsaiSaatKumpul } from "@/lib/nilai-otomatis";
 import { dinilaiRubrik, klaimMasihBerlaku, perluDinilaiAi } from "@/lib/penilaian-ai";
 import { jamIndonesia } from "@/lib/waktu-indonesia";
 
@@ -264,6 +264,13 @@ async function nilaiDanTutup(
   ujian: Ujian,
   sekarang: Date,
   sebabPaksa: string | null,
+  /**
+   * Berapa lama permintaan ini menunggu penilaian esai oleh AI. Pengumpulan
+   * biasa menunggu supaya peserta langsung melihat nilai lengkapnya;
+   * pengumpulan paksa tidak, supaya layar peserta segera tahu ujiannya
+   * dihentikan.
+   */
+  tungguAiMs = 0,
 ) {
   const bank = await soalUjian(attempt.examId);
   const lembar = bacaLembar(attempt.paper);
@@ -349,25 +356,40 @@ async function nilaiDanTutup(
     console.error("periksa kemiripan", galat);
   }
 
-  // ---------- PENILAIAN ESAI OLEH AI, SESUDAH JAWABAN INI TERKIRIM ----------
+  // ---------- PENILAIAN ESAI OLEH AI, DI DALAM PERMINTAAN INI ----------
   //
-  // Esai dinilai AI terhadap rubrik mata ujinya. Penilaiannya DIJADWALKAN
-  // di sini lewat after(), bukan dikerjakan: satu panggilan model memakan
-  // belasan detik, dan peserta tidak boleh menatap layar berputar selama itu
-  // sesudah menekan KUMPULKAN. Jawaban ini sampai ke peserta lebih dulu,
-  // lalu fungsi yang sama melanjutkan menilai. Lihat src/lib/nilai-otomatis.ts.
+  // Esai dinilai AI terhadap rubrik mata ujinya sekarang juga, seluruhnya
+  // bersamaan, dan permintaan ini menunggu hasilnya paling lama tungguAiMs.
+  // AI hanya mengklasifikasikan jawaban ke level rubrik, jadi biasanya selesai
+  // dalam beberapa detik dan peserta langsung melihat nilai lengkapnya. Yang
+  // melewati batas dilanjutkan lewat after(). Lihat src/lib/nilai-otomatis.ts.
   //
   // Dibungkus penangkap galat dengan alasan yang sama seperti kemiripan: yang
-  // sudah tersimpan di atas adalah nilai objektif seseorang, dan penjadwalan
+  // sudah tersimpan di atas adalah nilai objektif seseorang, dan penilaian
   // yang gagal tidak boleh membuat pengumpulannya berakhir dengan galat.
-  // Esai yang tidak sempat dijadwalkan dinilai papan pantau pengajar.
+  // Esai yang tidak sempat dinilai dinilai papan pantau pengajar.
   let menungguAi = false;
   const adaUntukAi = dipakai.some((soal) => dinilaiRubrik(soal) && String(jawaban[soal.id] ?? "").trim() !== "");
   if (adaUntukAi) {
     try {
-      menungguAi = await jadwalkanNilaiEsai(ujian, attempt.id);
+      const ai = await nilaiEsaiSaatKumpul(ujian, attempt.id, tungguAiMs);
+      menungguAi = ai.menungguAi;
+      if (ai.nilai) {
+        // Angka yang dikirim balik ke peserta diambil dari hitungan TERBARU,
+        // yang sudah memuat esainya. Tanpa ini peserta melihat nilai tanpa
+        // esai sementara basis data sudah memuat nilai lengkapnya.
+        ringkas.nilai = ai.nilai.nilai;
+        ringkas.benar = ai.nilai.benar;
+        ringkas.salah = ai.nilai.salah;
+        ringkas.sebagian = ai.nilai.sebagian;
+        ringkas.kosong = ai.nilai.kosong;
+        ringkas.tertunda = ai.nilai.tertunda;
+        ringkas.poin = ai.nilai.poin;
+        ringkas.poinMaks = ai.nilai.poinMaks;
+        ringkas.lulus = ai.nilai.nilai >= ujian.passingGrade;
+      }
     } catch (galat) {
-      console.error("jadwalkan nilai esai", attempt.id, galat);
+      console.error("nilai esai saat kumpul", attempt.id, galat);
     }
   }
 
@@ -893,7 +915,7 @@ export async function POST(request: Request) {
       const ujian = ujianRow[0];
       if (!ujian) return Response.json({ success: false, message: "Ujian tidak ditemukan." }, { status: 404 });
 
-      const ringkas = await nilaiDanTutup(attempt, ujian, sekarang, null);
+      const ringkas = await nilaiDanTutup(attempt, ujian, sekarang, null, TUNGGU_SAAT_KUMPUL_MS);
 
       return Response.json({
         success: true,
