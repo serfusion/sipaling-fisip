@@ -496,5 +496,43 @@ export async function nilaiEsaiSaatKumpul(
   if (jam) clearTimeout(jam);
 
   if (hasil === "habis") return { menungguAi: true, nilai: null };
-  return { menungguAi: false, nilai: hasil?.nilai.get(attemptId) ?? null };
+
+  // Selesai sebelum batas belum tentu berarti SEMUA esainya dinilai di
+  // sini. Papan pantau pengajar dapat mengklaim sebagian atau seluruhnya
+  // lebih dulu (ia menyegar tiap sepuluh detik, dan esai sudah terbaca
+  // "belum dinilai" sejak status lembarnya berubah), dan permintaan
+  // "kumpulkan" yang terkirim dua kali dapat saling berebut. Yang menentukan
+  // apakah layar peserta perlu menunggu karena itu KEADAAN BASIS DATA, dengan
+  // aturan yang sama dengan yang dipakai layar itu sendiri ketika bertanya.
+  const baris = await db.select().from(cbtAttempts).where(eq(cbtAttempts.id, attemptId)).limit(1);
+  const masih = baris[0] ? await esaiMasihDinilai(baris[0]) : false;
+  return { menungguAi: masih, nilai: hasil?.nilai.get(attemptId) ?? null };
+}
+
+/**
+ * Masih ada esai lembar ini yang belum ternilai AI, atau sedang dinilai?
+ *
+ * Satu aturan untuk dua pertanyaan yang sama: jawaban "kumpulkan" (perlukah
+ * layar peserta menunggu) dan aksi "hasil" yang ditanyakan layar itu sesudahnya
+ * (masihkah ia perlu menunggu). Dua aturan yang ditulis terpisah akan
+ * berselisih, dan selisihnya terlihat sebagai layar yang berhenti bertanya
+ * padahal nilainya belum lengkap.
+ */
+export async function esaiMasihDinilai(
+  attempt: Pick<typeof cbtAttempts.$inferSelect, "id" | "examId" | "paper" | "approvedAt">,
+  sekarang: Date = new Date(),
+): Promise<boolean> {
+  const bank = await soalUjian(attempt.examId);
+  const jawaban = await db.select().from(cbtAnswers).where(eq(cbtAnswers.attemptId, attempt.id));
+  const petaJawab = new Map(jawaban.map((j) => [j.questionId, j]));
+  return bacaLembar(attempt.paper).some((l) => {
+    const soal = bank.find((s) => s.id === l.id);
+    const j = petaJawab.get(l.id);
+    if (!soal || !j || !dinilaiRubrik(soal)) return false;
+    const keadaan = {
+      jawaban: j.answer, isCorrect: j.isCorrect, gradedBy: j.gradedBy,
+      diubah: j.updatedAt, disahkan: Boolean(attempt.approvedAt),
+    };
+    return perluDinilaiAi(keadaan, sekarang) || klaimMasihBerlaku(j.gradedBy, j.updatedAt, sekarang);
+  });
 }

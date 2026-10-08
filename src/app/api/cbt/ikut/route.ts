@@ -45,8 +45,8 @@ import {
   bacaKlien, bolehMasukKlien, periksaKunciKlien, rapikanKlien, rapikanPerangkatKunci,
 } from "@/lib/kunci-layar";
 import { periksaKemiripan } from "@/lib/mirip-simpan";
-import { TUNGGU_SAAT_KUMPUL_MS, nilaiEsaiSaatKumpul } from "@/lib/nilai-otomatis";
-import { dinilaiRubrik, klaimMasihBerlaku, perluDinilaiAi } from "@/lib/penilaian-ai";
+import { TUNGGU_SAAT_KUMPUL_MS, esaiMasihDinilai, nilaiEsaiSaatKumpul } from "@/lib/nilai-otomatis";
+import { dinilaiRubrik } from "@/lib/penilaian-ai";
 import { jamIndonesia } from "@/lib/waktu-indonesia";
 
 export const runtime = "nodejs";
@@ -697,12 +697,18 @@ export async function POST(request: Request) {
 
     // ---------- HASIL TERBARU, SESUDAH KUMPUL ----------
     //
-    // Esai dinilai AI beberapa detik SESUDAH peserta mengumpulkan (lihat
-    // nilaiDanTutup). Layar "Ujian selesai" menanyakan nilainya lagi lewat
-    // jalur ini sampai seluruh esainya ternilai, supaya peserta melihat angka
-    // yang lengkap tanpa memuat ulang halaman, dan tanpa angka itu harus
-    // menunggu pengajar membuka papan pantaunya.
-    if (aksi === "hasil") {
+    // Biasanya esai sudah dinilai di dalam permintaan "kumpulkan" itu sendiri
+    // (lihat nilaiDanTutup). Bila belum, karena penyedia AI lambat atau papan
+    // pantau pengajar sedang memegangnya, layar "Ujian selesai" menanyakan
+    // nilainya lagi lewat jalur ini sampai seluruh esainya ternilai.
+    //
+    // "selesai" untuk lembar yang SUDAH tertutup juga dijawab di sini, dengan
+    // keadaan yang sekarang, bukan dengan 409. Permintaan "kumpulkan" dapat
+    // putus di jalan sesudah lembarnya tertutup di server (ia menunggu
+    // penilaian esai sampai sepuluh detik), dan peserta yang menekan tombolnya
+    // lagi harus sampai di layar hasilnya, bukan membaca "sudah dikumpulkan"
+    // sambil tetap terkurung di layar soal.
+    if (aksi === "hasil" || (aksi === "selesai" && attempt.status !== "berjalan")) {
       if (attempt.status === "berjalan") {
         return Response.json({ success: false, message: "Ujian ini belum dikumpulkan." }, { status: 409 });
       }
@@ -713,22 +719,7 @@ export async function POST(request: Request) {
       // bocor lewat jalan memutar ini.
       if (!ujian.showScore) return Response.json({ success: true, tampilkanNilai: false, hasil: null, menungguAi: false });
 
-      let menungguAi = false;
-      if (await rubrikUjian(ujian)) {
-        const bank = await soalUjian(attempt.examId);
-        const jawaban = await db.select().from(cbtAnswers).where(eq(cbtAnswers.attemptId, attempt.id));
-        const petaJawab = new Map(jawaban.map((j) => [j.questionId, j]));
-        menungguAi = bacaLembar(attempt.paper).some((l) => {
-          const soal = bank.find((s) => s.id === l.id);
-          const j = petaJawab.get(l.id);
-          if (!soal || !j || !dinilaiRubrik(soal)) return false;
-          const keadaan = {
-            jawaban: j.answer, isCorrect: j.isCorrect, gradedBy: j.gradedBy,
-            diubah: j.updatedAt, disahkan: Boolean(attempt.approvedAt),
-          };
-          return perluDinilaiAi(keadaan, sekarang) || klaimMasihBerlaku(j.gradedBy, j.updatedAt, sekarang);
-        });
-      }
+      const menungguAi = (await rubrikUjian(ujian)) ? await esaiMasihDinilai(attempt, sekarang) : false;
 
       const nilai = attempt.score ?? 0;
       return Response.json({
