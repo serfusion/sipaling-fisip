@@ -13,6 +13,7 @@
 // berpindah sendiri ke kunci cadangan.
 // ============================================================
 import Anthropic from "@anthropic-ai/sdk";
+import { transformJSONSchema } from "@anthropic-ai/sdk/lib/transform-json-schema";
 import { kunciAktif, LABEL_PENYEDIA, samarkan, type KunciAi, type PenyediaAi } from "@/lib/ai-kunci";
 import { catatPanggilan, laporkanKunciGagal, type FiturAi, cekBatas } from "@/lib/ai-pemakaian";
 
@@ -218,6 +219,29 @@ export async function ujiKunci(k: KunciAi & { model: string }): Promise<{ model:
   return { model: jawab.model, ms: Date.now() - mulai };
 }
 
+/**
+ * Skema yang aman dikirim ke Claude.
+ *
+ * Keluaran terstruktur Claude tidak menerima sebagian kata kunci JSON Schema
+ * (mis. maxItems, minItems di atas satu) dan menuntut additionalProperties
+ * false pada SETIAP objek; skema yang memuatnya ditolak 400. Gemini dan
+ * ChatGPT menerima kata kunci itu, jadi skema portal tetap ditulis lengkap
+ * dan baru dibersihkan di sini, dengan pembersih milik SDK Anthropic sendiri:
+ * batasan yang tidak didukung dipindahkan ke deskripsi medannya, sehingga
+ * model tetap membacanya, dan jumlah yang benar tetap ditegakkan pembaca
+ * jawaban di sisi portal.
+ *
+ * Skema yang tidak dapat dibersihkan (mis. tanpa "type") dikirim apa adanya:
+ * penolakannya lebih mudah dibaca daripada galat dari pembersihnya.
+ */
+export function skemaClaude(skema: Record<string, unknown>): Record<string, unknown> {
+  try {
+    return transformJSONSchema(skema);
+  } catch {
+    return skema;
+  }
+}
+
 async function lewatClaude(k: KunciAi & { model: string }, input: Masukan): Promise<JawabanModel> {
   const client = new Anthropic({ apiKey: k.kunci });
   try {
@@ -236,7 +260,7 @@ async function lewatClaude(k: KunciAi & { model: string }, input: Masukan): Prom
       ...(ringan ? {} : { thinking: { type: "adaptive" as const } }),
       output_config: {
         ...(ringan ? {} : { effort: input.cepat ? ("low" as const) : (input.usaha ?? "high") }),
-        format: { type: "json_schema", schema: input.skema },
+        format: { type: "json_schema", schema: skemaClaude(input.skema) },
       },
       messages: [
         {
@@ -266,6 +290,11 @@ async function lewatClaude(k: KunciAi & { model: string }, input: Masukan): Prom
         "Model menolak memproses naskah ini. Periksa isinya, lalu coba lagi dengan bagian yang relevan saja.",
         422,
       );
+    }
+    // Keluaran yang terpotong batas panjang adalah JSON setengah jadi. Sebabnya
+    // dikatakan apa adanya, bukan dibiarkan menjadi "tidak dapat diurai".
+    if (pesan.stop_reason === "max_tokens") {
+      throw new GalatModel("Jawaban Claude terpotong batas panjang sebelum selesai. Coba lagi.", 502);
     }
 
     const teks = pesan.content
@@ -343,9 +372,19 @@ function mundurPikirGemini(p: PikirGemini): PikirGemini {
 /** Kendali berpikir Gemini yang terbukti diterima, per model. */
 const pikirGeminiCocok = new Map<string, PikirGemini>();
 
-/** Penolakan 400 yang disebabkan kendali berpikir, bukan isi permintaannya. */
+/**
+ * Penolakan 400 yang disebabkan kendali berpikir, bukan isi permintaannya.
+ *
+ * Hanya yang pesannya menyebut "think". Status INVALID_ARGUMENT saja tidak
+ * cukup: Google memakainya untuk hampir semua 400, termasuk kunci yang
+ * kedaluwarsa. Menganggap semuanya penolakan kendali berpikir berarti
+ * mengulang permintaan yang pasti gagal lagi, dan, bila 400 sesaat kebetulan
+ * lolos pada ulangan berikutnya, mengingat "tanpa kendali" untuk model itu
+ * selama server hidup: seluruh esai sesudahnya dinilai dengan model yang
+ * berpikir sepanjang bawaannya.
+ */
 function tolakPikir(status: number, badan: string): boolean {
-  return status === 400 && (/think/i.test(badan) || /INVALID_ARGUMENT/.test(badan));
+  return status === 400 && /think/i.test(badan);
 }
 
 /**
@@ -466,6 +505,9 @@ async function lewatGemini(k: KunciAi & { model: string }, input: Masukan): Prom
   };
   const calon = data.candidates?.[0];
   const teks = (calon?.content?.parts || []).map((p) => p.text ?? "").join("");
+  if (teks.trim() && calon?.finishReason === "MAX_TOKENS") {
+    throw new GalatModel("Jawaban Gemini terpotong batas panjang sebelum selesai. Coba lagi.", 502);
+  }
   if (!teks.trim()) {
     throw new GalatModel(
       calon?.finishReason === "MAX_TOKENS"

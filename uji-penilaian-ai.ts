@@ -14,6 +14,7 @@ import {
 } from "./src/lib/penilaian-ai";
 import { LEVEL_GERBANG, hitungRubrik, rubrikBawaan } from "./src/lib/rubrik";
 import { VERSI_PERINTAH, bacaGerbang, bacaPenilaian, skemaPenilaian, susunPerintah } from "./src/lib/nilai-esai";
+import { skemaClaude } from "./src/lib/ai-penyedia";
 
 let lulus = 0;
 const gagal: string[] = [];
@@ -163,6 +164,35 @@ async function main() {
   );
   benar("medan lama dari model tidak ikut terbawa", !("terpenuhi" in alasanPanjang[0]));
   sama("alasan yang terlalu panjang dipotong", alasanPanjang[0].alasan.length, 2000);
+
+  // ============================================================
+  console.log("\n=== SKEMA YANG DITERIMA CLAUDE ===\n");
+  // ============================================================
+  //
+  // Keluaran terstruktur Claude menolak 400 skema yang memuat maxItems,
+  // minItems di atas satu, atau objek tanpa additionalProperties false.
+  // Skema penilaian memuat ketiganya untuk Gemini dan ChatGPT, jadi yang
+  // dikirim ke Claude harus sudah dibersihkan.
+
+  const terlarang: string[] = [];
+  const telusur = (o: Record<string, unknown>, jalur: string) => {
+    if ("maxItems" in o) terlarang.push(`${jalur}.maxItems`);
+    if ("minItems" in o && ![0, 1].includes(o.minItems as number)) terlarang.push(`${jalur}.minItems`);
+    if (o.type === "object" && o.additionalProperties !== false) terlarang.push(`${jalur} additionalProperties`);
+    for (const [k, v] of Object.entries((o.properties as Record<string, Record<string, unknown>>) ?? {})) telusur(v, `${jalur}.${k}`);
+    if (o.items) telusur(o.items as Record<string, unknown>, `${jalur}[]`);
+  };
+  const mentah = skemaPenilaian(12) as unknown as Record<string, unknown>;
+  telusur(mentah, "$");
+  benar("skema mentah memang memuat batasan yang ditolak Claude (uji ini menguji sesuatu)", terlarang.length > 0);
+  terlarang.length = 0;
+  const bersih = skemaClaude(mentah);
+  telusur(bersih, "$");
+  sama("skema untuk Claude bersih", terlarang.join(", "), "");
+  benar("batasan jumlahnya tetap terbaca model lewat deskripsi",
+    String((bersih.properties as Record<string, { description?: string }>).kriteria.description).includes("12"));
+  benar("skema aslinya tidak ikut berubah (Gemini dan ChatGPT tetap menerima batasannya)",
+    (skemaPenilaian(12) as unknown as { properties: { saran: { maxItems?: number } } }).properties.saran.maxItems === 2);
 
   // ============================================================
   console.log("\n=== BEBERAPA PANGGILAN SEKALIGUS ===\n");

@@ -327,10 +327,12 @@ export async function nilaiEsai(input: {
     // memuat pertimbangan pengajar, bukan oleh model yang berpikir panjang.
     usaha: "low",
     cepat: true,
-    // Cukup untuk dua belas kriteria berikut alasannya, dengan ruang untuk
-    // sedikit proses berpikir yang masih dihitung sebagian penyedia ke dalam
-    // batas ini. Batas yang pendek juga memotong keluaran yang melantur.
-    maksKeluaran: 3_000,
+    // Batas atas, bukan sasaran: jawaban yang wajar tidak menjadi lebih lambat
+    // karena batasnya longgar. Disesuaikan dengan jumlah kriteria, karena
+    // proses berpikir model ikut dihitung ke dalam batas ini pada Claude dan
+    // Gemini, dan jawaban yang terpotong di tengah adalah esai yang gagal
+    // dinilai, bukan esai yang dinilai lebih cepat.
+    maksKeluaran: 2_000 + 250 * input.rubrik.kriteria.length,
   });
 
   const isi = (jawab.isi ?? {}) as {
