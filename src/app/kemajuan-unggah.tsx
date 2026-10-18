@@ -125,8 +125,7 @@ export default function KemajuanUnggah({
       )}
 
       <p className="unggah-catatan">
-        Jangan tutup atau muat ulang halaman ini sampai nomor tiket muncul. Berkas besar memang lama;
-        selama angka di atas masih bergerak, prosesnya sedang berjalan.
+        Jangan tutup halaman sampai nomor tiket muncul.
       </p>
     </section>
   );
