@@ -342,7 +342,7 @@ function KartuAbsensi({
       </div>
 
       <p className="absen-catatan">
-        Absensi tidak melalui pemeriksaan. Kunjungan Anda sudah tercatat dan tidak perlu ditunggu.
+        Kunjungan Anda sudah tercatat.
       </p>
     </div>
   );
@@ -1494,7 +1494,7 @@ export default function SipalingApp({ kartuTerkunci = [] }: { kartuTerkunci?: re
                         </button>
                       ))}
                     </div>
-                    <p className="helper">Pilih dulu, lalu tentukan kebutuhannya di bawah.</p>
+                    
                   </div>
                 )}
                 <div className="field-group">
@@ -1645,12 +1645,6 @@ export default function SipalingApp({ kartuTerkunci = [] }: { kartuTerkunci?: re
                         </div>
                       );
                     })}
-
-                    <p className="helper serah-catatan">
-                      Berkas disimpan di portal hanya sampai admin perpustakaan mengarsipkannya, lalu dihapus dari
-                      penyimpanan. Ukuran besar biasanya karena halaman dipindai sebagai foto; simpan ulang sebagai
-                      PDF teks bila melebihi batas.
-                    </p>
                   </div>
                 ) : (
                   <div className="field-group field-full upload-box">
@@ -1751,7 +1745,7 @@ export default function SipalingApp({ kartuTerkunci = [] }: { kartuTerkunci?: re
             <article className="card page-panel">
               <div className="section-heading"><div><p className="section-eyebrow">PEMANTAUAN</p><h2>Cek Status Layanan</h2><p className="section-subtitle">Cukup masukkan nomor tiket untuk melihat detail serta perkembangan layanan.</p></div><span className="heading-icon">⌕</span></div>
               <form className="form-grid status-form" onSubmit={checkStatus}>
-                <div className="field-group field-full"><label htmlFor="statusTicket">Nomor Tiket <em>*</em></label><input id="statusTicket" name="ticket" type="text" placeholder="SIPALING-TA-2670201001-01234 atau SIPALING-PRODI-JUDUL-XXXXX-XXXXX" required value={statusTicketVal} onChange={(event) => setStatusTicketVal(event.target.value)} /><p className="helper">Berlaku untuk nomor tiket layanan maupun kode pengajuan judul.</p></div>
+                <div className="field-group field-full"><label htmlFor="statusTicket">Nomor Tiket <em>*</em></label><input id="statusTicket" name="ticket" type="text" placeholder="SIPALING-TA-2670201001-01234 atau SIPALING-PRODI-JUDUL-XXXXX-XXXXX" required value={statusTicketVal} onChange={(event) => setStatusTicketVal(event.target.value)} /></div>
                 <div className="form-actions field-full"><button type="submit" className="button button-primary" disabled={isChecking}>{isChecking ? "Mencari..." : "Cek Status"}<span>→</span></button></div>
               </form>
               {statusError && <ErrorNotice message={statusError} />}

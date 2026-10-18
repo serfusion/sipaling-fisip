@@ -85,9 +85,7 @@ export function periksaBerkasBagian(
     return {
       ok: false,
       pesan:
-        `Berkas "${nama}" berukuran ${mb} MB, melebihi batas ${maks} MB. ` +
-        "Ukuran sebesar ini biasanya karena halamannya dipindai sebagai foto. " +
-        "Simpan ulang sebagai PDF teks, atau perkecil resolusi pindaiannya.",
+        `Berkas "${nama}" berukuran ${mb} MB, melebihi batas ${maks} MB. Simpan ulang sebagai PDF teks.`,
     };
   }
   return { ok: true };

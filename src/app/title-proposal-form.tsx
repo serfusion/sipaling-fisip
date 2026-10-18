@@ -307,7 +307,7 @@ export default function TitleProposalForm({
       <div className="tp-lecturers">
         <div className="tp-lecturers-head">
           <span className="tp-statement-title">Usulan Dosen Pembimbing</span>
-          <p className="helper">Urut sesuai prioritas. Angka di samping nama = jumlah bimbingan berjalan.</p>
+          <p className="helper">Urut sesuai prioritas.</p>
         </div>
         {lecturerError && <p className="helper helper-error">{lecturerError}</p>}
         <div className="tp-lecturer-grid">
@@ -342,7 +342,6 @@ export default function TitleProposalForm({
         <button type="submit" className="button button-primary" disabled={sending}>
           {sending ? "Mengirim…" : "Kirim ke Program Studi"} <span>→</span>
         </button>
-        <p className="helper">Anda akan menerima kode pelacakan untuk memantau prosesnya.</p>
       </div>
     </form>
   );
