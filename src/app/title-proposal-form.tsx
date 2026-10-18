@@ -293,7 +293,7 @@ export default function TitleProposalForm({
 
       <div className="tp-upload">
         <span className="tp-statement-title">Bukti Keuangan <em>*</em></span>
-        <p className="helper">PDF/JPG/PNG, maks. 10 MB.</p>
+        <p className="helper">Bukti pembayaran semester berjalan. PDF/JPG/PNG, maks. 10 MB.</p>
         <PilihBerkas
           id="paymentFile"
           name="paymentFile"
