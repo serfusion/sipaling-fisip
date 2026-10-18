@@ -27,7 +27,7 @@ import { getCurrentProfile, serviceTypeForProfile } from "@/lib/supabase-server"
 import { explainServerError } from "@/lib/api-errors";
 import { audienceUntukLayanan, pushNotifications } from "@/lib/notify";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
-import { blockedByMaintenance } from "@/lib/maintenance-gate";
+import { blockedByMaintenance, blockedByServiceLock } from "@/lib/maintenance-gate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -168,6 +168,11 @@ export async function POST(request: Request) {
     if (!serviceCatalog[serviceType] || !serviceCatalog[serviceType].includes(serviceNeed)) {
       return Response.json({ success: false, message: "Pilihan layanan tidak valid." }, { status: 400 });
     }
+
+    // Kartu layanan yang sedang dikunci Super Admin tidak menerima pengajuan,
+    // termasuk dari tab lama yang dibuka sebelum kartunya dikunci.
+    const terkunci = await blockedByServiceLock(serviceType);
+    if (terkunci) return terkunci;
 
     const absensi = isAbsensiPerpus(serviceType, serviceNeed);
     // Absensi tidak meminta mahasiswa menulis apa pun: judulnya diisi sendiri

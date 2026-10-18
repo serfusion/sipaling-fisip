@@ -27,6 +27,7 @@ import { tempelkanBagian, unggahBagianLangsung } from "@/lib/unggah-klien";
 import { pesanStatusHttp } from "@/lib/pesan-http";
 import { kirimFormulir } from "@/lib/kirim-ulang";
 import { kemajuanAwal, type Kemajuan } from "@/lib/kemajuan";
+import { KARTU_PENGAJUAN_JUDUL, layananTertutup } from "@/lib/maintenance";
 import KemajuanUnggah, { type BerkasAntre } from "./kemajuan-unggah";
 import { LecturerPicker, type LecturerOption } from "./lecturer-picker";
 import TitleProposalForm from "./title-proposal-form";
@@ -595,9 +596,42 @@ function ServiceIcon({ type }: { type: string }) {
   );
 }
 
-export default function SipalingApp() {
+// Gembok pada kartu dan panel layanan yang sedang maintenance. Belenggunya
+// digambar terpisah supaya dapat bernapas dan terangkat sendiri lewat CSS.
+function Gembok() {
+  return (
+    <span className="kunci-medali" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+        <path className="kunci-belenggu" d="M8.2 11V8.1a3.8 3.8 0 0 1 7.6 0V11" />
+        <rect x="5.4" y="11" width="13.2" height="9.6" rx="2.6" fill="currentColor" fillOpacity=".16" />
+        <circle cx="12" cy="15.1" r="1.15" fill="currentColor" stroke="none" />
+        <path d="M12 16.1v1.9" />
+      </svg>
+    </span>
+  );
+}
+
+// Roda gigi kecil pada lencana "Maintenance". Giginya bukan path sendiri:
+// lingkaran bergaris tebal yang garisnya diputus-putus delapan kali.
+function RodaGigi() {
+  return (
+    <svg className="kunci-roda" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.4" strokeWidth="3.2" strokeDasharray="3.3 3.3" />
+      <circle cx="12" cy="12" r="5.2" strokeWidth="3.4" />
+    </svg>
+  );
+}
+
+// Layanan pertama yang tidak terkunci, untuk pilihan awal dan tombol Reset.
+// Bila semuanya terkunci, kartu pertama tetap dipakai dan formulirnya
+// digantikan panel gembok.
+function layananPertamaTerbuka(kartuTerkunci: readonly string[]): ServiceType {
+  return serviceTypes.find((type) => !layananTertutup(type, kartuTerkunci)) ?? serviceTypes[0];
+}
+
+export default function SipalingApp({ kartuTerkunci = [] }: { kartuTerkunci?: readonly string[] }) {
   const [activeTab, setActiveTab] = useState<Tab>("form");
-  const [serviceType, setServiceType] = useState<ServiceType>(serviceTypes[0]);
+  const [serviceType, setServiceType] = useState<ServiceType>(() => layananPertamaTerbuka(kartuTerkunci));
   const [sessionRole, setSessionRole] = useState<string>("");
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
   const [lecturerError, setLecturerError] = useState("");
@@ -645,6 +679,24 @@ export default function SipalingApp() {
   // Penanda gembok pada tombol Cakrawala. Hanya status kuncinya yang dibaca —
   // daftar kodenya tidak pernah dikirim ke halaman publik.
   const [cakrawalaLocked, setCakrawalaLocked] = useState(false);
+  // Kartu terkunci yang baru diketuk. `n` naik setiap ketukan supaya goyangan
+  // gemboknya dapat diulang walaupun kartunya sama.
+  const [kartuDiketuk, setKartuDiketuk] = useState<{ type: ServiceType; n: number } | null>(null);
+
+  // Gembok tampil sama bagi semua orang, termasuk Super Admin, supaya ia
+  // melihat persis yang dilihat mahasiswa. Bedanya hanya pada `kartuTertutup`:
+  // Super Admin tetap dapat membuka kartunya untuk diuji.
+  const isSuperAdmin = sessionRole === "super_admin";
+  const kartuDigembok = (type: string) => layananTertutup(type, kartuTerkunci);
+  const kartuTertutup = (type: string) => layananTertutup(type, kartuTerkunci, sessionRole);
+  const layananAwal = layananPertamaTerbuka(kartuTerkunci);
+  const layananTerbuka = serviceTypes.filter((type) => !kartuDigembok(type));
+
+  useEffect(() => {
+    if (!kartuDiketuk) return;
+    const timer = window.setTimeout(() => setKartuDiketuk(null), 4800);
+    return () => window.clearTimeout(timer);
+  }, [kartuDiketuk]);
 
   function doCopy(ticket: string) {
     copyTicketToClipboard(ticket, () => {
@@ -787,6 +839,11 @@ export default function SipalingApp() {
   }
 
   function selectService(type: ServiceType) {
+    if (kartuTertutup(type)) {
+      setKartuDiketuk((kini) => ({ type, n: (kini?.n ?? 0) + 1 }));
+      return;
+    }
+    setKartuDiketuk(null);
     const nextNeed = needsFor(type, finalTaskType)[0];
     setServiceType(type);
     setSelectedNeed(nextNeed);
@@ -959,8 +1016,8 @@ export default function SipalingApp() {
       form.reset();
       setFileInfo("");
       setBagianBerkas({});
-      setServiceType(serviceTypes[0]);
-      setSelectedNeed(serviceCatalog[serviceTypes[0]].needs[0]);
+      setServiceType(layananAwal);
+      setSelectedNeed(serviceCatalog[layananAwal].needs[0]);
       clearLecturerSearch();
     } catch (error: unknown) {
       setSubmitError(error instanceof Error ? error.message : "Pengajuan gagal dikirim.");
@@ -1155,6 +1212,41 @@ export default function SipalingApp() {
     }
   }
 
+  // Pengganti formulir untuk layanan yang sedang dikunci Super Admin.
+  function panelKunci(nama: string, keterangan: string) {
+    return (
+      <div className="kunci-panel">
+        <div className="kunci-panel-gembok"><Gembok /></div>
+        <p className="section-eyebrow">MAINTENANCE</p>
+        <h3>{nama} sedang maintenance</h3>
+        <p>{keterangan}</p>
+        {layananTerbuka.length > 0 && (
+          <div className="kunci-panel-pilihan">
+            <span>Layanan yang sudah terbuka</span>
+            <div>
+              {layananTerbuka.map((type) => (
+                <button type="button" key={type} className="kunci-chip" onClick={() => selectService(type)}>
+                  <ServiceIcon type={type} /> {serviceCatalog[type].short} <span aria-hidden="true">→</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Pengingat bagi Super Admin yang sedang menguji kartu terkunci: yang ia
+  // isi sungguh terkirim, tetapi mahasiswa belum dapat melakukan hal yang sama.
+  function barUji(nama: string) {
+    return (
+      <div className="kunci-uji-bar">
+        <Gembok />
+        <span><b>Mode uji Super Admin.</b> {nama} masih terkunci untuk mahasiswa; Anda tetap dapat mencobanya dari akun ini.</span>
+      </div>
+    );
+  }
+
   return (
     <div className="site-shell">
       <div className="ambient ambient-one" />
@@ -1264,24 +1356,57 @@ export default function SipalingApp() {
             </span>
           </div>
           <div className="service-grid">
-            {serviceTypes.map((type) => {
+            {serviceTypes.map((type, index) => {
               const item = serviceCatalog[type];
               const selected = type === serviceType;
+              const digembok = kartuDigembok(type);
+              const tertutup = kartuTertutup(type);
               return (
                 <button
                   type="button"
-                  className={`service-card ${selected ? "service-card-selected" : ""}`}
+                  className={`service-card ${selected ? "service-card-selected" : ""} ${digembok ? "service-card-locked" : ""}`}
                   key={type}
                   onClick={() => selectService(type)}
-                  aria-pressed={selected}
+                  aria-pressed={tertutup ? undefined : selected}
+                  aria-disabled={tertutup || undefined}
+                  data-goyang={kartuDiketuk?.type === type ? kartuDiketuk.n % 2 : undefined}
+                  // Tiap kartu memulai daurnya pada saat yang berbeda, jadi
+                  // gembok-gemboknya tidak berdenyut serempak seperti lampu.
+                  style={{ "--urut": index } as React.CSSProperties}
                 >
                   <span className="service-icon"><ServiceIcon type={type} /></span>
                   <span className="service-card-copy"><strong>{item.short}</strong><small>{item.description}</small></span>
                   <span className="service-arrow">→</span>
+                  {digembok && (
+                    <>
+                      <span className="kunci-sr">, terkunci sementara karena sedang maintenance</span>
+                      <span className="kunci-lapis" aria-hidden="true">
+                        <Gembok />
+                        <span className="kunci-nama">{item.short}</span>
+                        <span className="kunci-label"><RodaGigi /> Maintenance</span>
+                        {isSuperAdmin && <span className="kunci-uji">Super Admin · klik untuk uji</span>}
+                      </span>
+                    </>
+                  )}
                 </button>
               );
             })}
           </div>
+          <p className="kunci-kabar" role="status">
+            {kartuDiketuk && (
+              <span key={kartuDiketuk.n}>
+                <b>{serviceCatalog[kartuDiketuk.type].short}</b> sedang maintenance dan untuk sementara belum dapat dipakai.
+                {layananTerbuka.length > 0 && (
+                  <> Yang sudah terbuka: {layananTerbuka.map((type, i) => (
+                    <span key={type}>
+                      {i > 0 && ", "}
+                      <button type="button" className="kunci-tautan" onClick={() => selectService(type)}>{serviceCatalog[type].short}</button>
+                    </span>
+                  ))}.</>
+                )}
+              </span>
+            )}
+          </p>
         </section>
 
         <nav className="tabs" aria-label="Navigasi halaman layanan">
@@ -1304,9 +1429,17 @@ export default function SipalingApp() {
                   <h2>Form Layanan Mahasiswa</h2>
                   <p className="section-subtitle">Lengkapi data berikut. Layanan dan kebutuhan di bawah ini sudah dapat digunakan.</p>
                 </div>
-                <div className="form-badge"><span className="live-dot" /> Terbuka</div>
+                {kartuTertutup(serviceType)
+                  ? <div className="form-badge form-badge-kunci"><span className="live-dot" /> Maintenance</div>
+                  : <div className="form-badge"><span className="live-dot" /> Terbuka</div>}
               </div>
 
+              {kartuTertutup(serviceType) ? panelKunci(
+                serviceCatalog[serviceType].short,
+                "Kami sedang merapikan layanan ini supaya lebih nyaman dipakai. Untuk sementara pengajuannya ditutup, dan akan dibuka kembali begitu siap.",
+              ) : (
+              <>
+              {isSuperAdmin && kartuDigembok(serviceType) && barUji(serviceType)}
               <div className="selected-service-banner">
                 <span className="selected-service-icon"><ServiceIcon type={serviceType} /></span>
                 <div className="selected-service-copy"><strong>{serviceType}</strong><span>{currentService.description}</span></div>
@@ -1342,7 +1475,7 @@ export default function SipalingApp() {
                 <div className="field-group">
                   <label htmlFor="serviceType">Jenis Layanan <em>*</em></label>
                   <select id="serviceType" name="serviceType" value={serviceType} onChange={(event) => { const t = event.target.value as ServiceType; const nextNeed = needsFor(t, finalTaskType)[0]; setServiceType(t); setSelectedNeed(nextNeed); setAttendanceInfo(null); setBagianBerkas({}); if (isTitleProposalNeed(nextNeed)) selectTab("judul"); }} required>
-                    {serviceTypes.map((type) => <option value={type} key={type}>{type}</option>)}
+                    {serviceTypes.map((type) => <option value={type} key={type} disabled={kartuTertutup(type)}>{type}{kartuTertutup(type) ? " (maintenance)" : ""}</option>)}
                   </select>
                 </div>
                 {isAcademicReview && (
@@ -1535,7 +1668,7 @@ export default function SipalingApp() {
                 )}
                 <div className="form-actions field-full">
                   <button type="submit" className="button button-primary" disabled={isSubmitting}>{isSubmitting ? (isAbsensi ? "Mencatat…" : "Mengirim…") : isAbsensi ? "Absen Sekarang" : "Kirim Layanan"}<span>→</span></button>
-                  <button type="reset" className="button button-light" onClick={() => { setServiceType(serviceTypes[0]); setSelectedNeed(firstFormNeed(serviceTypes[0], finalTaskType)); setAttendanceInfo(null); clearLecturerSearch(); setFileInfo(""); setBagianBerkas({}); setSubmitError(""); setSubmitMessage(null); }}>Reset</button>
+                  <button type="reset" className="button button-light" onClick={() => { setServiceType(layananAwal); setSelectedNeed(firstFormNeed(layananAwal, finalTaskType)); setAttendanceInfo(null); clearLecturerSearch(); setFileInfo(""); setBagianBerkas({}); setSubmitError(""); setSubmitMessage(null); }}>Reset</button>
                 </div>
                 </>
                 )}
@@ -1543,6 +1676,8 @@ export default function SipalingApp() {
               {isSubmitting && <KemajuanUnggah kemajuan={kemajuan} antrean={antreanUnggah} kerja="pengajuan" />}
               {submitError && <ErrorNotice message={submitError} />}
               {submitMessage && <SuccessNotice>{submitMessage}</SuccessNotice>}
+              </>
+              )}
             </article>
           )}
 
@@ -1557,6 +1692,12 @@ export default function SipalingApp() {
                 <span className="heading-icon">✎</span>
               </div>
 
+              {kartuTertutup(KARTU_PENGAJUAN_JUDUL) ? panelKunci(
+                "Pengajuan Judul",
+                "Pengajuan judul bagian dari layanan Tugas Akhir yang sedang maintenance, jadi untuk sementara ditutup. Kode pengajuan yang sudah ada tetap dapat dilacak di tab Cek Status.",
+              ) : (
+              <>
+              {isSuperAdmin && kartuDigembok(KARTU_PENGAJUAN_JUDUL) && barUji("Pengajuan Judul")}
               <ol className="tp-steps">
                 <li><b>1</b><span>Isi template</span></li>
                 <li><b>2</b><span>Verifikasi Prodi</span></li>
@@ -1600,6 +1741,8 @@ export default function SipalingApp() {
                     }, 20);
                   }}
                 />
+              )}
+              </>
               )}
             </article>
           )}
@@ -1756,6 +1899,11 @@ export default function SipalingApp() {
                         Status saat ini: {revLayanan.status}
                         {revLayanan.status !== "Revisi" && ", upload revisi belum dibuka untuk tiket ini."}
                       </span>
+                      {kartuTertutup(revLayanan.serviceType) && (
+                        <span className="rev-status rev-status-beda">
+                          Layanan ini sedang maintenance, jadi upload revisinya ditutup sementara.
+                        </span>
+                      )}
                       <small>
                         {jumlahBerkas(revBentuk) > 1
                           ? `Layanan ini meminta ${jumlahBerkas(revBentuk)} berkas. Semuanya akan menggantikan berkas sebelumnya pada tiket yang sama.`
@@ -1817,7 +1965,7 @@ export default function SipalingApp() {
                       <button
                         type="submit"
                         className="button button-primary"
-                        disabled={isUploadingRevision || revLayanan.status !== "Revisi"}
+                        disabled={isUploadingRevision || revLayanan.status !== "Revisi" || kartuTertutup(revLayanan.serviceType)}
                       >
                         {isUploadingRevision ? "Mengunggah..." : "Kirim Revisi"}<span>→</span>
                       </button>

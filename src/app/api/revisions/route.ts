@@ -21,7 +21,7 @@ import { and, eq } from "drizzle-orm";
 import { MAX_DOCUMENT_BYTES, removeDocument, uploadDocument } from "@/lib/document-storage";
 import { explainServerError } from "@/lib/api-errors";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
-import { blockedByMaintenance } from "@/lib/maintenance-gate";
+import { blockedByMaintenance, blockedByServiceLock } from "@/lib/maintenance-gate";
 import { bentukUnggah, periksaBerkasTunggal } from "@/lib/bentuk-unggah";
 import { amankanBagian, bacaBagianDariForm, jalurDiklaim } from "@/lib/unggah-klaim";
 import { revisiPemilikJalur } from "@/lib/kiriman-ulang-server";
@@ -159,6 +159,12 @@ export async function POST(request: Request) {
         });
       }
     }
+
+    // Revisi ikut kunci kartu layanan tiketnya. Diperiksa SESUDAH kiriman
+    // ulang: revisi yang sudah tersimpan tetap dikabarkan berhasil walaupun
+    // kartunya baru dikunci sesudahnya.
+    const terkunci = await blockedByServiceLock(service.serviceType);
+    if (terkunci) return terkunci;
 
     if (service.status !== "Revisi") {
       return Response.json(

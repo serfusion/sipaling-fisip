@@ -8,6 +8,77 @@
 
 export const MAINTENANCE_KEY = "maintenance_mode";
 
+// ---------------------------------------------------------------------------
+// Kunci per kartu layanan
+// ---------------------------------------------------------------------------
+
+/**
+ * Tujuh kartu layanan pada portal mahasiswa, urut seperti tampil di sana.
+ *
+ * Nama-namanya harus sama persis dengan serviceTypes di
+ * src/app/sipaling-app.tsx dan kunci serviceCatalog di
+ * src/app/api/requests/route.ts: yang dikunci adalah nilai serviceType yang
+ * benar-benar dikirim formulir.
+ */
+export const KARTU_LAYANAN = [
+  "Layanan Tugas Akhir",
+  "Layanan PDDIKTI",
+  "Layanan Akademik",
+  "Layanan Prodi",
+  "Layanan Umum",
+  "Layanan Perpustakaan",
+  "Layanan Laboratorium",
+] as const;
+
+export type KartuLayanan = (typeof KARTU_LAYANAN)[number];
+
+/**
+ * Kartu yang terkunci selama Super Admin belum pernah mengaturnya sendiri:
+ * semuanya kecuali Perpustakaan, satu-satunya layanan yang sudah berjalan
+ * penuh. Begitu daftar kunci tersimpan dari dashboard, daftar inilah yang
+ * berhenti berlaku — termasuk bila yang disimpan daftar kosong.
+ */
+export const KARTU_TERKUNCI_BAWAAN: readonly KartuLayanan[] = KARTU_LAYANAN.filter(
+  (kartu) => kartu !== "Layanan Perpustakaan",
+);
+
+/**
+ * Pengajuan judul tidak punya kartu sendiri. Ia bagian dari kartu Tugas
+ * Akhir ("ajukan judul, lalu unggah draft"), jadi ikut terkunci bersamanya.
+ */
+export const KARTU_PENGAJUAN_JUDUL: KartuLayanan = "Layanan Tugas Akhir";
+
+/**
+ * Nama lama yang masih tersimpan pada tiket-tiket awal. Tiket lama ikut
+ * terkunci bersama kartu yang kini memegang layanannya.
+ */
+const NAMA_LAMA: Record<string, KartuLayanan> = {
+  "Layanan Skripsi / Jurnal": "Layanan Tugas Akhir",
+};
+
+export function kartuUntukLayanan(serviceType: string): KartuLayanan | null {
+  if ((KARTU_LAYANAN as readonly string[]).includes(serviceType)) return serviceType as KartuLayanan;
+  return NAMA_LAMA[serviceType] ?? null;
+}
+
+/**
+ * Apakah layanan ini tertutup bagi pengunjung dengan peran tersebut?
+ *
+ * Super Admin selalu lolos supaya ia dapat menguji kartu yang sedang
+ * maintenance sebelum membukanya untuk mahasiswa. Layanan yang tidak
+ * dikenal tidak dianggap terkunci: menolak nama asing adalah tugas validasi
+ * formulir, bukan tugas kunci ini.
+ */
+export function layananTertutup(
+  serviceType: string,
+  lockedServices: readonly string[],
+  role?: string | null,
+) {
+  if (role === PERAN_LOLOS_MAINTENANCE) return false;
+  const kartu = kartuUntukLayanan(serviceType);
+  return kartu !== null && lockedServices.includes(kartu);
+}
+
 export type MaintenanceState = {
   /** Portal mahasiswa ditutup dan diganti halaman kucing tidur. */
   enabled: boolean;
@@ -28,6 +99,12 @@ export type MaintenanceState = {
   message: string;
   /** Teks pada lencana kuning di bawah pesan. */
   note: string;
+  /**
+   * Kartu layanan yang sedang dikunci untuk maintenance. Berlaku walaupun
+   * portalnya sendiri terbuka: kartunya tampil bergembok dan pengajuannya
+   * ditolak server.
+   */
+  lockedServices: KartuLayanan[];
 };
 
 export const DEFAULT_MAINTENANCE: MaintenanceState = {
@@ -38,6 +115,7 @@ export const DEFAULT_MAINTENANCE: MaintenanceState = {
   message:
     "Server kami sedang tidur siang ditemani kucing penjaga. Tim admin lagi mengelus-elus mesinnya biar cepat bangun. Data Anda aman, cuma ikut rebahan sebentar.",
   note: "Coba tengok lagi beberapa saat lagi",
+  lockedServices: [...KARTU_TERKUNCI_BAWAAN],
 };
 
 const LIMIT = { lead: 120, message: 400, note: 90 } as const;
@@ -66,6 +144,12 @@ export function normalizeMaintenance(input: unknown): MaintenanceState {
     lead: clean(raw.lead, DEFAULT_MAINTENANCE.lead, LIMIT.lead),
     message: clean(raw.message, DEFAULT_MAINTENANCE.message, LIMIT.message),
     note: clean(raw.note, DEFAULT_MAINTENANCE.note, LIMIT.note),
+    // Belum pernah diatur (bukan array) berarti memakai daftar bawaan.
+    // Disaring lewat KARTU_LAYANAN supaya nama asing terbuang, tidak ada
+    // yang ganda, dan urutannya selalu sama dengan urutan kartu.
+    lockedServices: Array.isArray(raw.lockedServices)
+      ? KARTU_LAYANAN.filter((kartu) => (raw.lockedServices as unknown[]).includes(kartu))
+      : [...KARTU_TERKUNCI_BAWAAN],
   };
 }
 
