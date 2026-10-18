@@ -2,7 +2,12 @@
 
 import Link from "next/link";
 import { useAutoLogout } from "@/lib/use-auto-logout";
-import { DEFAULT_MAINTENANCE, type MaintenanceState } from "@/lib/maintenance";
+import {
+  DEFAULT_MAINTENANCE,
+  KARTU_LAYANAN,
+  type KartuLayanan,
+  type MaintenanceState,
+} from "@/lib/maintenance";
 import { sisaPemakaian, type CakrawalaCode } from "@/lib/cakrawala";
 import type { LecturerOption } from "../lecturer-picker";
 import DatabasePanel from "./database-panel";
@@ -471,6 +476,9 @@ export default function DashboardApp({
   const [mtBusy, setMtBusy] = useState(false);
   const [mtMessage, setMtMessage] = useState("");
   const [mtError, setMtError] = useState("");
+  // Panel mana yang terakhir menyimpan, supaya pesan berhasil/gagal tampil di
+  // dekat tombol yang ditekan, bukan di panel sebelahnya.
+  const [mtAsal, setMtAsal] = useState<"portal" | "kartu">("portal");
 
   // Kunci Cakrawala: status kunci, daftar kode, dan formulir pembuat kode.
   const [cwLocked, setCwLocked] = useState(true);
@@ -1011,8 +1019,9 @@ export default function DashboardApp({
   // Satu pintu simpan untuk seluruh panel maintenance: sakelar maupun tombol
   // "Simpan teks" mengirim persis apa yang sedang tampak di layar, jadi tidak
   // ada perbedaan antara yang dilihat Super Admin dan yang tersimpan.
-  async function saveMaintenance(next: MaintenanceState) {
+  async function saveMaintenance(next: MaintenanceState, asal: "portal" | "kartu" = "portal", pesan?: string) {
     setMtBusy(true);
+    setMtAsal(asal);
     setMtMessage("");
     setMtError("");
     try {
@@ -1028,15 +1037,40 @@ export default function DashboardApp({
       setMt(payload.maintenance);
       setMtDraft(payload.maintenance);
       setMtMessage(
-        payload.maintenance.enabled
-          ? "Mode maintenance MENYALA. Portal mahasiswa sekarang menampilkan halaman kucing tidur."
-          : "Mode maintenance dimatikan. Portal mahasiswa kembali normal.",
+        pesan ??
+          (payload.maintenance.enabled
+            ? "Mode maintenance MENYALA. Portal mahasiswa sekarang menampilkan halaman kucing tidur."
+            : "Mode maintenance dimatikan. Portal mahasiswa kembali normal."),
       );
     } catch (reason: unknown) {
       setMtError(reason instanceof Error ? reason.message : "Mode maintenance belum tersimpan.");
     } finally {
       setMtBusy(false);
     }
+  }
+
+  // Kunci per kartu layanan. Yang dikirim tetap seluruh status maintenance,
+  // sama seperti sakelar lain di panel ini; daftar kartunya dirapikan server.
+  function ubahKunciKartu(kartu: KartuLayanan, kunci: boolean) {
+    const lockedServices = kunci
+      ? [...mt.lockedServices, kartu]
+      : mt.lockedServices.filter((terkunci) => terkunci !== kartu);
+    const nama = kartu.replace(/^Layanan /, "");
+    void saveMaintenance(
+      { ...mtDraft, lockedServices },
+      "kartu",
+      kunci
+        ? `Kartu ${nama} dikunci. Mahasiswa kini melihat gemboknya, dan pengajuannya ditolak sampai dibuka kembali.`
+        : `Kartu ${nama} dibuka. Mahasiswa sudah dapat memakainya.`,
+    );
+  }
+
+  function aturSemuaKartu(kunci: boolean) {
+    void saveMaintenance(
+      { ...mtDraft, lockedServices: kunci ? [...KARTU_LAYANAN] : [] },
+      "kartu",
+      kunci ? "Semua kartu layanan dikunci." : "Semua kartu layanan dibuka.",
+    );
   }
 
   // Satu pintu untuk seluruh perubahan kunci Cakrawala: sakelar, pembuatan
@@ -1612,6 +1646,78 @@ export default function DashboardApp({
               <p className="section-eyebrow">SUPER ADMIN</p>
               <h2 className="dsh-title">Mode maintenance portal</h2>
 
+              <div className="panel mtk">
+                <div className="mtk-kepala">
+                  <div className="mtp-hero-copy">
+                    <b>Kunci per kartu layanan</b>
+                    <span>
+                      Kartu yang dikunci tampil bergembok di portal mahasiswa, dan server menolak pengajuan maupun
+                      upload revisinya. Anda sendiri tetap dapat membuka kartu itu dari portal untuk mengujinya.
+                    </span>
+                  </div>
+                  <span className="mtk-hitung">
+                    {KARTU_LAYANAN.length - mt.lockedServices.length} dari {KARTU_LAYANAN.length} terbuka
+                  </span>
+                </div>
+
+                <div className="mtk-kisi">
+                  {KARTU_LAYANAN.map((kartu) => {
+                    const terkunci = mt.lockedServices.includes(kartu);
+                    return (
+                      <div className="mtk-kartu" data-kunci={terkunci ? "1" : undefined} key={kartu}>
+                        <span className="mtk-ikon" aria-hidden="true">
+                          {terkunci ? (
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path className="mtk-belenggu" d="M8.2 11V8.1a3.8 3.8 0 0 1 7.6 0V11" />
+                              <rect x="5.4" y="11" width="13.2" height="9.6" rx="2.6" />
+                            </svg>
+                          ) : (
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M6 12.5l4 4 8-9" />
+                            </svg>
+                          )}
+                        </span>
+                        <div className="mtk-salin">
+                          <b>{kartu.replace(/^Layanan /, "")}</b>
+                          <span>{terkunci ? "Maintenance" : "Terbuka"}</span>
+                        </div>
+                        <label className="mtp-switch" title={terkunci ? `Buka kunci ${kartu}` : `Kunci ${kartu}`}>
+                          <input
+                            type="checkbox"
+                            checked={!terkunci}
+                            disabled={mtBusy}
+                            aria-label={`${kartu} terbuka untuk mahasiswa`}
+                            onChange={(event) => ubahKunciKartu(kartu, !event.target.checked)}
+                          />
+                          <i aria-hidden="true" />
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mtp-actions">
+                  <button type="button" className="btn btn-light" disabled={mtBusy || mt.lockedServices.length === 0} onClick={() => aturSemuaKartu(false)}>
+                    Buka semua
+                  </button>
+                  <button type="button" className="btn btn-light" disabled={mtBusy || mt.lockedServices.length === KARTU_LAYANAN.length} onClick={() => aturSemuaKartu(true)}>
+                    Kunci semua
+                  </button>
+                  <a className="btn btn-light" href="/" target="_blank" rel="noreferrer">
+                    Lihat portal →
+                  </a>
+                </div>
+
+                {mtAsal === "kartu" && mtMessage && <div className="dsh-ok">{mtMessage}</div>}
+                {mtAsal === "kartu" && mtError && <div className="dsh-error">{mtError}</div>}
+
+                <div className="mtp-hint">
+                  <b>Catatan.</b> Pengajuan Judul tidak punya kartu sendiri; ia ikut kartu <b>Tugas Akhir</b>. Upload
+                  revisi ikut kartu layanan tiketnya, sedangkan Cek Status tetap terbuka untuk semua tiket. Sebelum
+                  pernah diatur di sini, semua kartu kecuali Perpustakaan terkunci.
+                </div>
+              </div>
+
               <div className="panel">
                 <div className="mtp-hero" data-on={mt.enabled ? "1" : undefined}>
                   <div className="mtp-hero-copy">
@@ -1739,8 +1845,8 @@ export default function DashboardApp({
                     </a>
                   </div>
 
-                  {mtMessage && <div className="dsh-ok">{mtMessage}</div>}
-                  {mtError && <div className="dsh-error">{mtError}</div>}
+                  {mtAsal === "portal" && mtMessage && <div className="dsh-ok">{mtMessage}</div>}
+                  {mtAsal === "portal" && mtError && <div className="dsh-error">{mtError}</div>}
                 </form>
 
                 <div className="mtp-hint">

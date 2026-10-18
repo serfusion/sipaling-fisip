@@ -23,9 +23,13 @@ export default async function HomePage({
   const wantsPreview = params?.preview === "maintenance";
   const state = await readMaintenanceState();
 
+  // Kunci per kartu ikut dibaca dari baris yang sama, jadi kartu sudah
+  // bergembok sejak HTML pertama tanpa permintaan tambahan dari peramban.
+  const portal = <SipalingApp kartuTerkunci={state.lockedServices} />;
+
   // Jalur cepat untuk 99% kunjungan: tidak ada maintenance, tidak ada
   // pratinjau, jadi tidak perlu memanggil Supabase sama sekali.
-  if (!state.enabled && !wantsPreview) return <SipalingApp />;
+  if (!state.enabled && !wantsPreview) return portal;
 
   const profile = await getCurrentProfile();
 
@@ -36,7 +40,7 @@ export default async function HomePage({
     return <MaintenanceScreen state={{ ...state, enabled: true }} preview />;
   }
 
-  if (!state.enabled) return <SipalingApp />;
+  if (!state.enabled) return portal;
 
   // Dosen dan admin yang sudah login tetap dapat memakai portal selama
   // maintenance: merekalah yang sedang membereskan sesuatu di baliknya.
@@ -49,7 +53,7 @@ export default async function HomePage({
           <span>Pengunjung umum melihat halaman istirahat. Anda dilewatkan karena sudah login.</span>
           <Link href="/dashboard">Buka dashboard →</Link>
         </div>
-        <SipalingApp />
+        {portal}
       </>
     );
   }

@@ -11,6 +11,11 @@ import {
   normalizeMaintenance,
   parseMaintenance,
   DEFAULT_MAINTENANCE,
+  KARTU_LAYANAN,
+  KARTU_TERKUNCI_BAWAAN,
+  KARTU_PENGAJUAN_JUDUL,
+  kartuUntukLayanan,
+  layananTertutup,
 } from "./src/lib/maintenance";
 
 let lulus = 0;
@@ -115,6 +120,58 @@ sama("pengaturan lama terbaca terkunci", parseMaintenance('{"enabled":true,"secr
 sama("izin admin bisa dinyalakan", normalizeMaintenance({ adminLogin: true }).adminLogin, true);
 sama("izin admin hanya true yang menyala", normalizeMaintenance({ adminLogin: "true" }).adminLogin, false);
 sama("bawaan izin admin mati", DEFAULT_MAINTENANCE.adminLogin, false);
+
+// --- Kunci per kartu layanan ---------------------------------------------
+// Sebelum Super Admin pernah mengaturnya, hanya Perpustakaan yang terbuka.
+sama("tujuh kartu", KARTU_LAYANAN.length, 7);
+sama("bawaan: enam kartu terkunci", KARTU_TERKUNCI_BAWAAN.length, 6);
+sama("bawaan: Perpustakaan terbuka", KARTU_TERKUNCI_BAWAAN.includes("Layanan Perpustakaan"), false);
+sama("pengaturan kosong memakai bawaan", normalizeMaintenance({}).lockedServices.length, 6);
+sama("pengaturan lama tanpa kolom memakai bawaan", parseMaintenance('{"enabled":false}').lockedServices.length, 6);
+sama("JSON rusak memakai bawaan", parseMaintenance("{rusak").lockedServices.length, 6);
+// Daftar kosong yang tersimpan berarti SEMUA terbuka — bukan "belum diatur".
+sama("daftar kosong berarti semua terbuka", normalizeMaintenance({ lockedServices: [] }).lockedServices.length, 0);
+sama("bukan array memakai bawaan", normalizeMaintenance({ lockedServices: "Layanan Umum" }).lockedServices.length, 6);
+// Nama asing dibuang, ganda dirapatkan, urutan mengikuti urutan kartu.
+sama(
+  "nama asing dibuang, ganda dirapatkan, urut kartu",
+  normalizeMaintenance({
+    lockedServices: ["Layanan Umum", "Layanan Rahasia", "Layanan Tugas Akhir", "Layanan Umum", 7, null],
+  }).lockedServices.join("|"),
+  "Layanan Tugas Akhir|Layanan Umum",
+);
+// Normalisasi tidak boleh membagi array bawaan: mengubah hasilnya tidak
+// boleh ikut mengubah DEFAULT_MAINTENANCE.
+const hasil = normalizeMaintenance({});
+hasil.lockedServices.pop();
+sama("bawaan tidak ikut berubah", DEFAULT_MAINTENANCE.lockedServices.length, 6);
+sama("daftar bawaan tetap enam", KARTU_TERKUNCI_BAWAAN.length, 6);
+
+// Nama lama "Layanan Skripsi / Jurnal" pada tiket awal ikut kartu Tugas Akhir.
+sama("nama lama dipetakan", kartuUntukLayanan("Layanan Skripsi / Jurnal"), "Layanan Tugas Akhir");
+sama("nama asing tidak dipetakan", kartuUntukLayanan("Layanan Rahasia"), null);
+sama("tiket lama ikut terkunci", layananTertutup("Layanan Skripsi / Jurnal", ["Layanan Tugas Akhir"]), true);
+sama("layanan asing tidak dianggap terkunci", layananTertutup("Layanan Rahasia", [...KARTU_LAYANAN]), false);
+sama("pengajuan judul ikut Tugas Akhir", KARTU_PENGAJUAN_JUDUL, "Layanan Tugas Akhir");
+
+// Tabel kebenaran: setiap kartu, terkunci/terbuka, setiap peran.
+for (const kartu of KARTU_LAYANAN) {
+  for (const peran of [...SEMUA_PERAN, null, undefined, ""]) {
+    const lolos = peran === "super_admin";
+    sama(`${kartu} terkunci, ${peran} ${lolos ? "lolos" : "tertahan"}`, layananTertutup(kartu, [kartu], peran), !lolos);
+    sama(`${kartu} terbuka, ${peran} lolos`, layananTertutup(kartu, [], peran), false);
+  }
+}
+// Mengunci satu kartu tidak mengunci kartu lain.
+for (const kartu of KARTU_LAYANAN) {
+  sama(
+    `hanya ${kartu} yang tertutup`,
+    KARTU_LAYANAN.filter((lain) => layananTertutup(lain, [kartu])).join("|"),
+    kartu,
+  );
+}
+// Peran mirip tidak menyamar menjadi Super Admin.
+sama("Super_Admin tidak lolos kunci kartu", layananTertutup("Layanan Umum", ["Layanan Umum"], "Super_Admin"), true);
 
 console.log(`\n${lulus} periksa lulus`);
 if (gagal.length > 0) {

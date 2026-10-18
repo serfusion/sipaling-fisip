@@ -17,7 +17,8 @@ import { canReviewProposals, type ProposalChoiceRow } from "@/lib/proposal-acces
 import { PRODI_AUDIENCE, pushNotification } from "@/lib/notify";
 import { explainServerError } from "@/lib/api-errors";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
-import { blockedByMaintenance } from "@/lib/maintenance-gate";
+import { blockedByMaintenance, blockedByServiceLock } from "@/lib/maintenance-gate";
+import { KARTU_PENGAJUAN_JUDUL } from "@/lib/maintenance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,6 +53,9 @@ export async function POST(request: Request) {
   // menyelinap mengirim data. Dosen/admin yang login tetap dilayani.
   const closed = await blockedByMaintenance();
   if (closed) return closed;
+  // Pengajuan judul bagian dari kartu Tugas Akhir dan ikut terkunci bersamanya.
+  const terkunci = await blockedByServiceLock(KARTU_PENGAJUAN_JUDUL);
+  if (terkunci) return terkunci;
   try {
     const form = await request.formData();
 
