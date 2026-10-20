@@ -249,15 +249,20 @@ const ILKOM_ADV: Entri[] = [
 // ---------- KAMUS ILMU PEMERINTAHAN ----------
 //
 // Kurikulum Ilmu Pemerintahan FISIP, kode apa adanya dari SIMAK. Daftar ini
-// TIDAK berlaku untuk Ilmu Komunikasi: sepuluh kode di dalamnya dipakai ulang
-// di sana untuk mata kuliah yang sama sekali berbeda.
+// TIDAK berlaku untuk Ilmu Komunikasi: lima kode di dalamnya dipakai ulang di
+// sana untuk mata kuliah yang sama sekali berbeda.
+//
+// AIKA, Metodelogi Ilmu Pemerintahan, Tata Naskah Dan Kearsipan, Managemen
+// Pengadaan Barang Dan Jasa, Politik Hukum Agraria, dan Kapita Selekta
+// Pemerintahan dibetulkan atas permintaan admin. Bunyi lamanya dicatat di
+// BUNYI_LAMA supaya tidak kembali lewat draf lama.
 const PEMERINTAHAN_KODE: Record<string, string> = {
   // Mata kuliah pengembangan kepribadian
-  "MPK-001": "Al-Islam and Kemuhammadiyahan I",
-  "MPK-002": "Al-Islam and Kemuhammadiyahan II",
-  "MPK-003": "Al-Islam and Kemuhammadiyahan III",
-  "MPK-004": "Al-Islam and Kemuhammadiyahan IV",
-  "MPK-005": "Al-Islam and Kemuhammadiyahan V",
+  "MPK-001": "Islamic and Muhammadiyah Studies I",
+  "MPK-002": "Islamic and Muhammadiyah Studies II",
+  "MPK-003": "Islamic and Muhammadiyah Studies III",
+  "MPK-004": "Islamic and Muhammadiyah Studies IV",
+  "MPK-005": "Islamic and Muhammadiyah Studies V",
   "MPK-006": "Pancasila and Civic Education",
   "MPK-007": "Indonesian Language",
   "MPK-008": "English I",
@@ -277,7 +282,7 @@ const PEMERINTAHAN_KODE: Record<string, string> = {
   "MKK-020": "Fundamentals of Logic",
   "MKK-021": "Indonesian Social System",
   "MKK-022": "Indonesian Political System",
-  "MKK-023": "Methodology of Government Science",
+  "MKK-023": "Methodology of Government Studies",
   "MKK-024": "Islamic Political Thought",
   "MKK-032": "Indonesian Bureaucracy",
 
@@ -291,27 +296,53 @@ const PEMERINTAHAN_KODE: Record<string, string> = {
   "MKKB-031": "Government Organization and Management",
   "MKKB-033": "Government Ethics",
   "MKKB-034": "Government Ecology",
-  "MKKB-035": "Document Administration and Archiving",
+  "MKKB-035": "Correspondence and Records Management",
   "MKKB-036": "Development Program Management",
   "MKKB-037": "Public Service Management",
-  "MKKB-038": "Procurement of Goods and Services Management",
+  "MKKB-038": "Goods and Services Procurement Management",
   "MKKB-039": "Regional Financial Politics",
   "MKKB-040": "Conflict Management and Area Studies",
   "MKKB-041": "Indonesian Party System and General Elections",
   "MKKB-042": "Legislative Process",
-  "MKKB-043": "Agrarian Legal Politics",
+  "MKKB-043": "Agrarian Law Politics",
   "MKKB-044": "Public Policy Analysis",
   "MKKB-045": "Political Theory and Philosophy",
   "MKKB-046": "Comparative Political and Government Systems",
   "MKKB-047": "Civil Society",
 
   // Mata kuliah perilaku berkarya
-  "MKPB-048": "Selected Topics in Government",
+  "MKPB-048": "Selected Topics in Government Studies",
   "MKPB-049": "Electronic Government (E-Government)",
   "MKPB-050": "Government Seminar",
   "MKPB-051": "Field Work Practice (Internship)",
   "MKPB-052": "Community Service Program",
   "MKPB-053": "Undergraduate Thesis",
+};
+
+// ---------- BUNYI LAMA YANG SUDAH DIBETULKAN ----------
+//
+// Draf dan arsip yang dibuat sebelum kamus dibetulkan masih membawa bunyi
+// lama di kolom Inggrisnya. Begitu salah satunya dimuat lalu disimpan lagi,
+// `panenKamus` membaca bunyi lama itu sebagai koreksi admin — dan koreksi
+// admin MENANG atas kamus bawaan. Tanpa daftar ini, perbaikannya terhapus
+// diam-diam oleh draf lama pertama yang disimpan ulang.
+//
+// Bunyi di sini tidak dipanen untuk kode MANA PUN di lingkupnya: angkatan
+// yang kodenya berganti mendapat bunyi lama yang sama lewat lapis nama.
+const BUNYI_LAMA: Record<string, Set<string>> = {
+  [LINGKUP_PEMERINTAHAN]: new Set([
+    "Al-Islam and Kemuhammadiyahan",
+    "Al-Islam and Kemuhammadiyahan I",
+    "Al-Islam and Kemuhammadiyahan II",
+    "Al-Islam and Kemuhammadiyahan III",
+    "Al-Islam and Kemuhammadiyahan IV",
+    "Al-Islam and Kemuhammadiyahan V",
+    "Methodology of Government Science",
+    "Document Administration and Archiving",
+    "Procurement of Goods and Services Management",
+    "Agrarian Legal Politics",
+    "Selected Topics in Government",
+  ]),
 };
 
 // ---------- MERAKIT LINGKUP ----------
@@ -428,12 +459,12 @@ const NAMA_MENTAH: Array<[string, string]> = [
   ["dasar dasar manajemen", "Principles of Management"],
 
   // AIKA
-  ["aika i", "Al-Islam and Kemuhammadiyahan I"],
-  ["aika ii", "Al-Islam and Kemuhammadiyahan II"],
-  ["aika iii", "Al-Islam and Kemuhammadiyahan III"],
-  ["aika iv", "Al-Islam and Kemuhammadiyahan IV"],
-  ["aika v", "Al-Islam and Kemuhammadiyahan V"],
-  ["al islam dan kemuhammadiyahan", "Al-Islam and Kemuhammadiyahan"],
+  ["aika i", "Islamic and Muhammadiyah Studies I"],
+  ["aika ii", "Islamic and Muhammadiyah Studies II"],
+  ["aika iii", "Islamic and Muhammadiyah Studies III"],
+  ["aika iv", "Islamic and Muhammadiyah Studies IV"],
+  ["aika v", "Islamic and Muhammadiyah Studies V"],
+  ["al islam dan kemuhammadiyahan", "Islamic and Muhammadiyah Studies"],
 
   // Ilmu Pemerintahan
   ["sosiologi pemerintahan", "Sociology of Government"],
@@ -450,25 +481,25 @@ const NAMA_MENTAH: Array<[string, string]> = [
   ["manajemen program pembangunan", "Development Program Management"],
   ["managemen layanan publik", "Public Service Management"],
   ["manajemen pelayanan publik", "Public Service Management"],
-  ["managemen pengadaan barang dan jasa", "Procurement of Goods and Services Management"],
+  ["managemen pengadaan barang dan jasa", "Goods and Services Procurement Management"],
   ["managemen konflik dan studi kawasan", "Conflict Management and Area Studies"],
   ["manajemen konflik", "Conflict Management"],
   ["sistem kepartaian dan pemilu indonesia", "Indonesian Party System and General Elections"],
-  ["politik hukum agraria", "Agrarian Legal Politics"],
+  ["politik hukum agraria", "Agrarian Law Politics"],
   ["politik keuangan daerah", "Regional Financial Politics"],
   ["keuangan negara", "State Finance"],
   ["proses legislasi", "Legislative Process"],
-  ["tata naskah dan kearsipan", "Document Administration and Archiving"],
+  ["tata naskah dan kearsipan", "Correspondence and Records Management"],
   ["pemikiran politik islam", "Islamic Political Thought"],
-  ["metodelogi ilmu pemerintahan", "Methodology of Government Science"],
-  ["metodologi ilmu pemerintahan", "Methodology of Government Science"],
+  ["metodelogi ilmu pemerintahan", "Methodology of Government Studies"],
+  ["metodologi ilmu pemerintahan", "Methodology of Government Studies"],
   ["analisa dan kebijakan publik", "Public Policy Analysis"],
   ["analisis kebijakan publik", "Public Policy Analysis"],
   ["kebijakan publik", "Public Policy"],
   ["teori dan filsafat politik", "Political Theory and Philosophy"],
   ["perbandingan sistem politik dan pemerintahan", "Comparative Political and Government Systems"],
   ["perbandingan pemerintahan", "Comparative Government"],
-  ["kapita selekta pemerintahan", "Selected Topics in Government"],
+  ["kapita selekta pemerintahan", "Selected Topics in Government Studies"],
   ["pemerintahan elektronik e-government", "Electronic Government (E-Government)"],
   ["e-government", "Electronic Government (E-Government)"],
   ["seminar pemerintahan", "Government Seminar"],
@@ -705,6 +736,7 @@ export type PasanganKamus = { kode: string; en: string; lingkup: string };
  *
  * Hanya yang BERBEDA dari kamus bawaan lingkup ini. Menyimpan ulang yang
  * sudah ada hanya menggelembungkan penyimpanan tanpa mengubah hasil apa pun.
+ * Bunyi lama yang sudah dibetulkan juga tidak dipanen — lihat BUNYI_LAMA.
  *
  * Lingkupnya ikut disimpan. Tanpa itu, koreksi "MKK-012 = Basic Cultural
  * Studies" yang benar untuk Ilmu Komunikasi akan ikut mengubah transkrip
@@ -723,6 +755,7 @@ export function panenKamus(rows: BarisMatkul[], lingkup?: Lingkup): PasanganKamu
     const en = String(row.en || "").trim();
     if (!kode || en.length < 3 || sudah.has(kode)) continue;
     if (terjemahkanMatkul(kode, "", {}, lingkup).en === en) continue;
+    if (BUNYI_LAMA[sasaran]?.has(en)) continue;
     sudah.add(kode);
     hasil.push({ kode, en, lingkup: sasaran });
   }
