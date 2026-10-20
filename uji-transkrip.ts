@@ -106,9 +106,29 @@ sama("Etika Pemerintahan", cari("Etika Pemerintahan"), "Government Ethics");
 sama("Skripsi", cari("Skripsi"), "Undergraduate Thesis");
 sama("PKL", cari("PKL"), "Field Work Practice (Internship)");
 sama("KKN", cari("KKN"), "Community Service Program");
-sama("AIKA V", cari("AIKA V"), "Al-Islam and Kemuhammadiyahan V");
 sama("kurung E-Government tetap rapi",
   cari("Pemerintahan Elektronik ( E-Government )"), "Electronic Government (E-Government)");
+
+// Bunyi yang dibetulkan atas permintaan admin. AIKA kini berbunyi sama
+// dengan Ilmu Komunikasi, bukan "Al-Islam and Kemuhammadiyahan".
+const DIBETULKAN: Array<[string, string]> = [
+  ["AIKA I", "Islamic and Muhammadiyah Studies I"],
+  ["AIKA V", "Islamic and Muhammadiyah Studies V"],
+  ["Politik Hukum Agraria", "Agrarian Law Politics"],
+  ["Tata Naskah Dan Kearsipan", "Correspondence and Records Management"],
+  ["Metodelogi Ilmu Pemerintahan", "Methodology of Government Studies"],
+  ["Managemen Pengadaan Barang Dan Jasa", "Goods and Services Procurement Management"],
+  ["Kapita Selekta Pemerintahan", "Selected Topics in Government Studies"],
+];
+for (const [nama, en] of DIBETULKAN) sama(nama, cari(nama), en);
+
+// Lapis nama menampung angkatan yang kodenya berganti. Bunyinya harus sama
+// dengan lapis kode — kalau satu nama dibetulkan di satu lapis saja,
+// angkatan berkode lain tetap tercetak dengan bunyi lama.
+const selisihLapis = rows.filter((r) =>
+  terjemahkanMatkul("XXX-999", r.nama, {}, IP).en !== terjemahkanMatkul(r.kode, "", {}, IP).en);
+benar("lapis nama sama dengan lapis kode untuk ke-53 mata kuliah",
+  selisihLapis.length === 0, selisihLapis.map((r) => `${r.kode} "${r.nama}"`).join(", "));
 
 console.log("\n=== ATURAN KAMUS ===\n");
 
@@ -198,6 +218,19 @@ sama("konsentrasi ikut menentukan laci",
     { prodi: "Ilmu Komunikasi", konsentrasi: "Broadcasting" })[0].lingkup,
   LINGKUP_ILKOM_BC);
 
+// Draf dan arsip lama masih membawa bunyi sebelum dibetulkan. Memanennya
+// saat drafnya disimpan ulang menjadikannya koreksi admin, yang MENANG atas
+// kamus bawaan — perbaikannya hilang tanpa ada yang tahu.
+const drafLama = [
+  { kode: "MPK-001", nama: "AIKA I", en: "Al-Islam and Kemuhammadiyahan I" },
+  { kode: "MKKB-043", nama: "Politik Hukum Agraria", en: "Agrarian Legal Politics" },
+  // Kode yang berganti mendapat bunyi lama lewat lapis nama.
+  { kode: "ZZZ-006", nama: "Kapita Selekta Pemerintahan", en: "Selected Topics in Government" },
+];
+sama("bunyi lama dari draf lama tidak dipanen", panenKamus(drafLama, IP).length, 0);
+sama("koreksi tangan yang sungguhan tetap dipanen",
+  panenKamus([{ kode: "MKKB-043", nama: "Politik Hukum Agraria", en: "Politics of Agrarian Law" }], IP).length, 1);
+
 console.log("\n=== ILMU KOMUNIKASI: TIGA KONSENTRASI ===\n");
 
 // Bahannya transkrip dwibahasa RESMI fakultas untuk ketiga konsentrasi, tanpa
@@ -269,13 +302,12 @@ sama("MKB-011 di Advertising", terjemahkanMatkul("MKB-011", "", {}, ADV).en,
 
 console.log("\n=== KODE YANG BERTABRAKAN ANTAR PRODI ===\n");
 
-// Inilah sebabnya kamus dipecah. Kesepuluh kode ini dipakai OLEH KEDUA prodi
+// Inilah sebabnya kamus dipecah. Kelima kode ini dipakai OLEH KEDUA prodi
 // untuk mata kuliah yang berbeda; sebelum diperbaiki, transkrip Ilmu
 // Komunikasi tercetak dengan nama mata kuliah Ilmu Pemerintahan.
 const BENTROK: Array<[string, string, string]> = [
   ["MKK-012", "Introduction to Sociology", "Basic Cultural Studies"],
   ["MKK-020", "Fundamentals of Logic", "Computer and Multimedia"],
-  ["MPK-001", "Al-Islam and Kemuhammadiyahan I", "Islamic and Muhammadiyah Studies I"],
   ["MPK-010", "Philosophy of Science", "Philosophy of Knowledge and Fundamentals of Logic"],
 ];
 for (const [kode, ip, ilkom] of BENTROK) {
@@ -299,16 +331,23 @@ sama("tanpa prodi, kode bentrok tidak dijawab dari kode",
   terjemahkanMatkul("MKPB-051", "").sumber, "kosong");
 // Daftar lengkapnya dikunci, bukan sekadar jumlahnya: kode yang diam-diam
 // masuk atau keluar daftar ini mengubah transkrip yang sudah dicetak.
-// Sepuluh yang pertama bentrok ANTAR PRODI; MKB-011 dan MPK-011 bentrok di
-// dalam Ilmu Komunikasi sendiri, karena KUI menulisnya lain di berkas
+// Lima bentrok ANTAR PRODI (di atas). Sisanya bentrok di dalam Ilmu
+// Komunikasi sendiri karena KUI menulisnya lain antar konsentrasi: MPK-003
+// s.d. 005 di berkas Public Relations, MKB-011 dan MPK-011 di berkas
 // Broadcasting.
 sama("daftar kode bentrok persis seperti yang didata",
   kodeBentrok().join(", "),
   "MKB-011, MKK-012, MKK-020, MKPB-051, MKPB-052, " +
-    "MPK-001, MPK-002, MPK-003, MPK-004, MPK-005, MPK-010, MPK-011");
+    "MPK-003, MPK-004, MPK-005, MPK-010, MPK-011");
 // Kode yang berarti sama di mana pun tetap dijawab tanpa prodi.
 sama("tanpa prodi, kode yang tidak bentrok tetap dijawab",
   terjemahkanMatkul("MKB-044", "").en, "Undergraduate Thesis");
+// AIKA I dan II tidak bentrok lagi: sejak AIKA Ilmu Pemerintahan dibetulkan,
+// kedua prodi menulisnya sama.
+sama("MPK-001 berbunyi sama di kedua prodi",
+  terjemahkanMatkul("MPK-001", "", {}, IP).en, terjemahkanMatkul("MPK-001", "", {}, BC).en);
+sama("tanpa prodi, AIKA I dijawab dari kode",
+  terjemahkanMatkul("MPK-001", "").en, "Islamic and Muhammadiyah Studies I");
 
 console.log("\n=== RANTAI LINGKUP ===\n");
 
