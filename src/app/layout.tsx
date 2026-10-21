@@ -26,12 +26,20 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
           rel="stylesheet"
         />
-        {/* Iklan In-Page Push. Ditulis langsung di HTML server (bukan disisipkan
-            lewat useEffect) agar pemeriksa pemasangan jaringan iklan, yang
-            membaca HTML mentah, dapat menemukannya. Halaman CBT tetap bersih:
-            CSP ketatnya (headers() di next.config.ts) menolak skrip ini. */}
-        {/* eslint-disable-next-line @next/next/no-sync-scripts -- tag wajib persis seperti dari jaringan iklan */}
-        <script src="https://nap5k.com/tag.min.js" data-zone="12084733" async></script>
+        {/* Iklan In-Page Push, tag inline persis seperti dari jaringan iklan.
+            Ditulis langsung di HTML server (bukan lewat useEffect atau
+            next/script) agar pemeriksa pemasangannya, yang mencocokkan HTML
+            mentah, menemukannya apa adanya. JANGAN diubah satu karakter pun.
+
+            Di halaman CBT potongan ini ikut berjalan ('unsafe-inline'), tetapi
+            skrip nap5k.com yang disisipkannya ditolak peramban: CSP ketat CBT
+            (headers() di next.config.ts) tidak membuka script-src https:. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(s){s.dataset.zone='12084733',s.src='https://nap5k.com/tag.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))",
+          }}
+        />
       </head>
       <body>
         {children}
