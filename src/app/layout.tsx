@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
-import Iklan from "./iklan";
 
 export const metadata: Metadata = {
   title: "SiPaling FISIP | Layanan Akademik",
@@ -27,10 +26,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
           rel="stylesheet"
         />
+        {/* Iklan In-Page Push. Ditulis langsung di HTML server (bukan disisipkan
+            lewat useEffect) agar pemeriksa pemasangan jaringan iklan, yang
+            membaca HTML mentah, dapat menemukannya. Halaman CBT tetap bersih:
+            CSP ketatnya (headers() di next.config.ts) menolak skrip ini. */}
+        {/* eslint-disable-next-line @next/next/no-sync-scripts -- tag wajib persis seperti dari jaringan iklan */}
+        <script src="https://nap5k.com/tag.min.js" data-zone="12084733" async></script>
       </head>
       <body>
         {children}
-        <Iklan />
       </body>
     </html>
   );
