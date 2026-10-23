@@ -24,7 +24,7 @@ const supabase = supabaseOrigins();
 // window.open. Lapisan lain tetap ditegakkan: 'object-src none', 'base-uri
 // self', 'frame-ancestors none', 'form-action self', dan connect-src yang
 // dikunci sehingga data tidak dapat dikirim ke domain asing.
-const cspDasar = [
+const csp = [
   "default-src 'self'",
   // React mode pengembangan memakai eval() untuk penyusunan ulang callstack.
   // Produksi tidak memerlukannya, jadi 'unsafe-eval' hanya diberikan saat
@@ -58,38 +58,7 @@ const cspDasar = [
   "base-uri 'self'",
   "object-src 'none'",
   "upgrade-insecure-requests",
-];
-// CSP ketat, tanpa iklan: berlaku untuk seluruh halaman CBT.
-const csp = cspDasar.join("; ");
-
-// CSP portal dan situs drama: sama seperti di atas, ditambah izin untuk
-// skrip iklan In-Page Push. Jaringan iklan itu berpindah-pindah domain
-// (skrip, pelacak, service worker), sehingga daftar putih per domain cepat
-// basi; yang dibuka adalah https:. CBT TIDAK mendapat izin ini.
-const cspIklan = cspDasar
-  .map((d) => {
-    if (d.startsWith("script-src")) return `${d} https:`;
-    if (d.startsWith("connect-src")) return `${d} https: wss:`;
-    if (d.startsWith("frame-src")) return "frame-src 'self' https:";
-    if (d.startsWith("worker-src")) return `${d} https:`;
-    return d;
-  })
-  .join("; ");
-
-// Pola host subdomain CBT untuk aturan headers() (cocok dengan cbt.* dan
-// www.cbt.*, serta NEXT_PUBLIC_CBT_HOST bila disetel).
-function polaHostCbt() {
-  const pola = ["(www\\.)?cbt\\..+"];
-  const disetel = (process.env.NEXT_PUBLIC_CBT_HOST || process.env.CBT_HOST || "")
-    .trim()
-    .toLowerCase()
-    .replace(/^https?:\/\//, "")
-    .replace(/[/:].*$/, "")
-    .replace(/^www\./, "");
-  if (disetel) pola.push(`(www\\.)?${disetel.replace(/[.]/g, "\\.")}`);
-  return pola.join("|");
-}
-const cspKetat = { key: "Content-Security-Policy", value: csp };
+].join("; ");
 
 /**
  * Perangkat keras yang dimatikan untuk SELURUH portal.
@@ -123,7 +92,7 @@ const IZIN_PERANGKAT_UJIAN = IZIN_PERANGKAT
   .replace("microphone=()", "microphone=(self)");
 
 const securityHeaders = [
-  { key: "Content-Security-Policy", value: cspIklan },
+  { key: "Content-Security-Policy", value: csp },
   // Paksa HTTPS selama 2 tahun, termasuk subdomain.
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
   // Cegah situs ini dibingkai orang lain (clickjacking).
@@ -159,16 +128,9 @@ const nextConfig: NextConfig = {
       // Dua jalur, karena halamannya memang dapat dicapai lewat keduanya:
       // /cbt/ujian pada domain utama, dan /ujian pada subdomain CBT yang
       // ditulis ulang middleware.
-      // CBT tanpa iklan: aturan yang datang belakangan menimpa CSP iklan di
-      // atas dengan CSP ketat — /cbt pada domain portal, /ujian, dan seluruh
-      // subdomain CBT.
-      { source: "/cbt", headers: [cspKetat] },
-      { source: "/cbt/:path*", headers: [cspKetat] },
-      { source: "/ujian/:path*", headers: [cspKetat] },
-      { source: "/:path*", has: [{ type: "host", value: polaHostCbt() }], headers: [cspKetat] },
       {
         source: "/ujian",
-        headers: [cspKetat, { key: "Permissions-Policy", value: IZIN_PERANGKAT_UJIAN }],
+        headers: [{ key: "Permissions-Policy", value: IZIN_PERANGKAT_UJIAN }],
       },
       {
         source: "/cbt/ujian",

@@ -1,0 +1,190 @@
+import type { NextConfig } from "next";
+
+// Origin Supabase diambil dari environment agar CSP-nya setepat mungkin.
+// Bila belum diatur saat build, dipakai pola wildcard supaya situs tetap
+// berfungsi (mis. pada preview yang belum lengkap env-nya).
+function supabaseOrigins() {
+  const raw = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  try {
+    const { origin, host } = new URL(raw);
+    return { http: origin, ws: `wss://${host}` };
+  } catch {
+    return { http: "https://*.supabase.co https://*.supabase.com", ws: "wss://*.supabase.co wss://*.supabase.com" };
+  }
+}
+
+const supabase = supabaseOrigins();
+
+// Content Security Policy.
+//
+// Catatan jujur soal 'unsafe-inline' pada script-src: Next.js menyisipkan
+// skrip hidrasi inline, dan jendela cetak (laporan antrean, surat tugas,
+// pratinjau surat) juga memakai skrip inline. Menghapusnya memerlukan CSP
+// berbasis nonce yang belum dapat diterapkan pada jendela about:blank hasil
+// window.open. Lapisan lain tetap ditegakkan: 'object-src none', 'base-uri
+// self', 'frame-ancestors none', 'form-action self', dan connect-src yang
+// dikunci sehingga data tidak dapat dikirim ke domain asing.
+const cspDasar = [
+  "default-src 'self'",
+  // React mode pengembangan memakai eval() untuk penyusunan ulang callstack.
+  // Produksi tidak memerlukannya, jadi 'unsafe-eval' hanya diberikan saat
+  // `next dev`. Tanpa ini, hidrasi gagal dan seluruh halaman mati saat
+  // dikembangkan lokal — sementara CSP produksi tetap ketat.
+  process.env.NODE_ENV === "production"
+    ? "script-src 'self' 'unsafe-inline'"
+    : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com data:",
+  // https: dibuka untuk gambar dan video sejak soal CBT boleh membawa media.
+  // Dosen menempelkan tautan gambar dari mana saja — Wikipedia, situs
+  // kampus, penyimpanan awan miliknya sendiri — dan daftar putih tuan rumah
+  // akan menolak yang sah jauh lebih sering daripada menahan yang jahat.
+  //
+  // Yang DILEPAS di sini hanya pemuatan gambar dan media, bukan skrip: berkas
+  // gambar tidak menjalankan kode, dan connect-src tetap terkunci sehingga
+  // data portal tidak dapat dikirim ke tuan rumah asing.
+  "img-src 'self' data: blob: https:",
+  `connect-src 'self' ${supabase.http} ${supabase.ws}`,
+  "media-src 'self' blob: https:",
+  "worker-src 'self' blob:",
+  "manifest-src 'self'",
+  // Video sematan pada soal. Daftarnya SEMPIT dan disengaja: iframe adalah
+  // halaman asing yang berjalan di dalam layar ujian, jadi ia tidak boleh
+  // dibuka selebar img-src di atas.
+  "frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com " +
+    "https://player.vimeo.com https://drive.google.com",
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "upgrade-insecure-requests",
+];
+// CSP ketat, tanpa iklan: berlaku untuk seluruh halaman CBT.
+const csp = cspDasar.join("; ");
+
+// CSP portal dan situs drama: sama seperti di atas, ditambah izin untuk
+// skrip iklan In-Page Push. Jaringan iklan itu berpindah-pindah domain
+// (skrip, pelacak, service worker), sehingga daftar putih per domain cepat
+// basi; yang dibuka adalah https:. CBT TIDAK mendapat izin ini.
+const cspIklan = cspDasar
+  .map((d) => {
+    if (d.startsWith("script-src")) return `${d} https:`;
+    if (d.startsWith("connect-src")) return `${d} https: wss:`;
+    if (d.startsWith("frame-src")) return "frame-src 'self' https:";
+    if (d.startsWith("worker-src")) return `${d} https:`;
+    return d;
+  })
+  .join("; ");
+
+// Pola host subdomain CBT untuk aturan headers() (cocok dengan cbt.* dan
+// www.cbt.*, serta NEXT_PUBLIC_CBT_HOST bila disetel).
+function polaHostCbt() {
+  const pola = ["(www\\.)?cbt\\..+"];
+  const disetel = (process.env.NEXT_PUBLIC_CBT_HOST || process.env.CBT_HOST || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/[/:].*$/, "")
+    .replace(/^www\./, "");
+  if (disetel) pola.push(`(www\\.)?${disetel.replace(/[.]/g, "\\.")}`);
+  return pola.join("|");
+}
+const cspKetat = { key: "Content-Security-Policy", value: csp };
+
+/**
+ * Perangkat keras yang dimatikan untuk SELURUH portal.
+ *
+ * Kamera ikut dimatikan di sini, dan dibuka kembali HANYA pada layar ujian
+ * (lihat headers() di bawah). Membukanya di seluruh portal jauh lebih mudah
+ * ditulis dan salah: satu-satunya halaman yang benar-benar membutuhkan kamera
+ * adalah layar ujian pada mode Sertifikasi, dan setiap halaman lain yang ikut
+ * mendapat izinnya adalah permukaan tambahan yang tidak ada gunanya.
+ */
+const IZIN_PERANGKAT =
+  "camera=(), microphone=(), geolocation=(), payment=(), usb=(), " +
+  "magnetometer=(), gyroscope=(), browsing-topics=()";
+
+/**
+ * Sama seperti di atas, kecuali kamera DAN mikrofon diizinkan untuk asal ini
+ * sendiri.
+ *
+ * Ini BUKAN pemberian akses: peramban tetap meminta izin peserta lewat
+ * dialognya sendiri, dan peserta tetap dapat menolak. Yang dibuka hanyalah
+ * kemungkinan untuk bertanya — tanpa baris ini, getUserMedia ditolak peramban
+ * sebelum dialognya sempat muncul.
+ *
+ * Mikrofonnya dahulu tertinggal di sini, dan akibatnya persis itu: perekaman
+ * yang dinyalakan dosen selalu berakhir "ditolak" pada tiap peserta, tanpa
+ * satu pun kotak izin pernah muncul. Yang menolak bukan pesertanya melainkan
+ * header ini.
+ */
+const IZIN_PERANGKAT_UJIAN = IZIN_PERANGKAT
+  .replace("camera=()", "camera=(self)")
+  .replace("microphone=()", "microphone=(self)");
+
+const securityHeaders = [
+  { key: "Content-Security-Policy", value: cspIklan },
+  // Paksa HTTPS selama 2 tahun, termasuk subdomain.
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+  // Cegah situs ini dibingkai orang lain (clickjacking).
+  { key: "X-Frame-Options", value: "DENY" },
+  // Cegah peramban menebak-nebak tipe konten (MIME sniffing).
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  // Matikan perangkat keras yang tidak dipakai portal ini.
+  {
+    key: "Permissions-Policy",
+    value: IZIN_PERANGKAT,
+  },
+  // Isolasi jendela; 'allow-popups' dipertahankan karena cetak surat memakai window.open.
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
+  { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+  { key: "X-Permitted-Cross-Domain-Policies", value: "none" },
+  { key: "X-DNS-Prefetch-Control", value: "off" },
+];
+
+const nextConfig: NextConfig = {
+  // Sembunyikan header X-Powered-By agar versi framework tidak terekspos.
+  poweredByHeader: false,
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: securityHeaders,
+      },
+      // Layar ujian, dan HANYA layar ujian. Aturan yang datang belakangan
+      // menimpa nilai Permissions-Policy dari aturan menyeluruh di atas;
+      // seluruh header keamanan lainnya tetap berlaku apa adanya.
+      //
+      // Dua jalur, karena halamannya memang dapat dicapai lewat keduanya:
+      // /cbt/ujian pada domain utama, dan /ujian pada subdomain CBT yang
+      // ditulis ulang middleware.
+      // CBT tanpa iklan: aturan yang datang belakangan menimpa CSP iklan di
+      // atas dengan CSP ketat — /cbt pada domain portal, /ujian, dan seluruh
+      // subdomain CBT.
+      { source: "/cbt", headers: [cspKetat] },
+      { source: "/cbt/:path*", headers: [cspKetat] },
+      { source: "/ujian/:path*", headers: [cspKetat] },
+      { source: "/:path*", has: [{ type: "host", value: polaHostCbt() }], headers: [cspKetat] },
+      {
+        source: "/ujian",
+        headers: [cspKetat, { key: "Permissions-Policy", value: IZIN_PERANGKAT_UJIAN }],
+      },
+      {
+        source: "/cbt/ujian",
+        headers: [{ key: "Permissions-Policy", value: IZIN_PERANGKAT_UJIAN }],
+      },
+      {
+        // Jawaban API tidak boleh singgah di cache peramban maupun CDN:
+        // isinya data pribadi mahasiswa, dosen, dan admin.
+        source: "/api/:path*",
+        headers: [
+          { key: "Cache-Control", value: "no-store, no-cache, must-revalidate, private" },
+          { key: "Pragma", value: "no-cache" },
+        ],
+      },
+    ];
+  },
+};
+
+export default nextConfig;
