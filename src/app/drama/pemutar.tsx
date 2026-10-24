@@ -21,8 +21,8 @@
 // hls.js dimuat dengan impor dinamis, bukan di atas berkas. Pustakanya besar,
 // dan sebagian besar pengunjung portal tidak pernah membuka menu ini; memuat
 // -nya di muka berarti seluruh portal ikut menanggung berat yang hanya
-// dipakai satu menu. Peramban yang sudah dapat memutar HLS sendiri (Safari,
-// iOS) bahkan tidak memuatnya sama sekali.
+// dipakai satu menu. iPhone, yang memutar HLS sendiri dan tidak punya
+// MediaSource, bahkan tidak memuatnya sama sekali.
 // ============================================================
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -121,8 +121,19 @@ export function Pemutar({ aliran, platform, onSelesai }: Props) {
 
     const butuhHls = pilihan.hls || sumber.includes(".m3u8");
     const bisaSendiri = video.canPlayType("application/vnd.apple.mpegurl") !== "";
+    // hls.js didahulukan di mana pun MediaSource tersedia, dan pemutar HLS
+    // bawaan peramban hanya dipakai bila tidak — yaitu di iPhone.
+    //
+    // Dulu urutannya terbalik: "bisa sendiri" berarti hls.js tidak dimuat.
+    // Itu benar selama hanya Safari yang menjawab begitu. Chrome versi baru
+    // kini ikut menjawab "maybe" untuk HLS, sehingga seluruh pengunjung Chrome
+    // diam-diam berpindah ke pemutar bawaannya yang masih muda — tanpa
+    // pemulihan galat di bawah, dan tanpa dukungan yang matang untuk jalur
+    // audio terpisah yang dipakai FreeReels. Situs hulu memakai urutan yang
+    // sama dengan yang dipakai di sini sekarang.
+    const adaMse = typeof window.MediaSource !== "undefined";
 
-    if (butuhHls && !bisaSendiri) {
+    if (butuhHls && (adaMse || !bisaSendiri)) {
       import("hls.js")
         .then(({ default: Hls }) => {
           if (!hidup) return;

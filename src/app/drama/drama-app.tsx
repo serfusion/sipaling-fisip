@@ -470,7 +470,18 @@ function HasilCari({
   );
 }
 
-export default function DramaApp() {
+/**
+ * Nama yang tertulis di kepala layar.
+ *
+ * Layar yang sama dipasang di dua tempat: situs Nonton Drama sendiri, dan tab
+ * Theater Drama di menu Alat portal. Hanya namanya yang berbeda — sisanya
+ * sengaja satu berkas, supaya perbaikan pemutaran tidak perlu diulang dua kali.
+ */
+type Merek = { judul: string; sub: string };
+
+const MEREK_SITUS: Merek = { judul: "Nonton Drama", sub: "Bonus pemegang kode Cakrawala" };
+
+export default function DramaApp({ merek = MEREK_SITUS }: { merek?: Merek }) {
   const [platform, setPlatform] = useState<Platform>(PLATFORM_TERBUKA[0]);
   const [kata, setKata] = useState("");
   const [cari, setCari] = useState("");
@@ -504,8 +515,8 @@ export default function DramaApp() {
           <div className="dr-merek">
             <span className="dr-merek-ic" aria-hidden="true">▶</span>
             <span>
-              <b>Nonton Drama</b>
-              <small>Bonus pemegang kode Cakrawala</small>
+              <b>{merek.judul}</b>
+              <small>{merek.sub}</small>
             </span>
           </div>
 

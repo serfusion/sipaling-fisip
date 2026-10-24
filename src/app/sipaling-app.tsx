@@ -1281,6 +1281,11 @@ export default function SipalingApp({ kartuTerkunci = [] }: { kartuTerkunci?: re
               >
                 <span className="hero-kilau">Cakrawala</span>
               </a>
+              {/* Menu Alat: perkakas di luar naskah tugas akhir, satu tab per
+                  alat. Tiap alat menjaga aksesnya sendiri di halamannya. */}
+              <a className="hero-button" href="/perkakas">
+                Alat
+              </a>
               <a className={sessionRole ? "hero-button hero-button-logged" : "hero-button"} href="/dashboard">
                 {sessionRole ? `● Dashboard ${DASH_ROLE_LABEL[sessionRole] || "Admin"}` : "Login Dosen/Admin"}
               </a>

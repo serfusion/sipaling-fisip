@@ -6805,7 +6805,7 @@ table.qt td small { font-size: 11.5px; }
   background: rgba(239,106,138,.12); border: 1px solid rgba(239,106,138,.3); color: var(--dr-utama);
   font-size: 10px; font-weight: 800; letter-spacing: .1em; }
 .dk-gembok svg { width: 13px; height: 13px; }
-.dk-hero h1 { margin: 14px 0 10px; font-size: clamp(1.9rem, 7vw, 2.6rem); letter-spacing: -.03em; }
+.dk-judul { margin: 14px 0 10px; font-size: clamp(1.9rem, 7vw, 2.6rem); font-weight: 800; letter-spacing: -.03em; }
 .dk-lead { margin: 0; font-size: 14px; line-height: 1.7; color: var(--dr-redup); }
 
 .dk-body { max-width: 640px; margin: 0 auto; padding: 0 20px 40px; display: grid; gap: 16px; }
@@ -6835,6 +6835,46 @@ table.qt td small { font-size: 11.5px; }
 .dk-kaki { max-width: 640px; margin: 0 auto; padding: 20px; border-top: 1px solid var(--dr-garis);
   display: flex; flex-wrap: wrap; gap: 10px; font-size: 11.5px; color: var(--dr-redup); }
 .dk-kaki strong { color: var(--dr-tinta); font-size: 12.5px; }
+
+/* ============================================================
+   MENU ALAT — /perkakas
+
+   Menu di sebelah Cakrawala, wadah perkakas yang bukan alat naskah. Kepalanya
+   meminjam rupa hero portal (biru tua di atas foto gedung) supaya terbaca
+   sebagai bagian portal, bukan situs lain. Isinya gelap karena alat
+   pertamanya Theater Drama; tab yang menyala diberi warna latar isi itu
+   sendiri, sehingga tab dan isinya tampak satu lembar.
+   ============================================================ */
+.pk { min-height: 100vh; background: #0b0f1a; color: #eef2fb; color-scheme: dark; }
+.pk-atas { color: white; background-image: linear-gradient(90deg, rgba(5,30,72,.96) 0%, rgba(14,82,170,.88) 52%, rgba(21,101,216,.42) 100%), url("/images/gedung-umt-background.png");
+  background-position: center 43%; background-size: cover; background-repeat: no-repeat; }
+.pk-atas-in { max-width: 1240px; margin: 0 auto; padding: 20px 18px 16px; }
+.pk-balik { display: inline-block; margin-bottom: 12px; color: rgba(255,255,255,.82); font-size: 12px;
+  font-weight: 600; text-decoration: none; }
+.pk-balik:hover { color: white; }
+.pk-atas h1 { margin: 0 0 6px; font-size: clamp(1.7rem, 5vw, 2.4rem); line-height: 1; letter-spacing: -.04em; font-weight: 800; }
+.pk-lead { margin: 0; font-size: 13px; line-height: 1.5; color: rgba(255,255,255,.85); }
+
+.pk-tab-wadah { max-width: 1240px; margin: 0 auto; padding: 0 18px; }
+.pk-tab { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.pk-tab::-webkit-scrollbar { display: none; }
+.pk-tab-btn { display: inline-flex; align-items: center; gap: 10px; flex: 0 0 auto; padding: 10px 18px 11px 11px;
+  border: 1px solid rgba(255,255,255,.18); border-bottom: none; border-radius: 14px 14px 0 0;
+  background: rgba(255,255,255,.08); color: rgba(255,255,255,.85); text-decoration: none;
+  transition: background .15s ease, color .15s ease; }
+.pk-tab-btn:hover { background: rgba(255,255,255,.16); color: white; }
+.pk-tab-btn.on { background: #0b0f1a; border-color: #0b0f1a; color: #eef2fb; }
+.pk-tab-ic { width: 30px; height: 30px; flex: 0 0 30px; border-radius: 9px; display: grid; place-items: center;
+  background: rgba(245,197,66,.18); color: var(--yellow); }
+.pk-tab-btn.on .pk-tab-ic { background: linear-gradient(140deg, #ef6a8a, #c94a6b); color: white; }
+.pk-tab-ic svg { width: 17px; height: 17px; }
+.pk-tab-teks b { display: block; font-size: 13px; letter-spacing: -.01em; }
+.pk-tab-teks small { display: block; margin-top: 1px; font-size: 11px; opacity: .72; }
+@media (max-width: 560px) {
+  .pk-atas-in { padding: 16px 16px 12px; }
+  .pk-tab-wadah { padding: 0 16px; }
+  .pk-tab-teks small { display: none; }
+}
 
 /* ---------- Panel Nonton Drama di dalam Cakrawala ----------
    Panel ini pintu ke situs lain, bukan alat yang dikerjakan di tempat. Karena

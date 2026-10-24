@@ -25,9 +25,16 @@ type Props = {
   portal: string;
   /** Keterangan langganan yang baru saja berakhir, bila pengunjungnya dikenali. */
   habis: { nomor: string; nama: string | null; sampai: string } | null;
+  /**
+   * Dipasang sebagai tab Theater Drama di menu Alat, bukan sebagai situs
+   * sendiri. Di sana kepala halaman, tautan balik, dan kakinya sudah disediakan
+   * menu Alat, jadi layar ini cukup menggambar isinya.
+   */
+  dalamAlat?: boolean;
 };
 
-export default function KunciDrama({ portal, habis }: Props) {
+export default function KunciDrama({ portal, habis, dalamAlat = false }: Props) {
+  const judul = dalamAlat ? "Theater Drama" : "Nonton Drama";
   const [kode, setKode] = useState("");
   const [wa, setWa] = useState("");
   const [nama, setNama] = useState("");
@@ -61,8 +68,10 @@ export default function KunciDrama({ portal, habis }: Props) {
         throw new Error(isiJawab.message || "Kode tidak dapat diperiksa.");
       }
       // Gerbangnya ada di server, jadi halamannya diminta ulang seutuhnya:
-      // cookie pembuka baru terbaca pada permintaan berikutnya.
-      window.location.replace("/");
+      // cookie pembuka baru terbaca pada permintaan berikutnya. Yang dimuat
+      // ulang halaman ini sendiri, bukan akar: layar yang sama juga dipasang
+      // di /perkakas/drama, dan "/" di sana adalah beranda portal.
+      window.location.reload();
       return;
     } catch (alasan: unknown) {
       setGalat(alasan instanceof Error ? alasan.message : "Kode tidak dapat diperiksa.");
@@ -74,7 +83,7 @@ export default function KunciDrama({ portal, habis }: Props) {
   return (
     <div className="dk">
       <header className="dk-hero">
-        <a className="dk-back" href={portal}>← Portal SiPaling FISIP</a>
+        {!dalamAlat && <a className="dk-back" href={portal}>← Portal SiPaling FISIP</a>}
         <span className="dk-gembok">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <rect x="4" y="10" width="16" height="10" rx="2" />
@@ -82,7 +91,7 @@ export default function KunciDrama({ portal, habis }: Props) {
           </svg>
           KHUSUS PEMEGANG KODE
         </span>
-        <h1>Nonton Drama</h1>
+        {dalamAlat ? <h2 className="dk-judul">{judul}</h2> : <h1 className="dk-judul">{judul}</h1>}
         <p className="dk-lead">
           Drama pendek dari sembilan sumber sekaligus, cari judulnya, pilih episodenya, langsung
           jalan. Gratis untuk yang langganan Cakrawala, tanpa tambahan biaya apa pun.
@@ -141,7 +150,7 @@ export default function KunciDrama({ portal, habis }: Props) {
             {galat && <p className="dk-galat" role="alert">{galat}</p>}
 
             <button type="submit" className="dk-btn" disabled={sibuk}>
-              {sibuk ? "Memeriksa…" : "Buka Nonton Drama"}
+              {sibuk ? "Memeriksa…" : `Buka ${judul}`}
             </button>
           </form>
         </section>
@@ -159,10 +168,12 @@ export default function KunciDrama({ portal, habis }: Props) {
         </section>
       </main>
 
-      <footer className="dk-kaki">
-        <strong>SiPaling FISIP</strong>
-        <span>Nonton Drama · bonus untuk pemegang kode Cakrawala</span>
-      </footer>
+      {!dalamAlat && (
+        <footer className="dk-kaki">
+          <strong>SiPaling FISIP</strong>
+          <span>Nonton Drama · bonus untuk pemegang kode Cakrawala</span>
+        </footer>
+      )}
     </div>
   );
 }

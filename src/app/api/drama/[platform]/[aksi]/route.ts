@@ -338,7 +338,20 @@ function rapikan(platform: Platform, aksi: Aksi, isi: unknown, minta: Permintaan
     // "daftar" yang dipakai daftar JUDUL akan membuat layar menerima dua
     // bentuk berbeda di bawah satu nama — dan bentuk yang salah tafsir di
     // sana berakhir sebagai deretan kartu tanpa gambar.
-    if (daftar.length > 1) return { daftarEpisode: daftar };
+    //
+    // Yang menentukan tabel platformnya, BUKAN banyaknya larik di jawaban.
+    // ReelShort menjawab permintaan SATU episode dengan videoList berisi
+    // tiga mutu; dihitung dari lariknya, ketiga mutu itu terbaca sebagai tiga
+    // episode, dikirim sebagai daftarEpisode — padahal layar menunggu
+    // "episode" — dan pemutarnya tidak pernah muncul sama sekali.
+    if (platform.caraEpisode === "semua" && daftar.length > 1) return { daftarEpisode: daftar };
+    if (daftar.length > 1) {
+      // Hulu yang ikut mengirim episode tetangga: ambil yang memang diminta,
+      // dikenali dari nomornya DAN id-nya sendiri. Tanpa id, deretan itu
+      // pilihan mutu satu episode, dan seluruh tautannya dikumpulkan di bawah.
+      const tepat = daftar.find((item) => item.id && item.nomor === nomor && item.aliran.length);
+      if (tepat) return { episode: tepat };
+    }
     return { episode: bacaEpisodeTunggal(isi, nomor, opsi) };
   }
 
