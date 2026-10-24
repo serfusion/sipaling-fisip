@@ -131,6 +131,18 @@ sama("akar portal bukan urusan drama", rencanaDrama(PORTAL, "/"), null);
 sama("di localhost /drama tetap dilayani di tempat", rencanaDrama("localhost:3000", "/drama"), null);
 sama("di pratayang penyebaran juga", rencanaDrama("sipaling-fisip-abc.vercel.app", "/drama"), null);
 
+console.log("\n== TAB THEATER DRAMA DI MENU ALAT ==");
+// Theater Drama dilayani di portal sendiri, satu domain dengan Cakrawala.
+// Awalannya memang mengandung kata "drama", dan justru karena itu perlu
+// dibuktikan tidak tertangkap aturan pengalihan ke domain drama.
+sama("/perkakas/drama di portal tidak dialihkan", rencanaSitus(PORTAL, "/perkakas/drama"), { tindakan: "lewat" });
+sama("/perkakas di portal tidak dialihkan", rencanaSitus(PORTAL, "/perkakas"), { tindakan: "lewat" });
+sama("/perkakas/drama di localhost juga", rencanaSitus("localhost:3000", "/perkakas/drama"), { tindakan: "lewat" });
+sama("/perkakas/drama di domain drama diantar ke portal",
+  rencanaSitus(DRAMA, "/perkakas/drama"), { tindakan: "alih", host: PORTAL, pathname: "/perkakas/drama" });
+sama("/perkakas/drama di subdomain CBT diantar ke portal",
+  rencanaSitus(CBT, "/perkakas/drama"), { tindakan: "alih", host: PORTAL, pathname: "/perkakas/drama" });
+
 console.log("\n== ATURAN CBT TIDAK IKUT BERUBAH ==");
 // Yang di bawah membuktikan penambahan situs drama tidak menggeser satu pun
 // aturan yang sudah menentukan ke mana peserta ujian mendarat.
@@ -413,6 +425,101 @@ console.log("\n== MEMBACA DAFTAR JUDUL ==");
     data: { list: [{ bookId: "7", bookName: "Yang Benar" }] },
   };
   sama("spanduk tanpa judul dilewati", bacaDaftar(adaSpanduk).map((item) => item.id), ["7"]);
+}
+
+// ============================================================
+console.log("\n== MEMBACA BERANDA BERKELOMPOK ==");
+// ============================================================
+// Bentuk-bentuk di bawah disalin dari jawaban hulu yang sesungguhnya
+// (2026-10-24), dipangkas ke kolom yang dibaca. Sebelum v51, keenamnya
+// terbaca sebagai daftar KOSONG: pembacanya berhenti pada larik kelompok.
+{
+  const netshort = [
+    { contentType: 0, groupId: "g1", contentName: "Drama Viral", contentInfos: [
+      { id: null, shortPlayId: "189", shortPlayLibraryId: "188", shortPlayName: "Sampai Kita Bertemu Lagi",
+        shortPlayCover: "https://awscover.netshort.com/a.webp", shortPlayLabels: "[\"Cinta Tragis\",\"Kabur Saat Hamil\"]",
+        labelArray: ["Cinta Tragis", "Kabur Saat Hamil"] },
+    ] },
+    { contentType: 0, groupId: "g2", contentName: "Baru", contentInfos: [
+      { shortPlayId: "210", shortPlayName: "Pacar Kakakku", shortPlayCover: "https://awscover.netshort.com/b.webp" },
+    ] },
+  ];
+  const ns = bacaDaftar(netshort);
+  sama("NetShort: judul dari SEMUA kelompok", ns.map((k) => k.id), ["189", "210"]);
+  sama("NetShort: shortPlayCover terbaca sebagai sampul", ns[0].sampul, "https://awscover.netshort.com/a.webp");
+  sama("NetShort: labelArray terbaca", ns[0].label, ["Cinta Tragis", "Kabur Saat Hamil"]);
+
+  const goodshort = { data: { current: 1, records: [
+    { channelId: 65, name: "榜单栏目", items: [
+      { bookId: "31001", bookName: "Bos Mafia", cover: "https://acfs1.goodreels.com/c1.jpg", chapterCount: 60 },
+    ] },
+    { channelId: 66, name: "Baru", items: [
+      { bookId: "31002", bookName: "Ratu Mafia", cover: "https://acfs1.goodreels.com/c2.jpg", chapterCount: 50 },
+    ] },
+  ] } };
+  const gs = bacaDaftar(goodshort);
+  sama("GoodShort: records → items terbaca", gs.map((k) => k.id), ["31001", "31002"]);
+  sama("GoodShort: nama kelompok tidak ikut jadi judul", gs.some((k) => k.judul === "榜单栏目"), false);
+
+  const melolo = { code: 0, data: { cells: [
+    { books: [], cell_data: [{ books: [
+      { book_id: "768", book_name: "(Dub)Pria Idaman", serial_count: "71", abstract: "Enam tahun lalu.",
+        thumb_url: "https://p16-novel-sign.fizzopic.org/x~tplv-cp:570:810.heic?rk3s=9&x-signature=Wb%3D" },
+    ] }] },
+  ] } };
+  const ml = bacaDaftar(melolo);
+  sama("Melolo: cells → cell_data → books terbaca", ml.map((k) => k.id), ["768"]);
+  sama("Melolo: serial_count terbaca sebagai jumlah episode", ml[0].episode, 71);
+  sama("Melolo: abstract terbaca sebagai ringkasan", ml[0].ringkasan, "Enam tahun lalu.");
+  cek("Melolo: sampul HEIC dibelokkan ke WebP", ml[0].sampul.startsWith("https://wsrv.nl/?url=https%3A%2F%2Fp16-novel-sign") && ml[0].sampul.includes("output=webp"));
+  cek("Melolo: tanda tangan sampulnya ikut utuh", ml[0].sampul.includes(encodeURIComponent("x-signature=Wb%3D")));
+
+  const reelshort = { success: true, data: { search_keyword_list: ["Kulihat"], lists: [
+    { books: [{ book_id: "6ac7", book_title: "Dibuang Selama 18 Tahun", book_pic: "https://v-img.crazymaplestudios.com/a.jpg",
+      special_desc: "Sejak kecil.", chapter_count: 61 }] },
+  ] } };
+  const rs = bacaDaftar(reelshort);
+  sama("ReelShort: book_title terbaca sebagai judul", rs.map((k) => k.judul), ["Dibuang Selama 18 Tahun"]);
+  sama("ReelShort: special_desc terbaca sebagai ringkasan", rs[0].ringkasan, "Sejak kecil.");
+
+  const freereels = { code: 200, data: { items: [
+    { type: "column_vertical_three", module_key: "1034", items: [
+      { key: "XqHe", title: "Protokol Hasrat", cover: "https://static-v1.mydramawave.com/a.jpg", episode_count: 30,
+        tag: ["Gratis"], series_tag: ["Romansa", "Misteri"] },
+    ] },
+  ] } };
+  const fr = bacaDaftar(freereels);
+  sama("FreeReels: items → items terbaca", fr.map((k) => k.id), ["XqHe"]);
+  sama("FreeReels: series_tag terbaca sebagai label", fr[0].label, ["Romansa", "Misteri"]);
+
+  const flickreels = { status_code: 1, data: [{ list: [
+    { playlet_id: 14519, title: "Pengecualian Bos Mafia", cover: "https://zshipubcf.farsunpteltd.com/a.jpg", upload_num: "40" },
+  ] }] };
+  const fl = bacaDaftar(flickreels);
+  sama("FlickReels: data → list terbaca", fl.map((k) => k.id), ["14519"]);
+  sama("FlickReels: upload_num terbaca sebagai jumlah episode", fl[0].episode, 40);
+
+  // Penelusuran berkelompok tidak boleh memungut label atau penanda halaman
+  // sebagai judul: keduanya punya id dan nama, tetapi tidak bersampul.
+  const berlabel = { data: { tags: [{ id: 1, name: "CEO" }], records: [{ items: [
+    { bookId: "9", bookName: "Yang Benar", cover: "https://x/9.jpg", tags: [{ id: 2, name: "Mafia" }] },
+  ] }] } };
+  sama("label {id, name} tidak terbaca sebagai judul", bacaDaftar(berlabel).map((k) => k.id), ["9"]);
+
+  // Hasil pencarian NetShort menandai kata yang dicari dengan <em>.
+  const cariNs = { searchCodeSearchResult: [
+    { shortPlayId: "197", shortPlayName: "Salah Pilih <em>Cinta</em>", shortPlayCover: "https://x/c.webp",
+      labelNames: "Romantis Urban,Menghukum Penjahat" },
+  ] };
+  const hasilNs = bacaDaftar(cariNs);
+  sama("tanda HTML dibuang dari judul", hasilNs[0].judul, "Salah Pilih Cinta");
+  sama("label berkoma dipecah", hasilNs[0].label, ["Romantis Urban", "Menghukum Penjahat"]);
+
+  sama("label berupa JSON di dalam teks diurai",
+    bacaKartu({ shortPlayId: "1", shortPlayName: "A", shortPlayLabels: "[\"Karma\",\"Penebusan\"]" })?.label,
+    ["Karma", "Penebusan"]);
+  sama("sampul yang bukan HEIC tidak dititipkan",
+    bacaKartu({ bookId: "1", bookName: "A", cover: "https://x/a.jpg" })?.sampul, "https://x/a.jpg");
 }
 
 // ============================================================

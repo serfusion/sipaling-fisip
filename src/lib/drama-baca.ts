@@ -111,10 +111,49 @@ function gambar(nilai: unknown): string {
   return nilaiTeks;
 }
 
+/**
+ * Alamat sampul yang dapat digambar peramban.
+ *
+ * Melolo mengirim sampulnya sebagai HEIC, format yang hanya dikenal Safari:
+ * di Chrome dan Firefox kartunya kosong tanpa satu pesan pun. Yang HEIC
+ * dibelokkan lewat wsrv.nl, pengubah gambar terbuka yang juga dipakai situs
+ * hulu untuk seluruh sampulnya, dan pulang sebagai WebP. Sampul lain tidak
+ * disentuh: tidak ada gunanya menitipkan gambar yang sudah dapat dibuka.
+ *
+ * Sengaja hanya untuk sampul. Fungsi `gambar` di atas ikut merapikan tautan
+ * video, dan tautan video tidak boleh lewat pengubah gambar.
+ */
+function sampulTampil(alamat: string): string {
+  if (!/\.heic(\?|$)/i.test(alamat)) return alamat;
+  return `https://wsrv.nl/?url=${encodeURIComponent(alamat)}&w=360&output=webp&q=80`;
+}
+
+/**
+ * Judul tanpa tanda HTML. Hasil pencarian NetShort menandai kata yang dicari
+ * dengan <em>, dan layar menampilkannya sebagai huruf apa adanya.
+ */
+function judulBersih(nilai: unknown): string {
+  return teks(nilai).replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+}
+
 function daftarTeks(nilai: unknown): string[] {
   if (!Array.isArray(nilai)) {
     const satu = teks(nilai);
-    return satu ? [satu] : [];
+    if (!satu) return [];
+    // Sebagian hulu mengirim lariknya sebagai teks: NetShort menulis
+    // shortPlayLabels sebagai JSON di dalam teks, dan labelNames-nya sebagai
+    // daftar berkoma. Dibaca apa adanya, keduanya tampil sebagai satu label
+    // panjang berisi tanda kurung dan tanda kutip.
+    if (satu.startsWith("[")) {
+      try {
+        const terurai: unknown = JSON.parse(satu);
+        if (Array.isArray(terurai)) return daftarTeks(terurai);
+      } catch {
+        // Bukan JSON; dibaca sebagai teks biasa di bawah.
+      }
+    }
+    if (satu.includes(",")) return daftarTeks(satu.split(",").map((isi) => isi.trim()));
+    return [satu];
   }
   const hasil: string[] = [];
   for (const isi of nilai) {
@@ -162,12 +201,14 @@ const KUNCI_ID = [
 const KUNCI_JUDUL = [
   "bookName",
   "book_name",
+  "book_title",
   "title",
   "dramaName",
   "playlet_name",
   "playletName",
   "shortPlayName",
   "collection_title",
+  "series_title",
   "name",
 ] as const;
 
@@ -185,6 +226,10 @@ const KUNCI_SAMPUL = [
   "img",
   "pic",
   "thumbnail",
+  "shortPlayCover",
+  "thumb_url",
+  "first_chapter_cover",
+  "series_cover",
 ] as const;
 
 const KUNCI_EPISODE = [
@@ -197,6 +242,9 @@ const KUNCI_EPISODE = [
   "total_episode",
   "totalEpisode",
   "episodeTotal",
+  "serial_count",
+  "upload_num",
+  "episode_cnt",
   "episodes",
 ] as const;
 
@@ -207,11 +255,29 @@ const KUNCI_RINGKASAN = [
   "intro",
   "summary",
   "desc",
+  "abstract",
+  "special_desc",
+  "introduce",
+  "shotIntroduce",
+  "series_intro",
 ] as const;
 
-const KUNCI_LABEL = ["tags", "tagNames", "labels", "typeTwoNames", "categories"] as const;
+const KUNCI_LABEL = [
+  "tags",
+  "tagNames",
+  "labels",
+  "typeTwoNames",
+  "categories",
+  "labelArray",
+  "series_tag",
+  "playlet_tag_name",
+  "labelNames",
+  "shortPlayLabels",
+] as const;
 
 const KUNCI_NOMOR = [
+  // Melolo: urutan episodenya di vid_index, id-nya di vid.
+  "vid_index",
   "episodeNumber",
   "episode_number",
   "chapterIndex",
@@ -235,6 +301,7 @@ const KUNCI_NAMA_EPISODE = ["chapterName", "episodeName", "name", "title", "inde
  * platform yang memang hanya menomori dengan satu id.
  */
 const KUNCI_ID_EPISODE = [
+  "vid",
   "chapterId",
   "chapter_id",
   "episodeId",
@@ -273,6 +340,10 @@ const KUNCI_DAFTAR_EPISODE = [
   "episode_list",
   "episodes",
   "videoList",
+  // Melolo: episode-episodenya. Tanpa baris ini penelusuran umum menemukan
+  // larik lain lebih dulu — daftar pemerannya — dan judul Melolo tampil
+  // dengan "episode" berisi nama aktor, tanpa satu pun tautan video.
+  "video_list",
   "videos",
   "multiVideos",
   "list",
@@ -339,14 +410,14 @@ export function cariLarik(payload: unknown, kunciDikenal: readonly string[] = KU
 
 export function bacaKartu(item: Objek): Kartu | null {
   const id = teks(pilih(item, KUNCI_ID));
-  const judul = teks(pilih(item, KUNCI_JUDUL));
+  const judul = judulBersih(pilih(item, KUNCI_JUDUL));
   if (!id || !judul) return null;
 
   const jumlah = pilih(item, KUNCI_EPISODE);
   return {
     id,
     judul,
-    sampul: gambar(pilih(item, KUNCI_SAMPUL)),
+    sampul: sampulTampil(gambar(pilih(item, KUNCI_SAMPUL))),
     // "episodes" kadang berisi lariknya, bukan jumlahnya.
     episode: Array.isArray(jumlah) ? jumlah.length : Math.max(0, Math.floor(angka(jumlah))),
     ringkasan: teks(pilih(item, KUNCI_RINGKASAN)).slice(0, 600),
@@ -354,8 +425,70 @@ export function bacaKartu(item: Objek): Kartu | null {
   };
 }
 
-/** Daftar kartu dari sebuah jawaban, tanpa kembar dan tanpa yang cacat. */
+/** Berapa kartu paling banyak dipulangkan sebuah jawaban daftar. */
+const BATAS_KARTU = 120;
+
+/**
+ * Kartu dari SELURUH kelompok di dalam sebuah jawaban.
+ *
+ * Sebagian besar beranda hulu kini berkelompok: NetShort mengirim larik
+ * kelompok yang masing-masing membawa contentInfos, GoodShort records yang
+ * masing-masing membawa items, Melolo cells → cell_data → books, ReelShort
+ * lists → books, FreeReels items → items, FlickReels data → list. cariLarik
+ * berhenti pada larik PERTAMA yang ditemukannya — larik kelompoknya — dan
+ * kelompok bukan judul, sehingga enam dari sembilan sumber tampil kosong
+ * padahal hulu mengirim ratusan judul.
+ *
+ * Penelusuran ini menyapu ke bawah selapis demi selapis dan memungut setiap
+ * objek yang berupa kartu. Yang dipungut WAJIB bersampul: label {id, name}
+ * dan penanda halaman juga punya id dan nama, dan sampullah yang membedakan
+ * judul dari keduanya. Begitu sebuah kartu ditemukan, isinya tidak ditelusuri
+ * lagi — episode di dalam sebuah judul bukan judul tersendiri.
+ */
+function kumpulkanKartu(payload: unknown): Kartu[] {
+  const hasil: Kartu[] = [];
+  const terlihat = new Set<string>();
+  let lapis: unknown[] = [payload];
+
+  for (let dalam = 0; dalam < 10 && lapis.length && hasil.length < BATAS_KARTU; dalam++) {
+    const berikut: unknown[] = [];
+    for (const simpul of lapis) {
+      if (Array.isArray(simpul)) {
+        berikut.push(...simpul.slice(0, 200));
+        continue;
+      }
+      const isi = objek(simpul);
+      if (!isi) continue;
+
+      const kartu = bacaKartu(isi);
+      if (kartu?.sampul) {
+        if (!terlihat.has(kartu.id)) {
+          terlihat.add(kartu.id);
+          hasil.push(kartu);
+        }
+        continue;
+      }
+      for (const nilai of Object.values(isi)) {
+        if (typeof nilai === "object" && nilai !== null) berikut.push(nilai);
+      }
+    }
+    lapis = berikut.slice(0, 3000);
+  }
+
+  return hasil.slice(0, BATAS_KARTU);
+}
+
+/**
+ * Daftar kartu dari sebuah jawaban, tanpa kembar dan tanpa yang cacat.
+ *
+ * Penelusuran seluruh kelompok dicoba lebih dulu. Cara lama — larik pertama
+ * yang dikenal — tetap dipakai sebagai cadangan untuk jawaban yang judulnya
+ * memang tidak bersampul, supaya judul seperti itu tidak hilang dari layar.
+ */
 export function bacaDaftar(payload: unknown): Kartu[] {
+  const berkelompok = kumpulkanKartu(payload);
+  if (berkelompok.length) return berkelompok;
+
   const hasil: Kartu[] = [];
   const terlihat = new Set<string>();
   for (const item of cariLarik(payload)) {
@@ -363,7 +496,7 @@ export function bacaDaftar(payload: unknown): Kartu[] {
     if (!kartu || terlihat.has(kartu.id)) continue;
     terlihat.add(kartu.id);
     hasil.push(kartu);
-    if (hasil.length >= 120) break;
+    if (hasil.length >= BATAS_KARTU) break;
   }
   return hasil;
 }
@@ -524,13 +657,35 @@ function mutuTeks(nilai: unknown): string {
  * peramban — yang membuka perlu tahu tombol mana yang ia tekan.
  */
 function mutuDari(induk: Objek, dariKunci = ""): string {
-  const dasar =
-    mutuTeks(pilih(induk, ["type", "quality", "resolution", "definition", "name", "label"])) ||
-    mutuTeks(dariKunci);
-  const sandi = teks(pilih(induk, ["encode", "codec", "encodeType"])).toUpperCase();
-  const cocok = sandi === "H264" || sandi === "H265" || sandi === "AVC" || sandi === "HEVC";
-  if (!cocok) return dasar;
+  // Tiap kolom dicoba sendiri-sendiri, bukan "yang pertama terisi". Melolo
+  // mengirim resolution "720x1280" DAN definition "720p"; yang pertama
+  // terisi adalah resolution, yang bukan bentuk mutu, sehingga seluruh
+  // tombol mutunya tampil tanpa nama.
+  let dasar = "";
+  for (const kunci of ["type", "quality", "resolution", "definition", "name", "label"]) {
+    dasar = mutuTeks(induk[kunci]);
+    if (dasar) break;
+  }
+  if (!dasar) dasar = mutuTeks(dariKunci);
+  const sandi = sandiDari(induk);
+  if (!sandi) return dasar;
   return dasar ? `${dasar} ${sandi}` : sandi;
+}
+
+/**
+ * Cara memampatkan gambar sebuah tautan, dalam dua nama saja: H264 atau H265.
+ *
+ * Hulu menyebutnya dengan banyak nama. "bytevc1" adalah nama ByteDance untuk
+ * H265 — dipakai Melolo — dan hvc1/hev1/avc1 nama kotaknya di berkas mp4.
+ * Tanpa disatukan, tautan H265 Melolo tidak dikenali sebagai H265, tidak
+ * ditaruh di belakang, dan dicoba lebih dulu di peramban yang tidak dapat
+ * memutarnya.
+ */
+function sandiDari(induk: Objek): "H264" | "H265" | "" {
+  const sandi = teks(pilih(induk, ["encode", "codec", "encodeType"])).toUpperCase();
+  if (["H265", "HEVC", "HVC1", "HEV1", "BYTEVC1", "X265"].includes(sandi)) return "H265";
+  if (["H264", "AVC", "AVC1", "X264"].includes(sandi)) return "H264";
+  return "";
 }
 
 /**
@@ -542,9 +697,9 @@ function mutuDari(induk: Objek, dariKunci = ""): string {
  * mungkin jalan, dan yang lain tetap tersedia sebagai tombol mutu.
  */
 function condongSandi(induk: Objek): number {
-  const sandi = teks(pilih(induk, ["encode", "codec", "encodeType"])).toUpperCase();
-  if (sandi === "H265" || sandi === "HEVC") return -25;
-  if (sandi === "H264" || sandi === "AVC") return 6;
+  const sandi = sandiDari(induk);
+  if (sandi === "H265") return -25;
+  if (sandi === "H264") return 6;
   return 0;
 }
 
@@ -641,6 +796,16 @@ export function kumpulkanAliran(payload: unknown, opsi: OpsiAliran = {}): Aliran
 
   telusuri(payload, "", null, 0);
 
+  // Tautan yang sama kerap muncul dua kali: sekali di akar sebagai pilihan
+  // bawaan, sekali di daftar mutunya. Yang dipertahankan yang bernilai
+  // tertinggi, tetapi namanya diambil dari kembarannya yang lebih lengkap —
+  // tombol "720p" tanpa keterangan H265 menjanjikan tontonan yang tidak dapat
+  // diputar di sebagian peramban.
+  const namaTerlengkap = new Map<string, string>();
+  for (const item of temuan) {
+    if (item.mutu.length > (namaTerlengkap.get(item.url)?.length ?? -1)) namaTerlengkap.set(item.url, item.mutu);
+  }
+
   const terlihat = new Set<string>();
   return temuan
     .sort((a, b) => b.nilai - a.nilai)
@@ -650,10 +815,10 @@ export function kumpulkanAliran(payload: unknown, opsi: OpsiAliran = {}): Aliran
       return true;
     })
     .slice(0, 8)
-    .map(({ url, mutu, lewatHulu }) => ({
+    .map(({ url, lewatHulu }) => ({
       url,
       hls: /\.m3u8(\?|$)/i.test(url),
-      mutu,
+      mutu: namaTerlengkap.get(url) ?? "",
       lewatHulu,
     }));
 }
@@ -735,7 +900,7 @@ export function bacaRinci(
     const isi = objek(akar[kunci]);
     if (isi) {
       kandidat.push(isi);
-      for (const kunciDalam of ["book", "detail", "info", "collection"]) {
+      for (const kunciDalam of ["book", "detail", "info", "collection", "video_data"]) {
         const lebihDalam = objek(isi[kunciDalam]);
         if (lebihDalam) kandidat.push(lebihDalam);
       }
@@ -756,8 +921,8 @@ export function bacaRinci(
 
   return {
     id: teks(ambil(KUNCI_ID)) || id,
-    judul: teks(ambil(KUNCI_JUDUL)) || cadangan?.judul || "",
-    sampul: gambar(ambil(KUNCI_SAMPUL)) || cadangan?.sampul || "",
+    judul: judulBersih(ambil(KUNCI_JUDUL)) || cadangan?.judul || "",
+    sampul: sampulTampil(gambar(ambil(KUNCI_SAMPUL))) || cadangan?.sampul || "",
     ringkasan: (teks(ambil(KUNCI_RINGKASAN)) || cadangan?.ringkasan || "").slice(0, 2000),
     // Jumlah yang disebut hulu dipercaya lebih dulu; daftar episode kerap
     // dipotong sepuluh pertama pada jawaban rinci.

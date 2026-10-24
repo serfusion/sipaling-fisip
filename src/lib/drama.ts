@@ -36,9 +36,9 @@ export const SUMBER_HULU = {
   repo: "SekaiDrama",
   cabang: "main",
   /** Commit hulu yang dibaca saat tabel di bawah disusun. */
-  commit: "0481a1c",
+  commit: "131356e",
   /** Tanggal pembacaan itu, bukan tanggal commit-nya. */
-  dibacaPada: "2026-09-15",
+  dibacaPada: "2026-10-24",
   lisensi: "MIT",
 } as const;
 
@@ -271,7 +271,7 @@ export const PLATFORM: Platform[] = [
       terbaru: { jalur: "/reelshort/homepage", berkas: "reelshort/homepage" },
       lainnya: { jalur: "/reelshort/foryou", berkas: "reelshort/foryou", halaman: halamanNomor(100) },
       cari: { jalur: "/reelshort/search", berkas: "reelshort/search", kunciCari: "query", halaman: halamanNomor(100) },
-      rinci: { jalur: "/reelshort/detail", berkas: "reelshort/detail", kunciId: "bookId" },
+      rinci: { jalur: "/reelshort/get-detail", berkas: "reelshort/detail", kunciId: "bookId" },
       episode: {
         jalur: "/reelshort/get-episode", berkas: "reelshort/watch",
         kunciId: "bookId",
@@ -352,7 +352,7 @@ export const PLATFORM: Platform[] = [
     caraEpisode: "id-episode",
     kunciIdEpisode: "videoId",
     titik: {
-      terbaru: { jalur: "/melolo/latest", berkas: "melolo/latest" },
+      terbaru: { jalur: "/melolo/get-latest", berkas: "melolo/latest" },
       populer: { jalur: "/melolo/trending", berkas: "melolo/trending" },
       lainnya: { jalur: "/melolo/foryou", berkas: "melolo/foryou", halaman: halamanGeser(6) },
       cari: { jalur: "/melolo/search", berkas: "melolo/search", kunciCari: "query" },
