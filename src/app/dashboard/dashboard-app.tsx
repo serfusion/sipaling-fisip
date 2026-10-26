@@ -1131,6 +1131,7 @@ export default function DashboardApp({
   if (["super_admin", "admin", "admin_akademik"].includes(profile.role)) {
     templateCards.push({ icon: "▤", title: "Transkrip Nilai", desc: "Impor Excel → IPK otomatis → pratinjau berkop, cetak tanpa kop.", href: "/dashboard/template?jenis=transkrip" });
     templateCards.push({ icon: "🌐", title: "Transkrip Nilai (ID+EN)", desc: "Impor Excel KUI → transkrip dwibahasa (Indonesia + Inggris) siap cetak Legal tanpa kop.", href: "/dashboard/template?jenis=transkrip-en" });
+    templateCards.push({ icon: "📜", title: "Transkrip Nilai · Kertas Concorde", desc: "Transkrip dwibahasa (ID+EN) untuk kertas Concorde kuning F4 yang diserahkan ke mahasiswa: teks di bawah kop 4,7 cm, muat satu lembar.", href: "/dashboard/template?jenis=transkrip-concorde" });
   }
   if (["super_admin", "admin", "admin_umum"].includes(profile.role)) {
     templateCards.push({ icon: "✉", title: "Surat Keterangan Aktif", desc: "Pratinjau berkop FISIP → edit langsung → cetak tanpa kop (kertas kop kampus).", href: "/dashboard/template?jenis=surat-aktif" });
