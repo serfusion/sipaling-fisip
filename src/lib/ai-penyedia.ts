@@ -13,6 +13,7 @@
 // berpindah sendiri ke kunci cadangan.
 // ============================================================
 import Anthropic from "@anthropic-ai/sdk";
+import { transformJSONSchema } from "@anthropic-ai/sdk/lib/transform-json-schema";
 import { kunciAktif, LABEL_PENYEDIA, samarkan, type KunciAi, type PenyediaAi } from "@/lib/ai-kunci";
 import { catatPanggilan, laporkanKunciGagal, type FiturAi, cekBatas } from "@/lib/ai-pemakaian";
 
@@ -106,6 +107,17 @@ export async function mintaJson(input: {
    * menambah ketepatan.
    */
   usaha?: "low" | "medium" | "high";
+  /**
+   * Jawaban pendek yang DITUNGGU seseorang saat itu juga, mis. esai yang
+   * dinilai selagi peserta menunggu sesudah menekan KUMPULKAN.
+   *
+   * Menekan proses berpikir model sampai serendah yang diterima tiap
+   * penyedia: Gemini lewat thinkingConfig, ChatGPT lewat reasoning_effort
+   * (hanya pada model penalar), Claude lewat effort "low". Model yang
+   * dipasang Super Admin TIDAK diganti; yang diubah hanya seberapa lama ia
+   * berpikir sebelum menjawab.
+   */
+  cepat?: boolean;
   /** Untuk catatan pemakaian bulanan: fitur mana yang memanggil. */
   fitur?: FiturAi;
 }): Promise<JawabanModel> {
@@ -207,20 +219,48 @@ export async function ujiKunci(k: KunciAi & { model: string }): Promise<{ model:
   return { model: jawab.model, ms: Date.now() - mulai };
 }
 
+/**
+ * Skema yang aman dikirim ke Claude.
+ *
+ * Keluaran terstruktur Claude tidak menerima sebagian kata kunci JSON Schema
+ * (mis. maxItems, minItems di atas satu) dan menuntut additionalProperties
+ * false pada SETIAP objek; skema yang memuatnya ditolak 400. Gemini dan
+ * ChatGPT menerima kata kunci itu, jadi skema portal tetap ditulis lengkap
+ * dan baru dibersihkan di sini, dengan pembersih milik SDK Anthropic sendiri:
+ * batasan yang tidak didukung dipindahkan ke deskripsi medannya, sehingga
+ * model tetap membacanya, dan jumlah yang benar tetap ditegakkan pembaca
+ * jawaban di sisi portal.
+ *
+ * Skema yang tidak dapat dibersihkan (mis. tanpa "type") dikirim apa adanya:
+ * penolakannya lebih mudah dibaca daripada galat dari pembersihnya.
+ */
+export function skemaClaude(skema: Record<string, unknown>): Record<string, unknown> {
+  try {
+    return transformJSONSchema(skema);
+  } catch {
+    return skema;
+  }
+}
+
 async function lewatClaude(k: KunciAi & { model: string }, input: Masukan): Promise<JawabanModel> {
   const client = new Anthropic({ apiKey: k.kunci });
   try {
     // Dialirkan, bukan sekali tunggu: dua puluh soal beserta pembahasannya
     // adalah keluaran panjang, dan permintaan panjang yang tidak dialirkan
     // menabrak batas waktu HTTP sebelum jawabannya selesai.
+    // Claude Haiku 4.5 tidak menerima effort maupun thinking adaptif: keduanya
+    // dijawab 400. Ia memang model yang paling cepat, jadi tanpa keduanya pun
+    // ia tidak berpikir panjang. Model lain memakai thinking adaptif dengan
+    // effort sebagai kendali kedalamannya.
+    const ringan = /haiku/i.test(k.model);
     const aliran = client.messages.stream({
       model: k.model,
       max_tokens: input.maksKeluaran ?? 32_000,
       system: input.sistem,
-      thinking: { type: "adaptive" },
+      ...(ringan ? {} : { thinking: { type: "adaptive" as const } }),
       output_config: {
-        effort: input.usaha ?? "high",
-        format: { type: "json_schema", schema: input.skema },
+        ...(ringan ? {} : { effort: input.cepat ? ("low" as const) : (input.usaha ?? "high") }),
+        format: { type: "json_schema", schema: skemaClaude(input.skema) },
       },
       messages: [
         {
@@ -250,6 +290,11 @@ async function lewatClaude(k: KunciAi & { model: string }, input: Masukan): Prom
         "Model menolak memproses naskah ini. Periksa isinya, lalu coba lagi dengan bagian yang relevan saja.",
         422,
       );
+    }
+    // Keluaran yang terpotong batas panjang adalah JSON setengah jadi. Sebabnya
+    // dikatakan apa adanya, bukan dibiarkan menjadi "tidak dapat diurai".
+    if (pesan.stop_reason === "max_tokens") {
+      throw new GalatModel("Jawaban Claude terpotong batas panjang sebelum selesai. Coba lagi.", 502);
     }
 
     const teks = pesan.content
@@ -283,6 +328,89 @@ async function lewatClaude(k: KunciAi & { model: string }, input: Masukan): Prom
   }
 }
 
+// ------------------------------------------------------------
+// MODE CEPAT: SEBERAPA SEDIKIT MODEL BOLEH BERPIKIR
+// ------------------------------------------------------------
+//
+// Tiap penyedia, bahkan tiap generasi model, punya kendali berpikir yang
+// berbeda, dan yang salah dijawab 400. Aturannya karena itu ditulis menurut
+// NAMA MODEL yang benar-benar dipanggil, dengan cadangan: bila penyedia
+// menolaknya, permintaan diulang sekali dengan kendali yang lebih longgar,
+// lalu tanpa kendali sama sekali. Yang berhasil diingat per model, supaya
+// 400 yang sia-sia hanya terjadi sekali per proses, bukan sekali per esai.
+
+/** Kendali berpikir Gemini yang diterima model ini. null = jangan kirim apa pun. */
+type PikirGemini = { thinkingBudget: number } | { thinkingLevel: "minimal" | "low" } | null;
+
+/**
+ * Kendali berpikir Gemini yang paling rendah untuk satu model.
+ *
+ *   Gemini 2.5 Pro            thinkingBudget 128   (tidak dapat dimatikan; 0 ditolak)
+ *   Gemini 2.5 Flash/Lite     thinkingBudget 0     (berpikir mati)
+ *   Flash-Lite 3.x            thinkingLevel minimal (sekaligus bawaannya)
+ *   Flash 3.x, Pro 3.x,       thinkingLevel low    (satu-satunya level rendah yang
+ *   alias gemini-flash-latest                       diterima SEMUA Flash 3.x dan 3.1 Pro;
+ *                                                   "minimal" ditolak 3.7/3.8 Flash)
+ *
+ * Gemini 3.x tidak diberi thinkingBudget: diterima hanya demi kompatibilitas
+ * dan disebut dapat menimbulkan 400 sesekali. Keduanya juga tidak pernah
+ * dikirim bersamaan; itu selalu 400.
+ */
+export function pikirGeminiCepat(model: string): PikirGemini {
+  const m = model.toLowerCase();
+  if (/gemini-(1|2\.0|2\.5)/.test(m)) return /pro/.test(m) ? { thinkingBudget: 128 } : { thinkingBudget: 0 };
+  if (/lite/.test(m)) return { thinkingLevel: "minimal" };
+  return { thinkingLevel: "low" };
+}
+
+/** Langkah mundur bila kendali berpikir ditolak: minimal → low → tanpa kendali. */
+function mundurPikirGemini(p: PikirGemini): PikirGemini {
+  if (p && "thinkingLevel" in p && p.thinkingLevel === "minimal") return { thinkingLevel: "low" };
+  return null;
+}
+
+/** Kendali berpikir Gemini yang terbukti diterima, per model. */
+const pikirGeminiCocok = new Map<string, PikirGemini>();
+
+/**
+ * Penolakan 400 yang disebabkan kendali berpikir, bukan isi permintaannya.
+ *
+ * Hanya yang pesannya menyebut "think". Status INVALID_ARGUMENT saja tidak
+ * cukup: Google memakainya untuk hampir semua 400, termasuk kunci yang
+ * kedaluwarsa. Menganggap semuanya penolakan kendali berpikir berarti
+ * mengulang permintaan yang pasti gagal lagi, dan, bila 400 sesaat kebetulan
+ * lolos pada ulangan berikutnya, mengingat "tanpa kendali" untuk model itu
+ * selama server hidup: seluruh esai sesudahnya dinilai dengan model yang
+ * berpikir sepanjang bawaannya.
+ */
+function tolakPikir(status: number, badan: string): boolean {
+  return status === 400 && /think/i.test(badan);
+}
+
+/**
+ * reasoning_effort ChatGPT yang paling rendah untuk satu model, atau
+ * undefined bila model itu bukan model penalar dan medan ini tidak boleh
+ * dikirim sama sekali (gpt-4o-mini, bawaan portal, menolaknya dengan 400).
+ */
+export function nalarOpenAiCepat(model: string): "none" | "minimal" | "low" | undefined {
+  const m = model.toLowerCase().trim();
+  if (/chat/.test(m)) return undefined;
+  if (/-pro\b/.test(m)) return undefined;
+  if (/^o1-(mini|preview)/.test(m)) return undefined;
+  if (/^gpt-5(-mini|-nano)?(-\d{4}-\d{2}-\d{2})?$/.test(m)) return "minimal";
+  if (/^o[1-9]/.test(m) || /codex/.test(m) || /^gpt-6-astra/.test(m) || /^gpt-6\.1-sol/.test(m)) return "low";
+  if (/^gpt-(5\.\d|6)/.test(m)) return "none";
+  return undefined;
+}
+
+/** Langkah mundur bila reasoning_effort ditolak: none/minimal → low → tanpa medan. */
+function mundurNalarOpenAi(n: "none" | "minimal" | "low" | undefined): "low" | undefined {
+  return n === "none" || n === "minimal" ? "low" : undefined;
+}
+
+/** reasoning_effort yang terbukti diterima, per model. null = jangan kirim. */
+const nalarOpenAiCocok = new Map<string, "none" | "minimal" | "low" | null>();
+
 /**
  * Jalur Gemini, lewat HTTP biasa.
  *
@@ -307,38 +435,54 @@ async function lewatGemini(k: KunciAi & { model: string }, input: Masukan): Prom
   // model cadangan dengan kunci yang SAMA, sebelum menyerah ke kunci
   // berikutnya — portal yang hanya punya satu kunci pun tetap tertolong.
   let modelDipakai = k.model;
+  const kirim = (model: string, pikir: PikirGemini) =>
+    fetch(alamatUntuk(model), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": kunci },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: input.sistem }] },
+        contents: [
+          {
+            role: "user",
+            parts: [
+              ...(input.gambar ?? []).map((g) => ({
+                inline_data: { mime_type: g.jenis, data: g.data },
+              })),
+              ...(input.suara ?? []).map((a) => ({
+                inline_data: { mime_type: a.jenis, data: a.data },
+              })),
+              { text: input.perintah },
+            ],
+          },
+        ],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseJsonSchema: input.skema,
+          maxOutputTokens: input.maksKeluaran ?? 32_000,
+          ...(pikir ? { thinkingConfig: pikir } : {}),
+        },
+      }),
+    });
+
   for (let coba = 0; coba < 2; coba += 1) {
     modelDipakai = coba === 0 ? k.model : modelCadangan;
+    // Mode cepat: kendali berpikir menurut model yang BENAR-BENAR dipanggil,
+    // karena percobaan kedua pindah ke model cadangan.
+    let pikir: PikirGemini = input.cepat
+      ? (pikirGeminiCocok.has(modelDipakai) ? pikirGeminiCocok.get(modelDipakai)! : pikirGeminiCepat(modelDipakai))
+      : null;
     try {
-      jawab = await fetch(alamatUntuk(modelDipakai), {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": kunci },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: input.sistem }] },
-          contents: [
-            {
-              role: "user",
-              parts: [
-                ...(input.gambar ?? []).map((g) => ({
-                  inline_data: { mime_type: g.jenis, data: g.data },
-                })),
-                ...(input.suara ?? []).map((a) => ({
-                  inline_data: { mime_type: a.jenis, data: a.data },
-                })),
-                { text: input.perintah },
-              ],
-            },
-          ],
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseJsonSchema: input.skema,
-            maxOutputTokens: input.maksKeluaran ?? 32_000,
-          },
-        }),
-      });
+      jawab = await kirim(modelDipakai, pikir);
+      // Kendali berpikir ditolak model ini: mundur selangkah dan ulangi
+      // seketika. 400 kembali tanpa ada yang dibangkitkan, jadi murah.
+      while (pikir && jawab.status === 400 && tolakPikir(jawab.status, await jawab.clone().text().catch(() => ""))) {
+        pikir = mundurPikirGemini(pikir);
+        jawab = await kirim(modelDipakai, pikir);
+      }
     } catch {
       throw new GalatModel("Gemini tidak dapat dihubungi. Periksa sambungan jaringan server.", 503);
     }
+    if (input.cepat && jawab.ok) pikirGeminiCocok.set(modelDipakai, pikir);
     if (jawab.status !== 503 || coba === 1) break;
     await new Promise((r) => setTimeout(r, 800));
   }
@@ -361,6 +505,9 @@ async function lewatGemini(k: KunciAi & { model: string }, input: Masukan): Prom
   };
   const calon = data.candidates?.[0];
   const teks = (calon?.content?.parts || []).map((p) => p.text ?? "").join("");
+  if (teks.trim() && calon?.finishReason === "MAX_TOKENS") {
+    throw new GalatModel("Jawaban Gemini terpotong batas panjang sebelum selesai. Coba lagi.", 502);
+  }
   if (!teks.trim()) {
     throw new GalatModel(
       calon?.finishReason === "MAX_TOKENS"
@@ -387,13 +534,14 @@ async function lewatGemini(k: KunciAi & { model: string }, input: Masukan): Prom
  */
 async function lewatOpenAi(k: KunciAi & { model: string }, input: Masukan): Promise<JawabanModel> {
   let jawab: Response;
-  try {
-    jawab = await fetch("https://api.openai.com/v1/chat/completions", {
+  const kirim = (nalar: "none" | "minimal" | "low" | undefined) =>
+    fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${k.kunci}` },
       body: JSON.stringify({
         model: k.model,
         max_completion_tokens: input.maksKeluaran ?? 16_000,
+        ...(nalar ? { reasoning_effort: nalar } : {}),
         response_format: {
           type: "json_schema",
           json_schema: { name: "jawaban", schema: input.skema, strict: false },
@@ -413,9 +561,24 @@ async function lewatOpenAi(k: KunciAi & { model: string }, input: Masukan): Prom
         ],
       }),
     });
+
+  // Mode cepat hanya berarti pada model penalar (gpt-5.x, seri o). Model
+  // bawaan portal, gpt-4o-mini, tidak berpikir lebih dulu dan menolak medan
+  // reasoning_effort, jadi padanya tidak dikirim apa pun.
+  let nalar: "none" | "minimal" | "low" | undefined = undefined;
+  if (input.cepat) {
+    nalar = nalarOpenAiCocok.has(k.model) ? (nalarOpenAiCocok.get(k.model) ?? undefined) : nalarOpenAiCepat(k.model);
+  }
+  try {
+    jawab = await kirim(nalar);
+    while (nalar && jawab.status === 400 && /reasoning[_.]?effort/i.test(await jawab.clone().text().catch(() => ""))) {
+      nalar = mundurNalarOpenAi(nalar);
+      jawab = await kirim(nalar);
+    }
   } catch {
     throw new GalatModel("ChatGPT tidak dapat dihubungi. Periksa sambungan jaringan server.", 503);
   }
+  if (input.cepat && jawab.ok) nalarOpenAiCocok.set(k.model, nalar ?? null);
 
   if (!jawab.ok) {
     const badan = await jawab.text().catch(() => "");

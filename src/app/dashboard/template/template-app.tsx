@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useAutoLogout } from "@/lib/use-auto-logout";
 import { sanitizeLetterHtml } from "@/lib/sanitize-html";
 import { DEFAULT_LETTER_HTML, LETTER_TITLES, type LetterSlug } from "./letter-defaults";
@@ -70,7 +70,8 @@ function fmtIPK(value: number) {
 
 /* ---------- komponen utama ---------- */
 
-type Jenis = "transkrip" | "kelulusan" | "kurikulum" | LetterSlug;
+type Jenis = "transkrip" | "transkrip-concorde" | "kelulusan" | "kurikulum" | LetterSlug;
+const JENIS_TRANSKRIP: Jenis[] = ["transkrip", "transkrip-en", "transkrip-concorde"];
 const LETTER_SLUGS: LetterSlug[] = ["surat-aktif", "izin-penelitian", "pkl"];
 
 export default function TemplateApp({ profile, initialJenis, initialArsip }: { profile: SessionProfile | null; initialJenis?: string; initialArsip?: string }) {
@@ -83,14 +84,15 @@ export default function TemplateApp({ profile, initialJenis, initialArsip }: { p
       : initialJenis === "izin-penelitian" ? "izin-penelitian"
         : initialJenis === "pkl" ? "pkl"
           : initialJenis === "transkrip-en" ? "transkrip-en"
-            : initialJenis === "transkrip" ? "transkrip"
-              : initialJenis === "kelulusan" ? "kelulusan"
-                : initialJenis === "kurikulum" ? "kurikulum"
-                  : null;
+            : initialJenis === "transkrip-concorde" ? "transkrip-concorde"
+              : initialJenis === "transkrip" ? "transkrip"
+                : initialJenis === "kelulusan" ? "kelulusan"
+                  : initialJenis === "kurikulum" ? "kurikulum"
+                    : null;
   const defaultJenis: Jenis =
-    (normalizedInitial === "transkrip" || normalizedInitial === "transkrip-en") && canTranskrip ? normalizedInitial
+    normalizedInitial && JENIS_TRANSKRIP.includes(normalizedInitial) && canTranskrip ? normalizedInitial
       : (normalizedInitial === "kelulusan" || normalizedInitial === "kurikulum") && canKelulusan ? normalizedInitial
-        : normalizedInitial && normalizedInitial !== "transkrip" && normalizedInitial !== "transkrip-en"
+        : normalizedInitial && !JENIS_TRANSKRIP.includes(normalizedInitial)
           && normalizedInitial !== "kelulusan" && normalizedInitial !== "kurikulum" && canSurat ? normalizedInitial
           : canTranskrip ? "transkrip"
             : canKelulusan ? "kelulusan"
@@ -137,6 +139,9 @@ export default function TemplateApp({ profile, initialJenis, initialArsip }: { p
           {canTranskrip && (
             <button type="button" className={jenis === "transkrip-en" ? "on" : ""} onClick={() => setJenis("transkrip-en")}>Transkrip (ID+EN)</button>
           )}
+          {canTranskrip && (
+            <button type="button" className={jenis === "transkrip-concorde" ? "on" : ""} onClick={() => setJenis("transkrip-concorde")}>Transkrip Kertas Concorde</button>
+          )}
           {canKelulusan && (
             <button type="button" className={jenis === "kelulusan" ? "on" : ""} onClick={() => setJenis("kelulusan")}>Input Kelulusan &amp; Dropout</button>
           )}
@@ -150,10 +155,11 @@ export default function TemplateApp({ profile, initialJenis, initialArsip }: { p
       </header>
       {jenis === "transkrip" && canTranskrip ? <TranskripModule lang="id" arsipAwal={initialArsip} key="tk-id" />
         : jenis === "transkrip-en" && canTranskrip ? <TranskripModule lang="en" arsipAwal={initialArsip} key="tk-en" />
+        : jenis === "transkrip-concorde" && canTranskrip ? <TranskripModule lang="en" kertas="concorde" arsipAwal={initialArsip} key="tk-concorde" />
           : jenis === "kelulusan" && canKelulusan ? <KelulusanModule key="kelulusan" />
             : jenis === "kurikulum" && canKelulusan ? <KurikulumModule key="kurikulum" />
               : <LetterModule
-                  slug={jenis === "transkrip" || jenis === "transkrip-en" || jenis === "kelulusan" || jenis === "kurikulum" ? "surat-aktif" : jenis}
+                  slug={jenis === "transkrip" || jenis === "transkrip-en" || jenis === "transkrip-concorde" || jenis === "kelulusan" || jenis === "kurikulum" ? "surat-aktif" : jenis}
                   key={jenis}
                 />}
     </div>
@@ -344,8 +350,48 @@ function tanggalSingkat(waktu: string | null) {
     : tanggal.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 }
 
-function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: string }) {
+// --- Kertas Concorde (F4) ------------------------------------------------
+//
+// Kertas asli yang diserahkan ke mahasiswa hanya setinggi F4 (33cm) dan
+// kopnya 4,7cm, jadi teksnya mulai 0,7cm lebih rendah daripada di kertas
+// sementara. Isi yang melewati 33cm tidak pindah ke halaman 2, melainkan
+// tidak ada kertasnya. Transkrip yang terlalu panjang karena itu dipadatkan
+// bertahap (lihat .tk-concorde[data-padat] di globals.css) sampai muat;
+// transkrip biasa tetap di tingkat 0, persis seperti templat ID+EN.
+const TINGGI_F4_PX = (33 * 96) / 2.54;
+const PADAT_MAKS = 4;
+
+/** Tinggi alami dokumen: tanpa min-height, tanda tangan tepat sesudah isinya. */
+function tinggiAlami(doc: HTMLElement) {
+  doc.style.setProperty("min-height", "0", "important");
+  const tinggi = doc.offsetHeight;
+  doc.style.removeProperty("min-height");
+  return tinggi;
+}
+
+/**
+ * Pasang tingkat pemadatan terendah yang membuat dokumen muat di F4.
+ *
+ * Bekerja langsung di DOM (atribut data-padat tidak dikelola React), jadi
+ * berlaku sama untuk pratinjau otomatis maupun tata letak hasil suntingan.
+ * Mengembalikan false bila tingkat terpadat pun belum muat.
+ */
+function padatkanKeF4(doc: HTMLElement) {
+  for (let tingkat = 0; tingkat <= PADAT_MAKS; tingkat++) {
+    if (tingkat === 0) delete doc.dataset.padat;
+    else doc.dataset.padat = String(tingkat);
+    if (tinggiAlami(doc) <= TINGGI_F4_PX) return true;
+  }
+  return false;
+}
+
+function TranskripModule({ lang, kertas = "sementara", arsipAwal }: {
+  lang: "id" | "en";
+  kertas?: "sementara" | "concorde";
+  arsipAwal?: string;
+}) {
   const EN = lang === "en";
+  const CONCORDE = kertas === "concorde";
   const customSlug: LetterSlug = EN ? "transkrip-en" : "transkrip-custom";
   const L = labelTranskrip(EN);
   const showIpk = (value: number) => (EN ? value.toFixed(2) : fmtIPK(value));
@@ -357,6 +403,9 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
   const [showHint, setShowHint] = useState(true);
   const [editLayout, setEditLayout] = useState(false);
   const docRef = useRef<HTMLDivElement>(null);
+  // Transkrip yang tetap lebih panjang daripada kertas Concorde walau sudah
+  // dipadatkan sampai tingkat terakhir.
+  const [lewatF4, setLewatF4] = useState(false);
 
   // --- Tata letak hasil suntingan tangan ---------------------------------
   //
@@ -430,7 +479,8 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
     : showProdi(meta.prodi);
   // Satu kelas untuk kedua cabang render dokumen (bawaan & hasil suntingan).
   const kelasDoc =
-    "tk-page tk-doc letter-page" + (EN ? " tk-bilingual" : "") + (editLayout ? " tk-editable" : "");
+    "tk-page tk-doc letter-page" + (EN ? " tk-bilingual" : "") + (CONCORDE ? " tk-concorde" : "") +
+    (editLayout ? " tk-editable" : "");
   // WAJIB di-memo. React memasang ulang dangerouslySetInnerHTML begitu OBJEK
   // propnya berganti — bukan begitu isinya berganti. Objek baru pada tiap
   // render berarti dokumen ditanam ulang pada tiap render, dan suntingan yang
@@ -1027,6 +1077,26 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
     return () => window.removeEventListener("beforeunload", jaga);
   }, [rows.length, sudahDiarsipkan]);
 
+  // Kertas Concorde: tingkat pemadatan dipilih ulang pada SETIAP render,
+  // sebelum peramban melukisnya, supaya yang tampil (dan yang tercetak)
+  // selalu sudah muat di F4. Sengaja tanpa daftar dependensi: biodata, nilai,
+  // judul skripsi, maupun tata letak hasil suntingan dapat mengubah tingginya.
+  useLayoutEffect(() => {
+    const doc = docRef.current;
+    if (!CONCORDE || !doc) return;
+    const lewat = !padatkanKeF4(doc);
+    if (lewat === lewatF4) return;
+    const jam = window.requestAnimationFrame(() => setLewatF4(lewat));
+    return () => window.cancelAnimationFrame(jam);
+  });
+
+  function sunting() {
+    setTataLetakKotor(true);
+    // Mengetik di tata letak beku tidak merender ulang modul ini, jadi
+    // kecocokannya dengan F4 diperiksa di sini juga.
+    if (CONCORDE && docRef.current) setLewatF4(!padatkanKeF4(docRef.current));
+  }
+
   function updateRow(index: number, patch: Partial<CourseRow>) {
     setRows((current) => current.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }
@@ -1228,7 +1298,9 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
         </button>
 
         <div className="tpl-actions">
-          <button type="button" className="btn btn-primary" onClick={() => window.print()}>🖨 Cetak tanpa kop (Legal 21,59×35,56 cm)</button>
+          <button type="button" className="btn btn-primary" onClick={() => window.print()}>
+            {CONCORDE ? "🖨 Cetak di kertas Concorde (tanpa kop)" : "🖨 Cetak tanpa kop (Legal 21,59×35,56 cm)"}
+          </button>
           <button
             type="button"
             className={editLayout ? "btn btn-primary btn-mini" : "btn btn-light btn-mini"}
@@ -1247,10 +1319,22 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
               {pastiOtomatis ? "Yakin? Suntingan tata letak dibuang" : "↺ Kembali ke tata letak bawaan"}
             </button>
           )}
-          <span className="print-tip no-print">Agar <strong>1 lembar</strong>: di dialog print set <strong>Margins = None</strong>, <strong>Scale = Default (100%)</strong>, dan matikan <strong>Headers and footers</strong>.</span>
+          <span className="print-tip no-print">
+            Agar <strong>1 lembar</strong>: di dialog print set <strong>Margins = None</strong>, <strong>Scale = Default (100%)</strong>, dan matikan <strong>Headers and footers</strong>.
+            {CONCORDE && <> Masukkan kertas Concorde dengan <strong>kop di sisi atas</strong>. Teks mulai 5,2 cm dari tepi atas, di bawah kop 4,7 cm, dan tanda tangan berakhir 1 cm di atas tepi bawah F4.</>}
+          </span>
           <button type="button" className="btn btn-light" onClick={() => { window.open("https://drive.google.com/drive/my-drive?hl=ID", "_blank", "noopener"); }} title="Buka Google Drive akun Anda untuk mengunggah PDF hasil cetak">⬢ Simpan ke Google Drive</button>
           <Link className="btn btn-light" href="/dashboard">Arsipkan link Drive di Dashboard → Arsip</Link>
         </div>
+
+        {CONCORDE && lewatF4 && (
+          <p className="tk-tataletak-nota no-print">
+            ⚠ Transkrip ini <b>lebih panjang daripada kertas Concorde F4</b> walau hurufnya sudah dipadatkan,
+            jadi bagian bawahnya akan terpotong saat dicetak. Ringkas nama mata kuliah atau judul skripsi
+            yang sangat panjang (di daftar sebelah kiri, atau lewat <b>✎ Edit tata letak</b>) sampai garis
+            merah di pratinjau berada di bawah tanda tangan.
+          </p>
+        )}
 
         {tataLetak !== null && (
           <p className="tk-tataletak-nota no-print">
@@ -1405,7 +1489,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
               className={kelasDoc}
               contentEditable={editLayout}
               suppressContentEditableWarning
-              onInput={() => setTataLetakKotor(true)}
+              onInput={sunting}
               dangerouslySetInnerHTML={isiTataLetak}
             />
           ) : (
@@ -1415,7 +1499,7 @@ function TranskripModule({ lang, arsipAwal }: { lang: "id" | "en"; arsipAwal?: s
             className={kelasDoc}
             contentEditable={editLayout}
             suppressContentEditableWarning
-            onInput={() => setTataLetakKotor(true)}
+            onInput={sunting}
           >
             <div className="kop-layer no-print" aria-hidden="true" />
             <div className="page-guide page-guide-legal no-print" aria-hidden="true" />

@@ -197,6 +197,15 @@ export default function ArsipTranskrip({ bolehHapus }: { bolehHapus: boolean }) 
                     >
                       Buka →
                     </Link>
+                    {baris.lang === "en" && (
+                      <Link
+                        className="dlink"
+                        href={`/dashboard/template?jenis=transkrip-concorde&arsip=${baris.id}`}
+                        title="Buka di templat Kertas Concorde (kertas asli F4, kop 4,7 cm)"
+                      >
+                        Concorde →
+                      </Link>
+                    )}
                     {bolehHapus && (pastiHapus === baris.id ? (
                       <span className="arsip-pasti">
                         <b>Hapus?</b>
