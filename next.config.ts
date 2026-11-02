@@ -30,9 +30,13 @@ const csp = [
   // Produksi tidak memerlukannya, jadi 'unsafe-eval' hanya diberikan saat
   // `next dev`. Tanpa ini, hidrasi gagal dan seluruh halaman mati saat
   // dikembangkan lokal — sementara CSP produksi tetap ketat.
+  //
+  // 'wasm-unsafe-eval' HANYA mengizinkan WebAssembly dikompilasi, bukan
+  // eval() JavaScript. Pembaca .rar Penilaian Tugas sendiri berjalan di
+  // pekerja dengan CSP-nya sendiri (lihat headers() di bawah).
   process.env.NODE_ENV === "production"
-    ? "script-src 'self' 'unsafe-inline'"
-    : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    ? "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'"
+    : "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   // https: dibuka untuk gambar dan video sejak soal CBT boleh membawa media.
@@ -135,6 +139,19 @@ const nextConfig: NextConfig = {
       {
         source: "/cbt/ujian",
         headers: [{ key: "Permissions-Policy", value: IZIN_PERANGKAT_UJIAN }],
+      },
+      {
+        // Pekerja pembaca RAR (Penilaian Tugas) dan HANYA dia. Pustaka unrar
+        // hasil Emscripten membangun fungsinya dengan `new Function`, yang
+        // ditolak CSP halaman. Web Worker memakai CSP dari jawaban skripnya
+        // sendiri, jadi izin 'unsafe-eval' cukup diberikan di sini: pekerja
+        // tidak dapat menyentuh DOM, kuki halaman, maupun skrip halaman, dan
+        // satu-satunya yang boleh ia ambil adalah unrar.wasm dari portal ini.
+        source: "/vendor/unrar-pekerja.js",
+        headers: [{
+          key: "Content-Security-Policy",
+          value: "default-src 'none'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; connect-src 'self'",
+        }],
       },
       {
         // Jawaban API tidak boleh singgah di cache peramban maupun CDN:

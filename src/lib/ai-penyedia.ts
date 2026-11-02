@@ -81,6 +81,18 @@ export type GambarMasuk = { jenis: string; data: string };
 export type SuaraMasuk = { jenis: string; data: string };
 
 /**
+ * Dokumen PDF yang ikut dibaca model, utuh beserta tata letak dan gambarnya.
+ * Base64 murni tanpa awalan "data:".
+ *
+ * Ketiga penyedia membaca PDF secara langsung: Gemini lewat inline_data,
+ * Claude lewat blok "document", ChatGPT lewat isian "file". Dipakai penilaian
+ * tugas: umpan balik seperti "pada halaman 7 terlampir tangkapan layar
+ * obrolan AI" hanya mungkin bila model MELIHAT halamannya, bukan hanya
+ * membaca teks yang disarikan darinya.
+ */
+export type DokumenMasuk = { jenis: "application/pdf"; data: string; nama?: string };
+
+/**
  * Penyedia mana yang dapat mendengar rekaman.
  *
  * Hanya Gemini. Rekaman ujian berbentuk WebM/Opus, dan masukan suara ChatGPT
@@ -100,6 +112,8 @@ export async function mintaJson(input: {
   gambar?: GambarMasuk[];
   /** Suara yang ikut didengar model. Hanya Gemini yang menerimanya. */
   suara?: SuaraMasuk[];
+  /** Dokumen PDF yang ikut dibaca model. Ketiga penyedia menerimanya. */
+  dokumen?: DokumenMasuk[];
   /**
    * Seberapa dalam model diminta berpikir. "low" untuk pekerjaan yang
    * berulang ribuan kali dan jawabannya pendek — memeriksa satu cuplikan
@@ -189,7 +203,14 @@ export async function mintaJson(input: {
 
 type Masukan = Parameters<typeof mintaJson>[0];
 
-function lewatKunci(k: KunciAi & { model: string }, input: Masukan): Promise<JawabanModel> {
+/**
+ * Satu permintaan lewat SATU kunci, tanpa cadangan dan tanpa pencatatan.
+ *
+ * Diekspor untuk uji: uji-penilaian-tugas.ts memanggilnya dengan kunci tiruan
+ * dan fetch tiruan, sehingga bentuk permintaan ke Gemini dan cara jawabannya
+ * dibaca diperiksa apa adanya tanpa basis data maupun jaringan.
+ */
+export function lewatKunci(k: KunciAi & { model: string }, input: Masukan): Promise<JawabanModel> {
   if (k.penyedia === "claude") return lewatClaude(k, input);
   if (k.penyedia === "openai") return lewatOpenAi(k, input);
   return lewatGemini(k, input);
@@ -270,6 +291,11 @@ async function lewatClaude(k: KunciAi & { model: string }, input: Masukan): Prom
           // dan pada pemeriksaan kamera itu berarti jawaban yang percaya diri
           // tentang gambar yang belum dibaca.
           content: [
+            ...(input.dokumen ?? []).map((d) => ({
+              type: "document" as const,
+              source: { type: "base64" as const, media_type: "application/pdf" as const, data: d.data },
+              ...(d.nama ? { title: d.nama.slice(0, 200) } : {}),
+            })),
             ...(input.gambar ?? []).map((g) => ({
               type: "image" as const,
               source: {
@@ -445,6 +471,9 @@ async function lewatGemini(k: KunciAi & { model: string }, input: Masukan): Prom
           {
             role: "user",
             parts: [
+              ...(input.dokumen ?? []).map((d) => ({
+                inline_data: { mime_type: d.jenis, data: d.data },
+              })),
               ...(input.gambar ?? []).map((g) => ({
                 inline_data: { mime_type: g.jenis, data: g.data },
               })),
@@ -551,6 +580,10 @@ async function lewatOpenAi(k: KunciAi & { model: string }, input: Masukan): Prom
           {
             role: "user",
             content: [
+              ...(input.dokumen ?? []).map((d, i) => ({
+                type: "file" as const,
+                file: { filename: d.nama || `dokumen-${i + 1}.pdf`, file_data: `data:${d.jenis};base64,${d.data}` },
+              })),
               ...(input.gambar ?? []).map((g) => ({
                 type: "image_url" as const,
                 image_url: { url: `data:${g.jenis};base64,${g.data}` },

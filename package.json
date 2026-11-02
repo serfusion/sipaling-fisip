@@ -6,7 +6,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "pekerja-rar": "esbuild vendor-src/unrar-pekerja.mjs --bundle --format=iife --platform=browser --minify --legal-comments=none --outfile=public/vendor/unrar-pekerja.js && cp node_modules/node-unrar-js/esm/js/unrar.wasm public/vendor/unrar.wasm"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
@@ -18,6 +19,7 @@
     "lottie-web": "5.13.0",
     "mammoth": "^1.12.0",
     "next": "16.2.6",
+    "node-unrar-js": "^2.0.2",
     "pdfjs-dist": "6.3.289",
     "pg": "8.20.0",
     "qrcode": "^1.5.4",

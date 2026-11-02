@@ -7602,3 +7602,77 @@ table.qt td small { font-size: 11.5px; }
   .mtk-kartu::before, .mtk-ikon path, .kunci-kabar > span { animation: none !important; }
   .kunci-lapis::after, .kunci-panel::after, .kunci-medali::before { opacity: 0; }
 }
+
+/* ============================================================
+   PENILAIAN TUGAS (AI) — menu keempat panel CBT
+   ============================================================ */
+.pt { display: grid; gap: 14px; }
+.pt .panel { border: 1px solid var(--line, #e2e8f0); border-radius: 14px; background: #fff; }
+.pt-pilih { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
+.pt-pilih label { display: grid; gap: 4px; flex: 1 1 18rem; font-size: 12px; color: var(--muted); }
+.pt-pilih select { min-height: 37px; border: 1px solid #cbd5e1; border-radius: 9px; padding: 0 10px; font-size: 13px; }
+.pt-langkah { display: grid; gap: 10px; }
+.pt-langkah h3 { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--navy); font-size: 15px; }
+.pt-langkah h3 > span { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--navy); color: #fff; font-size: 12px; }
+.pt-langkah h3 em { font-style: normal; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.pt-oke { color: #166534; background: #dcfce7; }
+.pt-kurang { color: #92400e; background: #fef3c7; }
+td.pt-oke, td.pt-kurang { font-weight: 800; text-align: center; }
+.pt-isian { display: flex; flex-wrap: wrap; gap: 10px; }
+.pt-isian label, .pt-lebar { display: grid; gap: 4px; flex: 1 1 14rem; font-size: 12px; color: var(--muted); }
+.pt-isian label.pt-pendek { flex: 0 1 6rem; }
+.pt-lebar { flex-basis: 100%; }
+.pt input:not([type="checkbox"]):not([type="file"]), .pt textarea, .pt-pustaka select {
+  width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 7px 9px; font: inherit; font-size: 13px;
+  color: #0f172a; background: #fff; }
+.pt textarea { resize: vertical; line-height: 1.45; }
+.pt-centang { display: flex !important; align-items: center; gap: 8px; flex: 1 1 14rem; }
+.pt-tombol { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pt-tombol label.btn { cursor: pointer; }
+.pt-pisah { flex: 1 1 auto; }
+.pt-pustaka { display: flex; gap: 8px; align-items: center; }
+.pt-tabel-wadah { overflow-x: auto; }
+.pt-tabel { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.pt-tabel th, .pt-tabel td { border-bottom: 1px solid #e2e8f0; padding: 6px 7px; text-align: left; vertical-align: top; }
+.pt-tabel th { background: #f8fafc; color: #334155; font-size: 11.5px; }
+.pt-tabel td small { color: var(--muted); }
+.pt-tabel input[type="number"] { width: 5.2rem; }
+.pt-mhs td:nth-child(2) input { min-width: 12rem; }
+.pt-mhs td:nth-child(3) input { min-width: 8rem; }
+.pt-mhs tr.on > td { background: #eff6ff; }
+.pt-aksi { display: flex; gap: 4px; flex-wrap: wrap; min-width: 11rem; }
+.pt-status { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700;
+  background: #f1f5f9; color: #475569; }
+.pt-status.membaca, .pt-status.menilai, .pt-status.antre { background: #dbeafe; color: #1e40af; }
+.pt-status.selesai { background: #dcfce7; color: #166534; }
+.pt-status.gagal { background: #fee2e2; color: #991b1b; }
+.pt-awas { margin-left: 6px; color: #b45309; }
+.pt-dosen { margin-left: 6px; color: #1d4ed8; }
+.pt-galat { display: block; margin-top: 3px; color: #991b1b; max-width: 22rem; }
+.pt-cip { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.pt-cip li { padding: 3px 9px; border-radius: 999px; font-size: 11.5px; background: #fef3c7; color: #92400e; }
+.pt-cip li.ada { background: #dcfce7; color: #166534; }
+.pt-jatuh { display: grid; gap: 8px; justify-items: center; text-align: center; padding: 22px 14px;
+  border: 2px dashed #cbd5e1; border-radius: 12px; background: #f8fafc; }
+.pt-jatuh b { color: var(--navy); font-size: 14px; }
+.pt-jatuh > span { color: var(--muted); font-size: 12px; }
+.pt-kemajuan { position: relative; height: 22px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
+.pt-kemajuan > div { height: 100%; background: linear-gradient(90deg, #1565d8, #0a2a5e); transition: width .4s; }
+.pt-kemajuan > span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 11.5px;
+  font-weight: 700; color: #0f172a; }
+.pt-uji { border: 1px solid #bfdbfe; background: #f8fbff; border-radius: 12px; padding: 12px 14px; display: grid; gap: 8px; }
+.pt-uji-kepala { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--navy); }
+.pt-periksa { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; font-size: 12.5px; }
+.pt-periksa li.ok { color: #166534; }
+.pt-periksa li.tidak { color: #b45309; }
+.pt-uji pre { max-height: 360px; overflow: auto; background: #0f172a; color: #e2e8f0; border-radius: 8px;
+  padding: 10px; font-size: 11.5px; white-space: pre-wrap; }
+.pt-rinci > td { background: #f8fafc; }
+.pt-rincian { display: grid; gap: 10px; padding: 6px 2px; }
+.pt-rincian-kepala { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; color: var(--navy); }
+.pt-rincian-kepala small { color: var(--muted); }
+@media (max-width: 640px) {
+  .pt-tombol .btn { flex: 1 1 auto; }
+  .pt-pisah { display: none; }
+}
