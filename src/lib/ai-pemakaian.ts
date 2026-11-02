@@ -50,7 +50,8 @@ export type CatatanPemakaian = {
 };
 
 /** Nama fitur yang dicatat — sengaja pendek; kunci setelan dibatasi 64 huruf. */
-export type FiturAi = "Buat soal" | "Penilaian esai" | "Transkrip suara" | "Pemeriksa kamera" | "Uji kunci" | "Lainnya";
+export type FiturAi =
+  | "Buat soal" | "Penilaian esai" | "Penilaian tugas" | "Transkrip suara" | "Pemeriksa kamera" | "Uji kunci" | "Lainnya";
 
 async function tambah(
   kunci: string,
@@ -187,7 +188,7 @@ export async function laporkanKunciGagal(input: {
 // batas ia dapat menghabiskan kuota sebelum transkrip suara sempat berjalan.
 // 0 atau kosong = tanpa batas. Yang dihitung: panggilan berhasil + gagal.
 
-export const FITUR_BERBATAS: FiturAi[] = ["Buat soal", "Penilaian esai", "Transkrip suara", "Pemeriksa kamera"];
+export const FITUR_BERBATAS: FiturAi[] = ["Buat soal", "Penilaian esai", "Penilaian tugas", "Transkrip suara", "Pemeriksa kamera"];
 const KUNCI_BATAS = "ai_batas";
 
 export async function bacaBatas(): Promise<Partial<Record<FiturAi, number>>> {

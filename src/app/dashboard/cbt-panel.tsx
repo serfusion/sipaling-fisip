@@ -52,6 +52,7 @@ import {
   DaftarMirip, LembarRubrik, PanelMahasiswa, PanelPenilaianEsai, PemutarRekaman,
   type PasanganMirip,
 } from "./cbt-v1";
+import { PanelPenilaianTugas } from "./penilaian-tugas";
 import { STATUS_MIRIP_LABEL, STATUS_MIRIP_WARNA, type StatusMirip } from "@/lib/mirip-jawaban";
 
 type Ujian = {
@@ -994,7 +995,7 @@ export default function CbtPanel({ role }: { role: string }) {
    * sidebar yang bertambah tiga akan dilihat juga oleh admin bagian yang tidak
    * pernah menyentuh ujian.
    */
-  const [menu, setMenu] = useState<"ujian" | "rubrik" | "mahasiswa">("ujian");
+  const [menu, setMenu] = useState<"ujian" | "rubrik" | "tugas" | "mahasiswa">("ujian");
 
   /** Rubrik yang dapat dipilih pada pengaturan ujian. */
   const [daftarRubrik, setDaftarRubrik] = useState<Array<{ id: number; nama: string; kriteria: unknown[] }>>([]);
@@ -2417,7 +2418,7 @@ export default function CbtPanel({ role }: { role: string }) {
         <p className="section-eyebrow">{pemantau ? "PENGAJAR & ADMIN" : "PENGAJAR"}</p>
         <h2 className="dsh-title">Ujian Online (CBT)</h2>
 
-        {/* ---------- TIGA MENU, SATU TEMPAT ----------
+        {/* ---------- EMPAT MENU, SATU TEMPAT ----------
             Penilaian esai dan daftar peserta hanya berarti bagi CBT, jadi
             keduanya duduk di sini, bukan sebagai dua menu baru di sidebar
             dashboard yang juga dilihat admin bagian yang tidak pernah
@@ -2429,12 +2430,16 @@ export default function CbtPanel({ role }: { role: string }) {
           <button type="button" className={menu === "rubrik" ? "on" : ""} onClick={() => setMenu("rubrik")}>
             Rubrik penilaian
           </button>
+          <button type="button" className={menu === "tugas" ? "on" : ""} onClick={() => setMenu("tugas")}>
+            Penilaian tugas (AI)
+          </button>
           <button type="button" className={menu === "mahasiswa" ? "on" : ""} onClick={() => setMenu("mahasiswa")}>
             Data mahasiswa
           </button>
         </div>
 
         {menu === "rubrik" && <PanelPenilaianEsai />}
+        {menu === "tugas" && <PanelPenilaianTugas />}
         {menu === "mahasiswa" && <PanelMahasiswa bolehKelola={pemantau} />}
 
         {menu === "ujian" && (<>

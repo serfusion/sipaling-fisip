@@ -54,12 +54,64 @@ async function mekarkan(data: Uint8Array, metode: number): Promise<Uint8Array> {
   return new Uint8Array(await new Response(aliran).arrayBuffer());
 }
 
+/** Bilangan 64-bit kecil (cukup untuk arsip di bawah 9 PB) sebagai number. */
+function u64(dv: DataView, pos: number): number {
+  return Number(dv.getBigUint64(pos, true));
+}
+
+/**
+ * Letak dan jumlah isi direktori pusat, termasuk arsip ZIP64.
+ *
+ * Arsip yang diunduh dari Google Drive, dan arsip di atas 4 GB atau 65.535
+ * berkas, memakai perluasan ZIP64: angka 32-bit di ekor arsip diisi
+ * 0xFFFFFFFF dan angka sebenarnya ditaruh di catatan ZIP64 tepat sebelumnya.
+ */
+function direktoriPusat(dv: DataView, akhir: number): { jumlah: number; pos: number } {
+  let jumlah = dv.getUint16(akhir + 10, true);
+  let pos = dv.getUint32(akhir + 16, true);
+  const lokator = akhir - 20;
+  if ((jumlah === 0xffff || pos === 0xffffffff) && lokator >= 0 && dv.getUint32(lokator, true) === 0x07064b50) {
+    const akhir64 = u64(dv, lokator + 8);
+    if (akhir64 + 56 <= dv.byteLength && dv.getUint32(akhir64, true) === 0x06064b50) {
+      jumlah = u64(dv, akhir64 + 32);
+      pos = u64(dv, akhir64 + 48);
+    }
+  }
+  return { jumlah, pos };
+}
+
+/** Angka ZIP64 pada bidang tambahan 0x0001, menurut urutan bakunya. */
+function bacaTambahan64(
+  dv: DataView,
+  awal: number,
+  panjang: number,
+  butuh: { asli: boolean; mampat: boolean; lokal: boolean },
+): { asli?: number; mampat?: number; lokal?: number } {
+  let p = awal;
+  while (p + 4 <= awal + panjang) {
+    const id = dv.getUint16(p, true);
+    const ukuran = dv.getUint16(p + 2, true);
+    if (id === 0x0001) {
+      let q = p + 4;
+      const hasil: { asli?: number; mampat?: number; lokal?: number } = {};
+      if (butuh.asli && q + 8 <= p + 4 + ukuran) { hasil.asli = u64(dv, q); q += 8; }
+      if (butuh.mampat && q + 8 <= p + 4 + ukuran) { hasil.mampat = u64(dv, q); q += 8; }
+      if (butuh.lokal && q + 8 <= p + 4 + ukuran) { hasil.lokal = u64(dv, q); }
+      return hasil;
+    }
+    p += 4 + ukuran;
+  }
+  return {};
+}
+
 /**
  * Buka arsip zip dan kembalikan berkas yang namanya lolos saringan.
  *
  * Saringan diberikan pemanggilnya supaya arsip besar tidak perlu dimekarkan
  * seluruhnya: sebuah .pptx berisi gambar-gambar yang tidak ada gunanya di
  * sini, dan memekarkannya hanya menghabiskan memori peramban.
+ *
+ * Isi yang tersandi (zip berkata sandi) dilewati, bukan menggugurkan arsip.
  */
 export async function bacaZip(
   sumber: ArrayBuffer,
@@ -70,23 +122,35 @@ export async function bacaZip(
   const akhir = cariAkhir(dv);
   if (akhir < 0) throw new Error("Berkasnya bukan arsip zip yang sah.");
 
-  const jumlah = dv.getUint16(akhir + 10, true);
-  let pos = dv.getUint32(akhir + 16, true);
+  const { jumlah } = direktoriPusat(dv, akhir);
+  let { pos } = direktoriPusat(dv, akhir);
 
   const hasil: IsiArsip[] = [];
+  let galatPertama: unknown = null;
   for (let i = 0; i < jumlah; i += 1) {
     if (pos + 46 > dv.byteLength || dv.getUint32(pos, true) !== TANDA_PUSAT) break;
 
+    const bendera = dv.getUint16(pos + 8, true);
     const metode = dv.getUint16(pos + 10, true);
-    const ukuranMampat = dv.getUint32(pos + 20, true);
+    let ukuranMampat = dv.getUint32(pos + 20, true);
+    const ukuranAsli32 = dv.getUint32(pos + 24, true);
     const panjangNama = dv.getUint16(pos + 28, true);
     const panjangTambahan = dv.getUint16(pos + 30, true);
     const panjangKomentar = dv.getUint16(pos + 32, true);
-    const awalLokal = dv.getUint32(pos + 42, true);
+    let awalLokal = dv.getUint32(pos + 42, true);
     const nama = new TextDecoder().decode(bita.subarray(pos + 46, pos + 46 + panjangNama));
+    if (ukuranMampat === 0xffffffff || awalLokal === 0xffffffff || ukuranAsli32 === 0xffffffff) {
+      const t = bacaTambahan64(dv, pos + 46 + panjangNama, panjangTambahan, {
+        asli: ukuranAsli32 === 0xffffffff, mampat: ukuranMampat === 0xffffffff, lokal: awalLokal === 0xffffffff,
+      });
+      if (t.mampat !== undefined) ukuranMampat = t.mampat;
+      if (t.lokal !== undefined) awalLokal = t.lokal;
+    }
     pos += 46 + panjangNama + panjangTambahan + panjangKomentar;
 
     if (!saring(nama)) continue;
+    // Bit 0 = tersandi. Isinya tidak dapat dibaca tanpa sandi.
+    if (bendera & 1) continue;
 
     // Panjang nama dan bagian tambahan pada KEPALA LOKAL bisa berbeda dari
     // yang tercatat di direktori pusat, jadi keduanya dibaca ulang di sana.
@@ -102,8 +166,9 @@ export async function bacaZip(
       // Satu berkas rusak di dalam arsip tidak boleh menggugurkan sisanya —
       // satu salindia yang gagal dibaca jauh lebih baik daripada seluruh
       // presentasi yang ditolak.
-      if (hasil.length === 0 && i === jumlah - 1) throw galat;
+      galatPertama ??= galat;
     }
   }
+  if (hasil.length === 0 && galatPertama) throw galatPertama;
   return hasil;
 }

@@ -37,6 +37,7 @@ function fiturMenyala(penyedia: string[]) {
   return [
     { nama: "Buat soal otomatis", nyala: ada },
     { nama: "Penilaian esai dengan AI", nyala: ada },
+    { nama: "Penilaian tugas & laporan PDF", nyala: ada },
     { nama: "Pemeriksa cuplikan kamera", nyala: ada },
     {
       nama: "Transkrip & deteksi suara mencurigakan",
