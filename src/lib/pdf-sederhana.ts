@@ -10,8 +10,13 @@
 //
 // Yang ditulis sengaja sempit, dan cukup untuk sebuah laporan:
 //   judul, paragraf (dengan **tebal** dan *miring*), garis, daftar berbutir
-//   atau bernomor, tabel bergaris dengan baris kepala, dan kaki halaman
-//   bernomor "Halaman 1 dari 2".
+//   atau bernomor, tabel bergaris dengan baris kepala, kotak sorot, pita
+//   kepala halaman, dan kaki halaman bernomor "Halaman 1 dari 2".
+//
+// Tampilannya (v54) dibuat resmi dan enak dibaca: pita biru tua berisi kode
+// kiriman di puncak tiap halaman, judul biru tua dengan bilah emas, tabel
+// berkepala biru tua dengan baris berselang, nilai akhir di dalam kotak
+// sorot, dan garis emas tipis di atas kaki halaman.
 //
 // HURUFNYA HELVETICA BAWAAN PDF. Empat huruf standar (biasa, tebal, miring,
 // tebal-miring) dijamin ada di setiap pembaca PDF, jadi tidak ada berkas huruf
@@ -28,7 +33,19 @@
 /** Satu blok isi laporan. Teks boleh memuat **tebal** dan *miring*. */
 export type BlokPdf =
   | { jenis: "judul"; teks: string; tingkat?: 1 | 2 | 3 }
-  | { jenis: "paragraf"; teks: string; ukuran?: number; tebal?: boolean; menjorok?: number }
+  | {
+      jenis: "paragraf";
+      teks: string;
+      ukuran?: number;
+      tebal?: boolean;
+      menjorok?: number;
+      /**
+       * Paragraf yang disorot dalam kotak berwarna: "nilai" (nilai akhir),
+       * "bahaya" (indikasi plagiasi, nilai kritis), "info". Paragraf sorot
+       * berjenis sama yang berurutan digambar dalam SATU kotak.
+       */
+      sorot?: JenisSorot;
+    }
   | { jenis: "garis" }
   | { jenis: "jarak"; pt: number }
   | { jenis: "daftar"; butir: string[]; bernomor?: boolean; ukuran?: number }
@@ -43,6 +60,8 @@ export type BlokPdf =
       kolomTebal?: number[];
       /** Kolom yang isinya rata tengah, mis. [2] untuk skor. */
       kolomTengah?: number[];
+      /** Kolom label yang diberi latar lembut, mis. [0] pada tabel informasi. */
+      kolomLabel?: number[];
       ukuran?: number;
     };
 
@@ -51,7 +70,15 @@ export type OpsiPdf = {
   penulis?: string;
   /** Teks kecil di kiri kaki tiap halaman. */
   kaki?: string;
+  /**
+   * Pita kepala di puncak tiap halaman: teks kiri (mis. "LAPORAN PENILAIAN
+   * TUGAS") dan kanan (mis. kode kiriman SIPALING-TUGAS-XXXXXXXX), supaya
+   * halaman mana pun yang tercecer tetap dapat dilacak ke kirimannya.
+   */
+  kepala?: { kiri: string; kanan?: string };
 };
+
+export type JenisSorot = "nilai" | "bahaya" | "info";
 
 // ------------------------------------------------------------
 // UKURAN HURUF HELVETICA (per 1000 satuan), kode WinAnsi 32..255
@@ -254,6 +281,49 @@ export function bungkus(teks: string, lebar: number, ukuran: number, dasar: Part
 }
 
 // ------------------------------------------------------------
+// WARNA
+//
+// Palet laporan: biru tua dan emas, tenang dan resmi. Biru tuanya sama dengan
+// biru situs CBT, supaya laporan yang dibuka mahasiswa dari papan nilai terasa
+// satu keluarga dengan halaman tempat ia mengunduhnya.
+// ------------------------------------------------------------
+
+type Rgb = readonly [number, number, number];
+
+const hex = (h: string): Rgb => [
+  parseInt(h.slice(1, 3), 16) / 255,
+  parseInt(h.slice(3, 5), 16) / 255,
+  parseInt(h.slice(5, 7), 16) / 255,
+];
+
+export const WARNA = {
+  /** Judul, kepala tabel, pita kepala halaman. */
+  aksen: hex("#1E2D6B"),
+  /** Garis hias di bawah pita dan judul utama. */
+  emas: hex("#C9A227"),
+  /** Teks isi: hampir hitam, lebih lembut daripada hitam pekat. */
+  tinta: hex("#1F2937"),
+  /** Kaki halaman. */
+  redup: hex("#6B7280"),
+  /** Garis tabel. */
+  garis: hex("#D5DBE7"),
+  /** Garis pemisah di bawah judul bagian. */
+  pemisah: hex("#BFC9DD"),
+  /** Baris tabel berselang. */
+  belang: hex("#F5F7FB"),
+  /** Kolom label tabel informasi. */
+  label: hex("#EEF2FA"),
+  putih: [1, 1, 1] as Rgb,
+} as const;
+
+/** Kotak sorot: latar, bilah kiri, dan warna teksnya. */
+const SOROT: Record<JenisSorot, { latar: Rgb; bilah: Rgb; teks: Rgb }> = {
+  nilai: { latar: hex("#EEF2FA"), bilah: hex("#1E2D6B"), teks: hex("#1E2D6B") },
+  bahaya: { latar: hex("#FDECEC"), bilah: hex("#B91C1C"), teks: hex("#7F1D1D") },
+  info: { latar: hex("#FFF8E6"), bilah: hex("#C9A227"), teks: hex("#5C4813") },
+};
+
+// ------------------------------------------------------------
 // TATA LETAK
 // ------------------------------------------------------------
 
@@ -261,9 +331,10 @@ const LEBAR_KERTAS = 595.28; // A4
 const TINGGI_KERTAS = 841.89;
 const TEPI_KIRI = 62;
 const TEPI_KANAN = 62;
-const TEPI_ATAS = 64;
-const TEPI_BAWAH = 62;
+const TEPI_ATAS = 66;
+const TEPI_BAWAH = 64;
 const LEBAR_ISI = LEBAR_KERTAS - TEPI_KIRI - TEPI_KANAN;
+const TINGGI_PITA = 30;
 
 const UKURAN_DASAR = 10.5;
 const UKURAN_JUDUL: Record<1 | 2 | 3, number> = { 1: 15.5, 2: 12.5, 3: 11 };
@@ -280,6 +351,7 @@ function lolosPdf(s: string) {
 }
 
 const angka = (n: number) => (Math.round(n * 100) / 100).toString();
+const rgb = (w: Rgb) => `${angka(w[0])} ${angka(w[1])} ${angka(w[2])}`;
 
 class Penata {
   halaman: string[][] = [];
@@ -305,7 +377,20 @@ class Penata {
     return this.y - TEPI_BAWAH;
   }
 
-  tulisBaris(baris: BarisTeks, x: number, yGaris: number, ukuran: number, rata: "kiri" | "tengah" = "kiri", lebar = 0) {
+  /**
+   * Tulis satu baris bergaya. Warnanya selalu dipasang di dalam objek
+   * teksnya sendiri: warna isian adalah bagian dari keadaan grafis PDF dan
+   * terbawa ke teks berikutnya bila tidak disetel ulang.
+   */
+  tulisBaris(
+    baris: BarisTeks,
+    x: number,
+    yGaris: number,
+    ukuran: number,
+    rata: "kiri" | "tengah" = "kiri",
+    lebar = 0,
+    warna: Rgb = WARNA.tinta,
+  ) {
     let xx = x;
     if (rata === "tengah") {
       const total = baris.reduce((n, p) => n + lebarTeks(p.teks, ukuran, p.tebal), 0);
@@ -313,34 +398,34 @@ class Penata {
     }
     for (const p of baris) {
       if (!p.teks) continue;
-      this.isi.push(`BT ${namaHuruf(p)} ${angka(ukuran)} Tf ${angka(xx)} ${angka(yGaris)} Td (${lolosPdf(p.teks)}) Tj ET`);
+      this.isi.push(`BT ${rgb(warna)} rg ${namaHuruf(p)} ${angka(ukuran)} Tf ${angka(xx)} ${angka(yGaris)} Td (${lolosPdf(p.teks)}) Tj ET`);
       xx += lebarTeks(p.teks, ukuran, p.tebal);
     }
   }
 
-  garis(x1: number, y1: number, x2: number, y2: number, tebal = 0.6, abu = 0) {
-    this.isi.push(`${angka(abu)} G ${angka(tebal)} w ${angka(x1)} ${angka(y1)} m ${angka(x2)} ${angka(y2)} l S 0 G`);
+  garis(x1: number, y1: number, x2: number, y2: number, tebal = 0.6, warna: Rgb = WARNA.garis) {
+    this.isi.push(`${rgb(warna)} RG ${angka(tebal)} w ${angka(x1)} ${angka(y1)} m ${angka(x2)} ${angka(y2)} l S`);
   }
 
-  kotak(x: number, y: number, w: number, h: number, isiAbu: number | null) {
-    if (isiAbu !== null) this.isi.push(`${angka(isiAbu)} g ${angka(x)} ${angka(y)} ${angka(w)} ${angka(h)} re f 0 g`);
-    this.isi.push(`0.6 w ${angka(x)} ${angka(y)} ${angka(w)} ${angka(h)} re S`);
+  kotak(x: number, y: number, w: number, h: number, isi: Rgb | null, tepi: Rgb | null = WARNA.garis, tebal = 0.5) {
+    if (isi) this.isi.push(`${rgb(isi)} rg ${angka(x)} ${angka(y)} ${angka(w)} ${angka(h)} re f`);
+    if (tepi) this.isi.push(`${rgb(tepi)} RG ${angka(tebal)} w ${angka(x)} ${angka(y)} ${angka(w)} ${angka(h)} re S`);
   }
 
   /** Paragraf atau judul yang dibungkus selebar isi. */
-  teks(teks: string, ukuran: number, opsi: { tebal?: boolean; menjorok?: number; jarakBawah?: number } = {}) {
+  teks(teks: string, ukuran: number, opsi: { tebal?: boolean; menjorok?: number; jarakBawah?: number; warna?: Rgb } = {}) {
     const menjorok = opsi.menjorok ?? 0;
-    const tinggi = ukuran * 1.32;
+    const tinggi = ukuran * 1.34;
     for (const baris of bungkus(teks, LEBAR_ISI - menjorok, ukuran, { tebal: opsi.tebal })) {
       this.pastikan(tinggi);
       this.y -= tinggi;
-      this.tulisBaris(baris, TEPI_KIRI + menjorok, this.y + ukuran * 0.28, ukuran);
+      this.tulisBaris(baris, TEPI_KIRI + menjorok, this.y + ukuran * 0.28, ukuran, "kiri", 0, opsi.warna);
     }
     this.y -= opsi.jarakBawah ?? 0;
   }
 
   daftar(butir: string[], bernomor: boolean, ukuran: number) {
-    const tinggi = ukuran * 1.32;
+    const tinggi = ukuran * 1.34;
     const menjorok = 16;
     butir.forEach((b, i) => {
       const tanda = bernomor ? `${i + 1}.` : "\u0095";
@@ -349,12 +434,43 @@ class Penata {
         this.pastikan(tinggi);
         this.y -= tinggi;
         const yTeks = this.y + ukuran * 0.28;
-        if (j === 0) this.tulisBaris([{ teks: tanda, tebal: false, miring: false }], TEPI_KIRI + 3, yTeks, ukuran);
+        if (j === 0) {
+          this.tulisBaris([{ teks: tanda, tebal: bernomor, miring: false }], TEPI_KIRI + 3, yTeks, ukuran, "kiri", 0, WARNA.aksen);
+        }
         this.tulisBaris(isi, TEPI_KIRI + menjorok + 4, yTeks, ukuran);
       });
-      this.y -= 2;
+      this.y -= 2.5;
     });
     this.y -= 4;
+  }
+
+  /**
+   * Kotak sorot: latar lembut dengan bilah warna di kiri. Beberapa paragraf
+   * sekaligus (nilai akhir dan predikat) masuk satu kotak, satu per baris.
+   */
+  sorot(paragraf: string[], jenis: JenisSorot) {
+    const w = SOROT[jenis];
+    const ukuran = UKURAN_DASAR + 0.5;
+    const tinggi = ukuran * 1.38;
+    const pad = 8;
+    const bilah = 3.5;
+    const baris = paragraf.flatMap((t) => bungkus(t, LEBAR_ISI - pad * 2 - bilah, ukuran));
+    const h = baris.length * tinggi + pad * 2 - 3;
+    if (h > TINGGI_KERTAS - TEPI_ATAS - TEPI_BAWAH - 40) {
+      // Terlalu tinggi untuk satu kotak: ditulis biasa saja.
+      for (const t of paragraf) this.teks(t, UKURAN_DASAR, { jarakBawah: 5 });
+      return;
+    }
+    this.pastikan(h + 6);
+    this.y -= 2;
+    const yBawah = this.y - h;
+    this.kotak(TEPI_KIRI, yBawah, LEBAR_ISI, h, w.latar, null);
+    this.kotak(TEPI_KIRI, yBawah, bilah, h, w.bilah, null);
+    baris.forEach((b, i) => {
+      const yTeks = this.y - pad - tinggi * (i + 1) + ukuran * 0.42;
+      this.tulisBaris(b, TEPI_KIRI + bilah + pad, yTeks, ukuran, "kiri", 0, w.teks);
+    });
+    this.y = yBawah - 9;
   }
 
   tabel(b: Extract<BlokPdf, { jenis: "tabel" }>) {
@@ -365,6 +481,7 @@ class Penata {
     const kolom = b.lebar.map((x) => (x / jumlahLebar) * LEBAR_ISI);
     const tebalKolom = new Set(b.kolomTebal ?? []);
     const tengahKolom = new Set(b.kolomTengah ?? []);
+    const labelKolom = new Set(b.kolomLabel ?? []);
 
     const siapkan = (baris: string[], kepala: boolean) =>
       kolom.map((w, i) => bungkus(String(baris[i] ?? ""), w - pad * 2, ukuran, { tebal: kepala || tebalKolom.has(i) }));
@@ -372,16 +489,20 @@ class Penata {
     const kepala = b.kepala && b.baris.length > 0 ? siapkan(b.baris[0], true) : null;
     const tinggiBaris = (sel: BarisTeks[][]) => Math.max(1, ...sel.map((s) => s.length)) * tinggi + pad * 2;
 
-    const gambarBaris = (sel: BarisTeks[][], dari: number, sampai: number, latar: boolean) => {
+    const gambarBaris = (sel: BarisTeks[][], dari: number, sampai: number, jenis: "kepala" | "isi", belang: boolean) => {
       const jumlah = sampai - dari;
       const h = Math.max(1, jumlah) * tinggi + pad * 2;
       let x = TEPI_KIRI;
       const yBawah = this.y - h;
       kolom.forEach((w, i) => {
-        this.kotak(x, yBawah, w, h, latar ? 0.92 : null);
+        const latar = jenis === "kepala" ? WARNA.aksen : labelKolom.has(i) ? WARNA.label : belang ? WARNA.belang : null;
+        this.kotak(x, yBawah, w, h, latar, jenis === "kepala" ? WARNA.aksen : WARNA.garis, 0.5);
         sel[i].slice(dari, sampai).forEach((garis, j) => {
           const yTeks = this.y - pad - tinggi * (j + 1) + ukuran * 0.3;
-          this.tulisBaris(garis, x + pad, yTeks, ukuran, tengahKolom.has(i) ? "tengah" : "kiri", w - pad * 2);
+          this.tulisBaris(
+            garis, x + pad, yTeks, ukuran, tengahKolom.has(i) ? "tengah" : "kiri", w - pad * 2,
+            jenis === "kepala" ? WARNA.putih : labelKolom.has(i) ? WARNA.aksen : WARNA.tinta,
+          );
         });
         x += w;
       });
@@ -391,13 +512,14 @@ class Penata {
     const tulisKepala = () => {
       if (!kepala) return;
       this.pastikan(tinggiBaris(kepala) + tinggi * 2 + pad * 2);
-      gambarBaris(kepala, 0, Math.max(1, ...kepala.map((s) => s.length)), true);
+      gambarBaris(kepala, 0, Math.max(1, ...kepala.map((s) => s.length)), "kepala", false);
     };
 
     tulisKepala();
-    for (const baris of b.baris.slice(kepala ? 1 : 0)) {
+    b.baris.slice(kepala ? 1 : 0).forEach((baris, urut) => {
       const sel = siapkan(baris, false);
       const total = Math.max(1, ...sel.map((s) => s.length));
+      const belang = urut % 2 === 1;
       let dari = 0;
       // Baris yang tidak muat dipindah utuh ke halaman berikutnya bila
       // memungkinkan; baris yang lebih tinggi dari satu halaman dipenggal.
@@ -408,39 +530,58 @@ class Penata {
       while (dari < total) {
         const muat = Math.max(1, Math.floor((this.sisa - pad * 2) / tinggi));
         const sampai = Math.min(total, dari + muat);
-        gambarBaris(sel, dari, sampai, false);
+        gambarBaris(sel, dari, sampai, "isi", belang);
         dari = sampai;
         if (dari < total) {
           this.halamanBaru();
           tulisKepala();
         }
       }
-    }
-    this.y -= 8;
+    });
+    this.y -= 9;
   }
 }
 
 /** Tata letak seluruh blok menjadi daftar perintah gambar per halaman. */
 function tataLetak(blok: BlokPdf[]): string[][] {
   const p = new Penata();
-  for (const b of blok) {
+  for (let i = 0; i < blok.length; i += 1) {
+    const b = blok[i];
     switch (b.jenis) {
       case "judul": {
         const tingkat = b.tingkat ?? 2;
         const ukuran = UKURAN_JUDUL[tingkat];
         // Judul tidak boleh tertinggal sendirian di dasar halaman.
         if (p.sisa < ukuran * 1.4 + 60) p.halamanBaru();
-        p.y -= tingkat === 1 ? 0 : 8;
-        p.teks(b.teks, ukuran, { tebal: true, jarakBawah: tingkat === 1 ? 2 : 3 });
+        p.y -= tingkat === 1 ? 0 : 10;
+        p.teks(b.teks, ukuran, { tebal: true, jarakBawah: tingkat === 1 ? 3 : 3, warna: WARNA.aksen });
+        if (tingkat === 1) {
+          // Bilah emas pendek di bawah judul utama.
+          p.y -= 1;
+          p.garis(TEPI_KIRI, p.y, TEPI_KIRI + 48, p.y, 2.2, WARNA.emas);
+          p.y -= 9;
+        }
         break;
       }
-      case "paragraf":
-        p.teks(b.teks, b.ukuran ?? UKURAN_DASAR, { tebal: b.tebal, menjorok: b.menjorok, jarakBawah: 5 });
+      case "paragraf": {
+        if (b.sorot) {
+          const kumpul = [b.teks];
+          while (i + 1 < blok.length) {
+            const n = blok[i + 1];
+            if (n.jenis !== "paragraf" || n.sorot !== b.sorot) break;
+            kumpul.push(n.teks);
+            i += 1;
+          }
+          p.sorot(kumpul, b.sorot);
+        } else {
+          p.teks(b.teks, b.ukuran ?? UKURAN_DASAR, { tebal: b.tebal, menjorok: b.menjorok, jarakBawah: 5 });
+        }
         break;
+      }
       case "garis":
         p.pastikan(10);
-        p.y -= 3;
-        p.garis(TEPI_KIRI, p.y, LEBAR_KERTAS - TEPI_KANAN, p.y, 0.8, 0.45);
+        p.y -= 2;
+        p.garis(TEPI_KIRI, p.y, LEBAR_KERTAS - TEPI_KANAN, p.y, 0.7, WARNA.pemisah);
         p.y -= 9;
         break;
       case "jarak":
@@ -478,6 +619,50 @@ function tanggalPdf(d: Date) {
     `${dua(d.getUTCHours())}${dua(d.getUTCMinutes())}${dua(d.getUTCSeconds())}Z`;
 }
 
+/** Potong teks WinAnsi supaya muat selebar ruang, dengan elipsis bila dipotong. */
+function muatkan(teks: string, ukuran: number, ruang: number, tebal = false) {
+  let t = winAnsi(teks);
+  if (lebarTeks(t, ukuran, tebal) <= ruang) return t;
+  while (t.length > 3 && lebarTeks(t + "\u0085", ukuran, tebal) > ruang) t = t.slice(0, -1);
+  return t.trimEnd() + "\u0085";
+}
+
+/** Pita kepala, garis kaki, nomor halaman, dan teks kaki satu halaman. */
+function hiasan(nomor: number, jumlah: number, opsi: OpsiPdf): string[] {
+  const keluar: string[] = [];
+
+  if (opsi.kepala) {
+    const yPita = TINGGI_KERTAS - TINGGI_PITA;
+    keluar.push(`${rgb(WARNA.aksen)} rg 0 ${angka(yPita)} ${angka(LEBAR_KERTAS)} ${TINGGI_PITA} re f`);
+    keluar.push(`${rgb(WARNA.emas)} rg 0 ${angka(yPita - 1.6)} ${angka(LEBAR_KERTAS)} 1.6 re f`);
+    const yTeks = yPita + 11;
+    const ukuran = 8.5;
+    let ruangKiri = LEBAR_ISI;
+    if (opsi.kepala.kanan) {
+      const kanan = muatkan(opsi.kepala.kanan, ukuran, LEBAR_ISI / 2, true);
+      const lebar = lebarTeks(kanan, ukuran, true);
+      ruangKiri = LEBAR_ISI - lebar - 18;
+      keluar.push(`BT ${rgb(WARNA.putih)} rg /F2 ${ukuran} Tf ${angka(LEBAR_KERTAS - TEPI_KANAN - lebar)} ${angka(yTeks)} Td (${lolosPdf(kanan)}) Tj ET`);
+    }
+    // Huruf kapital yang direnggangkan sedikit. Tc adalah keadaan teks yang
+    // terbawa ke objek teks berikutnya, jadi dikembalikan ke 0 sebelum ET.
+    const kiri = muatkan(opsi.kepala.kiri, ukuran, ruangKiri * 0.92, true);
+    keluar.push(`BT ${rgb(WARNA.putih)} rg 0.6 Tc /F2 ${ukuran} Tf ${TEPI_KIRI} ${angka(yTeks)} Td (${lolosPdf(kiri)}) Tj 0 Tc ET`);
+  }
+
+  const ukuran = 7.5;
+  const y = TEPI_BAWAH - 30;
+  keluar.push(`${rgb(WARNA.emas)} RG 0.6 w ${TEPI_KIRI} ${angka(y + 11)} m ${angka(LEBAR_KERTAS - TEPI_KANAN)} ${angka(y + 11)} l S`);
+  const kanan = winAnsi(`Halaman ${nomor} dari ${jumlah}`);
+  const xKanan = LEBAR_KERTAS - TEPI_KANAN - lebarTeks(kanan, ukuran);
+  keluar.push(`BT ${rgb(WARNA.redup)} rg /F1 ${ukuran} Tf ${angka(xKanan)} ${y} Td (${lolosPdf(kanan)}) Tj ET`);
+  if (opsi.kaki) {
+    const kaki = muatkan(opsi.kaki, ukuran, xKanan - TEPI_KIRI - 16);
+    keluar.push(`BT ${rgb(WARNA.redup)} rg /F3 ${ukuran} Tf ${TEPI_KIRI} ${y} Td (${lolosPdf(kaki)}) Tj ET`);
+  }
+  return keluar;
+}
+
 /**
  * Rakit berkas PDF dari daftar blok.
  *
@@ -489,21 +674,10 @@ export function buatPdf(blok: BlokPdf[], opsi: OpsiPdf = {}, waktu = new Date())
   const halaman = tataLetak(blok);
   const n = halaman.length;
 
-  // Kaki halaman ditulis sesudah tata letak, karena jumlah halamannya baru
-  // diketahui di sini.
+  // Pita kepala dan kaki ditulis sesudah tata letak, karena jumlah halamannya
+  // baru diketahui di sini.
   halaman.forEach((isi, i) => {
-    const ukuran = 7.5;
-    const y = TEPI_BAWAH - 26;
-    const kanan = winAnsi(`Halaman ${i + 1} dari ${n}`);
-    const xKanan = LEBAR_KERTAS - TEPI_KANAN - lebarTeks(kanan, ukuran);
-    isi.push(`0.45 g BT /F1 ${ukuran} Tf ${angka(xKanan)} ${y} Td (${lolosPdf(kanan)}) Tj ET 0 g`);
-    if (opsi.kaki) {
-      let kaki = winAnsi(opsi.kaki);
-      const ruang = xKanan - TEPI_KIRI - 16;
-      while (kaki.length > 3 && lebarTeks(kaki, ukuran) > ruang) kaki = kaki.slice(0, -2);
-      if (kaki !== winAnsi(opsi.kaki)) kaki = kaki.trimEnd() + "\u0085";
-      isi.push(`0.45 g BT /F3 ${ukuran} Tf ${TEPI_KIRI} ${y} Td (${lolosPdf(kaki)}) Tj ET 0 g`);
-    }
+    isi.push(...hiasan(i + 1, n, opsi));
   });
 
   const objek: string[] = [];
@@ -515,7 +689,7 @@ export function buatPdf(blok: BlokPdf[], opsi: OpsiPdf = {}, waktu = new Date())
   huruf.forEach((nama, i) => {
     objek[3 + i] = `<< /Type /Font /Subtype /Type1 /BaseFont /${nama} /Encoding /WinAnsiEncoding >>`;
   });
-  objek[7] = `<< /Producer ${untaiInfo("SiPaling FISIP")} /CreationDate (${tanggalPdf(waktu)})` +
+  objek[7] = `<< /Producer ${untaiInfo("SiPaling FISIP (Software SPF)")} /CreationDate (${tanggalPdf(waktu)})` +
     (opsi.judul ? ` /Title ${untaiInfo(opsi.judul)}` : "") +
     (opsi.penulis ? ` /Author ${untaiInfo(opsi.penulis)}` : "") + " >>";
   halaman.forEach((isi, i) => {

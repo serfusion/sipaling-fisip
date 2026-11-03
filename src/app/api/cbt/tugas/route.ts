@@ -2,15 +2,20 @@
 // CBT — PENILAIAN TUGAS DENGAN AI
 //
 // GET              penyedia AI mana yang siap
-// POST aksi=nilai  satu kiriman tugas (teks + lampiran) → skor & umpan balik
+// POST aksi=nilai  satu kiriman TERSIMPAN (id) → gerbang plagiasi → skor &
+//                  umpan balik AI → disimpan
 // POST aksi=rubrik teks dokumen rubrik → rubrik tugas tersusun
 //
-// YANG DIKIRIM KE SINI ADALAH ISI YANG SUDAH DISARIKAN, BUKAN ARSIPNYA. Zip,
-// rar, Word, Excel, dan PDF mahasiswa dibongkar di peramban dosen
-// (src/lib/tugas-berkas.ts). Yang berangkat hanya teksnya ditambah, bila
-// muat, PDF asli atau gambar halamannya untuk dibaca model. Arsip ratusan MB
-// tidak pernah melewati batas unggah fungsi serverless, dan tidak satu pun
-// berkas mahasiswa disimpan di server.
+// Sejak v54 yang dinilai adalah kiriman yang tersimpan di server sebagai
+// Markdown (dikumpulkan peserta lewat CBT atau diimpor pengajar). Peramban
+// pengajar hanya menyebut id-nya, ditambah lampiran visual BILA berkas aslinya
+// kebetulan masih terbuka di perambannya (impor dari Drive pada sesi yang
+// sama): PDF utuh atau gambar halaman, untuk dibaca model. Lampiran itu
+// dipakai untuk satu permintaan ini saja dan tidak disimpan.
+//
+// GERBANG PLAGIASI dijalankan lebih dulu (src/lib/tugas-papan.ts): kiriman
+// yang terindikasi plagiasi ditahan atau dinolkan menurut pengaturan tugas,
+// TANPA memanggil model, sehingga kuota AI tidak terpakai untuknya.
 //
 // Satu permintaan = satu mahasiswa. Peramban yang mengatur antreannya
 // (dua sekaligus), sehingga empat puluh mahasiswa tidak pernah menjadi satu
@@ -22,7 +27,16 @@ import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { bolehCbt } from "@/lib/cbt";
 import { GalatModel, penyediaTersedia, type DokumenMasuk, type GambarMasuk } from "@/lib/ai-penyedia";
 import { MAKS_TEKS_TUGAS, nilaiTugas, susunRubrikDenganAi } from "@/lib/tugas-nilai";
-import { periksaRubrikTugas, rapikanRubrikTugas } from "@/lib/tugas-rubrik";
+import { periksaRubrikTugas } from "@/lib/tugas-rubrik";
+import { TEMPLATE_BAWAAN, analisisTemplate, uraiMarkdown } from "@/lib/tugas-template";
+import { gerbangPlagiasi, rapikanTindakan } from "@/lib/tugas-papan";
+import { bolehUbah } from "@/lib/cbt";
+import { db } from "@/db";
+import { cbtTaskSubmissions } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import {
+  kepemilikan, kirimanDariId, kirimanKeKlien, rubrikDari, simpanHasil, tugasDariId,
+} from "@/lib/tugas-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -74,15 +88,32 @@ export async function POST(request: Request) {
     const batas = rateLimit({ request, name: "tugas-nilai", limit: 600, windowMs: 60 * 60_000 });
     if (!batas.ok) return tooManyRequests(batas.retryAfter);
 
-    const rubrik = rapikanRubrikTugas(body.rubrik);
+    const k = await kirimanDariId(Number(body.kiriman));
+    if (!k) return tolak("Kiriman tidak ditemukan. Muat ulang daftar kiriman.", 404);
+    const t = await tugasDariId(k.taskId);
+    if (!t) return tolak("Tugas kiriman ini sudah dihapus.", 404);
+    if (!bolehUbah(profile, kepemilikan(t))) return tolak("Hanya pembuat tugas ini yang dapat menilai kirimannya.", 403);
+
+    const rubrik = rubrikDari(t);
     const cek = periksaRubrikTugas(rubrik);
     if (!cek.ok) return tolak(`Rubrik belum siap: ${cek.pesan}`);
+    const tindakan = rapikanTindakan(t.plagiarismAction);
 
-    const t = (body.tugas ?? {}) as Record<string, unknown>;
-    const m = (body.mahasiswa ?? {}) as Record<string, unknown>;
-    const teks = String(body.teks ?? "");
-    if (teks.length > MAKS_TEKS_TUGAS * 1.5) return tolak("Teks tugas terlalu panjang.");
+    // ---------- GERBANG PLAGIASI ----------
+    const gerbang = gerbangPlagiasi({ status: k.similarityStatus, skor: k.similarity, putusan: k.decision }, tindakan);
+    if (!gerbang.lanjut) {
+      let baris = k;
+      if (k.status !== "dinilai" && k.status !== "ditahan") {
+        [baris] = await db.update(cbtTaskSubmissions).set({ status: "ditahan", updatedAt: new Date() })
+          .where(eq(cbtTaskSubmissions.id, k.id)).returning();
+      }
+      return Response.json(
+        { success: false, ditahan: true, message: gerbang.alasan, kiriman: kirimanKeKlien(baris, tindakan) },
+        { status: 409 },
+      );
+    }
 
+    const teks = k.markdown;
     const gambar: GambarMasuk[] = [];
     const dokumen: DokumenMasuk[] = [];
     let ukuran = 0;
@@ -97,27 +128,24 @@ export async function POST(request: Request) {
       else if (JENIS_GAMBAR.has(jenis)) gambar.push({ jenis, data });
     }
     if (!teks.trim() && gambar.length === 0 && dokumen.length === 0) {
-      return tolak("Kiriman ini tidak berisi teks maupun lampiran yang dapat dibaca.");
+      return tolak("Kiriman ini tidak berisi teks yang dapat dinilai. Unggah ulang berkas aslinya di sesi ini untuk melampirkan gambarnya.", 422);
     }
 
     const hasil = await nilaiTugas(
       {
-        tugas: {
-          mataKuliah: String(t.mataKuliah ?? "").slice(0, 200),
-          nomor: String(t.nomor ?? "").slice(0, 20),
-          nama: String(t.nama ?? "").slice(0, 300),
-          petunjuk: String(t.petunjuk ?? "").slice(0, 8000),
-        },
+        tugas: { mataKuliah: t.courseName, nomor: t.taskNo, nama: t.title, petunjuk: t.instruction },
         rubrik,
-        mahasiswa: { nama: String(m.nama ?? "").slice(0, 160), nim: String(m.nim ?? "").slice(0, 30) },
-        berkas: (Array.isArray(body.berkas) ? body.berkas : []).map((b) => String(b).slice(0, 200)).slice(0, 40),
+        mahasiswa: { nama: k.name, nim: k.nim },
+        berkas: k.fileName.split(/;\s*/).filter(Boolean).slice(0, 40),
         teks,
-        bagianTambahan: (Array.isArray(body.bagianTambahan) ? body.bagianTambahan : []).map((b) => String(b).slice(0, 200)),
+        bagianTambahan: analisisTemplate(uraiMarkdown(t.template || TEMPLATE_BAWAAN)).bagianBebas,
         keteranganLampiran: String(body.keteranganLampiran ?? "").slice(0, 300),
       },
       { gambar, dokumen },
     );
-    return Response.json({ success: true, hasil });
+    const { mentah, ...simpan } = hasil;
+    const baru = await simpanHasil(k, simpan, { disunting: false, isiIdentitas: true });
+    return Response.json({ success: true, hasil: { ...simpan, mentah }, catatanGerbang: gerbang.catatan, kiriman: kirimanKeKlien(baru, tindakan) });
   } catch (galat: unknown) {
     if (galat instanceof GalatModel) {
       return Response.json({ success: false, message: galat.message }, { status: galat.status });

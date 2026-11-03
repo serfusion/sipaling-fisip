@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { asalPortal } from "@/lib/situs-cbt";
+import { asalPortal, awalanCbt } from "@/lib/situs-cbt";
 import MasukCbt from "./masuk-cbt";
 
 export const metadata: Metadata = {
@@ -20,5 +20,5 @@ export default async function Page() {
   // server dan yang disusun peramban berbeda sesaat — dan React menjawab
   // perbedaan itu dengan membuang seluruh pohon lalu menyusunnya ulang.
   const kepala = await headers();
-  return <MasukCbt portal={asalPortal(kepala.get("host"))} />;
+  return <MasukCbt portal={asalPortal(kepala.get("host"))} awalan={awalanCbt(kepala.get("host"))} />;
 }

@@ -31,7 +31,7 @@ import KreditCbt, { KREDIT_CBT } from "./kredit";
  *   HANYA untuk tautan masuk mereka. Kosong berarti halaman ini memang sedang
  *   dibuka di portal itu sendiri, dan alamat relatif sudah benar.
  */
-export default function MasukCbt({ portal = "" }: { portal?: string }) {
+export default function MasukCbt({ portal = "", awalan = "/cbt" }: { portal?: string; awalan?: string }) {
   const router = useRouter();
   const [pintu, setPintu] = useState<"peserta" | "pengajar">("peserta");
   const [kode, setKode] = useState("");
@@ -124,6 +124,12 @@ export default function MasukCbt({ portal = "" }: { portal?: string }) {
               <button type="button" className="cbtd-btn" disabled={sibuk} onClick={() => void lanjut()}>
                 {sibuk ? "Memeriksa…" : "Lanjut"}
               </button>
+              {/* Dua pintu lain untuk peserta (v54): mengumpulkan tugas PDF
+                  dengan kode tugas, dan papan nilai tugas yang sudah terbit. */}
+              <div className="cbtd-pintu-lain">
+                <a href={`${awalan}/tugas`}><span aria-hidden="true">📤</span> Kumpulkan tugas</a>
+                <a href={`${awalan}/papan`}><span aria-hidden="true">📋</span> Papan nilai</a>
+              </div>
             </>
           ) : (
             <>

@@ -1,4 +1,5 @@
 import {
+  type AnyPgColumn,
   bigint,
   boolean,
   customType,
@@ -13,6 +14,7 @@ import {
   uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 const binary = customType<{ data: Buffer; driverData: Buffer }>({
   dataType() {
@@ -1356,4 +1358,178 @@ export const outreachAudit = pgTable("outreach_audit", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   index("idx_outreach_audit_waktu").on(t.createdAt),
+]);
+
+// ============================================================
+// CBT V54 — TUGAS: PENGUMPULAN, PLAGIASI, PAPAN NILAI, ARSIP DRIVE
+//
+// Penilaian tugas v53 tinggal sepenuhnya di peramban dosen. Itu cukup selama
+// yang mengunggah hanya dosen, dan cukup pula selama hasilnya hanya turun
+// sebagai PDF. Tiga permintaan baru mengakhiri cukupnya:
+//
+//   - mahasiswa mengumpulkan sendiri lewat CBT, jadi tugasnya harus ada di
+//     tempat yang dapat dicapai peramban MAHASISWA, bukan hanya dosennya;
+//   - tiap kiriman mendapat kode SIPALING-TUGAS-XXXXXXXX untuk melacak
+//     persoalan nilai, dan kode yang tidak tersimpan di mana pun tidak dapat
+//     dilacak;
+//   - nilai diterbitkan di papan CBT, dan papan hanya dapat membaca yang ada
+//     di server.
+//
+// BERKAS MAHASISWA TETAP TIDAK DISIMPAN. Yang disimpan teks Markdown hasil
+// pembacaannya (disusun di peramban pengirim), sidik SHA-256 berkas aslinya,
+// dan jumlah halamannya. Empat puluh PDF bergambar dapat mencapai ratusan MB;
+// empat puluh .md jarang lebih dari dua MB. Sidiknya yang menjawab "apakah PDF
+// yang saya pegang ini yang dulu saya kumpulkan" ketika nilai dipersoalkan.
+// ============================================================
+
+/**
+ * Satu tugas: pengaturan penilaian (rubrik, template, skala) dan pintu
+ * pengumpulannya.
+ *
+ * Kepemilikan mengikuti ujian CBT, dengan kolom yang sama dan aturan yang sama
+ * (pemilik() di src/lib/cbt.ts): id profil pembuat menentukan, lecturerId dan
+ * nama hanya cadangan.
+ */
+export const cbtTasks = pgTable("cbt_tasks", {
+  id: serial("id").primaryKey(),
+  /** Kode pengumpulan yang dibagikan ke kelas, mis. "K7M2QX". Bukan rahasia. */
+  code: varchar("code", { length: 12 }).notNull().unique(),
+  courseName: varchar("course_name", { length: 160 }).notNull().default(""),
+  taskNo: varchar("task_no", { length: 20 }).notNull().default(""),
+  title: varchar("title", { length: 300 }).notNull().default(""),
+  /** Petunjuk tugas untuk AI. Boleh kosong. */
+  instruction: text("instruction").notNull().default(""),
+  /** Nama dosen yang tercetak di laporan. */
+  lecturerName: varchar("lecturer_name", { length: 160 }).notNull().default(""),
+  className: varchar("class_name", { length: 80 }),
+  /** Rubrik tugas (src/lib/tugas-rubrik.ts) sebagai JSON. */
+  rubric: text("rubric").notNull().default('{"nama":"","kriteria":[]}'),
+  /** Template laporan Markdown. Kosong berarti template bawaan. */
+  template: text("template").notNull().default(""),
+  templateName: varchar("template_name", { length: 200 }).notNull().default(""),
+  /** Tangga predikat sebagai JSON. Larik kosong berarti tangga bawaan. */
+  scale: text("scale").notNull().default("[]"),
+  /** Cetak "Disusun menggunakan Software SPF" di kaki laporan. */
+  footerOn: boolean("footer_on").notNull().default(true),
+  /** Nilai di bawah angka ini merah di papan dan diberi keterangan. */
+  criticalScore: integer("critical_score").notNull().default(60),
+  /** Persen kemiripan yang mulai ditandai "perlu ditinjau". */
+  plagiarismReview: integer("plagiarism_review").notNull().default(25),
+  /** Persen kemiripan yang ditandai "terindikasi plagiasi". */
+  plagiarismHigh: integer("plagiarism_high").notNull().default(50),
+  /** Tindakan gerbang pada kemiripan tinggi: "tahan" | "nol" | "catat". */
+  plagiarismAction: varchar("plagiarism_action", { length: 20 }).notNull().default("tahan"),
+  /** Menerima kiriman lewat CBT. */
+  acceptOpen: boolean("accept_open").notNull().default(false),
+  deadlineAt: timestamp("deadline_at", { withTimezone: true }),
+  /** Nilainya tampil di papan nilai CBT. */
+  published: boolean("published").notNull().default(false),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  lecturerId: integer("lecturer_id").references(() => lecturers.id, { onDelete: "set null" }),
+  createdBy: varchar("created_by", { length: 160 }).notNull().default(""),
+  createdById: varchar("created_by_id", { length: 64 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("idx_cbt_tasks_pemilik").on(t.createdById),
+  index("idx_cbt_tasks_terbit").on(t.published, t.publishedAt),
+]);
+
+/**
+ * Satu kiriman tugas satu mahasiswa.
+ *
+ * `receipt` adalah kode SIPALING-TUGAS-XXXXXXXX. Delapan hurufnya ACAK, bukan
+ * nomor urut: kode inilah satu-satunya kunci untuk membuka keterangan nilai di
+ * papan, dan nomor urut dapat ditebak siapa saja.
+ */
+export const cbtTaskSubmissions = pgTable("cbt_task_submissions", {
+  id: serial("id").primaryKey(),
+  taskId: integer("task_id").notNull().references(() => cbtTasks.id, { onDelete: "cascade" }),
+  receipt: varchar("receipt", { length: 40 }).notNull().unique(),
+  nim: varchar("nim", { length: 32 }).notNull().default(""),
+  name: varchar("name", { length: 160 }).notNull().default(""),
+  /** "cbt" = dikumpulkan mahasiswa lewat CBT; "dosen" = diimpor dosen. */
+  source: varchar("source", { length: 12 }).notNull().default("cbt"),
+  fileName: varchar("file_name", { length: 400 }).notNull().default(""),
+  fileSize: integer("file_size").notNull().default(0),
+  /** SHA-256 (hex) berkas asli. Kosong untuk impor beberapa berkas sekaligus. */
+  fileHash: varchar("file_hash", { length: 64 }).notNull().default(""),
+  pages: integer("pages").notNull().default(0),
+  words: integer("words").notNull().default(0),
+  /** Isi kiriman sebagai Markdown. Inilah yang dinilai dan dibandingkan. */
+  markdown: text("markdown").notNull().default(""),
+  /** Persen tertinggi isi kiriman ini yang sama dengan kiriman lain. */
+  similarity: integer("similarity").notNull().default(0),
+  /** "bersih" | "rendah" | "tinjau" | "tinggi" */
+  similarityStatus: varchar("similarity_status", { length: 20 }).notNull().default("bersih"),
+  similarTo: integer("similar_to").references((): AnyPgColumn => cbtTaskSubmissions.id, { onDelete: "set null" }),
+  /** Putusan dosen atas indikasi plagiasi: "" | "lolos" | "plagiasi". */
+  decision: varchar("decision", { length: 20 }).notNull().default(""),
+  decidedBy: varchar("decided_by", { length: 160 }),
+  /** "masuk" | "dinilai" | "ditahan" | "gagal" */
+  status: varchar("status", { length: 20 }).notNull().default("masuk"),
+  score: numeric("score", { precision: 5, scale: 2 }),
+  /** Hasil penilaian (src/lib/tugas-nilai.ts) sebagai JSON, tanpa jawaban mentah model. */
+  result: text("result"),
+  /** Hasilnya sudah disunting dosen. */
+  edited: boolean("edited").notNull().default(false),
+  gradedAt: timestamp("graded_at", { withTimezone: true }),
+  submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("idx_cbt_task_sub_tugas").on(t.taskId, t.submittedAt),
+  // Satu NIM satu kiriman CBT per tugas. Impor dosen tidak ikut: nama dan
+  // NIM-nya ditebak dari nama berkas, dan tebakan yang kembar harus tetap
+  // dapat masuk supaya dosen dapat melihat lalu membetulkannya.
+  uniqueIndex("idx_cbt_task_sub_nim").on(t.taskId, t.nim).where(sql`source = 'cbt' AND nim <> ''`),
+]);
+
+/**
+ * Sepasang kiriman yang isinya sama melewati ambang bawah.
+ *
+ * Disimpan sekali per pasangan dengan subA < subB, seperti cbt_similarity.
+ * `shareA` dan `shareB` dibedakan karena kemiripan dokumen tidak setangkup:
+ * ringkasan dua halaman yang seluruhnya disalin dari makalah sepuluh halaman
+ * adalah 100% salinan, sementara makalahnya hanya 20% sama dengan ringkasan itu.
+ */
+export const cbtTaskSimilarity = pgTable("cbt_task_similarity", {
+  id: serial("id").primaryKey(),
+  taskId: integer("task_id").notNull().references(() => cbtTasks.id, { onDelete: "cascade" }),
+  subA: integer("sub_a").notNull().references(() => cbtTaskSubmissions.id, { onDelete: "cascade" }),
+  subB: integer("sub_b").notNull().references(() => cbtTaskSubmissions.id, { onDelete: "cascade" }),
+  /** max(shareA, shareB), 0–100. */
+  score: integer("score").notNull().default(0),
+  shareA: integer("share_a").notNull().default(0),
+  shareB: integer("share_b").notNull().default(0),
+  status: varchar("status", { length: 20 }).notNull().default("bersih"),
+  /** Rincian sinyal sebagai JSON, supaya angkanya dapat dijelaskan. */
+  signals: text("signals").notNull().default("{}"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("idx_cbt_task_sim_pasangan").on(t.subA, t.subB),
+  index("idx_cbt_task_sim_tugas").on(t.taskId, t.score),
+]);
+
+/**
+ * Arsip Drive: tautan Google Drive tempat hasil penilaian diarsipkan, beserta
+ * tautan pendeknya (/s/KODE) di portal.
+ *
+ * Isi tugas boleh dihapus dari portal sesudah diarsipkan; baris di sini tetap
+ * tinggal (task_id menjadi null) karena justru inilah petunjuk ke arsipnya.
+ * Karena itu pula hanya Super Admin yang boleh menghapusnya.
+ */
+export const driveArchives = pgTable("drive_archives", {
+  id: serial("id").primaryKey(),
+  code: varchar("code", { length: 16 }).notNull().unique(),
+  title: varchar("title", { length: 200 }).notNull(),
+  driveUrl: text("drive_url").notNull(),
+  note: text("note"),
+  taskId: integer("task_id").references(() => cbtTasks.id, { onDelete: "set null" }),
+  clicks: integer("clicks").notNull().default(0),
+  createdBy: varchar("created_by", { length: 160 }).notNull().default(""),
+  createdById: varchar("created_by_id", { length: 64 }),
+  createdByRole: varchar("created_by_role", { length: 40 }).notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("idx_drive_archives_waktu").on(t.createdAt),
 ]);

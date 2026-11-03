@@ -8,6 +8,7 @@ import {
   adalahHostCbt,
   asalCbt,
   asalPortal,
+  awalanCbt,
   dipakaiBersama,
   hostCbtUntuk,
   hostPortalUntuk,
@@ -106,6 +107,26 @@ sama("tautan lama /ujian ikut pindah",
 sama("dashboard tetap di portal", rencanaRute(PORTAL, "/dashboard"), { tindakan: "lewat" });
 sama("akar portal tetap portal", rencanaRute(PORTAL, "/"), { tindakan: "lewat" });
 sama("layanan lain tidak tersenggol", rencanaRute(PORTAL, "/alat"), { tindakan: "lewat" });
+
+console.log("\n== v54: PENGUMPULAN TUGAS DAN PAPAN NILAI ==");
+sama("/tugas di subdomain menampilkan pengumpulan tugas",
+  rencanaRute(CBT, "/tugas"), { tindakan: "tulis-ulang", pathname: "/cbt/tugas" });
+sama("/papan di subdomain menampilkan papan nilai",
+  rencanaRute(CBT, "/papan"), { tindakan: "tulis-ulang", pathname: "/cbt/papan" });
+sama("alamat kembar /cbt/papan dirapikan",
+  rencanaRute(CBT, "/cbt/papan"), { tindakan: "alih", host: "", pathname: "/papan" });
+sama("/cbt/tugas di portal pindah ke subdomain",
+  rencanaRute(PORTAL, "/cbt/tugas"), { tindakan: "alih", host: CBT, pathname: "/tugas" });
+sama("/papan diketik di portal tetap sampai",
+  rencanaRute(PORTAL, "/papan"), { tindakan: "alih", host: CBT, pathname: "/papan" });
+sama("tautan pendek Arsip Drive tetap di portal", rencanaRute(PORTAL, "/s/K7Q2XMP"), { tindakan: "lewat" });
+sama("tautan pendek dibuka di subdomain diantar ke portal",
+  rencanaRute(CBT, "/s/K7Q2XMP"), { tindakan: "alih", host: PORTAL, pathname: "/s/K7Q2XMP" });
+sama("/tugasku bukan /tugas", rencanaRute(PORTAL, "/tugasku"), { tindakan: "lewat" });
+sama("lokal: /cbt/papan dilayani di tempatnya", rencanaRute("localhost:3000", "/cbt/papan"), { tindakan: "lewat" });
+sama("awalan jalur di subdomain kosong", awalanCbt(CBT), "");
+sama("awalan jalur di portal /cbt", awalanCbt(PORTAL), "/cbt");
+sama("awalan jalur lokal /cbt", awalanCbt("localhost:3000"), "/cbt");
 
 console.log("\n== RUTE SAAT DIKEMBANGKAN LOKAL ==");
 sama("/cbt tetap dilayani di tempatnya", rencanaRute("localhost:3000", "/cbt"), { tindakan: "lewat" });

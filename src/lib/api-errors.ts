@@ -46,6 +46,11 @@ export function explainServerError(error: unknown, fallback: string): string {
   if (lower.includes("request_attachments")) {
     return "Tabel lampiran empat bagian belum dibuat. Jalankan supabase-update-v7-upload-4-bagian.sql di Supabase → SQL Editor.";
   }
+  // Tabel v54 (tugas lewat CBT, plagiasi, papan nilai, Arsip Drive). Diperiksa
+  // sebelum pesan umum, yang menunjuk berkas SQL pertama dan akan menyesatkan.
+  if (/cbt_tasks|cbt_task_submissions|cbt_task_similarity|drive_archives/.test(lower) && /does not exist|42p01/.test(lower)) {
+    return "Tabel tugas v54 belum dibuat. Jalankan supabase-update-v54-tugas-cbt.sql di Supabase → SQL Editor.";
+  }
   if (/relation .* does not exist|42p01/.test(lower)) {
     return "Tabel database belum dibuat. Jalankan isi file supabase-setup.sql lalu supabase-update-v2.sql di Supabase → SQL Editor.";
   }
