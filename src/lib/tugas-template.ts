@@ -37,7 +37,20 @@ import {
   ejaNilai, ejaRentang, type PredikatTugas, type RubrikTugas,
 } from "@/lib/tugas-rubrik";
 
-/** Template bawaan: persis template laporan yang dilampirkan dosen. */
+/**
+ * Kaki laporan (v54). Menggantikan "Disusun dengan bantuan AI berdasarkan
+ * rubrik dosen" atas permintaan pemilik portal. SPF = SiPaling FISIP.
+ */
+export const KAKI_SPF = "Disusun menggunakan Software SPF";
+
+/** Teks pita kepala tiap halaman laporan. */
+export const KEPALA_LAPORAN = "LAPORAN PENILAIAN TUGAS";
+
+/**
+ * Template bawaan: template laporan yang dilampirkan dosen, ditambah satu
+ * baris "Kode Kiriman" (v54) supaya laporan yang dipersoalkan dapat dilacak
+ * ke kirimannya.
+ */
 export const TEMPLATE_BAWAAN = `# **LAPORAN PENILAIAN \\[Nomor dan Nama Tugas\\]**
 
 **NAMA dan NIM**
@@ -51,6 +64,7 @@ export const TEMPLATE_BAWAAN = `# **LAPORAN PENILAIAN \\[Nomor dan Nama Tugas\\]
 | **Tugas Ke-** |  |
 | **Nama Mahasiswa** |  |
 | **Judul Proposal** |  |
+| **Kode Kiriman** |  |
 
 ## **2\\. Nilai Akhir**
 
@@ -344,6 +358,13 @@ export type DataLaporan = {
   bagianTambahan: Array<{ judul: string; isi: string }>;
   /** Mis. "2 November 2026". */
   tanggal: string;
+  /** Kode kiriman SIPALING-TUGAS-XXXXXXXX, bila kirimannya tersimpan di portal. */
+  kode?: string;
+  /**
+   * Keterangan sistem yang dicetak dalam kotak merah di bawah nilai akhir,
+   * mis. indikasi plagiasi atau nilai di bawah batas kritis.
+   */
+  keterangan?: string[];
 };
 
 /** "TUGAS 2: PROPOSAL PROGRAM PR" atau "Tugas 2: Proposal ..." menurut konteks. */
@@ -365,6 +386,7 @@ function nilaiLabel(label: string, d: DataLaporan | null): string | undefined {
   const l = polos(label).toLowerCase().replace(/[:\-–]+$/, "").trim();
   const isi = (v: string | undefined) => (d ? (v ?? "").trim() || "–" : "");
   if (!l) return undefined;
+  if (/^kode( kiriman| tugas| unik| resi)?$/.test(l)) return isi(d?.kode);
   if (/nomor dan nama tugas|nama tugas|judul tugas/.test(l)) return d ? judulTugas(d.tugas) : "";
   if (/^tugas( ke)?/.test(l)) return isi(d ? (d.tugas.nomor || d.tugas.nama) : "");
   if (/mata ?kuliah|matkul|mata uji/.test(l)) return isi(d?.tugas.mataKuliah);
@@ -390,6 +412,7 @@ function gantiPenanda(teks: string, d: DataLaporan, kapitalKonteks: boolean): st
       "nama tugas": d.tugas.nama, "judul": d.judulKarya, "nilai": ejaNilai(d.nilai),
       "predikat": d.predikat.huruf, "grade": d.predikat.huruf, "tanggal": d.tanggal,
       "dosen": d.tugas.dosen ?? "", "kelas": d.mahasiswa.kelas || d.tugas.kelas || "",
+      "kode": d.kode ?? "", "kode kiriman": d.kode ?? "",
     };
     return peta[k] !== undefined ? peta[k] : asli;
   });
@@ -429,6 +452,14 @@ export function isiTemplate(blokTemplate: BlokPdf[], d: DataLaporan): BlokPdf[] 
       const kb = polos(b.judul).toLowerCase().replace(/^[\d.a-z]\.?\s+/i, "").trim();
       return kb === k || kb.includes(k) || k.includes(kb);
     });
+  };
+
+  let keteranganTertulis = false;
+  const tulisKeterangan = () => {
+    const daftar = (d.keterangan ?? []).map((k) => k.trim()).filter(Boolean);
+    if (keteranganTertulis || !daftar.length) return;
+    keteranganTertulis = true;
+    for (const k of daftar) keluar.push({ jenis: "paragraf", teks: k, sorot: "bahaya" });
   };
 
   const isiLabel = (jenis: JenisLabel) => {
@@ -489,12 +520,15 @@ export function isiTemplate(blokTemplate: BlokPdf[], d: DataLaporan): BlokPdf[] 
         if (P_NILAI.test(p)) {
           let lbl = labelSebelumTitikDua(b.teks);
           if (!d.rataBiasa) lbl = lbl.replace(/\(\s*rata-?rata\s*\)/i, "(RATA-RATA TERBOBOT)");
-          keluar.push({ jenis: "paragraf", teks: `**${lbl}: ${nilaiTeks}**` });
+          keluar.push({ jenis: "paragraf", teks: `**${lbl}: ${nilaiTeks}**`, sorot: "nilai" });
           terpakai.nilai = true;
         } else if (P_PREDIKAT.test(p)) {
           const lbl = labelSebelumTitikDua(b.teks);
           const rentang = predikatPertama ? ` (Grade ${d.predikat.huruf}: ${ejaRentang(d.predikat)})` : "";
-          keluar.push({ jenis: "paragraf", teks: `**${lbl}: ${d.predikat.huruf}${rentang}**` });
+          keluar.push({ jenis: "paragraf", teks: `**${lbl}: ${d.predikat.huruf}${rentang}**`, sorot: "nilai" });
+          // Keterangan sistem (plagiasi, nilai kritis) tepat di bawah nilai
+          // akhir yang pertama, di tempat yang pasti dibaca.
+          if (predikatPertama) tulisKeterangan();
           predikatPertama = false;
         } else if (/^nama\s+(dan|&)\s+nim$/i.test(p)) {
           const tebal = /^\*\*/.test(b.teks.trim());
@@ -533,6 +567,7 @@ export function isiTemplate(blokTemplate: BlokPdf[], d: DataLaporan): BlokPdf[] 
             jenis: "tabel",
             lebar: [1, 2.3],
             kolomTebal: [0],
+            kolomLabel: [0],
             kepala: false,
             ukuran: 10,
             baris: b.baris.map((r) => {
@@ -554,8 +589,13 @@ export function isiTemplate(blokTemplate: BlokPdf[], d: DataLaporan): BlokPdf[] 
   // ---------- yang tidak ditemukan pada template, ditambahkan ----------
   if (!terpakai.nilai) {
     keluar.push({ jenis: "judul", tingkat: 2, teks: "Nilai Akhir" }, { jenis: "garis" });
-    keluar.push({ jenis: "paragraf", teks: `**NILAI AKHIR: ${nilaiTeks}**` });
-    keluar.push({ jenis: "paragraf", teks: `**PREDIKAT (GRADE): ${d.predikat.huruf} (Grade ${d.predikat.huruf}: ${ejaRentang(d.predikat)})**` });
+    keluar.push({ jenis: "paragraf", teks: `**NILAI AKHIR: ${nilaiTeks}**`, sorot: "nilai" });
+    keluar.push({ jenis: "paragraf", teks: `**PREDIKAT (GRADE): ${d.predikat.huruf} (Grade ${d.predikat.huruf}: ${ejaRentang(d.predikat)})**`, sorot: "nilai" });
+  }
+  // Template tanpa baris predikat pun tetap memuat keterangan sistem.
+  if (!keteranganTertulis && (d.keterangan ?? []).some((k) => k.trim())) {
+    keluar.push({ jenis: "judul", tingkat: 2, teks: "Keterangan" }, { jenis: "garis" });
+    tulisKeterangan();
   }
   if (!terpakai.rubrik) {
     keluar.push({ jenis: "judul", tingkat: 2, teks: "Rubrik Penilaian" }, { jenis: "garis" });
@@ -638,5 +678,6 @@ export function buatLaporanPdf(
     judul: `Laporan Penilaian ${judulTugas(d.tugas)} - ${d.mahasiswa.nama}`,
     penulis: d.tugas.dosen || undefined,
     kaki: opsi.kaki,
+    kepala: { kiri: KEPALA_LAPORAN, kanan: d.kode || "" },
   });
 }

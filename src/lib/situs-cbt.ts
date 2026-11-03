@@ -148,14 +148,29 @@ export function hostPortalUntuk(hostMentah: string | null | undefined): string {
 }
 
 /**
+ * Halaman situs CBT selain pintu masuk (v54: pengumpulan tugas dan papan
+ * nilai ikut tinggal di subdomain CBT, di samping layar ujian).
+ */
+const HALAMAN_CBT = ["/ujian", "/tugas", "/papan"];
+
+/**
  * Jalur yang dilayani situs CBT pada akarnya.
  *
  * Akar adalah pintu masuk, dan /ujian adalah layar ujian — alamat yang
  * sudah terlanjur dibagikan ke grup kelas sejak sebelum pindah, sehingga ia
- * wajib tetap mendarat pada ujian yang benar.
+ * wajib tetap mendarat pada ujian yang benar. /tugas adalah pengumpulan
+ * tugas, dan /papan papan nilai tugas.
  */
 export function jalurMilikCbt(pathname: string): boolean {
-  return pathname === "/" || pathname === "/ujian" || pathname.startsWith("/ujian/");
+  return pathname === "/" || HALAMAN_CBT.some((j) => pathname === j || pathname.startsWith(`${j}/`));
+}
+
+/**
+ * Awalan jalur halaman CBT pada tuan rumah ini: "" di subdomain CBT
+ * (cbt.…/tugas), "/cbt" di portal dan pengembangan lokal (…/cbt/tugas).
+ */
+export function awalanCbt(hostMentah: string | null | undefined): string {
+  return adalahHostCbt(hostMentah) ? "" : "/cbt";
 }
 
 /**
@@ -165,8 +180,7 @@ export function jalurCbtLama(pathname: string): boolean {
   return (
     pathname === "/cbt" ||
     pathname.startsWith("/cbt/") ||
-    pathname === "/ujian" ||
-    pathname.startsWith("/ujian/")
+    HALAMAN_CBT.some((j) => pathname === j || pathname.startsWith(`${j}/`))
   );
 }
 
