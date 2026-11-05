@@ -119,6 +119,12 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   // Sembunyikan header X-Powered-By agar versi framework tidak terekspos.
   poweredByHeader: false,
+  experimental: {
+    // Unggahan langsung ke penyimpanan disk server (v55) melewati middleware,
+    // yang bawaannya hanya meneruskan 10 MB badan permintaan. Berkas utuh
+    // skripsi boleh 25 MB.
+    proxyClientMaxBodySize: "30mb",
+  },
   async headers() {
     return [
       {

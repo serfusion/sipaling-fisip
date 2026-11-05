@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { requestAttachments, serviceRequests } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { createDocumentDownloadUrl } from "@/lib/document-storage";
+import { alihkanUnduhan, createDocumentDownloadUrl } from "@/lib/document-storage";
 import { canAccessServiceRequest, getCurrentProfile } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
@@ -48,7 +48,7 @@ export async function GET(
     }
 
     const signedUrl = await createDocumentDownloadUrl(attachment.fileStoragePath, attachment.fileName);
-    return Response.redirect(signedUrl, 302);
+    return alihkanUnduhan(signedUrl);
   } catch {
     return new Response("File tidak dapat diakses", { status: 500 });
   }

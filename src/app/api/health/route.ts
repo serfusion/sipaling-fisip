@@ -1,5 +1,6 @@
 import { getPool, isDatabaseConfigured } from "@/db";
-import { DOCUMENT_BUCKET } from "@/lib/document-storage";
+import { DOCUMENT_BUCKET, periksaPenyimpananDokumen } from "@/lib/document-storage";
+import { pakaiPenyimpananLokal } from "@/lib/penyimpanan-lokal";
 import { getSupabasePublishableKey, getSupabaseSecretKey, getSupabaseUrl } from "@/lib/supabase-config";
 import { createClient } from "@supabase/supabase-js";
 import { explainServerError } from "@/lib/api-errors";
@@ -55,7 +56,9 @@ export async function GET() {
   let storage: { ok: boolean; detail: string } = { ok: false, detail: "" };
   const url = getSupabaseUrl();
   const secret = getSupabaseSecretKey();
-  if (!url || !secret) {
+  if (pakaiPenyimpananLokal()) {
+    storage = await periksaPenyimpananDokumen();
+  } else if (!url || !secret) {
     storage.detail = "NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SECRET_KEY belum diatur, upload file tidak akan berjalan.";
   } else {
     try {

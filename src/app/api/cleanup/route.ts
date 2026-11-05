@@ -3,6 +3,7 @@ import { appSettings, cbtQuestions, requestAttachments, revisionUploads, service
 import { and, eq, inArray, isNotNull, lt, or, sql } from "drizzle-orm";
 import { getSupabaseSecretKey, getSupabaseUrl } from "@/lib/supabase-config";
 import { DOCUMENT_BUCKET } from "@/lib/document-storage";
+import { bucketLokal, pakaiPenyimpananLokal } from "@/lib/penyimpanan-lokal";
 import { createClient } from "@supabase/supabase-js";
 import { explainServerError } from "@/lib/api-errors";
 import { HARI_SIMPAN_MEDIA, jalurDariSoal, sapuMedia } from "@/lib/media-cbt";
@@ -53,9 +54,11 @@ export async function GET(request: Request) {
     const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 3600 * 1000);
     const url = getSupabaseUrl();
     const secretKey = getSupabaseSecretKey();
-    const storage = url && secretKey
-      ? createClient(url, secretKey, { auth: { autoRefreshToken: false, persistSession: false } }).storage.from(DOCUMENT_BUCKET)
-      : null;
+    const storage = pakaiPenyimpananLokal()
+      ? bucketLokal
+      : url && secretKey
+        ? createClient(url, secretKey, { auth: { autoRefreshToken: false, persistSession: false } }).storage.from(DOCUMENT_BUCKET)
+        : null;
 
     let filesDeleted = 0;
     let rowsCleaned = 0;
