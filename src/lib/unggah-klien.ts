@@ -179,6 +179,9 @@ function lewatXhr(izin: IzinUnggah, berkas: File, lapor?: LaporBita) {
 /** Unggah lewat pustaka Supabase. Cadangan bila XHR ditolak peramban atau
  *  perantara jaringannya (sebagian proxy kampus memperlakukan PUT berbeda). */
 async function lewatKlien(izin: IzinUnggah, berkas: File) {
+  // Izin dari penyimpanan disk server (alamat relatif /api/dokumen/…) tidak
+  // dikenal pustaka Supabase; XHR dan fetch sudah mencoba alamat yang benar.
+  if (izin.url.startsWith("/")) return "Unggahan ke penyimpanan portal gagal.";
   const klien = getSupabaseBrowserClient();
   if (!klien) return "Kunci Supabase peramban belum diatur.";
   const { error } = await klien.storage

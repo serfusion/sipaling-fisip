@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { serviceRequests } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { createDocumentDownloadUrl } from "@/lib/document-storage";
+import { alihkanUnduhan, createDocumentDownloadUrl } from "@/lib/document-storage";
 import { canAccessServiceRequest, getCurrentProfile } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
@@ -45,7 +45,7 @@ export async function GET(
 
     if (file.fileStoragePath) {
       const signedUrl = await createDocumentDownloadUrl(file.fileStoragePath, file.fileName);
-      return Response.redirect(signedUrl, 302);
+      return alihkanUnduhan(signedUrl);
     }
 
     const safeName = file.fileName.replace(/[\r\n"\\]/g, "_");

@@ -1,5 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseSecretKey, getSupabaseUrl } from "@/lib/supabase-config";
+import {
+  bucketLokal,
+  folderDokumen,
+  izinUnggahLokal,
+  kepalaLokal,
+  pakaiPenyimpananLokal,
+  urlUnduhLokal,
+} from "@/lib/penyimpanan-lokal";
 
 export const DOCUMENT_BUCKET = process.env.SUPABASE_DOCUMENT_BUCKET || "service-documents";
 export const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
@@ -54,6 +62,35 @@ function getStorageClient() {
   return klienTersimpan;
 }
 
+/**
+ * Bucket dokumen yang sedang dipakai: disk server (DOCUMENT_STORAGE=lokal,
+ * v55) atau Supabase Storage. Bentuk list/remove keduanya sama, jadi
+ * penyapu transit & pembersih memakainya tanpa membedakan.
+ */
+export function bucketDokumen() {
+  if (pakaiPenyimpananLokal()) return bucketLokal;
+  return getStorageClient().storage.from(DOCUMENT_BUCKET);
+}
+
+/** Keterangan penyimpanan untuk /api/health. */
+export async function periksaPenyimpananDokumen(): Promise<{ ok: boolean; detail: string }> {
+  if (!pakaiPenyimpananLokal()) return { ok: false, detail: "" };
+  const { promises: fs, constants } = await import("node:fs");
+  const folder = folderDokumen();
+  try {
+    await fs.mkdir(folder, { recursive: true });
+    await fs.access(folder, constants.W_OK);
+    return { ok: true, detail: `Dokumen disimpan di disk server (${folder}).` };
+  } catch (galat: unknown) {
+    return { ok: false, detail: `Folder dokumen ${folder} tidak dapat ditulis: ${galat instanceof Error ? galat.message : galat}` };
+  }
+}
+
+/** Pengalihan ke tautan unduh; tautan disk server relatif, jadi tidak lewat Response.redirect. */
+export function alihkanUnduhan(url: string) {
+  return new Response(null, { status: 302, headers: { Location: url, "Cache-Control": "private, no-store" } });
+}
+
 function safeSegment(value: string) {
   return value
     .normalize("NFKD")
@@ -103,6 +140,11 @@ export async function uploadDocument(input: {
   if (!isValidContent || !isValidContent(bytes)) {
     throw new Error("Isi file tidak sesuai dengan format " + extension.toUpperCase() + ". Silakan unggah file asli.");
   }
+  if (pakaiPenyimpananLokal()) {
+    const { error } = await bucketLokal.upload(path, bytes, { upsert: false });
+    if (error) throw new Error(`Penyimpanan dokumen gagal: ${error.message}`);
+    return path;
+  }
   const supabase = getStorageClient();
   const { error } = await supabase.storage.from(DOCUMENT_BUCKET).upload(path, bytes, {
     contentType: input.contentType,
@@ -117,6 +159,10 @@ export async function uploadDocument(input: {
 
 export async function removeDocument(path: string | null | undefined) {
   if (!path) return;
+  if (pakaiPenyimpananLokal()) {
+    await bucketLokal.remove([path]);
+    return;
+  }
   const supabase = getStorageClient();
   await supabase.storage.from(DOCUMENT_BUCKET).remove([path]);
 }
@@ -129,6 +175,7 @@ export async function removeDocument(path: string | null | undefined) {
  * tanpa melewati fungsi serverless — yang badannya dipotong pada 4,5 MB.
  */
 export async function buatIzinUnggah(path: string) {
+  if (pakaiPenyimpananLokal()) return { ...izinUnggahLokal(path), path };
   const supabase = getStorageClient();
   const { data, error } = await supabase.storage.from(DOCUMENT_BUCKET).createSignedUploadUrl(path);
   if (error || !data?.signedUrl || !data?.token) {
@@ -152,6 +199,10 @@ type KepalaObjek =
  * Range tidak dilayani.
  */
 async function bacaKepalaObjek(path: string): Promise<KepalaObjek> {
+  if (pakaiPenyimpananLokal()) {
+    const lokal = await kepalaLokal(path);
+    return lokal ? { ok: true, ...lokal } : { ok: false, sebab: "hilang" };
+  }
   const supabase = getStorageClient();
   const { data, error } = await supabase.storage.from(DOCUMENT_BUCKET).createSignedUrl(path, 60);
   if (error || !data?.signedUrl) {
@@ -288,6 +339,7 @@ export async function periksaObjekPdf(
 // berkas yang sudah diklaim tiket aman di tempatnya.
 
 export async function createDocumentDownloadUrl(path: string, fileName: string) {
+  if (pakaiPenyimpananLokal()) return urlUnduhLokal(path, 60, fileName);
   const supabase = getStorageClient();
   const { data, error } = await supabase.storage
     .from(DOCUMENT_BUCKET)

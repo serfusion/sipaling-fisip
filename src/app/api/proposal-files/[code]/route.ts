@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { titleProposalChoices, titleProposals } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
-import { createDocumentDownloadUrl } from "@/lib/document-storage";
+import { alihkanUnduhan, createDocumentDownloadUrl } from "@/lib/document-storage";
 import { getCurrentProfile } from "@/lib/supabase-server";
 import { canReviewProposals } from "@/lib/proposal-access";
 
@@ -55,7 +55,7 @@ export async function GET(
     }
 
     const signedUrl = await createDocumentDownloadUrl(proposal.path, proposal.fileName);
-    return Response.redirect(signedUrl, 302);
+    return alihkanUnduhan(signedUrl);
   } catch (error) {
     console.error("download proposal file", error);
     return new Response("Berkas tidak dapat diakses", { status: 500 });
